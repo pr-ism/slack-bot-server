@@ -1,0 +1,22 @@
+name: 공통 이슈 템플릿
+description: 일반적인 작업 및 이슈를 등록하기 위한 템플릿입니다.
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: 설명
+      description: 이슈에 대한 상세한 설명을 작성해주세요.
+      placeholder: |
+        이슈에 대한 설명을 이곳에 작성하세요.
+    validations:
+      required: true
+
+  - type: textarea
+    id: tasks
+    attributes:
+      label: 예상 Tasks
+      description: 이 이슈를 처리하기 위해 필요한 작업 목록을 작성해주세요.
+      value: |
+        - [ ]
+    validations:
+      required: false

@@ -1,0 +1,213 @@
+name: PR Automation Pipeline
+
+on:
+  pull_request:
+    types: [opened, synchronize, review_requested]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  pr-code-analysis:
+    name: PR 코드 분석
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup java
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+          cache: "gradle"
+
+      - name: chmod gradlew
+        run: chmod +x ./gradlew
+
+      - name: run jacocoTestCoverage
+        id: test
+        run: ./gradlew jacocoTestCoverage
+        continue-on-error: true
+
+      - name: set author slack id
+        if: always()
+        id: author-slack
+        run: |
+          GIT_ID="${{ github.event.pull_request.user.login }}"
+          GIT_ID_LC="${GIT_ID,,}"
+
+          AUTHOR_NAME="$GIT_ID"
+          AUTHOR_ID=""
+
+          if [ "$GIT_ID_LC" = "apptie" ]; then
+            AUTHOR_NAME="${{ secrets.APPTIE_SLACK_DISPLAY_NAME }}"
+            AUTHOR_ID="${{ secrets.APPTIE_SLACK_ID }}"
+          elif [ "$GIT_ID_LC" = "gyunnybot" ]; then
+            AUTHOR_NAME="${{ secrets.GYUNNYBOT_SLACK_DISPLAY_NAME }}"
+            AUTHOR_ID="${{ secrets.GYUNNYBOT_SLACK_ID }}"
+          elif [ "$GIT_ID_LC" = "hyns00" ]; then
+            AUTHOR_NAME="${{ secrets.HYNS00_SLACK_DISPLAY_NAME }}"
+            AUTHOR_ID="${{ secrets.HYNS00_SLACK_ID }}"
+          fi
+
+          echo "AUTHOR_GIT_ID=${GIT_ID}" >> $GITHUB_OUTPUT
+          echo "AUTHOR_NAME=${AUTHOR_NAME}" >> $GITHUB_OUTPUT
+          echo "AUTHOR_ID=${AUTHOR_ID}" >> $GITHUB_OUTPUT
+
+      - name: build reviewers
+        if: ${{ steps.test.outcome == 'success' && github.event.action == 'review_requested' }}
+        id: reviewers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          set -e
+
+          slack_mention() {
+            case "${1,,}" in
+              apptie) echo "<@${{ secrets.APPTIE_SLACK_ID }}>" ;;
+              gyunnybot) echo "<@${{ secrets.GYUNNYBOT_SLACK_ID }}>" ;;
+              hyns00) echo "<@${{ secrets.HYNS00_SLACK_ID }}>" ;;
+              *) echo "" ;;
+            esac
+          }
+
+          slack_name() {
+            case "${1,,}" in
+              apptie) echo "${{ secrets.APPTIE_SLACK_DISPLAY_NAME }}" ;;
+              gyunnybot) echo "${{ secrets.GYUNNYBOT_SLACK_DISPLAY_NAME }}" ;;
+              hyns00) echo "${{ secrets.HYNS00_SLACK_DISPLAY_NAME }}" ;;
+              *) echo "$1" ;;
+            esac
+          }
+
+          REQUESTED_JSON="$(gh api "repos/${OWNER}/${REPO}/pulls/${PR_NUMBER}/requested_reviewers" || echo '{"users":[],"teams":[]}')"
+          REVIEWS_JSON="$(gh api --paginate "repos/${OWNER}/${REPO}/pulls/${PR_NUMBER}/reviews" || echo '[]')"
+
+          req_users="$(echo "$REQUESTED_JSON" | jq -r '.users[].login?')"
+          req_teams="$(echo "$REQUESTED_JSON" | jq -r '.teams[].slug?')"
+          reviewed_users="$(echo "$REVIEWS_JSON" | jq -r '.[].user.login?' | sed '/^$/d' | sort -u)"
+
+          author_lc="${PR_AUTHOR,,}"
+
+          declare -A reqSet
+          for u in $req_users; do
+            ulc="${u,,}"
+            if [ "$ulc" != "$author_lc" ]; then
+              reqSet["$ulc"]=1
+            fi
+          done
+
+          declare -A reviewedSet
+          for u in $reviewed_users; do
+            ulc="${u,,}"
+            if [ "$ulc" != "$author_lc" ]; then
+              reviewedSet["$ulc"]="$u"
+            fi
+          done
+
+          PENDING=""
+          for u in $req_users; do
+            ulc="${u,,}"
+            if [ "$ulc" = "$author_lc" ]; then
+              continue
+            fi
+
+            m="$(slack_mention "$u")"
+            if [ -n "$m" ]; then
+              PENDING+="$m "
+            else
+              PENDING+="$(slack_name "$u") "
+            fi
+          done
+
+          for t in $req_teams; do
+            PENDING+="@${t} "
+          done
+
+          REVIEWED=""
+          for ulc in "${!reviewedSet[@]}"; do
+            if [ -n "${reqSet[$ulc]+x}" ]; then
+              continue
+            fi
+            REVIEWED+="$(slack_name "${reviewedSet[$ulc]}") "
+          done
+
+          if [ -z "$PENDING" ]; then
+            PENDING="(none)"
+          fi
+
+          if [ -z "$REVIEWED" ]; then
+            REVIEWED="(none)"
+          fi
+
+          echo "PENDING_REVIEWERS=${PENDING}" >> $GITHUB_OUTPUT
+          echo "REVIEWED_REVIEWERS=${REVIEWED}" >> $GITHUB_OUTPUT
+
+      - name: slack notification (failure)
+        if: ${{ steps.test.outcome == 'failure' }}
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          AUTHOR_NAME: ${{ steps.author-slack.outputs.AUTHOR_NAME }}
+          AUTHOR_GIT_ID: ${{ steps.author-slack.outputs.AUTHOR_GIT_ID }}
+          AUTHOR_SLACK_ID: ${{ steps.author-slack.outputs.AUTHOR_ID }}
+        run: |
+          ESCAPED_TITLE=$(echo "$PR_TITLE" | sed 's/"/\\"/g')
+
+          SLACK_MESSAGE='{"text":"PR 브랜치 분석","blocks":[{"type":"section","text":{"type":"mrkdwn","text":">*PR 브랜치 분석*\n>\n>*PR Author*\n>'
+          SLACK_MESSAGE+="$AUTHOR_NAME"
+          SLACK_MESSAGE+="\n>"
+          SLACK_MESSAGE+="($AUTHOR_GIT_ID)"
+          SLACK_MESSAGE+="\n>\n>*PR 링크*\n><"
+          SLACK_MESSAGE+="$PR_URL"
+          SLACK_MESSAGE+=">\n>\n>*PR 제목*\n>"
+          SLACK_MESSAGE+="$ESCAPED_TITLE"
+          SLACK_MESSAGE+="\n>\n>분석 결과\n>"
+          SLACK_MESSAGE+=":x:"
+          SLACK_MESSAGE+="\n>\n>*확인 요망*\n><@"
+          SLACK_MESSAGE+="$AUTHOR_SLACK_ID"
+          SLACK_MESSAGE+=">\n>\n>*상태*\n>빌드 테스트 실패"
+          SLACK_MESSAGE+='"}}]}'
+
+          curl -X POST "$SLACK_WEBHOOK" -d "${SLACK_MESSAGE}"
+
+      - name: slack notification (success)
+        if: ${{ steps.test.outcome == 'success' && github.event.action == 'review_requested' }}
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          AUTHOR_NAME: ${{ steps.author-slack.outputs.AUTHOR_NAME }}
+          AUTHOR_GIT_ID: ${{ steps.author-slack.outputs.AUTHOR_GIT_ID }}
+          PENDING_REVIEWERS: ${{ steps.reviewers.outputs.PENDING_REVIEWERS }}
+          REVIEWED_REVIEWERS: ${{ steps.reviewers.outputs.REVIEWED_REVIEWERS }}
+        run: |
+          ESCAPED_TITLE=$(echo "$PR_TITLE" | sed 's/"/\\"/g')
+
+          SLACK_MESSAGE='{"text":"PR 브랜치 분석","blocks":[{"type":"section","text":{"type":"mrkdwn","text":">*PR 브랜치 분석*\n>\n>*PR Author*\n>'
+          SLACK_MESSAGE+="$AUTHOR_NAME"
+          SLACK_MESSAGE+="\n>"
+          SLACK_MESSAGE+="($AUTHOR_GIT_ID)"
+          SLACK_MESSAGE+="\n>\n>*PR 링크*\n><"
+          SLACK_MESSAGE+="$PR_URL"
+          SLACK_MESSAGE+=">\n>\n>*PR 제목*\n>"
+          SLACK_MESSAGE+="$ESCAPED_TITLE"
+          SLACK_MESSAGE+="\n>\n>분석 결과\n>"
+          SLACK_MESSAGE+=":white_check_mark:"
+          SLACK_MESSAGE+="\n>\n>*리뷰 대기(멘션)*\n>"
+          SLACK_MESSAGE+="$PENDING_REVIEWERS"
+          SLACK_MESSAGE+="\n>\n>*리뷰 완료(표시명)*\n>"
+          SLACK_MESSAGE+="$REVIEWED_REVIEWERS"
+          SLACK_MESSAGE+='"}}]}'
+
+          curl -X POST "$SLACK_WEBHOOK" -d "${SLACK_MESSAGE}"
+
+      - name: fail job if test failed
+        if: ${{ steps.test.outcome == 'failure' }}
+        run: exit 1
