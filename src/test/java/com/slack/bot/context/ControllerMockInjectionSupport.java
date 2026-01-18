@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 public class ControllerMockInjectionSupport implements ApplicationContextInitializer<ConfigurableApplicationContext> {
 
-    private static final String BASE_PACKAGE = "com.prism.statistics";
+    private static final String BASE_PACKAGE = "com.slack.bot";
 
     @Override
     public void initialize(ConfigurableApplicationContext applicationContext) {
