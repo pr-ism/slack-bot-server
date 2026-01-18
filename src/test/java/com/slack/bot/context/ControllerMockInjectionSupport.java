@@ -90,9 +90,13 @@ public class ControllerMockInjectionSupport implements ApplicationContextInitial
     ) {
         for (String dependencyName : dependencies.keySet()) {
             Class<?> targetClass = dependencies.get(dependencyName);
-            Object mock = serviceMocks.computeIfAbsent(targetClass, k -> mock(targetClass));
+            String beanName = getBeanName(targetClass);
 
-            registerBeanDefinition(registry, getBeanName(targetClass), targetClass, mock);
+            if (!registry.containsBeanDefinition(beanName)) {
+                Object mock = serviceMocks.computeIfAbsent(targetClass, k -> mock(targetClass));
+
+                registerBeanDefinition(registry, beanName, targetClass, mock);
+            }
         }
     }
 
