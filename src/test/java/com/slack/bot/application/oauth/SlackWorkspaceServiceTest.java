@@ -6,8 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import com.slack.bot.application.oauth.dto.response.SlackTokenResponse;
 import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.infrastructure.workspace.persistence.JpaWorkspaceRepository;
-import java.util.List;
-import java.util.stream.StreamSupport;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -68,13 +67,12 @@ class SlackWorkspaceServiceTest {
         slackWorkspaceService.registerWorkspace(tokenResponse);
 
         // then
-        List<Workspace> workspaces = StreamSupport.stream(jpaWorkspaceRepository.findAll().spliterator(), false)
-                                                  .toList();
-        Workspace actual = workspaces.getFirst();
+        Optional<Workspace> actual = jpaWorkspaceRepository.findByTeamId("T123");
 
         assertAll(
-                () -> assertThat(actual.getAccessToken()).isEqualTo("xoxb-test-token"),
-                () -> assertThat(actual.getInstalledBy()).isEqualTo("U123")
+                () -> assertThat(actual).isPresent(),
+                () -> assertThat(actual.get().getAccessToken()).isEqualTo("xoxb-test-token"),
+                () -> assertThat(actual.get().getInstalledBy()).isEqualTo("U123")
         );
     }
 }
