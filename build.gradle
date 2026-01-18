@@ -35,9 +35,6 @@ dependencies {
 	implementation "io.github.openfeign.querydsl:querydsl-jpa:${queryDslVersion}"
 	annotationProcessor "io.github.openfeign.querydsl:querydsl-apt:${queryDslVersion}:jpa"
 
-	implementation 'org.springframework.boot:spring-boot-starter-security'
-	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
-
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 
