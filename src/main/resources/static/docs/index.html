@@ -463,7 +463,7 @@ Accept: application/json</code></pre>
 Content-Type: application/json;charset=UTF-8
 
 {
-  "url" : "https://slack.com/oauth/v2/authorize?client_id=client-id&amp;scope=chat:write,commands&amp;redirect_uri=https://example.com/callback"
+  "url" : "https://slack.com/oauth/v2/authorize?client_id=client-id&amp;scope=chat:write,commands&amp;redirect_uri=https://example.com/callback&amp;state=3e0b34bf-388c-4d92-a243-2585cfffd8b7"
 }</code></pre>
 </div>
 </div>
@@ -487,7 +487,7 @@ Content-Type: application/json;charset=UTF-8
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><code>url</code></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><code>String</code></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">슬랙 봇 설치 URL</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">슬랙 봇 설치 URL (state 포함)</p></td>
 </tr>
 </tbody>
 </table>
@@ -499,7 +499,7 @@ Content-Type: application/json;charset=UTF-8
 <h4 id="Callback-Code_http_request"><a class="link" href="#Callback-Code_http_request">HTTP request</a></h4>
 <div class="listingblock">
 <div class="content">
-<pre class="highlight nowrap"><code class="language-http" data-lang="http">GET /api/slack/callback?code=auth-code HTTP/1.1</code></pre>
+<pre class="highlight nowrap"><code class="language-http" data-lang="http">GET /api/slack/callback?code=auth-code&amp;state=saved-state HTTP/1.1</code></pre>
 </div>
 </div>
 </div>
@@ -527,6 +527,12 @@ Content-Type: application/json;charset=UTF-8
 <td class="tableblock halign-left valign-top"></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">슬랙에서 전달하는 OAuth 인증 코드</p></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>state</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">CSRF 방지를 위한 OAuth state 값</p></td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -537,6 +543,48 @@ Content-Type: application/json;charset=UTF-8
 <pre class="highlight nowrap"><code class="language-http" data-lang="http">HTTP/1.1 204 No Content</code></pre>
 </div>
 </div>
+</div>
+<div class="sect3">
+<h4 id="_예외_상황"><a class="link" href="#_예외_상황">예외 상황</a></h4>
+<div class="paragraph">
+<p><code>GET /install</code> 예외</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">에러 코드</th>
+<th class="tableblock halign-left valign-top">HTTP Status 이름</th>
+<th class="tableblock halign-left valign-top">HTTP Status 값</th>
+<th class="tableblock halign-left valign-top">메시지</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>A00</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UNAUTHORIZED</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">401</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">슬랙 OAuth 실패</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>A01</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UNAUTHORIZED</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">401</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">슬랙 OAuth 실패</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>A02</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UNAUTHORIZED</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">401</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">슬랙 OAuth 실패</p></td>
+</tr>
+</tbody>
+</table>
 </div>
 </div>
 </div>

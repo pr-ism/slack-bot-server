@@ -47,7 +47,7 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
     SlackWorkspaceService slackWorkspaceService;
 
     @Test
-    void 설치_URL_조회_문서화() throws Exception {
+    void 설치_URL_조회_성공_테스트() throws Exception {
         // given
         given(slackProperties.clientId()).willReturn("client-id");
         given(slackProperties.scopes()).willReturn("chat:write,commands");
@@ -87,7 +87,7 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
     }
 
     @Test
-    void 콜백_코드_수신_및_워크스페이스_등록_문서화() throws Exception {
+    void 콜백_코드_수신_성공_테스트() throws Exception {
         // given
         String code = "auth-code";
         String state = "saved-state";

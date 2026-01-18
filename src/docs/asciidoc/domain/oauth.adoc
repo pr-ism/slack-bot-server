@@ -10,3 +10,7 @@ operation::slack-oauth-controller-test/설치_url_조회_성공_테스트[snippe
 === 슬랙 봇 설치 토큰 교환 콜백
 
 operation::slack-oauth-controller-test/콜백_코드_수신_성공_테스트[snippets='http-request,query-parameters,http-response']
+
+==== 예외 상황
+
+include::{snippets}/oauth-exception-controller-test/exceptions/exception-response-fields-callbackException.adoc[]
