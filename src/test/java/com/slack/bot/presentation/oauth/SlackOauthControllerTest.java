@@ -2,7 +2,11 @@ package com.slack.bot.presentation.oauth;
 
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.get;
+import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
+import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
+import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
+import static org.springframework.restdocs.request.RequestDocumentation.queryParameters;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -18,6 +22,8 @@ import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.restdocs.payload.JsonFieldType;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @SuppressWarnings("NonAsciiCharacters")
@@ -34,7 +40,7 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
     SlackWorkspaceService slackWorkspaceService;
 
     @Test
-    void 설치_URL을_조회한다() throws Exception {
+    void 설치_URL_조회_성공_테스트() throws Exception {
         // given
         given(slackProperties.clientId()).willReturn("client-id");
         given(slackProperties.scopes()).willReturn("chat:write,commands");
@@ -48,13 +54,25 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
                                                  .toUriString();
 
         // when & then
-        mockMvc.perform(get("/api/slack/install").accept(MediaType.APPLICATION_JSON))
-               .andExpect(status().isOk())
-               .andExpect(jsonPath("$.url").value(expectedUrl));
+        ResultActions resultActions = mockMvc.perform(get("/api/slack/install").accept(MediaType.APPLICATION_JSON))
+                                             .andExpect(status().isOk())
+                                             .andExpect(jsonPath("$.url").value(expectedUrl));
+
+        설치_URL_조회_문서화(resultActions);
+    }
+
+    private void 설치_URL_조회_문서화(ResultActions resultActions) throws Exception {
+        resultActions.andDo(
+                restDocs.document(
+                        responseFields(
+                                fieldWithPath("url").type(JsonFieldType.STRING).description("슬랙 봇 설치 URL")
+                        )
+                )
+        );
     }
 
     @Test
-    void 콜백_코드를_받으면_워크스페이스를_등록한다() throws Exception {
+    void 콜백_코드_수신_성공_테스트() throws Exception {
         // given
         String code = "auth-code";
         SlackTokenResponse tokenResponse = new SlackTokenResponse(
@@ -68,7 +86,19 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
         willDoNothing().given(slackWorkspaceService).registerWorkspace(tokenResponse);
 
         // when & then
-        mockMvc.perform(get("/api/slack/callback").queryParam("code", code))
-               .andExpect(status().isNoContent());
+        ResultActions resultActions = mockMvc.perform(get("/api/slack/callback").queryParam("code", code))
+                                             .andExpect(status().isNoContent());
+
+        콜백_코드_수신_문서화(resultActions);
+    }
+
+    private void 콜백_코드_수신_문서화(ResultActions resultActions) throws Exception {
+        resultActions.andDo(
+                restDocs.document(
+                        queryParameters(
+                                parameterWithName("code").description("슬랙에서 전달하는 OAuth 인증 코드")
+                        )
+                )
+        );
     }
 }
