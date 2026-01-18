@@ -5,3 +5,12 @@ slack:
   client-secret: client-secret
   redirect-uri: redirect-url
   scopes: "chat:write,chat:write.customize,channels:read,groups:read,commands,users:read"
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: none
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:sql/schema.sql
