@@ -27,4 +27,12 @@ public record SlackTokenResponse(
 
         return Workspace.create(teamId, this.accessToken, installedBy);
     }
+
+    public String teamId() {
+        return this.team.id;
+    }
+
+    public String installedBy() {
+        return this.authedUser.id;
+    }
 }

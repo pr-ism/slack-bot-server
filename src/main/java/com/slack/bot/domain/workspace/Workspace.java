@@ -48,4 +48,12 @@ public class Workspace extends BaseTimeEntity {
         this.accessToken = accessToken;
         this.installedBy = installedBy;
     }
+
+    public void reconnect(String accessToken, String installedBy) {
+        validateAccessToken(accessToken);
+        validateInstalledBy(installedBy);
+
+        this.accessToken = accessToken;
+        this.installedBy = installedBy;
+    }
 }

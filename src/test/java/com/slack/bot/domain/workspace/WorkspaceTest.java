@@ -53,4 +53,44 @@ class WorkspaceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("슬랙 봇의 team ID는 비어 있을 수 없습니다.");
     }
+
+    @Test
+    void 워크스페이스를_재연결한다() {
+        // given
+        Workspace workspace = Workspace.create("T123", "old-token", "old-user");
+
+        // when
+        workspace.reconnect("new-token", "new-user");
+
+        // then
+        assertAll(
+                () -> assertThat(workspace.getTeamId()).isEqualTo("T123"),
+                () -> assertThat(workspace.getAccessToken()).isEqualTo("new-token"),
+                () -> assertThat(workspace.getInstalledBy()).isEqualTo("new-user")
+        );
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    void 슬랙_봇_access_token이_비어_있다면_재연결할_수_없다(String accessToken) {
+        // given
+        Workspace workspace = Workspace.create("T123", "old-token", "installer");
+
+        // when & then
+        assertThatThrownBy(() -> workspace.reconnect(accessToken, "installer"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("슬랙 봇의 access token은 비어 있을 수 없습니다.");
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    void 슬랙_봇_설치_회원이_비어_있다면_재연결할_수_없다(String installer) {
+        // given
+        Workspace workspace = Workspace.create("T123", "old-token", "installer");
+
+        // when & then
+        assertThatThrownBy(() -> workspace.reconnect("new-token", installer))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("슬랙 봇을 설치한 회원은 비어 있을 수 없습니다.");
+    }
 }

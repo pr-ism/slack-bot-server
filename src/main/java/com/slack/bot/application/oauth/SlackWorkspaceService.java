@@ -1,7 +1,6 @@
 package com.slack.bot.application.oauth;
 
 import com.slack.bot.application.oauth.dto.response.SlackTokenResponse;
-import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -15,8 +14,14 @@ public class SlackWorkspaceService {
 
     @Transactional
     public void registerWorkspace(SlackTokenResponse tokenResponse) {
-        Workspace workspace = tokenResponse.toEntity();
+        workspaceRepository.findByTeamId(tokenResponse.teamId())
+                           .ifPresentOrElse(
+                                   workspace -> workspace.reconnect(
+                                           tokenResponse.accessToken(),
+                                           tokenResponse.installedBy()
+                                   ),
+                                   () -> workspaceRepository.save(tokenResponse.toEntity())
+                           );
 
-        workspaceRepository.save(workspace);
     }
 }
