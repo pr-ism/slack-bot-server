@@ -7,7 +7,8 @@ import org.springframework.http.HttpStatus;
 public enum OauthErrorCode implements ErrorCode {
 
     SLACK_OAUTH_EMPTY_RESPONSE("A00", "슬랙 OAuth 실패", HttpStatus.UNAUTHORIZED),
-    SLACK_OAUTH_ERROR_RESPONSE("A01", "슬랙 OAuth 실패", HttpStatus.UNAUTHORIZED);
+    SLACK_OAUTH_ERROR_RESPONSE("A01", "슬랙 OAuth 실패", HttpStatus.UNAUTHORIZED),
+    SLACK_OAUTH_INVALID_STATE("A02", "슬랙 OAuth 실패", HttpStatus.UNAUTHORIZED);
 
     private final String errorCode;
     private final String message;

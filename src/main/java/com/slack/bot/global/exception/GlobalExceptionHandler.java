@@ -2,6 +2,7 @@ package com.slack.bot.global.exception;
 
 import com.slack.bot.application.oauth.exception.SlackOauthEmptyResponseException;
 import com.slack.bot.application.oauth.exception.SlackOauthErrorResponseException;
+import com.slack.bot.application.oauth.exception.SlackOauthInvalidStateException;
 import com.slack.bot.global.exception.dto.response.OauthErrorCode;
 import com.slack.bot.global.exception.dto.response.DefaultErrorCode;
 import com.slack.bot.global.exception.dto.response.ErrorCode;
@@ -42,6 +43,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.info("SlackOauthErrorResponseException : {}", ex.getMessage());
 
         return createResponseEntity(OauthErrorCode.SLACK_OAUTH_ERROR_RESPONSE);
+    }
+
+    @ExceptionHandler(SlackOauthInvalidStateException.class)
+    public ResponseEntity<ExceptionResponse> handleSlackOauthInvalidStateException(SlackOauthInvalidStateException ex) {
+        log.info("SlackOauthInvalidStateException : {}", ex.getMessage());
+
+        return createResponseEntity(OauthErrorCode.SLACK_OAUTH_INVALID_STATE);
     }
 
     private ResponseEntity<ExceptionResponse> createResponseEntity(ErrorCode errorCode) {
