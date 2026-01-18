@@ -1,6 +1,7 @@
 package com.slack.bot.application.oauth.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.slack.bot.domain.workspace.Workspace;
 
 public record SlackTokenResponse(
         boolean ok,
@@ -18,5 +19,9 @@ public record SlackTokenResponse(
     }
 
     public record AuthedUser(String id) {
+    }
+
+    public Workspace toEntity() {
+        return Workspace.create(this.accessToken, this.authedUser.id);
     }
 }
