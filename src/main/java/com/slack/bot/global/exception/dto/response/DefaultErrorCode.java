@@ -6,7 +6,8 @@ import org.springframework.http.HttpStatus;
 @Getter
 public enum DefaultErrorCode implements ErrorCode {
 
-    UNKNOWN_SERVER_EXCEPTION("D00", "서버 에러", HttpStatus.INTERNAL_SERVER_ERROR);
+    UNKNOWN_SERVER_EXCEPTION("D00", "서버 에러", HttpStatus.INTERNAL_SERVER_ERROR),
+    INVALID_INPUT("D01", "유효하지 않은 입력", HttpStatus.BAD_REQUEST);
 
     private final String errorCode;
     private final String message;

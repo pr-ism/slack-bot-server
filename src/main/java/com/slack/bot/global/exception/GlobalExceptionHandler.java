@@ -23,6 +23,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return createResponseEntity(DefaultErrorCode.UNKNOWN_SERVER_EXCEPTION);
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ExceptionResponse> handleIllegalArgumentException(IllegalArgumentException ex) {
+        log.info("IllegalArgumentException : {}", ex.getMessage());
+
+        return createResponseEntity(DefaultErrorCode.INVALID_INPUT);
+    }
+
     @ExceptionHandler(SlackOauthEmptyResponseException.class)
     public ResponseEntity<ExceptionResponse> handleSlackOauthEmptyResponseException(SlackOauthEmptyResponseException ex) {
         log.info("SlackOauthEmptyResponseException : {}", ex.getMessage());
