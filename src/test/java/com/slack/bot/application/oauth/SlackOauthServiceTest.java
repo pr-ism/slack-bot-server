@@ -7,6 +7,7 @@ import static org.springframework.http.HttpMethod.POST;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 
 import com.slack.bot.application.oauth.dto.response.SlackTokenResponse;
 import com.slack.bot.application.oauth.exception.SlackOauthEmptyResponseException;
@@ -17,9 +18,11 @@ import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.ResourceAccessException;
 
 @SpringBootTest
 @SuppressWarnings("NonAsciiCharacters")
@@ -89,6 +92,57 @@ class SlackOauthServiceTest {
                 () -> assertThatThrownBy(() -> slackOauthService.exchangeCodeForToken("auth-code"))
                         .isInstanceOf(SlackOauthErrorResponseException.class)
                         .hasMessageContaining("요청에 실패했습니다."),
+                () -> mockServer.verify()
+        );
+    }
+
+    @Test
+    void 슬랙_API_HTTP_오류_응답이면_OAuth_예외로_변환한다() {
+        // given
+        mockServer.expect(requestTo("https://slack.com/api/oauth.v2.access"))
+                  .andExpect(method(POST))
+                  .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+
+        // when & then
+        assertAll(
+                () -> assertThatThrownBy(() -> slackOauthService.exchangeCodeForToken("auth-code"))
+                        .isInstanceOf(SlackOauthErrorResponseException.class)
+                        .hasMessageContaining("HTTP 응답 : 429 Too Many Requests"),
+                () -> mockServer.verify()
+        );
+    }
+
+    @Test
+    void 슬랙_API_500_응답이면_OAuth_예외로_변환한다() {
+        // given
+        mockServer.expect(requestTo("https://slack.com/api/oauth.v2.access"))
+                  .andExpect(method(POST))
+                  .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+
+        // when & then
+        assertAll(
+                () -> assertThatThrownBy(() -> slackOauthService.exchangeCodeForToken("auth-code"))
+                        .isInstanceOf(SlackOauthErrorResponseException.class)
+                        .hasMessageContaining("500 Internal Server Error"),
+                () -> mockServer.verify()
+        );
+    }
+
+    @Test
+    void 슬랙_API_요청_타임아웃_발생시_OAuth_예외로_변환한다() {
+        // given
+        mockServer.expect(requestTo("https://slack.com/api/oauth.v2.access"))
+                  .andExpect(method(POST))
+                  .andRespond(invocation -> {
+                      throw new ResourceAccessException("connect timed out");
+                  });
+
+        // when & then
+        assertAll(
+                () -> assertThatThrownBy(() -> slackOauthService.exchangeCodeForToken("auth-code"))
+                        .isInstanceOf(SlackOauthErrorResponseException.class)
+                        .hasMessageContaining("네트워크 오류")
+                        .hasRootCauseInstanceOf(ResourceAccessException.class),
                 () -> mockServer.verify()
         );
     }
