@@ -1,5 +1,6 @@
 package com.slack.bot.context;
 
+import org.mockito.Mockito;
 import org.mockito.internal.util.MockUtil;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.TestContext;
@@ -14,7 +15,7 @@ public class ResetMockTestExecutionListener implements TestExecutionListener {
 
         for (String beanDefinitionName : beanDefinitionNames) {
             Object bean = applicationContext.getBean(beanDefinitionName);
-            if (MockUtil.isMock(bean)) {
+            if (Mockito.mockingDetails(bean).isMock()) {
                 MockUtil.resetMock(bean);
             }
         }
