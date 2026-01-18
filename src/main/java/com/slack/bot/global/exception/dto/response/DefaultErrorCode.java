@@ -6,18 +6,15 @@ import org.springframework.http.HttpStatus;
 @Getter
 public enum DefaultErrorCode implements ErrorCode {
 
-    UNKNOWN_SERVER_EXCEPTION("서버 에러", HttpStatus.INTERNAL_SERVER_ERROR);
+    UNKNOWN_SERVER_EXCEPTION("D00", "서버 에러", HttpStatus.INTERNAL_SERVER_ERROR);
 
+    private final String errorCode;
     private final String message;
     private final HttpStatus httpStatus;
 
-    DefaultErrorCode(String message, HttpStatus httpStatus) {
+    DefaultErrorCode(String errorCode, String message, HttpStatus httpStatus) {
+        this.errorCode = errorCode;
         this.message = message;
         this.httpStatus = httpStatus;
-    }
-
-    @Override
-    public String getErrorCode() {
-        return this.name();
     }
 }

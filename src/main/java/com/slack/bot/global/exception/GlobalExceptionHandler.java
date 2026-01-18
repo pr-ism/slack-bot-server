@@ -24,12 +24,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     @ExceptionHandler(SlackOauthEmptyResponseException.class)
-    public ResponseEntity<ExceptionResponse> handleSlackOauthEmptyResponseException() {
+    public ResponseEntity<ExceptionResponse> handleSlackOauthEmptyResponseException(SlackOauthEmptyResponseException ex) {
+        log.info("SlackOauthEmptyResponseException : {}", ex.getMessage());
+
         return createResponseEntity(OauthErrorCode.SLACK_OAUTH_EMPTY_RESPONSE);
     }
 
     @ExceptionHandler(SlackOauthErrorResponseException.class)
-    public ResponseEntity<ExceptionResponse> handleSlackOauthErrorResponseException() {
+    public ResponseEntity<ExceptionResponse> handleSlackOauthErrorResponseException(SlackOauthErrorResponseException ex) {
+        log.info("SlackOauthErrorResponseException : {}", ex.getMessage());
+
         return createResponseEntity(OauthErrorCode.SLACK_OAUTH_ERROR_RESPONSE);
     }
 
