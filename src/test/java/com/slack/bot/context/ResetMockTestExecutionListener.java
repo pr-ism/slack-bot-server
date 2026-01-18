@@ -8,7 +8,7 @@ import org.springframework.test.context.TestExecutionListener;
 public class ResetMockTestExecutionListener implements TestExecutionListener {
 
     @Override
-    public void beforeTestMethod(TestContext testContext) throws Exception {
+    public void beforeTestMethod(TestContext testContext) {
         ApplicationContext applicationContext = testContext.getApplicationContext();
         String[] beanDefinitionNames = applicationContext.getBeanDefinitionNames();
 
