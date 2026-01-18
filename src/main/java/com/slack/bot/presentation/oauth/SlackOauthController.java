@@ -65,8 +65,9 @@ public class SlackOauthController {
 
     private void validateState(HttpSession session, String state) {
         String storedState = (String) session.getAttribute(OAUTH_STATE_SESSION_ATTRIBUTE);
+
         if (storedState == null || !storedState.equals(state)) {
-            throw new SlackOauthInvalidStateException("유효하지 않은 OAuth 상태입니다.");
+            throw new SlackOauthInvalidStateException();
         }
     }
 
