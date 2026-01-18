@@ -13,14 +13,22 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Workspace extends BaseTimeEntity {
 
+    private String teamId;
     private String accessToken;
     private String installedBy;
 
-    public static Workspace create(String accessToken, String installedBy) {
+    public static Workspace create(String teamId, String accessToken, String installedBy) {
+        validateTeamId(teamId);
         validateAccessToken(accessToken);
         validateInstalledBy(installedBy);
 
-        return new Workspace(accessToken, installedBy);
+        return new Workspace(teamId, accessToken, installedBy);
+    }
+
+    private static void validateTeamId(String teamId) {
+        if (teamId == null || teamId.isBlank()) {
+            throw new IllegalArgumentException("슬랙 봇의 team ID는 비어 있을 수 없습니다.");
+        }
     }
 
     private static void validateAccessToken(String accessToken) {
@@ -35,7 +43,8 @@ public class Workspace extends BaseTimeEntity {
         }
     }
 
-    private Workspace(String accessToken, String installedBy) {
+    private Workspace(String teamId, String accessToken, String installedBy) {
+        this.teamId = teamId;
         this.accessToken = accessToken;
         this.installedBy = installedBy;
     }
