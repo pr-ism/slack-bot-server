@@ -8,6 +8,7 @@ import com.slack.bot.global.config.properties.SlackProperties;
 import com.slack.bot.presentation.common.ResponseEntityConst;
 import com.slack.bot.presentation.oauth.dto.response.SlackInstallUrlResponse;
 import jakarta.servlet.http.HttpSession;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -57,7 +58,7 @@ public class SlackOauthController {
     }
 
     private String generateAndStoreState(HttpSession session) {
-        String state = java.util.UUID.randomUUID().toString();
+        String state = UUID.randomUUID().toString();
 
         session.setAttribute(OAUTH_STATE_SESSION_ATTRIBUTE, state);
         return state;
