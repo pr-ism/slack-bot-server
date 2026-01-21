@@ -54,7 +54,7 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
         given(slackProperties.redirectUri()).willReturn("https://example.com/callback");
 
         // when & then
-        ResultActions resultActions = mockMvc.perform(get("/api/slack/install").accept(MediaType.APPLICATION_JSON))
+        ResultActions resultActions = mockMvc.perform(get("/slack/install").accept(MediaType.APPLICATION_JSON))
                                              .andExpect(status().isOk())
                                              .andExpect(jsonPath("$.url", containsString("state=")));
 
@@ -105,7 +105,7 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
 
         // when & then
         ResultActions resultActions = mockMvc.perform(
-                        get("/api/slack/callback")
+                        get("/slack/callback")
                                 .queryParam("code", code)
                                 .queryParam("state", state)
                                 .session(session)
@@ -147,7 +147,7 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
 
         // when & then
         mockMvc.perform(
-                        get("/api/slack/callback")
+                        get("/slack/callback")
                                 .queryParam("code", code)
                                 .queryParam("state", state)
                                 .session(session)
@@ -165,7 +165,7 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
 
         // when & then
         mockMvc.perform(
-                        get("/api/slack/callback")
+                        get("/slack/callback")
                                 .queryParam("code", "auth-code")
                                 .queryParam("state", "wrong-state")
                                 .session(session)
@@ -183,7 +183,7 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
 
         // when & then
         mockMvc.perform(
-                        get("/api/slack/callback")
+                        get("/slack/callback")
                                 .queryParam("code", "auth-code")
                                 .session(session)
                 )
