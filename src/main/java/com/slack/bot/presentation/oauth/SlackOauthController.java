@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @RestController
-@RequestMapping("/api/slack")
+@RequestMapping("/slack")
 @RequiredArgsConstructor
 public class SlackOauthController {
 
