@@ -16,7 +16,10 @@ public class RegisterWorkspaceService {
     public void registerWorkspace(SlackTokenResponse tokenResponse, Long userId) {
         workspaceRepository.findByTeamId(tokenResponse.teamId())
                            .ifPresentOrElse(
-                                   workspace -> workspace.reconnect(tokenResponse.accessToken()),
+                                   workspace -> workspace.reconnect(
+                                           tokenResponse.accessToken(),
+                                           tokenResponse.botUserId()
+                                   ),
                                    () -> workspaceRepository.save(tokenResponse.toEntity(userId))
                            );
 

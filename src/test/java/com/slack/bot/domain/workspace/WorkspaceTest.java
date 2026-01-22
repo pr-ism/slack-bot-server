@@ -10,7 +10,6 @@ import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
-import org.junit.jupiter.params.provider.NullSource;
 
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
@@ -32,6 +31,18 @@ class WorkspaceTest {
                 () -> assertThat(actual.getBotUserId()).isEqualTo("test-bot-user"),
                 () -> assertThat(actual.getUserId()).isEqualTo(1L)
         );
+    }
+
+    @Test
+    void 회원_ID가_비어_있다면_워크스페이스를_초기화_할_수_없다() {
+        assertThatThrownBy(() -> Workspace.builder()
+                                          .teamId("T123")
+                                          .accessToken("accessToken")
+                                          .botUserId("bot-user")
+                                          .userId(null)
+                                          .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("워크스페이스 생성 회원 ID는 비어 있을 수 없습니다.");
     }
 
     @ParameterizedTest
@@ -73,13 +84,13 @@ class WorkspaceTest {
                                        .build();
 
         // when
-        workspace.reconnect("new-token");
+        workspace.reconnect("new-token", "new-bot-user");
 
         // then
         assertAll(
                 () -> assertThat(workspace.getTeamId()).isEqualTo("T123"),
                 () -> assertThat(workspace.getAccessToken()).isEqualTo("new-token"),
-                () -> assertThat(workspace.getBotUserId()).isEqualTo("test-bot-user")
+                () -> assertThat(workspace.getBotUserId()).isEqualTo("new-bot-user")
         );
     }
 
@@ -95,9 +106,26 @@ class WorkspaceTest {
                                        .build();
 
         // when & then
-        assertThatThrownBy(() -> workspace.reconnect(accessToken))
+        assertThatThrownBy(() -> workspace.reconnect(accessToken, "new-bot-user"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("슬랙 봇의 access token은 비어 있을 수 없습니다.");
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    void 슬랙_봇_user_id가_비어_있다면_재연결할_수_없다(String botUserId) {
+        // given
+        Workspace workspace = Workspace.builder()
+                                       .teamId("T123")
+                                       .accessToken("old-token")
+                                       .botUserId("test-bot-user")
+                                       .userId(1L)
+                                       .build();
+
+        // when & then
+        assertThatThrownBy(() -> workspace.reconnect("new-token", botUserId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("슬랙 봇의 user ID는 비어 있을 수 없습니다.");
     }
 
     @ParameterizedTest
@@ -111,18 +139,5 @@ class WorkspaceTest {
                                           .build())
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("슬랙 봇의 user ID는 비어 있을 수 없습니다.");
-    }
-
-    @ParameterizedTest
-    @NullSource
-    void 워크스페이스_생성_회원_ID가_null이면_워크스페이스를_초기화할_수_없다(Long userId) {
-        assertThatThrownBy(() -> Workspace.builder()
-                                          .teamId("T123")
-                                          .accessToken("accessToken")
-                                          .botUserId("bot-user")
-                                          .userId(userId)
-                                          .build())
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("워크스페이스 생성 회원 ID는 비어 있을 수 없습니다.");
     }
 }

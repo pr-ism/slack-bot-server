@@ -56,9 +56,11 @@ public class Workspace extends BaseTimeEntity {
         }
     }
 
-    public void reconnect(String accessToken) {
+    public void reconnect(String accessToken, String botUserId) {
         validateAccessToken(accessToken);
+        validateBotUserId(botUserId);
 
         this.accessToken = accessToken;
+        this.botUserId = botUserId;
     }
 }
