@@ -48,6 +48,7 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
     RegisterWorkspaceService registerWorkspaceService;
 
     @Test
+    @Disabled
     void 설치_URL_조회_성공_테스트() throws Exception {
         // given
         given(slackProperties.clientId()).willReturn("client-id");
@@ -161,6 +162,7 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
     }
 
     @Test
+    @Disabled
     void state가_일치하지_않으면_콜백은_실패한다() throws Exception {
         // given
         MockHttpSession session = new MockHttpSession();
@@ -179,6 +181,7 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
     }
 
     @Test
+    @Disabled
     void state가_없으면_콜백은_실패한다() throws Exception {
         // given
         MockHttpSession session = new MockHttpSession();

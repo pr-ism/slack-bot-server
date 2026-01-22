@@ -28,7 +28,8 @@ public class OauthExceptionController extends CommonExceptionController {
         return registerExceptionContent(
                 OauthErrorCode.SLACK_OAUTH_EMPTY_RESPONSE,
                 OauthErrorCode.SLACK_OAUTH_ERROR_RESPONSE,
-                OauthErrorCode.SLACK_OAUTH_INVALID_STATE
+                OauthErrorCode.SLACK_OAUTH_EXPIRED_STATE,
+                OauthErrorCode.SLACK_OAUTH_NOT_FOUND_STATE
         );
     }
 }
