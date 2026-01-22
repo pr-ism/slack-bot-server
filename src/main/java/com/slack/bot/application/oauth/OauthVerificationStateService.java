@@ -24,7 +24,7 @@ public class OauthVerificationStateService {
     @Transactional
     public String generateSlackOauthState(Long userId) {
         String state = UUID.randomUUID().toString();
-        LocalDateTime expiresAt = LocalDateTime.now()
+        LocalDateTime expiresAt = LocalDateTime.now(clock)
                                                .plus(STATE_TTL);
         OauthVerificationState oauthVerificationState = OauthVerificationState.create(userId, state, expiresAt);
 
