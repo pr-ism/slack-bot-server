@@ -15,7 +15,7 @@ import org.springframework.web.client.RestClientResponseException;
 
 @Service
 @RequiredArgsConstructor
-public class SlackOauthService {
+public class OauthService {
 
     private final SlackProperties slackProperties;
     private final RestClient.Builder slackRestClientBuilder;

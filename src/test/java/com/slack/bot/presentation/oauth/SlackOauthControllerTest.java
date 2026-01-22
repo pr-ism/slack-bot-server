@@ -14,8 +14,8 @@ import static org.springframework.restdocs.request.RequestDocumentation.queryPar
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.slack.bot.application.oauth.SlackOauthService;
-import com.slack.bot.application.oauth.SlackWorkspaceService;
+import com.slack.bot.application.oauth.OauthService;
+import com.slack.bot.application.oauth.RegisterWorkspaceService;
 import com.slack.bot.application.oauth.dto.response.SlackTokenResponse;
 import com.slack.bot.application.oauth.dto.response.SlackTokenResponse.AuthedUser;
 import com.slack.bot.application.oauth.dto.response.SlackTokenResponse.Team;
@@ -41,10 +41,10 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
     SlackProperties slackProperties;
 
     @Autowired
-    SlackOauthService slackOauthService;
+    OauthService oauthService;
 
     @Autowired
-    SlackWorkspaceService slackWorkspaceService;
+    RegisterWorkspaceService registerWorkspaceService;
 
     @Test
     void 설치_URL_조회_성공_테스트() throws Exception {
@@ -100,8 +100,8 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute("SLACK_OAUTH_STATE", state);
 
-        given(slackOauthService.exchangeCodeForToken(code)).willReturn(tokenResponse);
-        willDoNothing().given(slackWorkspaceService).registerWorkspace(tokenResponse);
+        given(oauthService.exchangeCodeForToken(code)).willReturn(tokenResponse);
+        willDoNothing().given(registerWorkspaceService).registerWorkspace(tokenResponse);
 
         // when & then
         ResultActions resultActions = mockMvc.perform(
@@ -140,9 +140,9 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute("SLACK_OAUTH_STATE", state);
 
-        given(slackOauthService.exchangeCodeForToken(code)).willReturn(tokenResponse);
+        given(oauthService.exchangeCodeForToken(code)).willReturn(tokenResponse);
         willThrow(new IllegalArgumentException("슬랙 봇의 team ID는 비어 있을 수 없습니다."))
-                .given(slackWorkspaceService)
+                .given(registerWorkspaceService)
                 .registerWorkspace(tokenResponse);
 
         // when & then

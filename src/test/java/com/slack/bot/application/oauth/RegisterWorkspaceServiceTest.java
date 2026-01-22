@@ -18,10 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 @IntegrationTest
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
-class SlackWorkspaceServiceTest {
+class RegisterWorkspaceServiceTest {
 
     @Autowired
-    SlackWorkspaceService slackWorkspaceService;
+    RegisterWorkspaceService registerWorkspaceService;
 
     @Autowired
     JpaWorkspaceRepository jpaWorkspaceRepository;
@@ -40,7 +40,7 @@ class SlackWorkspaceServiceTest {
         );
 
         // when
-        slackWorkspaceService.registerWorkspace(tokenResponse);
+        registerWorkspaceService.registerWorkspace(tokenResponse);
 
         // then
         Optional<Workspace> actual = jpaWorkspaceRepository.findByTeamId("T123");
@@ -63,7 +63,7 @@ class SlackWorkspaceServiceTest {
         );
 
         // when
-        slackWorkspaceService.registerWorkspace(tokenResponse);
+        registerWorkspaceService.registerWorkspace(tokenResponse);
 
         // then
         Optional<Workspace> actual = jpaWorkspaceRepository.findByTeamId("T123");

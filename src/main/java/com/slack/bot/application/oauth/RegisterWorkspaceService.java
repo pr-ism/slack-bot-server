@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-public class SlackWorkspaceService {
+public class RegisterWorkspaceService {
 
     private final WorkspaceRepository workspaceRepository;
 

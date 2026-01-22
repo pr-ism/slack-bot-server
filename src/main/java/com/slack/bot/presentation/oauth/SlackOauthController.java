@@ -1,7 +1,7 @@
 package com.slack.bot.presentation.oauth;
 
-import com.slack.bot.application.oauth.SlackOauthService;
-import com.slack.bot.application.oauth.SlackWorkspaceService;
+import com.slack.bot.application.oauth.OauthService;
+import com.slack.bot.application.oauth.RegisterWorkspaceService;
 import com.slack.bot.application.oauth.dto.response.SlackTokenResponse;
 import com.slack.bot.application.oauth.exception.SlackOauthInvalidStateException;
 import com.slack.bot.global.config.properties.SlackProperties;
@@ -25,8 +25,8 @@ public class SlackOauthController {
     private static final String OAUTH_STATE_SESSION_ATTRIBUTE = "SLACK_OAUTH_STATE";
 
     private final SlackProperties slackProperties;
-    private final SlackOauthService slackOauthService;
-    private final SlackWorkspaceService slackWorkspaceService;
+    private final OauthService oauthService;
+    private final RegisterWorkspaceService registerWorkspaceService;
 
     @GetMapping("/install")
     public ResponseEntity<SlackInstallUrlResponse> installUrl(HttpSession session) {
@@ -50,9 +50,9 @@ public class SlackOauthController {
             HttpSession session
     ) {
         validateState(session, state);
-        SlackTokenResponse tokenResponse = slackOauthService.exchangeCodeForToken(code);
+        SlackTokenResponse tokenResponse = oauthService.exchangeCodeForToken(code);
 
-        slackWorkspaceService.registerWorkspace(tokenResponse);
+        registerWorkspaceService.registerWorkspace(tokenResponse);
         clearState(session);
         return ResponseEntityConst.NO_CONTENT;
     }
