@@ -23,7 +23,7 @@ class WorkspaceTest {
         assertAll(
                 () -> assertThat(actual.getTeamId()).isEqualTo("T123"),
                 () -> assertThat(actual.getAccessToken()).isEqualTo("accessToken"),
-                () -> assertThat(actual.getInstalledBy()).isEqualTo("installer")
+                () -> assertThat(actual.getInstallerId()).isEqualTo("installer")
         );
     }
 
@@ -66,7 +66,7 @@ class WorkspaceTest {
         assertAll(
                 () -> assertThat(workspace.getTeamId()).isEqualTo("T123"),
                 () -> assertThat(workspace.getAccessToken()).isEqualTo("new-token"),
-                () -> assertThat(workspace.getInstalledBy()).isEqualTo("new-user")
+                () -> assertThat(workspace.getInstallerId()).isEqualTo("new-user")
         );
     }
 

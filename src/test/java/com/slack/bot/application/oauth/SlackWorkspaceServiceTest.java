@@ -49,7 +49,7 @@ class SlackWorkspaceServiceTest {
         assertAll(
                 () -> assertThat(jpaWorkspaceRepository.count()).isEqualTo(1),
                 () -> assertThat(actual.getAccessToken()).isEqualTo("xoxb-new-token"),
-                () -> assertThat(actual.getInstalledBy()).isEqualTo("U456")
+                () -> assertThat(actual.getInstallerId()).isEqualTo("U456")
         );
     }
 
@@ -72,7 +72,7 @@ class SlackWorkspaceServiceTest {
         assertAll(
                 () -> assertThat(actual).isPresent(),
                 () -> assertThat(actual.get().getAccessToken()).isEqualTo("xoxb-test-token"),
-                () -> assertThat(actual.get().getInstalledBy()).isEqualTo("U123")
+                () -> assertThat(actual.get().getInstallerId()).isEqualTo("U123")
         );
     }
 }

@@ -15,7 +15,7 @@ public class Workspace extends BaseTimeEntity {
 
     private String teamId;
     private String accessToken;
-    private String installedBy;
+    private String installerId;
 
     public static Workspace create(String teamId, String accessToken, String installedBy) {
         validateTeamId(teamId);
@@ -43,10 +43,10 @@ public class Workspace extends BaseTimeEntity {
         }
     }
 
-    private Workspace(String teamId, String accessToken, String installedBy) {
+    private Workspace(String teamId, String accessToken, String installerId) {
         this.teamId = teamId;
         this.accessToken = accessToken;
-        this.installedBy = installedBy;
+        this.installerId = installerId;
     }
 
     public void reconnect(String accessToken, String installedBy) {
@@ -54,6 +54,6 @@ public class Workspace extends BaseTimeEntity {
         validateInstalledBy(installedBy);
 
         this.accessToken = accessToken;
-        this.installedBy = installedBy;
+        this.installerId = installedBy;
     }
 }
