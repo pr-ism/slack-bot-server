@@ -1,0 +1,7 @@
+slack:
+  bot-token: bot-token
+  signing-secret: signing-secret
+  client-id: client-id
+  client-secret: client-secret
+  redirect-uri: redirect-url
+  scopes: "chat:write,chat:write.customize,channels:read,groups:read,commands,users:read"
