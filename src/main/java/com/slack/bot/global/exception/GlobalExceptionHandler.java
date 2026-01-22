@@ -1,5 +1,6 @@
 package com.slack.bot.global.exception;
 
+import com.slack.bot.application.oauth.exception.EmptyAccessTokenException;
 import com.slack.bot.application.oauth.exception.ExpiredSlackOauthStateException;
 import com.slack.bot.application.oauth.exception.SlackOauthEmptyResponseException;
 import com.slack.bot.application.oauth.exception.SlackOauthErrorResponseException;
@@ -71,6 +72,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.info("InvalidTokenException : {}", ex.getMessage());
 
         return createResponseEntity(AuthErrorCode.INVALID_TOKEN);
+    }
+
+    @ExceptionHandler(EmptyAccessTokenException.class)
+    public ResponseEntity<Object> handleEmptyAccessTokenException(EmptyAccessTokenException ex) {
+        log.info("EmptyAccessTokenException : {}", ex.getMessage());
+
+        return createResponseEntity(AuthErrorCode.EMPTY_TOKEN);
     }
 
     @Override

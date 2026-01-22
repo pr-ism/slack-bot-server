@@ -6,7 +6,8 @@ import org.springframework.http.HttpStatus;
 @Getter
 public enum AuthErrorCode implements ErrorCode {
 
-    INVALID_TOKEN("A00", "유효하지 않은 토큰", HttpStatus.UNAUTHORIZED);
+    INVALID_TOKEN("A00", "유효하지 않은 토큰", HttpStatus.UNAUTHORIZED),
+    EMPTY_TOKEN("A01", "유효하지 않은 토큰", HttpStatus.UNAUTHORIZED);
 
     private final String errorCode;
     private final String message;

@@ -30,7 +30,8 @@ public class OauthExceptionController extends CommonExceptionController {
     private Map<String, ExceptionContent> registerInstallException() {
         return registerExceptionContent(
                 DefaultErrorCode.EMPTY_REQUIRED_PARAMETER,
-                AuthErrorCode.INVALID_TOKEN
+                AuthErrorCode.INVALID_TOKEN,
+                AuthErrorCode.EMPTY_TOKEN
         );
     }
 
