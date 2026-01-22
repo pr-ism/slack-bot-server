@@ -35,7 +35,7 @@ class TokenParsingServiceTest {
         given(tokenDecoder.decode(TokenType.ACCESS, "access-token")).willReturn(claims);
 
         // when
-        Long actual = tokenParsingService.encode("access-token");
+        Long actual = tokenParsingService.extractUserId("access-token");
 
         // then
         assertThat(actual).isEqualTo(42L);
@@ -45,7 +45,7 @@ class TokenParsingServiceTest {
     @NullAndEmptySource
     void access_token이_비어있다면_디코딩할_수_없다(String accessToken) {
         // when & then
-        assertThatThrownBy(() -> tokenParsingService.encode(accessToken))
+        assertThatThrownBy(() -> tokenParsingService.extractUserId(accessToken))
                 .isInstanceOf(EmptyAccessTokenException.class)
                 .hasMessage("access token이 비어 있습니다.");
     }

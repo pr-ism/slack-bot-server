@@ -33,7 +33,7 @@ public class SlackOauthController {
     public ResponseEntity<SlackInstallUrlResponse> getInstallUrl(
             @CookieValue(value = "accessToken") String accessToken
     ) {
-        Long userId = tokenParsingService.encode(accessToken);
+        Long userId = tokenParsingService.extractUserId(accessToken);
         String state = oauthVerificationStateService.generateSlackOauthState(userId);
         String slackOauthUrl = UriComponentsBuilder.fromUriString("https://slack.com/oauth/v2/authorize")
                                                    .queryParam("client_id", slackProperties.clientId())

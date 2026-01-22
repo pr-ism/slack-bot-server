@@ -13,7 +13,7 @@ public class TokenParsingService {
 
     private final TokenDecoder tokenDecoder;
 
-    public Long encode(String accessToken) {
+    public Long extractUserId(String accessToken) {
         validateAccessToken(accessToken);
 
         PrivateClaims privateClaims = tokenDecoder.decode(TokenType.ACCESS, accessToken);

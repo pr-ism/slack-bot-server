@@ -63,7 +63,7 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
         given(slackProperties.clientId()).willReturn("client-id");
         given(slackProperties.scopes()).willReturn("chat:write,commands");
         given(slackProperties.redirectUri()).willReturn("https://example.com/callback");
-        given(tokenParsingService.encode(accessToken)).willReturn(userId);
+        given(tokenParsingService.extractUserId(accessToken)).willReturn(userId);
         given(oauthVerificationStateService.generateSlackOauthState(userId)).willReturn(expectedState);
 
         // when & then
