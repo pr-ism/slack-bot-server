@@ -43,12 +43,12 @@ class SlackWorkspaceServiceTest {
         slackWorkspaceService.registerWorkspace(tokenResponse);
 
         // then
-        Workspace actual = jpaWorkspaceRepository.findByTeamId("T123")
-                                                 .orElseThrow();
+        Optional<Workspace> actual = jpaWorkspaceRepository.findByTeamId("T123");
 
         assertAll(
+                () -> assertThat(actual).isPresent(),
                 () -> assertThat(jpaWorkspaceRepository.count()).isEqualTo(1),
-                () -> assertThat(actual.getAccessToken()).isEqualTo("xoxb-new-token")
+                () -> assertThat(actual.get().getAccessToken()).isEqualTo("xoxb-new-token")
         );
     }
 
