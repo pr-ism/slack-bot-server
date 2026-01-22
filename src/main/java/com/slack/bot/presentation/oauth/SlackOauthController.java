@@ -8,6 +8,7 @@ import com.slack.bot.application.oauth.dto.response.SlackTokenResponse;
 import com.slack.bot.global.config.properties.SlackProperties;
 import com.slack.bot.presentation.common.ResponseEntityConst;
 import com.slack.bot.presentation.oauth.dto.response.SlackInstallUrlResponse;
+import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
@@ -39,6 +40,7 @@ public class SlackOauthController {
                                                    .queryParam("scope", slackProperties.scopes())
                                                    .queryParam("redirect_uri", slackProperties.redirectUri())
                                                    .queryParam("state", state)
+                                                   .encode(StandardCharsets.UTF_8)
                                                    .build()
                                                    .toUriString();
         SlackInstallUrlResponse response = new SlackInstallUrlResponse(slackOauthUrl);
