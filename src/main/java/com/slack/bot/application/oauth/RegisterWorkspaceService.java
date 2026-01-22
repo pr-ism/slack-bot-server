@@ -13,11 +13,11 @@ public class RegisterWorkspaceService {
     private final WorkspaceRepository workspaceRepository;
 
     @Transactional
-    public void registerWorkspace(SlackTokenResponse tokenResponse) {
+    public void registerWorkspace(SlackTokenResponse tokenResponse, Long userId) {
         workspaceRepository.findByTeamId(tokenResponse.teamId())
                            .ifPresentOrElse(
                                    workspace -> workspace.reconnect(tokenResponse.accessToken()),
-                                   () -> workspaceRepository.save(tokenResponse.toEntity())
+                                   () -> workspaceRepository.save(tokenResponse.toEntity(userId))
                            );
 
     }

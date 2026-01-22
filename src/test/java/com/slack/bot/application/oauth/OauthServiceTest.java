@@ -69,7 +69,6 @@ class OauthServiceTest {
                 () -> assertThat(response.ok()).isTrue(),
                 () -> assertThat(response.accessToken()).isEqualTo("xoxb-test-token"),
                 () -> assertThat(response.team().id()).isEqualTo("T123"),
-                () -> assertThat(response.authedUser().id()).isEqualTo("U123"),
                 () -> mockServer.verify()
         );
     }

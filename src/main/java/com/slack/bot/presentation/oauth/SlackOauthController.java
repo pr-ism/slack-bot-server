@@ -52,7 +52,7 @@ public class SlackOauthController {
         validateState(session, state);
         SlackTokenResponse tokenResponse = oauthService.exchangeCodeForToken(code);
 
-        registerWorkspaceService.registerWorkspace(tokenResponse);
+        registerWorkspaceService.registerWorkspace(tokenResponse, Long.MIN_VALUE);
         clearState(session);
         return ResponseEntityConst.NO_CONTENT;
     }
