@@ -29,7 +29,7 @@ class SlackWorkspaceServiceTest {
     @Test
     void 기존_워크스페이스가_있으면_재연결_처리한다() {
         // given
-        Workspace existingWorkspace = Workspace.create("T123", "old-token", "old-user");
+        Workspace existingWorkspace = Workspace.create("T123", "old-token");
         jpaWorkspaceRepository.save(existingWorkspace);
 
         SlackTokenResponse tokenResponse = new SlackTokenResponse(
@@ -48,8 +48,7 @@ class SlackWorkspaceServiceTest {
 
         assertAll(
                 () -> assertThat(jpaWorkspaceRepository.count()).isEqualTo(1),
-                () -> assertThat(actual.getAccessToken()).isEqualTo("xoxb-new-token"),
-                () -> assertThat(actual.getInstallerId()).isEqualTo("U456")
+                () -> assertThat(actual.getAccessToken()).isEqualTo("xoxb-new-token")
         );
     }
 
@@ -71,8 +70,7 @@ class SlackWorkspaceServiceTest {
 
         assertAll(
                 () -> assertThat(actual).isPresent(),
-                () -> assertThat(actual.get().getAccessToken()).isEqualTo("xoxb-test-token"),
-                () -> assertThat(actual.get().getInstallerId()).isEqualTo("U123")
+                () -> assertThat(actual.get().getAccessToken()).isEqualTo("xoxb-test-token")
         );
     }
 }

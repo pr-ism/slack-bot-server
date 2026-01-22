@@ -23,16 +23,11 @@ public record SlackTokenResponse(
 
     public Workspace toEntity() {
         String teamId = this.team == null ? null : this.team.id;
-        String installedBy = this.authedUser == null ? null : this.authedUser.id;
-
-        return Workspace.create(teamId, this.accessToken, installedBy);
+        return Workspace.create(teamId, this.accessToken);
     }
 
     public String teamId() {
         return this.team.id;
     }
 
-    public String installedBy() {
-        return this.authedUser.id;
-    }
 }

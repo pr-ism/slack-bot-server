@@ -16,10 +16,7 @@ public class SlackWorkspaceService {
     public void registerWorkspace(SlackTokenResponse tokenResponse) {
         workspaceRepository.findByTeamId(tokenResponse.teamId())
                            .ifPresentOrElse(
-                                   workspace -> workspace.reconnect(
-                                           tokenResponse.accessToken(),
-                                           tokenResponse.installedBy()
-                                   ),
+                                   workspace -> workspace.reconnect(tokenResponse.accessToken()),
                                    () -> workspaceRepository.save(tokenResponse.toEntity())
                            );
 

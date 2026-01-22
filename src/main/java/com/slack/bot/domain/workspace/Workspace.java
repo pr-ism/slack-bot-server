@@ -15,14 +15,12 @@ public class Workspace extends BaseTimeEntity {
 
     private String teamId;
     private String accessToken;
-    private String installerId;
 
-    public static Workspace create(String teamId, String accessToken, String installedBy) {
+    public static Workspace create(String teamId, String accessToken) {
         validateTeamId(teamId);
         validateAccessToken(accessToken);
-        validateInstalledBy(installedBy);
 
-        return new Workspace(teamId, accessToken, installedBy);
+        return new Workspace(teamId, accessToken);
     }
 
     private static void validateTeamId(String teamId) {
@@ -37,23 +35,14 @@ public class Workspace extends BaseTimeEntity {
         }
     }
 
-    private static void validateInstalledBy(String installedBy) {
-        if (installedBy == null || installedBy.isBlank()) {
-            throw new IllegalArgumentException("슬랙 봇을 설치한 회원은 비어 있을 수 없습니다.");
-        }
-    }
-
-    private Workspace(String teamId, String accessToken, String installerId) {
+    private Workspace(String teamId, String accessToken) {
         this.teamId = teamId;
         this.accessToken = accessToken;
-        this.installerId = installerId;
     }
 
-    public void reconnect(String accessToken, String installedBy) {
+    public void reconnect(String accessToken) {
         validateAccessToken(accessToken);
-        validateInstalledBy(installedBy);
 
         this.accessToken = accessToken;
-        this.installerId = installedBy;
     }
 }

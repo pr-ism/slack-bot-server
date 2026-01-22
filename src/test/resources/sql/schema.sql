@@ -13,6 +13,5 @@ CREATE TABLE IF NOT EXISTS workspaces (
     created_at TIMESTAMP(6) NOT NULL,
     updated_at TIMESTAMP(6) NOT NULL,
     team_id VARCHAR(255) NOT NULL,
-    access_token VARCHAR(255) NOT NULL,
-    installer_id VARCHAR(255) NOT NULL
+    access_token VARCHAR(255) NOT NULL
 );
