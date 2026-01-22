@@ -67,12 +67,20 @@ public class TokenConfig {
     public SecretKey accessTokenSecretKey() {
         byte[] accessTokenKeyBytes = tokenProperties.accessKey().getBytes(StandardCharsets.UTF_8);
 
+        if (accessTokenKeyBytes.length < KEY_LENGTH) {
+            throw new IllegalStateException("Access 토큰 키 길이가 올바르지 않습니다.");
+        }
+
         return new SecretKeySpec(accessTokenKeyBytes, HMAC_SHA_256);
     }
 
     @Bean
     public SecretKey refreshTokenSecretKey() {
         byte[] refreshTokenKeyBytes = tokenProperties.refreshKey().getBytes(StandardCharsets.UTF_8);
+
+        if (refreshTokenKeyBytes.length < KEY_LENGTH) {
+            throw new IllegalStateException("Refresh 토큰 키 길이가 올바르지 않습니다.");
+        }
 
         return new SecretKeySpec(refreshTokenKeyBytes, HMAC_SHA_256);
     }
