@@ -4,10 +4,12 @@ import com.slack.bot.application.oauth.exception.ExpiredSlackOauthStateException
 import com.slack.bot.application.oauth.exception.SlackOauthEmptyResponseException;
 import com.slack.bot.application.oauth.exception.SlackOauthErrorResponseException;
 import com.slack.bot.application.oauth.exception.SlackOauthStateNotFoundException;
+import com.slack.bot.global.exception.dto.response.AuthErrorCode;
 import com.slack.bot.global.exception.dto.response.OauthErrorCode;
 import com.slack.bot.global.exception.dto.response.DefaultErrorCode;
 import com.slack.bot.global.exception.dto.response.ErrorCode;
 import com.slack.bot.global.exception.dto.response.ExceptionResponse;
+import com.slack.bot.infrastructure.auth.jwt.exception.InvalidTokenException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
@@ -62,6 +64,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.info("SlackOauthStateNotFoundException : {}", ex.getMessage());
 
         return createResponseEntity(OauthErrorCode.SLACK_OAUTH_NOT_FOUND_STATE);
+    }
+
+    @ExceptionHandler(InvalidTokenException.class)
+    public ResponseEntity<Object> handleInvalidTokenException(InvalidTokenException ex) {
+        log.info("InvalidTokenException : {}", ex.getMessage());
+
+        return createResponseEntity(AuthErrorCode.INVALID_TOKEN);
     }
 
     @Override

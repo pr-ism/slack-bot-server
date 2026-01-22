@@ -27,8 +27,14 @@ class OauthExceptionControllerTest extends CommonExceptionControllerTest {
                         restDocs.document(
                                 customResponseFields(
                                         "exception-response",
-                                        beneathPath("data.callbackException").withSubsectionId("callbackException"),
+                                        beneathPath("data.installException").withSubsectionId("installException"),
                                         attributes(key("title").value("`GET /install` 예외")),
+                                        exceptionConvertFieldDescriptor(data.installException())
+                                ),
+                                customResponseFields(
+                                        "exception-response",
+                                        beneathPath("data.callbackException").withSubsectionId("callbackException"),
+                                        attributes(key("title").value("`GET /callback` 예외")),
                                         exceptionConvertFieldDescriptor(data.callbackException())
                                 )
                         )
