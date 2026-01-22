@@ -3,6 +3,7 @@ package com.slack.bot.application.oauth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
+import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.oauth.dto.response.SlackTokenResponse;
 import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.infrastructure.workspace.persistence.JpaWorkspaceRepository;
@@ -11,11 +12,10 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 @Transactional
-@SpringBootTest
+@IntegrationTest
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class SlackWorkspaceServiceTest {

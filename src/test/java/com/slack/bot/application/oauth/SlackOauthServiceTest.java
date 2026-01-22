@@ -9,6 +9,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 
+import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.oauth.dto.response.SlackTokenResponse;
 import com.slack.bot.application.oauth.exception.SlackOauthEmptyResponseException;
 import com.slack.bot.application.oauth.exception.SlackOauthErrorResponseException;
@@ -17,14 +18,13 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.ResourceAccessException;
 
-@SpringBootTest
+@IntegrationTest
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class SlackOauthServiceTest {
