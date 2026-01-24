@@ -5,11 +5,10 @@ import static com.slack.bot.domain.member.QProjectMember.projectMember;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.domain.member.ProjectMember;
 import com.slack.bot.domain.member.repository.ProjectMemberRepository;
+import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
 import jakarta.persistence.EntityManager;
-import java.sql.SQLException;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,9 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ProjectMemberRepositoryAdapter implements ProjectMemberRepository {
 
+    private final EntityManager entityManager;
     private final JPAQueryFactory queryFactory;
     private final JpaProjectMemberRepository projectMemberRepository;
-    private final EntityManager entityManager;
+    private final MysqlDuplicateKeyDetector mysqlDuplicateKeyDetector;
 
     @Override
     @Transactional
@@ -30,7 +30,7 @@ public class ProjectMemberRepositoryAdapter implements ProjectMemberRepository {
             entityManager.flush();
             return member;
         } catch (DataIntegrityViolationException ex) {
-            if (isDuplicateKey(ex)) {
+            if (mysqlDuplicateKeyDetector.isDuplicateKey(ex)) {
                 ProjectMember existing = queryFactory.selectFrom(projectMember)
                                                      .where(
                                                              projectMember.teamId.eq(member.getTeamId()),
@@ -57,24 +57,5 @@ public class ProjectMemberRepositoryAdapter implements ProjectMemberRepository {
                                            .fetchOne();
 
         return Optional.ofNullable(result);
-    }
-
-    private boolean isDuplicateKey(Throwable throwable) {
-        Throwable current = throwable;
-        while (current != null) {
-            if (current instanceof ConstraintViolationException) {
-                return true;
-            }
-            if (current instanceof SQLException sqlException) {
-                String sqlState = sqlException.getSQLState();
-
-                // MySQL 무결성 제약 조건 코드
-                if ("23000".equals(sqlState) && sqlException.getErrorCode() == 1062) {
-                    return true;
-                }
-            }
-            current = current.getCause();
-        }
-        return false;
     }
 }
