@@ -13,6 +13,7 @@ import com.slack.bot.global.exception.dto.response.DefaultErrorCode;
 import com.slack.bot.global.exception.dto.response.ErrorCode;
 import com.slack.bot.global.exception.dto.response.ExceptionResponse;
 import com.slack.bot.infrastructure.auth.jwt.exception.InvalidTokenException;
+import com.slack.bot.infrastructure.link.persistence.exception.AccessLinkDuplicateKeyException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
@@ -88,6 +89,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.info("WorkspaceNotFoundException : {}", ex.getMessage());
 
         return createResponseEntity(CommandErrorCode.WORK_SPACE_NOT_FOUND);
+    }
+
+    @ExceptionHandler(AccessLinkDuplicateKeyException.class)
+    public ResponseEntity<Object> handleAccessLinkDuplicateKeyException(AccessLinkDuplicateKeyException ex) {
+        log.info("AccessLinkDuplicateKeyException : {}", ex.getMessage());
+
+        return createResponseEntity(CommandErrorCode.DUPLICATE_LINK_KEY);
     }
 
     @Override
