@@ -6,7 +6,6 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.domain.member.ProjectMember;
 import com.slack.bot.domain.member.repository.ProjectMemberRepository;
 import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
-import jakarta.persistence.EntityManager;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -17,33 +16,41 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ProjectMemberRepositoryAdapter implements ProjectMemberRepository {
 
-    private final EntityManager entityManager;
     private final JPAQueryFactory queryFactory;
-    private final JpaProjectMemberRepository projectMemberRepository;
+    private final ProjectMemberCreator projectMemberCreator;
     private final MysqlDuplicateKeyDetector mysqlDuplicateKeyDetector;
 
     @Override
     @Transactional
     public ProjectMember save(ProjectMember member) {
         try {
-            projectMemberRepository.save(member);
-            entityManager.flush();
+            projectMemberCreator.saveNew(member);
             return member;
         } catch (DataIntegrityViolationException ex) {
-            if (mysqlDuplicateKeyDetector.isDuplicateKey(ex)) {
-                ProjectMember existing = queryFactory.selectFrom(projectMember)
-                                                     .where(
-                                                             projectMember.teamId.eq(member.getTeamId()),
-                                                             projectMember.slackUserId.eq(member.getSlackUserId())
-                                                     )
-                                                     .fetchOne();
-                if (existing != null) {
-                    existing.connectGithubId(member.getGithubId());
-                    return existing;
-                }
+            ProjectMember existing = resolveDuplicate(member, ex);
+            if (existing != null) {
+                return existing;
             }
             throw ex;
         }
+    }
+
+    private ProjectMember resolveDuplicate(ProjectMember member, DataIntegrityViolationException ex) {
+        if (mysqlDuplicateKeyDetector.isNotDuplicateKey(ex)) {
+            return null;
+        }
+
+        ProjectMember existing = queryFactory.selectFrom(projectMember)
+                                             .where(
+                                                     projectMember.teamId.eq(member.getTeamId()),
+                                                     projectMember.slackUserId.eq(member.getSlackUserId())
+                                             )
+                                             .fetchOne();
+        if (existing == null) {
+            return null;
+        }
+        existing.connectGithubId(member.getGithubId());
+        return existing;
     }
 
     @Override

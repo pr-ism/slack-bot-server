@@ -1,2 +1,2 @@
-INSERT INTO project_members (id, team_id, slack_user_id, display_name, github_id, created_at, updated_at)
-VALUES (1, 'T1', 'U1', '홍길동', NULL, '2024-01-01 00:00:00', '2024-01-01 00:00:00');
+INSERT INTO project_members (team_id, slack_user_id, display_name, github_id, created_at, updated_at)
+VALUES ('T1', 'U1', '기존 사용자', 'git-1', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);

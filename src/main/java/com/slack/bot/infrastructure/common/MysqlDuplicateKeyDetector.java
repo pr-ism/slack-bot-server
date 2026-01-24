@@ -25,4 +25,8 @@ public class MysqlDuplicateKeyDetector {
         }
         return false;
     }
+
+    public boolean isNotDuplicateKey(Throwable throwable) {
+        return !isDuplicateKey(throwable);
+    }
 }
