@@ -30,11 +30,11 @@ public class MemberConnectionSlackApiClient {
     }
 
     private String resolveDisplayName(JsonNode response, String slackUserId) {
-        if (response == null || !response.get("ok").asBoolean()) {
+        if (response == null || !response.path("ok").asBoolean()) {
             return slackUserId;
         }
 
-        JsonNode userNode = response.get("user");
+        JsonNode userNode = response.path("user");
         JsonNode profileNode = userNode.path("profile");
         String displayName = profileNode.path("display_name").asText();
         if (displayName != null && !displayName.isBlank()) {
