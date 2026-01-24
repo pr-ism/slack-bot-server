@@ -16,6 +16,9 @@ token:
   access-expired-millis-seconds: 3600000
   refresh-expired-millis-seconds: 259200000
 
+access-link:
+  key-secret: test-access-link-secret
+
 spring:
   datasource:
     hikari:

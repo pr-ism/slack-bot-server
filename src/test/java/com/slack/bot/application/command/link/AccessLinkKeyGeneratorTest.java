@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.domain.link.AccessLinkSequence;
 import com.slack.bot.domain.link.repository.AccessLinkSequenceRepository;
+import com.slack.bot.global.config.properties.AccessLinkKeyProperties;
 import com.slack.bot.infrastructure.link.persistence.JpaAccessLinkSequenceRepository;
 import java.util.HashSet;
 import java.util.Set;
@@ -32,11 +33,14 @@ class AccessLinkKeyGeneratorTest {
     @Autowired
     JpaAccessLinkSequenceRepository sequenceJpaRepository;
 
+    @Autowired
+    AccessLinkKeyProperties accessLinkKeyProperties;
+
     private AccessLinkKeyGenerator generator;
 
     @BeforeEach
     void setUp() {
-        generator = new AccessLinkKeyGenerator(sequenceRepository);
+        generator = new AccessLinkKeyGenerator(sequenceRepository, accessLinkKeyProperties);
     }
 
     @Test
@@ -46,7 +50,7 @@ class AccessLinkKeyGeneratorTest {
 
         // then
         assertAll(
-                () -> assertThat(key.length()).isGreaterThanOrEqualTo(6),
+                () -> assertThat(key).hasSize(22),
                 () -> assertThat(key).matches("^[0-9A-Za-z]+$")
         );
     }
