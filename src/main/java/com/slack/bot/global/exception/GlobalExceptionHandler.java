@@ -1,11 +1,13 @@
 package com.slack.bot.global.exception;
 
+import com.slack.bot.application.command.exception.WorkspaceNotFoundException;
 import com.slack.bot.application.oauth.exception.EmptyAccessTokenException;
 import com.slack.bot.application.oauth.exception.ExpiredSlackOauthStateException;
 import com.slack.bot.application.oauth.exception.SlackOauthEmptyResponseException;
 import com.slack.bot.application.oauth.exception.SlackOauthErrorResponseException;
 import com.slack.bot.application.oauth.exception.SlackOauthStateNotFoundException;
 import com.slack.bot.global.exception.dto.response.AuthErrorCode;
+import com.slack.bot.global.exception.dto.response.CommandErrorCode;
 import com.slack.bot.global.exception.dto.response.OauthErrorCode;
 import com.slack.bot.global.exception.dto.response.DefaultErrorCode;
 import com.slack.bot.global.exception.dto.response.ErrorCode;
@@ -79,6 +81,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.info("EmptyAccessTokenException : {}", ex.getMessage());
 
         return createResponseEntity(AuthErrorCode.EMPTY_TOKEN);
+    }
+
+    @ExceptionHandler(WorkspaceNotFoundException.class)
+    public ResponseEntity<Object> handleWorkspaceNotFoundException(WorkspaceNotFoundException ex) {
+        log.info("WorkspaceNotFoundException : {}", ex.getMessage());
+
+        return createResponseEntity(CommandErrorCode.WORK_SPACE_NOT_FOUND);
     }
 
     @Override
