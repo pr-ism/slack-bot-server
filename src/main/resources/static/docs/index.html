@@ -450,10 +450,35 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <h4 id="Install_http_request"><a class="link" href="#Install_http_request">HTTP request</a></h4>
 <div class="listingblock">
 <div class="content">
-<pre class="highlight nowrap"><code class="language-http" data-lang="http">GET /api/slack/install HTTP/1.1
-Accept: application/json</code></pre>
+<pre class="highlight nowrap"><code class="language-http" data-lang="http">GET /slack/install HTTP/1.1
+Accept: application/json
+Cookie: accessToken=test-access-token</code></pre>
 </div>
 </div>
+</div>
+<div class="sect3">
+<h4 id="Install_request_cookies"><a class="link" href="#Install_request_cookies">Request cookies</a></h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">이름</th>
+<th class="tableblock halign-left valign-top">필수여부</th>
+<th class="tableblock halign-left valign-top">설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>accessToken</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">로그인한 사용자의 액세스 토큰</p></td>
+</tr>
+</tbody>
+</table>
 </div>
 <div class="sect3">
 <h4 id="Install_http_response"><a class="link" href="#Install_http_response">HTTP response</a></h4>
@@ -463,7 +488,7 @@ Accept: application/json</code></pre>
 Content-Type: application/json;charset=UTF-8
 
 {
-  "url" : "https://slack.com/oauth/v2/authorize?client_id=client-id&amp;scope=chat:write,commands&amp;redirect_uri=https://example.com/callback&amp;state=3e0b34bf-388c-4d92-a243-2585cfffd8b7"
+  "url" : "https://slack.com/oauth/v2/authorize?client_id=client-id&amp;scope=chat:write,commands&amp;redirect_uri=https://example.com/callback&amp;state=state-token"
 }</code></pre>
 </div>
 </div>
@@ -492,6 +517,48 @@ Content-Type: application/json;charset=UTF-8
 </tbody>
 </table>
 </div>
+<div class="sect3">
+<h4 id="_예외_상황"><a class="link" href="#_예외_상황">예외 상황</a></h4>
+<div class="paragraph">
+<p><code>GET /install</code> 예외</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">에러 코드</th>
+<th class="tableblock halign-left valign-top">HTTP Status 이름</th>
+<th class="tableblock halign-left valign-top">HTTP Status 값</th>
+<th class="tableblock halign-left valign-top">메시지</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>D02</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BAD_REQUEST</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">400</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">필수 파라미터 누락</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>A00</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UNAUTHORIZED</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">401</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">유효하지 않은 토큰</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>A01</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UNAUTHORIZED</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">401</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">유효하지 않은 토큰</p></td>
+</tr>
+</tbody>
+</table>
+</div>
 </div>
 <div class="sect2">
 <h3 id="Callback-Code"><a class="link" href="#Callback-Code">슬랙 봇 설치 토큰 교환 콜백</a></h3>
@@ -499,7 +566,7 @@ Content-Type: application/json;charset=UTF-8
 <h4 id="Callback-Code_http_request"><a class="link" href="#Callback-Code_http_request">HTTP request</a></h4>
 <div class="listingblock">
 <div class="content">
-<pre class="highlight nowrap"><code class="language-http" data-lang="http">GET /api/slack/callback?code=auth-code&amp;state=saved-state HTTP/1.1</code></pre>
+<pre class="highlight nowrap"><code class="language-http" data-lang="http">GET /slack/callback?code=auth-code&amp;state=saved-state HTTP/1.1</code></pre>
 </div>
 </div>
 </div>
@@ -545,9 +612,9 @@ Content-Type: application/json;charset=UTF-8
 </div>
 </div>
 <div class="sect3">
-<h4 id="_예외_상황"><a class="link" href="#_예외_상황">예외 상황</a></h4>
+<h4 id="_예외_상황_2"><a class="link" href="#_예외_상황_2">예외 상황</a></h4>
 <div class="paragraph">
-<p><code>GET /install</code> 예외</p>
+<p><code>GET /callback</code> 예외</p>
 </div>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
@@ -566,22 +633,28 @@ Content-Type: application/json;charset=UTF-8
 </thead>
 <tbody>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><code>A00</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>O00</code></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">UNAUTHORIZED</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">401</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">슬랙 OAuth 실패</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><code>A01</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>O01</code></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">UNAUTHORIZED</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">401</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">슬랙 OAuth 실패</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><code>A02</code></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">UNAUTHORIZED</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">401</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">슬랙 OAuth 실패</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>O02</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BAD_REQUEST</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">400</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">만료된 state</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>O03</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BAD_REQUEST</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">400</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">존재하지 않는 state</p></td>
 </tr>
 </tbody>
 </table>
@@ -592,7 +665,7 @@ Content-Type: application/json;charset=UTF-8
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-01-18 17:12:26 +0900
+Last updated 2026-01-22 12:27:50 +0900
 </div>
 </div>
 </body>

@@ -1,5 +1,6 @@
 package com.slack.bot.application;
 
+import com.slack.bot.domain.auth.TokenDecoder;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -11,6 +12,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @SpringBootTest
-@MockitoBean(types = DateTimeProvider.class)
+@MockitoBean(types = {DateTimeProvider.class, TokenDecoder.class})
 public @interface IntegrationTest {
 }

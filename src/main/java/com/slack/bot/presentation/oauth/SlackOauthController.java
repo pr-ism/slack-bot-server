@@ -1,16 +1,17 @@
 package com.slack.bot.presentation.oauth;
 
-import com.slack.bot.application.oauth.SlackOauthService;
-import com.slack.bot.application.oauth.SlackWorkspaceService;
+import com.slack.bot.application.oauth.OauthVerificationStateService;
+import com.slack.bot.application.oauth.OauthService;
+import com.slack.bot.application.oauth.RegisterWorkspaceService;
+import com.slack.bot.application.oauth.TokenParsingService;
 import com.slack.bot.application.oauth.dto.response.SlackTokenResponse;
-import com.slack.bot.application.oauth.exception.SlackOauthInvalidStateException;
 import com.slack.bot.global.config.properties.SlackProperties;
 import com.slack.bot.presentation.common.ResponseEntityConst;
 import com.slack.bot.presentation.oauth.dto.response.SlackInstallUrlResponse;
-import jakarta.servlet.http.HttpSession;
-import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -22,22 +23,26 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RequiredArgsConstructor
 public class SlackOauthController {
 
-    private static final String OAUTH_STATE_SESSION_ATTRIBUTE = "SLACK_OAUTH_STATE";
-
+    private final OauthService oauthService;
     private final SlackProperties slackProperties;
-    private final SlackOauthService slackOauthService;
-    private final SlackWorkspaceService slackWorkspaceService;
+    private final TokenParsingService tokenParsingService;
+    private final RegisterWorkspaceService registerWorkspaceService;
+    private final OauthVerificationStateService oauthVerificationStateService;
 
     @GetMapping("/install")
-    public ResponseEntity<SlackInstallUrlResponse> installUrl(HttpSession session) {
-        String state = generateAndStoreState(session);
+    public ResponseEntity<SlackInstallUrlResponse> getInstallUrl(
+            @CookieValue(value = "accessToken") String accessToken
+    ) {
+        Long userId = tokenParsingService.extractUserId(accessToken);
+        String state = oauthVerificationStateService.generateSlackOauthState(userId);
         String slackOauthUrl = UriComponentsBuilder.fromUriString("https://slack.com/oauth/v2/authorize")
-                                                  .queryParam("client_id", slackProperties.clientId())
-                                                  .queryParam("scope", slackProperties.scopes())
-                                                  .queryParam("redirect_uri", slackProperties.redirectUri())
-                                                  .queryParam("state", state)
-                                                  .build()
-                                                  .toUriString();
+                                                   .queryParam("client_id", slackProperties.clientId())
+                                                   .queryParam("scope", slackProperties.scopes())
+                                                   .queryParam("redirect_uri", slackProperties.redirectUri())
+                                                   .queryParam("state", state)
+                                                   .encode(StandardCharsets.UTF_8)
+                                                   .build()
+                                                   .toUriString();
         SlackInstallUrlResponse response = new SlackInstallUrlResponse(slackOauthUrl);
 
         return ResponseEntity.ok(response);
@@ -46,33 +51,12 @@ public class SlackOauthController {
     @GetMapping("/callback")
     public ResponseEntity<Void> callback(
             @RequestParam("code") String code,
-            @RequestParam(value = "state", required = false) String state,
-            HttpSession session
+            @RequestParam(value = "state") String state
     ) {
-        validateState(session, state);
-        SlackTokenResponse tokenResponse = slackOauthService.exchangeCodeForToken(code);
+        Long userId = oauthVerificationStateService.resolveUserIdByState(state);
+        SlackTokenResponse tokenResponse = oauthService.exchangeCodeForToken(code);
 
-        slackWorkspaceService.registerWorkspace(tokenResponse);
-        clearState(session);
+        registerWorkspaceService.registerWorkspace(tokenResponse, userId);
         return ResponseEntityConst.NO_CONTENT;
-    }
-
-    private String generateAndStoreState(HttpSession session) {
-        String state = UUID.randomUUID().toString();
-
-        session.setAttribute(OAUTH_STATE_SESSION_ATTRIBUTE, state);
-        return state;
-    }
-
-    private void validateState(HttpSession session, String state) {
-        String storedState = (String) session.getAttribute(OAUTH_STATE_SESSION_ATTRIBUTE);
-
-        if (storedState == null || !storedState.equals(state)) {
-            throw new SlackOauthInvalidStateException();
-        }
-    }
-
-    private void clearState(HttpSession session) {
-        session.removeAttribute(OAUTH_STATE_SESSION_ATTRIBUTE);
     }
 }

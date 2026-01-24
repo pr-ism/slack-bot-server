@@ -8,16 +8,19 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-public class SlackWorkspaceService {
+public class RegisterWorkspaceService {
 
     private final WorkspaceRepository workspaceRepository;
 
     @Transactional
-    public void registerWorkspace(SlackTokenResponse tokenResponse) {
+    public void registerWorkspace(SlackTokenResponse tokenResponse, Long userId) {
         workspaceRepository.findByTeamId(tokenResponse.teamId())
                            .ifPresentOrElse(
-                                   workspace -> workspace.reconnect(tokenResponse.accessToken()),
-                                   () -> workspaceRepository.save(tokenResponse.toEntity())
+                                   workspace -> workspace.reconnect(
+                                           tokenResponse.accessToken(),
+                                           tokenResponse.botUserId()
+                                   ),
+                                   () -> workspaceRepository.save(tokenResponse.toEntity(userId))
                            );
 
     }

@@ -1,11 +1,11 @@
 package com.slack.bot.presentation.oauth;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.BDDMockito.willThrow;
+import static org.springframework.restdocs.cookies.CookieDocumentation.cookieWithName;
+import static org.springframework.restdocs.cookies.CookieDocumentation.requestCookies;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.get;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
@@ -13,15 +13,18 @@ import static org.springframework.restdocs.request.RequestDocumentation.paramete
 import static org.springframework.restdocs.request.RequestDocumentation.queryParameters;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.allOf;
 
-import com.slack.bot.application.oauth.SlackOauthService;
-import com.slack.bot.application.oauth.SlackWorkspaceService;
+import com.slack.bot.application.oauth.OauthVerificationStateService;
+import com.slack.bot.application.oauth.OauthService;
+import com.slack.bot.application.oauth.RegisterWorkspaceService;
+import com.slack.bot.application.oauth.TokenParsingService;
 import com.slack.bot.application.oauth.dto.response.SlackTokenResponse;
-import com.slack.bot.application.oauth.dto.response.SlackTokenResponse.AuthedUser;
 import com.slack.bot.application.oauth.dto.response.SlackTokenResponse.Team;
+import com.slack.bot.application.oauth.exception.ExpiredSlackOauthStateException;
 import com.slack.bot.global.config.properties.SlackProperties;
 import com.slack.bot.presentation.CommonControllerSliceTestSupport;
-import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -30,8 +33,6 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.restdocs.payload.JsonFieldType;
 import org.springframework.test.web.servlet.ResultActions;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.util.UriComponentsBuilder;
 
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
@@ -41,37 +42,47 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
     SlackProperties slackProperties;
 
     @Autowired
-    SlackOauthService slackOauthService;
+    OauthService oauthService;
 
     @Autowired
-    SlackWorkspaceService slackWorkspaceService;
+    RegisterWorkspaceService registerWorkspaceService;
+
+    @Autowired
+    OauthVerificationStateService oauthVerificationStateService;
+
+    @Autowired
+    TokenParsingService tokenParsingService;
 
     @Test
     void 설치_URL_조회_성공_테스트() throws Exception {
         // given
+        String accessToken = "test-access-token";
+        Long userId = 7L;
+        String expectedState = "state-token";
+
         given(slackProperties.clientId()).willReturn("client-id");
         given(slackProperties.scopes()).willReturn("chat:write,commands");
         given(slackProperties.redirectUri()).willReturn("https://example.com/callback");
+        given(tokenParsingService.extractUserId(accessToken)).willReturn(userId);
+        given(oauthVerificationStateService.generateSlackOauthState(userId)).willReturn(expectedState);
 
         // when & then
-        ResultActions resultActions = mockMvc.perform(get("/slack/install").accept(MediaType.APPLICATION_JSON))
+        ResultActions resultActions = mockMvc.perform(
+                                                     get("/slack/install").accept(MediaType.APPLICATION_JSON)
+                                                                          .cookie(new Cookie("accessToken", accessToken))
+                                             )
                                              .andExpect(status().isOk())
-                                             .andExpect(jsonPath("$.url", containsString("state=")));
-
-        HttpSession session = resultActions.andReturn().getRequest().getSession(false);
-        String body = resultActions.andReturn().getResponse().getContentAsString();
-        String slackUrl = objectMapper.readTree(body).get("url").asText();
-        MultiValueMap<String, String> params = UriComponentsBuilder.fromUriString(slackUrl)
-                                                                   .build()
-                                                                   .getQueryParams();
-
-        assertAll(
-                () -> assertThat(session).isNotNull(),
-                () -> assertThat(params.getFirst("client_id")).isEqualTo("client-id"),
-                () -> assertThat(params.getFirst("scope")).isEqualTo("chat:write,commands"),
-                () -> assertThat(params.getFirst("redirect_uri")).isEqualTo("https://example.com/callback"),
-                () -> assertThat(params.getFirst("state")).isEqualTo(session.getAttribute("SLACK_OAUTH_STATE"))
-        );
+                                             .andExpect(
+                                                     jsonPath(
+                                                             "$.url",
+                                                             allOf(
+                                                                     containsString("state="),
+                                                                     containsString("client_id=client-id"),
+                                                                     containsString("scope=chat:write,commands"),
+                                                                     containsString("redirect_uri=https://example.com/callback")
+                                                             )
+                                                     )
+                                             );
 
         설치_URL_조회_문서화(resultActions);
     }
@@ -79,6 +90,9 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
     private void 설치_URL_조회_문서화(ResultActions resultActions) throws Exception {
         resultActions.andDo(
                 restDocs.document(
+                        requestCookies(
+                                cookieWithName("accessToken").description("로그인한 사용자의 액세스 토큰")
+                        ),
                         responseFields(
                                 fieldWithPath("url").type(JsonFieldType.STRING).description("슬랙 봇 설치 URL (state 포함)")
                         )
@@ -94,23 +108,26 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
         SlackTokenResponse tokenResponse = new SlackTokenResponse(
                 true,
                 "xoxb-token",
-                new Team("T123", "테스트 워크스페이스"),
-                new AuthedUser("U123")
+                "B123",
+                new Team("T123", "테스트 워크스페이스")
         );
         MockHttpSession session = new MockHttpSession();
         session.setAttribute("SLACK_OAUTH_STATE", state);
 
-        given(slackOauthService.exchangeCodeForToken(code)).willReturn(tokenResponse);
-        willDoNothing().given(slackWorkspaceService).registerWorkspace(tokenResponse);
+        Long userId = 99L;
+
+        given(oauthVerificationStateService.resolveUserIdByState(state)).willReturn(userId);
+        given(oauthService.exchangeCodeForToken(code)).willReturn(tokenResponse);
+        willDoNothing().given(registerWorkspaceService).registerWorkspace(tokenResponse, userId);
 
         // when & then
         ResultActions resultActions = mockMvc.perform(
-                        get("/slack/callback")
-                                .queryParam("code", code)
-                                .queryParam("state", state)
-                                .session(session)
-                        )
-                        .andExpect(status().isNoContent());
+                                                     get("/slack/callback")
+                                                             .queryParam("code", code)
+                                                             .queryParam("state", state)
+                                                             .session(session)
+                                             )
+                                             .andExpect(status().isNoContent());
 
         콜백_코드_수신_문서화(resultActions);
     }
@@ -134,24 +151,26 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
         SlackTokenResponse tokenResponse = new SlackTokenResponse(
                 true,
                 "xoxb-token",
-                new Team(null, "테스트 워크스페이스"),
-                new AuthedUser("U123")
+                "B123",
+                new Team(null, "테스트 워크스페이스")
         );
         MockHttpSession session = new MockHttpSession();
         session.setAttribute("SLACK_OAUTH_STATE", state);
 
-        given(slackOauthService.exchangeCodeForToken(code)).willReturn(tokenResponse);
+        Long userId = 33L;
+        given(oauthVerificationStateService.resolveUserIdByState(state)).willReturn(userId);
+        given(oauthService.exchangeCodeForToken(code)).willReturn(tokenResponse);
         willThrow(new IllegalArgumentException("슬랙 봇의 team ID는 비어 있을 수 없습니다."))
-                .given(slackWorkspaceService)
-                .registerWorkspace(tokenResponse);
+                .given(registerWorkspaceService)
+                .registerWorkspace(tokenResponse, userId);
 
         // when & then
         mockMvc.perform(
-                        get("/slack/callback")
-                                .queryParam("code", code)
-                                .queryParam("state", state)
-                                .session(session)
-                )
+                       get("/slack/callback")
+                               .queryParam("code", code)
+                               .queryParam("state", state)
+                               .session(session)
+               )
                .andExpect(status().isBadRequest())
                .andExpect(jsonPath("$.errorCode").value("D01"))
                .andExpect(jsonPath("$.message").value("유효하지 않은 입력"));
@@ -163,16 +182,19 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute("SLACK_OAUTH_STATE", "expected-state");
 
+        given(oauthVerificationStateService.resolveUserIdByState("wrong-state"))
+                .willThrow(new ExpiredSlackOauthStateException());
+
         // when & then
         mockMvc.perform(
-                        get("/slack/callback")
-                                .queryParam("code", "auth-code")
-                                .queryParam("state", "wrong-state")
-                                .session(session)
-                )
-               .andExpect(status().isUnauthorized())
-               .andExpect(jsonPath("$.errorCode").value("A02"))
-               .andExpect(jsonPath("$.message").value("슬랙 OAuth 실패"));
+                       get("/slack/callback")
+                               .queryParam("code", "auth-code")
+                               .queryParam("state", "wrong-state")
+                               .session(session)
+               )
+               .andExpect(status().isBadRequest())
+               .andExpect(jsonPath("$.errorCode").value("O02"))
+               .andExpect(jsonPath("$.message").value("만료된 state"));
     }
 
     @Test
@@ -183,12 +205,12 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
 
         // when & then
         mockMvc.perform(
-                        get("/slack/callback")
-                                .queryParam("code", "auth-code")
-                                .session(session)
-                )
-               .andExpect(status().isUnauthorized())
-               .andExpect(jsonPath("$.errorCode").value("A02"))
-               .andExpect(jsonPath("$.message").value("슬랙 OAuth 실패"));
+                       get("/slack/callback")
+                               .queryParam("code", "auth-code")
+                               .session(session)
+               )
+               .andExpect(status().isBadRequest())
+               .andExpect(jsonPath("$.errorCode").value("D02"))
+               .andExpect(jsonPath("$.message").value("필수 파라미터 누락"));
     }
 }

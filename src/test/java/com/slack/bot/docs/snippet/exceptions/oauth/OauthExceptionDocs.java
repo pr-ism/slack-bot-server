@@ -5,5 +5,8 @@ import java.util.Map;
 import lombok.Builder;
 
 @Builder
-public record OauthExceptionDocs(Map<String, ExceptionContent> callbackException) {
+public record OauthExceptionDocs(
+        Map<String, ExceptionContent> installException,
+        Map<String, ExceptionContent> callbackException
+) {
 }

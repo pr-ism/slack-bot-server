@@ -27,10 +27,10 @@ import org.springframework.web.client.ResourceAccessException;
 @IntegrationTest
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
-class SlackOauthServiceTest {
+class OauthServiceTest {
 
     @Autowired
-    SlackOauthService slackOauthService;
+    OauthService oauthService;
 
     @Autowired
     RestClient.Builder slackRestClientBuilder;
@@ -61,7 +61,7 @@ class SlackOauthServiceTest {
                   .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
 
         // when
-        SlackTokenResponse response = slackOauthService.exchangeCodeForToken("auth-code");
+        SlackTokenResponse response = oauthService.exchangeCodeForToken("auth-code");
 
         // then
         assertAll(
@@ -69,7 +69,6 @@ class SlackOauthServiceTest {
                 () -> assertThat(response.ok()).isTrue(),
                 () -> assertThat(response.accessToken()).isEqualTo("xoxb-test-token"),
                 () -> assertThat(response.team().id()).isEqualTo("T123"),
-                () -> assertThat(response.authedUser().id()).isEqualTo("U123"),
                 () -> mockServer.verify()
         );
     }
@@ -89,7 +88,7 @@ class SlackOauthServiceTest {
 
         // when & then
         assertAll(
-                () -> assertThatThrownBy(() -> slackOauthService.exchangeCodeForToken("auth-code"))
+                () -> assertThatThrownBy(() -> oauthService.exchangeCodeForToken("auth-code"))
                         .isInstanceOf(SlackOauthErrorResponseException.class)
                         .hasMessageContaining("요청에 실패했습니다."),
                 () -> mockServer.verify()
@@ -105,7 +104,7 @@ class SlackOauthServiceTest {
 
         // when & then
         assertAll(
-                () -> assertThatThrownBy(() -> slackOauthService.exchangeCodeForToken("auth-code"))
+                () -> assertThatThrownBy(() -> oauthService.exchangeCodeForToken("auth-code"))
                         .isInstanceOf(SlackOauthErrorResponseException.class)
                         .hasMessageContaining("HTTP 응답 : 429 Too Many Requests"),
                 () -> mockServer.verify()
@@ -121,7 +120,7 @@ class SlackOauthServiceTest {
 
         // when & then
         assertAll(
-                () -> assertThatThrownBy(() -> slackOauthService.exchangeCodeForToken("auth-code"))
+                () -> assertThatThrownBy(() -> oauthService.exchangeCodeForToken("auth-code"))
                         .isInstanceOf(SlackOauthErrorResponseException.class)
                         .hasMessageContaining("500 Internal Server Error"),
                 () -> mockServer.verify()
@@ -139,7 +138,7 @@ class SlackOauthServiceTest {
 
         // when & then
         assertAll(
-                () -> assertThatThrownBy(() -> slackOauthService.exchangeCodeForToken("auth-code"))
+                () -> assertThatThrownBy(() -> oauthService.exchangeCodeForToken("auth-code"))
                         .isInstanceOf(SlackOauthErrorResponseException.class)
                         .hasMessageContaining("네트워크 오류")
                         .hasRootCauseInstanceOf(ResourceAccessException.class),
@@ -156,7 +155,7 @@ class SlackOauthServiceTest {
 
         // when & then
         assertAll(
-                () -> assertThatThrownBy(() -> slackOauthService.exchangeCodeForToken("auth-code"))
+                () -> assertThatThrownBy(() -> oauthService.exchangeCodeForToken("auth-code"))
                         .isInstanceOf(SlackOauthEmptyResponseException.class)
                         .hasMessageContaining("응답이 비어 있습니다."),
                 () -> mockServer.verify()

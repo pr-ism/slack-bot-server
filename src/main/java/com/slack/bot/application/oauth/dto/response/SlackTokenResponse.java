@@ -9,10 +9,10 @@ public record SlackTokenResponse(
         @JsonProperty("access_token")
         String accessToken,
 
-        Team team,
+        @JsonProperty("bot_user_id")
+        String botUserId,
 
-        @JsonProperty("authed_user")
-        AuthedUser authedUser
+        Team team
 ) {
 
     public record Team(String id, String name) {
@@ -21,9 +21,15 @@ public record SlackTokenResponse(
     public record AuthedUser(String id) {
     }
 
-    public Workspace toEntity() {
+    public Workspace toEntity(Long userId) {
         String teamId = this.team == null ? null : this.team.id;
-        return Workspace.create(teamId, this.accessToken);
+
+        return Workspace.builder()
+                        .userId(userId)
+                        .teamId(teamId)
+                        .accessToken(accessToken)
+                        .botUserId(botUserId)
+                        .build();
     }
 
     public String teamId() {

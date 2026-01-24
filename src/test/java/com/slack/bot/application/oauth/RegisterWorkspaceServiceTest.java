@@ -18,10 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 @IntegrationTest
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
-class SlackWorkspaceServiceTest {
+class RegisterWorkspaceServiceTest {
 
     @Autowired
-    SlackWorkspaceService slackWorkspaceService;
+    RegisterWorkspaceService registerWorkspaceService;
 
     @Autowired
     JpaWorkspaceRepository jpaWorkspaceRepository;
@@ -29,48 +29,58 @@ class SlackWorkspaceServiceTest {
     @Test
     void 기존_워크스페이스가_있으면_재연결_처리한다() {
         // given
-        Workspace existingWorkspace = Workspace.create("T123", "old-token");
+        Long userId = 1L;
+        Workspace existingWorkspace = Workspace.builder()
+                                               .teamId("T123")
+                                               .accessToken("old-token")
+                                               .botUserId("B001")
+                                               .userId(userId)
+                                               .build();
         jpaWorkspaceRepository.save(existingWorkspace);
 
         SlackTokenResponse tokenResponse = new SlackTokenResponse(
                 true,
                 "xoxb-new-token",
-                new SlackTokenResponse.Team("T123", "테스트 팀"),
-                new SlackTokenResponse.AuthedUser("U456")
+                "B002",
+                new SlackTokenResponse.Team("T123", "테스트 팀")
         );
 
         // when
-        slackWorkspaceService.registerWorkspace(tokenResponse);
+        registerWorkspaceService.registerWorkspace(tokenResponse, userId);
 
         // then
-        Optional<Workspace> actual = jpaWorkspaceRepository.findByTeamId("T123");
+        Workspace actual = jpaWorkspaceRepository.findByTeamId("T123")
+                                                 .orElseThrow();
 
         assertAll(
-                () -> assertThat(actual).isPresent(),
                 () -> assertThat(jpaWorkspaceRepository.count()).isEqualTo(1),
-                () -> assertThat(actual.get().getAccessToken()).isEqualTo("xoxb-new-token")
+                () -> assertThat(actual.getAccessToken()).isEqualTo("xoxb-new-token"),
+                () -> assertThat(actual.getUserId()).isEqualTo(userId)
         );
     }
 
     @Test
     void 슬랙_봇을_설치한_워크스페이스를_등록한다() {
         // given
+        Long installerId = 2L;
         SlackTokenResponse tokenResponse = new SlackTokenResponse(
                 true,
                 "xoxb-test-token",
-                new SlackTokenResponse.Team("T123", "테스트 팀"),
-                new SlackTokenResponse.AuthedUser("U123")
+                "B003",
+                new SlackTokenResponse.Team("T123", "테스트 팀")
         );
 
         // when
-        slackWorkspaceService.registerWorkspace(tokenResponse);
+        registerWorkspaceService.registerWorkspace(tokenResponse, installerId);
 
         // then
         Optional<Workspace> actual = jpaWorkspaceRepository.findByTeamId("T123");
 
         assertAll(
                 () -> assertThat(actual).isPresent(),
-                () -> assertThat(actual.get().getAccessToken()).isEqualTo("xoxb-test-token")
+                () -> assertThat(actual.get().getAccessToken()).isEqualTo("xoxb-test-token"),
+                () -> assertThat(actual.get().getUserId()).isEqualTo(installerId),
+                () -> assertThat(actual.get().getBotUserId()).isEqualTo("B003")
         );
     }
 }
