@@ -54,7 +54,13 @@ public class ProjectMember extends BaseTimeEntity {
     }
 
     public void connectGithubId(GithubId githubId) {
+        validateGithubId(githubId);
         this.githubId = githubId;
     }
-}
 
+    private void validateGithubId(GithubId githubId) {
+        if (githubId == null || githubId == GithubId.EMPTY) {
+            throw new IllegalArgumentException("GitHub ID는 비어 있을 수 없습니다.");
+        }
+    }
+}

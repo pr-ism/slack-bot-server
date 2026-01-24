@@ -6,10 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 import com.slack.bot.domain.member.vo.GithubId;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 
 @SuppressWarnings("NonAsciiCharacters")
@@ -50,6 +53,29 @@ class ProjectMemberTest {
 
         // then
         assertThat(projectMember.getGithubId().getValue()).isEqualTo("new-id");
+    }
+
+    private static Stream<Arguments> connectGithubIdTestArguments() {
+        return Stream.of(
+                Arguments.of((GithubId) null),
+                Arguments.of(GithubId.EMPTY)
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("connectGithubIdTestArguments")
+    void 깃허브_ID가_비어_있으면_연결할_수_없다(GithubId githubId) {
+        // given
+        ProjectMember projectMember = ProjectMember.builder()
+                                                   .teamId("T1")
+                                                   .slackUserId("U1")
+                                                   .displayName("홍길동")
+                                                   .build();
+
+        // when & then
+        assertThatThrownBy(() -> projectMember.connectGithubId(githubId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("GitHub ID는 비어 있을 수 없습니다.");
     }
 
     @ParameterizedTest
@@ -94,4 +120,3 @@ class ProjectMemberTest {
          .hasMessageContaining("표시 이름은 비어 있을 수 없습니다.");
     }
 }
-
