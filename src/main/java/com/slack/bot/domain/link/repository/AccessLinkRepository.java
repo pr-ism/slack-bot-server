@@ -6,7 +6,7 @@ import java.util.Optional;
 
 public interface AccessLinkRepository {
 
-    AccessLink save(AccessLink link);
+    AccessLink saveOrFindExisting(AccessLink link);
 
     Optional<AccessLink> findByProjectMemberId(Long projectMemberId);
 

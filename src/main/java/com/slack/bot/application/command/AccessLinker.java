@@ -22,7 +22,7 @@ public class AccessLinker {
                                            () -> {
                                                AccessLink link = createNew(projectMemberId);
 
-                                               return accessLinkRepository.save(link)
+                                               return accessLinkRepository.saveOrFindExisting(link)
                                                                           .getLinkKey();
                                            }
                                    );

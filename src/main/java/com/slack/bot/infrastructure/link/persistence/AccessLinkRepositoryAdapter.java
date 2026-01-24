@@ -26,7 +26,7 @@ public class AccessLinkRepositoryAdapter implements AccessLinkRepository {
 
     @Override
     @Transactional(readOnly = true)
-    public AccessLink save(AccessLink link) {
+    public AccessLink saveOrFindExisting(AccessLink link) {
         try {
             return persistenceHandler.save(link);
         } catch (DataIntegrityViolationException ex) {
