@@ -101,12 +101,8 @@ public class AccessLinkKeyGenerator {
         if (value.length() >= length) {
             return value;
         }
-        StringBuilder builder = new StringBuilder(length);
-        for (int i = value.length(); i < length; i++) {
-            builder.append(ALPHABET[0]);
-        }
-        builder.append(value);
-        return builder.toString();
+
+        return String.valueOf(ALPHABET[0]).repeat(length - value.length()) + value;
     }
 
     private byte[] hashKey(String key) {

@@ -5,11 +5,8 @@ import java.util.Optional;
 
 public interface ProjectMemberRepository {
 
-    void save(ProjectMember projectMember);
-
-    Optional<ProjectMember> findById(Long id);
+    ProjectMember save(ProjectMember projectMember);
 
     Optional<ProjectMember> findBySlackUser(String teamId, String slackUserId);
 
-    Optional<ProjectMember> findByGithubUser(String teamId, String githubId);
 }

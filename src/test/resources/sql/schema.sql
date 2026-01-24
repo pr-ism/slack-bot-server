@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS project_members (
     display_name VARCHAR(255),
     github_id VARCHAR(255),
     created_at TIMESTAMP(6) NOT NULL,
-    updated_at TIMESTAMP(6) NOT NULL
+    updated_at TIMESTAMP(6) NOT NULL,
+    CONSTRAINT uk_project_members_team_slack UNIQUE (team_id, slack_user_id)
 );
 
 CREATE TABLE IF NOT EXISTS channels (

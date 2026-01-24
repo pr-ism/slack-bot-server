@@ -40,15 +40,16 @@ public class MemberConnectionWriter {
             String displayName,
             String githubId
     ) {
+        GithubId newGithubId = GithubId.create(githubId);
         ProjectMember projectMember = ProjectMember.builder()
                                                    .teamId(teamId)
                                                    .slackUserId(slackUserId)
                                                    .displayName(displayName)
                                                    .build();
-        GithubId newGithubId = GithubId.create(githubId);
 
         projectMember.connectGithubId(newGithubId);
-        projectMemberRepository.save(projectMember);
-        return displayName;
+        ProjectMember savedMember = projectMemberRepository.save(projectMember);
+
+        return savedMember.getDisplayName();
     }
 }
