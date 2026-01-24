@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.springframework.http.HttpMethod.GET;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
@@ -56,6 +57,7 @@ class MemberConnectionSlackApiClientTest {
                 """;
         mockServer.expect(requestTo("https://slack.com/api/users.info?user=U1"))
                   .andExpect(method(GET))
+                  .andExpect(header("Authorization", "Bearer xoxb-token"))
                   .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
 
         // when
@@ -84,6 +86,7 @@ class MemberConnectionSlackApiClientTest {
                 """;
         mockServer.expect(requestTo("https://slack.com/api/users.info?user=U2"))
                   .andExpect(method(GET))
+                  .andExpect(header("Authorization", "Bearer xoxb-token"))
                   .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
 
         // when
@@ -106,6 +109,7 @@ class MemberConnectionSlackApiClientTest {
                 """;
         mockServer.expect(requestTo("https://slack.com/api/users.info?user=U3"))
                   .andExpect(method(GET))
+                  .andExpect(header("Authorization", "Bearer xoxb-token"))
                   .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
 
         // when
@@ -123,6 +127,7 @@ class MemberConnectionSlackApiClientTest {
         // given
         mockServer.expect(requestTo("https://slack.com/api/users.info?user=U4"))
                   .andExpect(method(GET))
+                  .andExpect(header("Authorization", "Bearer xoxb-token"))
                   .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
         // when & then
