@@ -1,5 +1,6 @@
 package com.slack.bot.global.exception;
 
+import com.slack.bot.application.command.client.exception.SlackUserInfoRequestException;
 import com.slack.bot.application.command.exception.WorkspaceNotFoundException;
 import com.slack.bot.application.oauth.exception.EmptyAccessTokenException;
 import com.slack.bot.application.oauth.exception.ExpiredSlackOauthStateException;
@@ -96,6 +97,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.info("AccessLinkDuplicateKeyException : {}", ex.getMessage());
 
         return createResponseEntity(CommandErrorCode.DUPLICATE_LINK_KEY);
+    }
+
+    @ExceptionHandler(SlackUserInfoRequestException.class)
+    public ResponseEntity<Object> hnadleSlackUserInfoRequestException(SlackUserInfoRequestException ex) {
+        log.info("SlackUserInfoRequestException : {}", ex.getMessage());
+
+        return createResponseEntity(CommandErrorCode.SLACK_USER_INFO_API_FAILED);
     }
 
     @Override

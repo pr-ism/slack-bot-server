@@ -1,16 +1,20 @@
 package com.slack.bot.application.command.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.springframework.http.HttpMethod.GET;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.slack.bot.application.command.client.exception.SlackUserInfoRequestException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -110,6 +114,21 @@ class MemberConnectionSlackApiClientTest {
         // then
         assertAll(
                 () -> assertThat(displayName).isEqualTo("U3"),
+                () -> mockServer.verify()
+        );
+    }
+
+    @Test
+    void API_호출이_실패하면_예외를_던진다() {
+        // given
+        mockServer.expect(requestTo("https://slack.com/api/users.info?user=U4"))
+                  .andExpect(method(GET))
+                  .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+
+        // when & then
+        assertAll(
+                () -> assertThatThrownBy(() -> memberConnectionSlackApiClient.resolveUserName("xoxb-token", "U4"))
+                        .isInstanceOf(SlackUserInfoRequestException.class),
                 () -> mockServer.verify()
         );
     }
