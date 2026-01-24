@@ -68,7 +68,7 @@ public class AccessLinkRepositoryAdapter implements AccessLinkRepository {
                 String sqlState = sqlException.getSQLState();
 
                 // MySQL 무결성 제약 조건 코드
-                if ("23505".equals(sqlState)) {
+                if ("23000".equals(sqlState) && sqlException.getErrorCode() == 1062) {
                     return true;
                 }
             }
