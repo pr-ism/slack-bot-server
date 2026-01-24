@@ -15,6 +15,7 @@ import com.slack.bot.global.exception.dto.response.ErrorCode;
 import com.slack.bot.global.exception.dto.response.ExceptionResponse;
 import com.slack.bot.infrastructure.auth.jwt.exception.InvalidTokenException;
 import com.slack.bot.infrastructure.link.persistence.exception.AccessLinkDuplicateKeyException;
+import com.slack.bot.infrastructure.link.persistence.exception.AccessLinkSequenceStateException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
@@ -100,10 +101,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     @ExceptionHandler(SlackUserInfoRequestException.class)
-    public ResponseEntity<Object> hnadleSlackUserInfoRequestException(SlackUserInfoRequestException ex) {
+    public ResponseEntity<Object> handleSlackUserInfoRequestException(SlackUserInfoRequestException ex) {
         log.info("SlackUserInfoRequestException : {}", ex.getMessage());
 
         return createResponseEntity(CommandErrorCode.SLACK_USER_INFO_API_FAILED);
+    }
+
+    @ExceptionHandler(AccessLinkSequenceStateException.class)
+    public ResponseEntity<Object> handleAccessLinkSequenceStateException(AccessLinkSequenceStateException ex) {
+        log.info("AccessLinkSequenceStateException : {}", ex.getMessage());
+
+        return createResponseEntity(CommandErrorCode.LINK_SEQUENCE_NOT_EXISTS);
     }
 
     @Override
