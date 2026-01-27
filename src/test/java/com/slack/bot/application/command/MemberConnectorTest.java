@@ -28,8 +28,8 @@ class MemberConnectorTest {
 
     @Test
     @Sql(scripts = {
-            "classpath:sql/fixtures/member/workspace_t1.sql",
-            "classpath:sql/fixtures/member/project_member_t1_u2.sql"
+            "classpath:sql/fixtures/member/workspace_team1.sql",
+            "classpath:sql/fixtures/member/project_member_team1_user2.sql"
     })
     void 이미_연동된_멤버는_새로운_Github_ID로_연동한다() {
         // when
@@ -46,7 +46,7 @@ class MemberConnectorTest {
     }
 
     @Test
-    @Sql(scripts = "classpath:sql/fixtures/member/workspace_t1.sql")
+    @Sql(scripts = "classpath:sql/fixtures/member/workspace_team1.sql")
     void 멤버가_없으면_새_멤버를_생성한다() {
         // when
         String actualConnectedName = memberConnector.connectUser("T1", "U3", "gildong");

@@ -66,7 +66,7 @@ class AccessLinkKeyGeneratorTest {
     }
 
     @Test
-    @Sql(scripts = "classpath:sql/fixtures/link/access_link_sequence_initial.sql")
+    @Sql(scripts = "classpath:sql/fixtures/link/access_link_sequence_initial_seed.sql")
     void 블록을_모두_사용하면_다음_블록을_확보한다() {
         // when
         int total = 1_001;
@@ -86,7 +86,7 @@ class AccessLinkKeyGeneratorTest {
     }
 
     @Test
-    @Sql(scripts = "classpath:sql/fixtures/link/access_link_sequence_initial.sql")
+    @Sql(scripts = "classpath:sql/fixtures/link/access_link_sequence_initial_seed.sql")
     void 동시에_요청해도_키는_중복되지_않는다() throws Exception {
         // given
         int threadCount = 10;

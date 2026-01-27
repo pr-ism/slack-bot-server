@@ -35,7 +35,7 @@ class AccessLinkSequenceRepositoryAdapterTest {
     JpaAccessLinkSequenceRepository sequenceJpaRepository;
 
     @Test
-    @Sql(scripts = "classpath:sql/fixtures/link/access_link_sequence_initial_zero.sql")
+    @Sql(scripts = "classpath:sql/fixtures/link/access_link_sequence_initial_zero_seed.sql")
     void 동시에_요청해도_시퀀스_블록이_중복되지_않고_초기화된다() throws Exception {
         // given
         int threadCount = 10;

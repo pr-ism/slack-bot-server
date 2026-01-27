@@ -21,7 +21,7 @@ class TeamChannelReaderTest {
     TeamChannelReader teamChannelReader;
 
     @Test
-    @Sql(scripts = "classpath:sql/fixtures/channel/channels_t1.sql")
+    @Sql(scripts = "classpath:sql/fixtures/channel/channels_team1.sql")
     void 팀에_속한_채널을_조회한다() {
         // when
         List<Channel> actualChannels = teamChannelReader.readAll("T1");

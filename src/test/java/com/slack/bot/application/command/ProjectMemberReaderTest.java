@@ -21,7 +21,7 @@ class ProjectMemberReaderTest {
     ProjectMemberReader projectMemberReader;
 
     @Test
-    @Sql(scripts = "classpath:sql/fixtures/member/project_member_t1_u1.sql")
+    @Sql(scripts = "classpath:sql/fixtures/member/project_member_team1_user1.sql")
     void 프로젝트_멤버를_조회한다() {
         // given
         // when

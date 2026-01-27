@@ -29,7 +29,7 @@ class MemberConnectionWriterTest {
     ProjectMemberRepository projectMemberRepository;
 
     @Test
-    @Sql(scripts = "classpath:sql/fixtures/member/project_member_t1_u2.sql")
+    @Sql(scripts = "classpath:sql/fixtures/member/project_member_team1_user2.sql")
     void 이미_존재하는_멤버는_표시_이름을_유지한_채_Github_ID를_갱신한다() {
         // when
         String actualConnectedName = memberConnectionWriter.saveOrUpdateMember(

@@ -34,8 +34,8 @@ class AccessLinkerTest {
 
     @Test
     @Sql(scripts = {
-            "classpath:sql/fixtures/link/access_link_sequence_initial.sql",
-            "classpath:sql/fixtures/link/project_member_t1_u1.sql"
+            "classpath:sql/fixtures/link/access_link_sequence_initial_seed.sql",
+            "classpath:sql/fixtures/link/project_member_team1_user1.sql"
     })
     void 프로젝트_멤버가_개인_설정_링크_키를_받는다() {
         // given
@@ -54,8 +54,8 @@ class AccessLinkerTest {
 
     @Test
     @Sql(scripts = {
-            "classpath:sql/fixtures/link/access_link_sequence_initial.sql",
-            "classpath:sql/fixtures/link/project_member_t1_u1.sql"
+            "classpath:sql/fixtures/link/access_link_sequence_initial_seed.sql",
+            "classpath:sql/fixtures/link/project_member_team1_user1.sql"
     })
     void 링크_키로_멤버를_조회한다() {
         // given
@@ -74,9 +74,9 @@ class AccessLinkerTest {
 
     @Test
     @Sql(scripts = {
-            "classpath:sql/fixtures/link/access_link_sequence_initial.sql",
-            "classpath:sql/fixtures/link/project_member_t1_u1.sql",
-            "classpath:sql/fixtures/link/access_link_t1_u1.sql"
+            "classpath:sql/fixtures/link/access_link_sequence_initial_seed.sql",
+            "classpath:sql/fixtures/link/project_member_team1_user1.sql",
+            "classpath:sql/fixtures/link/access_link_team1_user1.sql"
     })
     void 링크_키로_연결된_멤버를_단_건_조회한다() {
         // given
@@ -94,9 +94,9 @@ class AccessLinkerTest {
 
     @Test
     @Sql(scripts = {
-            "classpath:sql/fixtures/link/access_link_sequence_initial.sql",
-            "classpath:sql/fixtures/link/project_member_t1_u1.sql",
-            "classpath:sql/fixtures/link/access_link_t1_u1.sql"
+            "classpath:sql/fixtures/link/access_link_sequence_initial_seed.sql",
+            "classpath:sql/fixtures/link/project_member_team1_user1.sql",
+            "classpath:sql/fixtures/link/access_link_team1_user1.sql"
     })
     void 기존_링크_키를_조회한다() {
         // given
@@ -115,8 +115,8 @@ class AccessLinkerTest {
 
     @Test
     @Sql(scripts = {
-            "classpath:sql/fixtures/link/access_link_sequence_initial.sql",
-            "classpath:sql/fixtures/link/project_member_t1_u1.sql"
+            "classpath:sql/fixtures/link/access_link_sequence_initial_seed.sql",
+            "classpath:sql/fixtures/link/project_member_team1_user1.sql"
     })
     void 동시에_요청해도_링크_키는_단건으로_생성된다() throws Exception {
         // given

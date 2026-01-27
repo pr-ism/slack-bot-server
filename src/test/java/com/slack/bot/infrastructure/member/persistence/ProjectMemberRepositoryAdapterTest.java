@@ -23,7 +23,7 @@ class ProjectMemberRepositoryAdapterTest {
     ProjectMemberRepository projectMemberRepository;
 
     @Test
-    @Sql(scripts = "classpath:sql/fixtures/member/project_member_t1_u1.sql")
+    @Sql(scripts = "classpath:sql/fixtures/member/project_member_team1_user1.sql")
     void 중복_멤버_저장_시_기존_멤버를_반환하고_Github_ID를_갱신한다() {
         // given
         ProjectMember duplicate = ProjectMember.builder()
