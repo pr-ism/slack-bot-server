@@ -33,7 +33,10 @@ class AccessLinkerTest {
     JpaAccessLinkRepository accessLinkRepository;
 
     @Test
-    @Sql(scripts = "classpath:sql/fixtures/link/project_member_t1_u1.sql")
+    @Sql(scripts = {
+            "classpath:sql/fixtures/link/access_link_sequence_initial.sql",
+            "classpath:sql/fixtures/link/project_member_t1_u1.sql"
+    })
     void 프로젝트_멤버가_개인_설정_링크_키를_받는다() {
         // given
         Long projectMemberId = 1L;
@@ -50,7 +53,10 @@ class AccessLinkerTest {
     }
 
     @Test
-    @Sql(scripts = "classpath:sql/fixtures/link/project_member_t1_u1.sql")
+    @Sql(scripts = {
+            "classpath:sql/fixtures/link/access_link_sequence_initial.sql",
+            "classpath:sql/fixtures/link/project_member_t1_u1.sql"
+    })
     void 링크_키로_멤버를_조회한다() {
         // given
         Long projectMemberId = 1L;
@@ -68,6 +74,7 @@ class AccessLinkerTest {
 
     @Test
     @Sql(scripts = {
+            "classpath:sql/fixtures/link/access_link_sequence_initial.sql",
             "classpath:sql/fixtures/link/project_member_t1_u1.sql",
             "classpath:sql/fixtures/link/access_link_t1_u1.sql"
     })
@@ -87,6 +94,7 @@ class AccessLinkerTest {
 
     @Test
     @Sql(scripts = {
+            "classpath:sql/fixtures/link/access_link_sequence_initial.sql",
             "classpath:sql/fixtures/link/project_member_t1_u1.sql",
             "classpath:sql/fixtures/link/access_link_t1_u1.sql"
     })
@@ -106,7 +114,10 @@ class AccessLinkerTest {
     }
 
     @Test
-    @Sql(scripts = "classpath:sql/fixtures/link/project_member_t1_u1.sql")
+    @Sql(scripts = {
+            "classpath:sql/fixtures/link/access_link_sequence_initial.sql",
+            "classpath:sql/fixtures/link/project_member_t1_u1.sql"
+    })
     void 동시에_요청해도_링크_키는_단건으로_생성된다() throws Exception {
         // given
         Long projectMemberId = 1L;

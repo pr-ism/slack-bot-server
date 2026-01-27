@@ -25,7 +25,6 @@ public class AccessLinkRepositoryAdapter implements AccessLinkRepository {
     private final MysqlDuplicateKeyDetector mysqlDuplicateKeyDetector;
 
     @Override
-    @Transactional(readOnly = true)
     public AccessLink saveOrFindExisting(AccessLink link) {
         try {
             return persistenceHandler.save(link);

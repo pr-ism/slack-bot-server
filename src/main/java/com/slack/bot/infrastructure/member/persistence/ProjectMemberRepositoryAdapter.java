@@ -19,9 +19,9 @@ public class ProjectMemberRepositoryAdapter implements ProjectMemberRepository {
     private final JPAQueryFactory queryFactory;
     private final ProjectMemberCreator projectMemberCreator;
     private final MysqlDuplicateKeyDetector mysqlDuplicateKeyDetector;
+    private final JpaProjectMemberRepository jpaProjectMemberRepository;
 
     @Override
-    @Transactional
     public ProjectMember save(ProjectMember member) {
         try {
             projectMemberCreator.saveNew(member);
@@ -50,7 +50,7 @@ public class ProjectMemberRepositoryAdapter implements ProjectMemberRepository {
             return null;
         }
         existing.connectGithubId(member.getGithubId());
-        return existing;
+        return jpaProjectMemberRepository.save(existing);
     }
 
     @Override

@@ -6,11 +6,10 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.domain.link.AccessLinkSequence;
 import com.slack.bot.domain.link.dto.AccessLinkSequenceBlockDto;
 import com.slack.bot.domain.link.repository.AccessLinkSequenceRepository;
-import com.slack.bot.infrastructure.link.persistence.exception.AccessLinkSequenceStateException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @RequiredArgsConstructor
@@ -19,10 +18,10 @@ public class AccessLinkSequenceRepositoryAdapter implements AccessLinkSequenceRe
     private static final Object CREATE_LOCK = new Object();
 
     private final JPAQueryFactory queryFactory;
+    private final AccessLinkSequencePersistenceHandler persistenceHandler;
     private final AccessLinkSequenceCreator accessLinkSequenceCreator;
 
     @Override
-    @Transactional
     public AccessLinkSequenceBlockDto allocateBlock(Long size, Long initialValue) {
         if (size == null || size <= 0L) {
             throw new IllegalArgumentException("블록 크기는 0보다 커야 합니다.");
@@ -36,30 +35,12 @@ public class AccessLinkSequenceRepositoryAdapter implements AccessLinkSequenceRe
 
     private long incrementNextValue(Long size, Long initialValue) {
         try {
-            return tryIncrement(size);
-        } catch (AccessLinkSequenceStateException ex) {
+            return persistenceHandler.tryIncrement(size);
+        } catch (DataAccessException ex) {
             ensureInitialized(initialValue);
-            return tryIncrement(size);
-        }
-    }
 
-    private long tryIncrement(Long size) {
-        long updatedRows = queryFactory.update(accessLinkSequence)
-                                       .set(accessLinkSequence.nextValue, accessLinkSequence.nextValue.add(size))
-                                       .where(accessLinkSequence.id.eq(AccessLinkSequence.DEFAULT_ID))
-                                       .execute();
-        if (updatedRows == 0L) {
-            throw new AccessLinkSequenceStateException();
+            return persistenceHandler.tryIncrement(size);
         }
-
-        Long current = queryFactory.select(accessLinkSequence.nextValue)
-                                   .from(accessLinkSequence)
-                                   .where(accessLinkSequence.id.eq(AccessLinkSequence.DEFAULT_ID))
-                                   .fetchOne();
-        if (current == null) {
-            throw new AccessLinkSequenceStateException();
-        }
-        return current;
     }
 
     private void ensureInitialized(Long initialValue) {
@@ -71,6 +52,7 @@ public class AccessLinkSequenceRepositoryAdapter implements AccessLinkSequenceRe
             if (exists) {
                 return;
             }
+
             createIfAbsent(initialValue);
         }
     }

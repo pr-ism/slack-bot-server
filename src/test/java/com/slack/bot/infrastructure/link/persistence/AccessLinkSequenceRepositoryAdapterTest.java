@@ -17,6 +17,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.springframework.test.context.jdbc.Sql;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,7 @@ class AccessLinkSequenceRepositoryAdapterTest {
     JpaAccessLinkSequenceRepository sequenceJpaRepository;
 
     @Test
+    @Sql(scripts = "classpath:sql/fixtures/link/access_link_sequence_initial_zero.sql")
     void 동시에_요청해도_시퀀스_블록이_중복되지_않고_초기화된다() throws Exception {
         // given
         int threadCount = 10;
