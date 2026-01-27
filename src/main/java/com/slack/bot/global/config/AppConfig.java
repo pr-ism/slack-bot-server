@@ -30,6 +30,7 @@ public class AppConfig {
         factory.setConnectTimeout(Duration.ofSeconds(1L));
         factory.setReadTimeout(Duration.ofSeconds(3L));
         return RestClient.builder()
+                         .requestFactory(factory)
                          .baseUrl("https://slack.com/api/");
     }
 
