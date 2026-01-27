@@ -1,16 +1,21 @@
 package com.slack.bot.global.exception;
 
+import com.slack.bot.application.command.client.exception.SlackUserInfoRequestException;
+import com.slack.bot.application.command.exception.WorkspaceNotFoundException;
 import com.slack.bot.application.oauth.exception.EmptyAccessTokenException;
 import com.slack.bot.application.oauth.exception.ExpiredSlackOauthStateException;
 import com.slack.bot.application.oauth.exception.SlackOauthEmptyResponseException;
 import com.slack.bot.application.oauth.exception.SlackOauthErrorResponseException;
 import com.slack.bot.application.oauth.exception.SlackOauthStateNotFoundException;
 import com.slack.bot.global.exception.dto.response.AuthErrorCode;
+import com.slack.bot.global.exception.dto.response.CommandErrorCode;
 import com.slack.bot.global.exception.dto.response.OauthErrorCode;
 import com.slack.bot.global.exception.dto.response.DefaultErrorCode;
 import com.slack.bot.global.exception.dto.response.ErrorCode;
 import com.slack.bot.global.exception.dto.response.ExceptionResponse;
 import com.slack.bot.infrastructure.auth.jwt.exception.InvalidTokenException;
+import com.slack.bot.infrastructure.link.persistence.exception.AccessLinkDuplicateKeyException;
+import com.slack.bot.infrastructure.link.persistence.exception.AccessLinkSequenceStateException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
@@ -79,6 +84,34 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.info("EmptyAccessTokenException : {}", ex.getMessage());
 
         return createResponseEntity(AuthErrorCode.EMPTY_TOKEN);
+    }
+
+    @ExceptionHandler(WorkspaceNotFoundException.class)
+    public ResponseEntity<Object> handleWorkspaceNotFoundException(WorkspaceNotFoundException ex) {
+        log.info("WorkspaceNotFoundException : {}", ex.getMessage());
+
+        return createResponseEntity(CommandErrorCode.WORK_SPACE_NOT_FOUND);
+    }
+
+    @ExceptionHandler(AccessLinkDuplicateKeyException.class)
+    public ResponseEntity<Object> handleAccessLinkDuplicateKeyException(AccessLinkDuplicateKeyException ex) {
+        log.info("AccessLinkDuplicateKeyException : {}", ex.getMessage());
+
+        return createResponseEntity(CommandErrorCode.DUPLICATE_LINK_KEY);
+    }
+
+    @ExceptionHandler(SlackUserInfoRequestException.class)
+    public ResponseEntity<Object> handleSlackUserInfoRequestException(SlackUserInfoRequestException ex) {
+        log.info("SlackUserInfoRequestException : {}", ex.getMessage());
+
+        return createResponseEntity(CommandErrorCode.SLACK_USER_INFO_API_FAILED);
+    }
+
+    @ExceptionHandler(AccessLinkSequenceStateException.class)
+    public ResponseEntity<Object> handleAccessLinkSequenceStateException(AccessLinkSequenceStateException ex) {
+        log.info("AccessLinkSequenceStateException : {}", ex.getMessage());
+
+        return createResponseEntity(CommandErrorCode.LINK_SEQUENCE_NOT_EXISTS);
     }
 
     @Override

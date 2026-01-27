@@ -15,3 +15,6 @@ token:
   refresh-expired-seconds: 259200
   access-expired-millis-seconds: 3600000
   refresh-expired-millis-seconds: 259200000
+
+access-link:
+  key-secret: access-link-secret
