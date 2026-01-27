@@ -65,12 +65,14 @@ class AccessLinkSequenceRepositoryAdapterTest {
             }
             ready.await();
             start.countDown();
-            done.await(5, TimeUnit.SECONDS);
+
+            boolean finished = done.await(5, TimeUnit.SECONDS);
+            assertThat(finished).isTrue();
         }
 
         Set<Long> allocatedValues = ConcurrentHashMap.newKeySet();
         for (Future<AccessLinkSequenceBlockDto> future : futures) {
-            AccessLinkSequenceBlockDto block = future.get();
+            AccessLinkSequenceBlockDto block = future.get(5, TimeUnit.SECONDS);
             for (long value = block.start(); value <= block.end(); value++) {
                 allocatedValues.add(value);
             }
