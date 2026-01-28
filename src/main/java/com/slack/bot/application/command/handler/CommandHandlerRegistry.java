@@ -6,6 +6,7 @@ import com.slack.bot.application.command.ProjectMemberReader;
 import com.slack.bot.application.command.dto.SlackCommandContextDto;
 import com.slack.bot.global.config.properties.AppProperties;
 import com.slack.bot.global.config.properties.CommandMessageProperties;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -73,6 +74,8 @@ public class CommandHandlerRegistry {
             return unknownCommand;
         }
 
-        return Objects.requireNonNullElse(commands.get(key), unknownCommand);
+        String lowerKey = key.toLowerCase(Locale.ROOT);
+
+        return Objects.requireNonNullElse(commands.get(lowerKey), unknownCommand);
     }
 }
