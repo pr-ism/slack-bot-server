@@ -554,7 +554,7 @@ Content-Type: application/json;charset=UTF-8
 <td class="tableblock halign-left valign-top"><p class="tableblock"><code>A01</code></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">UNAUTHORIZED</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">401</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">유효하지 않은 토큰</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">존재하지 않은 토큰</p></td>
 </tr>
 </tbody>
 </table>
@@ -662,10 +662,69 @@ Content-Type: application/json;charset=UTF-8
 </div>
 </div>
 </div>
+<div class="sect1">
+<h2 id="Command-API"><a class="link" href="#Command-API">Command API</a></h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="Command"><a class="link" href="#Command">슬랙 봇 커맨드 실행</a></h3>
+<div class="sect3">
+<h4 id="Command_http_request"><a class="link" href="#Command_http_request">HTTP request</a></h4>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight nowrap"><code class="language-http" data-lang="http">POST /slack/commands HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+
+text=help&amp;userId=U123&amp;teamId=T456</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="Command_form_parameters"><a class="link" href="#Command_form_parameters">Form parameters</a></h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Parameter</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>text</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">슬랙 명령어 텍스트</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>userId</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">슬랙 사용자 ID</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>teamId</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">슬랙 팀(워크스페이스) ID</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="Command_http_response"><a class="link" href="#Command_http_response">HTTP response</a></h4>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight nowrap"><code class="language-http" data-lang="http">HTTP/1.1 200 OK
+Content-Type: application/json;charset=UTF-8
+
+"ok"</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-01-22 12:27:50 +0900
+Last updated 2026-01-28 18:00:30 +0900
 </div>
 </div>
 </body>
