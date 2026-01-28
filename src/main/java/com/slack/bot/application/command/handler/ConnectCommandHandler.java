@@ -29,7 +29,8 @@ public class ConnectCommandHandler implements BotCommandHandler {
         List<String> arguments = context.arguments();
 
         if (arguments.size() < 2) {
-            return messages.connect().missingGithubId();
+            return messages.connect()
+                           .missingGithubId();
         }
 
         String githubId = arguments.get(1);
@@ -39,10 +40,13 @@ public class ConnectCommandHandler implements BotCommandHandler {
         try {
             String displayName = memberService.connectUser(teamId, userId, githubId);
 
-            return messages.connect().success().formatted(displayName, githubId);
+            return messages.connect()
+                           .success()
+                           .formatted(displayName, githubId);
         } catch (Exception e) {
             log.warn("Exception : ", e);
-            return messages.connect().fail();
+            return messages.connect()
+                           .fail();
         }
     }
 }
