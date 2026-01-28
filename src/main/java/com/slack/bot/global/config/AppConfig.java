@@ -3,6 +3,7 @@ package com.slack.bot.global.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
 import com.slack.bot.global.config.properties.AccessLinkKeyProperties;
+import com.slack.bot.global.config.properties.AppProperties;
 import com.slack.bot.global.config.properties.CommandMessageProperties;
 import com.slack.bot.global.config.properties.SlackProperties;
 import java.time.Clock;
@@ -19,7 +20,9 @@ import org.springframework.web.client.RestClient;
 
 @Configuration
 @EnableScheduling
-@EnableConfigurationProperties({SlackProperties.class, AccessLinkKeyProperties.class, CommandMessageProperties.class})
+@EnableConfigurationProperties(
+        {SlackProperties.class, AccessLinkKeyProperties.class, CommandMessageProperties.class, AppProperties.class}
+)
 public class AppConfig {
 
     private static final String DATE_TIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ss";
