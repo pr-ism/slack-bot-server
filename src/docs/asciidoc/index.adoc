@@ -9,3 +9,4 @@
 :docinfo: shared-head
 
 include::{docdir}/domain/oauth.adoc[]
+include::{docdir}/domain/command.adoc[]

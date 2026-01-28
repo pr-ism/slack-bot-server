@@ -5,6 +5,30 @@ slack:
   client-secret: client-secret
   redirect-uri: redirect-url
   scopes: "chat:write,chat:write.customize,channels:read,groups:read,commands,users:read"
+  command:
+    messages:
+      help: |-
+        👋 PRism 봇 사용법
+
+        - `/prism connect [GitHubID]`: 내 슬랙 계정과 깃허브 계정을 연결합니다.
+        - `/prism channels`: 채널별 API 키를 확인합니다.
+        - `/prism my-page`: 내 전용 설정 링크를 받습니다.
+        - `/prism help`: 이 도움말을 봅니다.
+      unknown: "⚠️ 알 수 없는 명령어입니다. `/prism help`를 입력해보세요."
+      connect:
+        missing-github-id: "GitHub ID를 입력해주세요.\n예시: `/prism connect hello-world`"
+        success: "✅ 연결되었습니다! (Slack: %s ↔ GitHub: %s)"
+        fail: "❌ 연결에 실패했습니다."
+      channels:
+        empty: "ℹ️ 이 워크스페이스에 등록된 채널이 없습니다. 봇을 채널에 초대해 주세요."
+        header: "📡 등록된 채널 목록 (이 워크스페이스):"
+        line-format: "- <#%s> : `%s`"
+      my-page:
+        not-connected: "아직 GitHub ID가 연결되지 않았습니다. `/prism connect [GitHubID]`로 먼저 연결해주세요."
+        link-message: |-
+          🔗 내 전용 설정 링크
+          %s
+          이 링크를 가진 사람만 접근할 수 있습니다.
 
 token:
   access-key: thisIsA32ByteAccessTokenKeyForHS
@@ -16,17 +40,13 @@ token:
   access-expired-millis-seconds: 3600000
   refresh-expired-millis-seconds: 259200000
 
+app:
+  public-base-url: http://localhost:8080
+
 access-link:
-  key-secret: test-access-link-secret
+  key-secret: access-link-secret
 
 spring:
-  datasource:
-    url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-    hikari:
-      maximum-pool-size: 20
   jpa:
     hibernate:
       ddl-auto: none

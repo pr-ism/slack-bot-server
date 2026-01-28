@@ -2,7 +2,13 @@ package com.slack.bot.global.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
+import com.slack.bot.application.command.AccessLinker;
+import com.slack.bot.application.command.MemberConnector;
+import com.slack.bot.application.command.ProjectMemberReader;
+import com.slack.bot.application.command.handler.CommandHandlerRegistry;
 import com.slack.bot.global.config.properties.AccessLinkKeyProperties;
+import com.slack.bot.global.config.properties.AppProperties;
+import com.slack.bot.global.config.properties.CommandMessageProperties;
 import com.slack.bot.global.config.properties.SlackProperties;
 import java.time.Clock;
 import java.time.Duration;
@@ -18,7 +24,9 @@ import org.springframework.web.client.RestClient;
 
 @Configuration
 @EnableScheduling
-@EnableConfigurationProperties({SlackProperties.class, AccessLinkKeyProperties.class})
+@EnableConfigurationProperties(
+        {SlackProperties.class, AccessLinkKeyProperties.class, CommandMessageProperties.class, AppProperties.class}
+)
 public class AppConfig {
 
     private static final String DATE_TIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ss";
@@ -49,5 +57,22 @@ public class AppConfig {
         return builder.simpleDateFormat(DATE_TIME_FORMAT)
                       .serializers(new LocalDateTimeSerializer(DateTimeFormatter.ofPattern(DATE_TIME_FORMAT)))
                       .build();
+    }
+
+    @Bean
+    public CommandHandlerRegistry slackCommandHandlerRegistry(
+            MemberConnector memberConnector,
+            ProjectMemberReader projectMemberReader,
+            AccessLinker accessLinker,
+            AppProperties appProperties,
+            CommandMessageProperties commandMessageProperties
+    ) {
+        return CommandHandlerRegistry.create(
+                memberConnector,
+                projectMemberReader,
+                accessLinker,
+                appProperties,
+                commandMessageProperties
+        );
     }
 }
