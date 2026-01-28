@@ -82,7 +82,6 @@ class MemberConnectionWriterTest {
         CountDownLatch ready = new CountDownLatch(threadCount);
         CountDownLatch start = new CountDownLatch(1);
         CountDownLatch done = new CountDownLatch(threadCount);
-        boolean finished;
 
         // when
         try (ExecutorService executor = Executors.newFixedThreadPool(threadCount)) {
@@ -108,14 +107,14 @@ class MemberConnectionWriterTest {
             }
             ready.await();
             start.countDown();
-            finished = done.await(5, TimeUnit.SECONDS);
+            boolean finished = done.await(3, TimeUnit.SECONDS);
+            assertThat(finished).isTrue();
         }
 
         Optional<ProjectMember> actualSavedMember = projectMemberRepository.findBySlackUser(teamId, slackUserId);
 
         // then
         assertAll(
-                () -> assertThat(finished).isTrue(),
                 () -> assertThat(actualSavedMember).isPresent(),
                 () -> assertThat(actualSavedMember.get().getDisplayName()).isEqualTo(displayName),
                 () -> assertThat(actualSavedMember.get().getGithubId().getValue()).isEqualTo(githubId)
