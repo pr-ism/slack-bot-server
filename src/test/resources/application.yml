@@ -14,7 +14,7 @@ slack:
         - `/prism channels`: 채널별 API 키를 확인합니다.
         - `/prism my-page`: 내 전용 설정 링크를 받습니다.
         - `/prism help`: 이 도움말을 봅니다.
-      unknown: "⚠️ 알 수 없는 명령어입니다. `/prims help`를 입력해보세요."
+      unknown: "⚠️ 알 수 없는 명령어입니다. `/prism help`를 입력해보세요."
       connect:
         missing-github-id: "GitHub ID를 입력해주세요.\n예시: `/prism connect hello-world`"
         success: "✅ 연결되었습니다! (Slack: %s ↔ GitHub: %s)"
