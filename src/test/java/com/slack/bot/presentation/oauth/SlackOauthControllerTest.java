@@ -1,11 +1,12 @@
 package com.slack.bot.presentation.oauth;
 
+import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.BDDMockito.willThrow;
-import static org.springframework.restdocs.cookies.CookieDocumentation.cookieWithName;
-import static org.springframework.restdocs.cookies.CookieDocumentation.requestCookies;
+import static org.springframework.restdocs.headers.HeaderDocumentation.headerWithName;
+import static org.springframework.restdocs.headers.HeaderDocumentation.requestHeaders;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.get;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
@@ -13,10 +14,9 @@ import static org.springframework.restdocs.request.RequestDocumentation.paramete
 import static org.springframework.restdocs.request.RequestDocumentation.queryParameters;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.hamcrest.Matchers.allOf;
 
-import com.slack.bot.application.oauth.OauthVerificationStateService;
 import com.slack.bot.application.oauth.OauthService;
+import com.slack.bot.application.oauth.OauthVerificationStateService;
 import com.slack.bot.application.oauth.RegisterWorkspaceService;
 import com.slack.bot.application.oauth.TokenParsingService;
 import com.slack.bot.application.oauth.dto.response.SlackTokenResponse;
@@ -24,7 +24,6 @@ import com.slack.bot.application.oauth.dto.response.SlackTokenResponse.Team;
 import com.slack.bot.application.oauth.exception.ExpiredSlackOauthStateException;
 import com.slack.bot.global.config.properties.SlackProperties;
 import com.slack.bot.presentation.CommonControllerSliceTestSupport;
-import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -69,7 +68,7 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
         // when & then
         ResultActions resultActions = mockMvc.perform(
                                                      get("/slack/install").accept(MediaType.APPLICATION_JSON)
-                                                                          .cookie(new Cookie("accessToken", accessToken))
+                                                                          .header("Authorization", "Bearer " + accessToken)
                                              )
                                              .andExpect(status().isOk())
                                              .andExpect(
@@ -90,8 +89,8 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
     private void 설치_URL_조회_문서화(ResultActions resultActions) throws Exception {
         resultActions.andDo(
                 restDocs.document(
-                        requestCookies(
-                                cookieWithName("accessToken").description("로그인한 사용자의 액세스 토큰")
+                        requestHeaders(
+                                headerWithName("Authorization").description("로그인한 사용자의 액세스 토큰")
                         ),
                         responseFields(
                                 fieldWithPath("url").type(JsonFieldType.STRING).description("슬랙 봇 설치 URL (state 포함)")
@@ -141,6 +140,36 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
                         )
                 )
         );
+    }
+
+    @Test
+    void Bearer_접두사가_없는_토큰으로도_설치_URL를_조회할_수_있다() throws Exception {
+        // given
+        String accessToken = "raw-access-token";
+        Long userId = 7L;
+        String expectedState = "state-token";
+
+        given(slackProperties.clientId()).willReturn("client-id");
+        given(slackProperties.scopes()).willReturn("chat:write,commands");
+        given(slackProperties.redirectUri()).willReturn("https://example.com/callback");
+        given(tokenParsingService.extractUserId(accessToken)).willReturn(userId);
+        given(oauthVerificationStateService.generateSlackOauthState(userId)).willReturn(expectedState);
+
+        // when & then
+        mockMvc.perform(
+                       get("/slack/install").accept(MediaType.APPLICATION_JSON)
+                                            .header("Authorization", accessToken)
+               )
+               .andExpect(status().isOk())
+               .andExpect(
+                       jsonPath(
+                               "$.url",
+                               allOf(
+                                       containsString("state="),
+                                       containsString("client_id=client-id")
+                               )
+                       )
+               );
     }
 
     @Test
