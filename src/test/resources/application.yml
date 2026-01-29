@@ -42,6 +42,12 @@ token:
 
 app:
   public-base-url: http://localhost:8080
+  async:
+    event:
+      core-pool-size: 4
+      max-pool-size: 8
+      thread-name-prefix: slack-events-
+      queue-capacity: 50
 
 access-link:
   key-secret: access-link-secret
@@ -54,3 +60,6 @@ spring:
     init:
       mode: always
       schema-locations: classpath:sql/schema.sql
+  datasource:
+    hikari:
+      maximum-pool-size: 20

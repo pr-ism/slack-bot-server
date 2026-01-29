@@ -721,10 +721,151 @@ Content-Type: application/json;charset=UTF-8
 </div>
 </div>
 </div>
+<div class="sect1">
+<h2 id="Event-API"><a class="link" href="#Event-API">Event API</a></h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="url_verification_event"><a class="link" href="#url_verification_event">url_verification 이벤트 실행</a></h3>
+<div class="sect3">
+<h4 id="url_verification_event_http_request"><a class="link" href="#url_verification_event_http_request">HTTP request</a></h4>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight nowrap"><code class="language-http" data-lang="http">POST /slack/events HTTP/1.1
+Content-Type: application/json;charset=UTF-8
+
+{
+  "type" : "url_verification",
+  "challenge" : "test-challenge"
+}</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="url_verification_event_request_fields"><a class="link" href="#url_verification_event_request_fields">Request fields</a></h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 20%;">
+<col style="width: 20%;">
+<col style="width: 20%;">
+<col style="width: 20%;">
+<col style="width: 20%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">필드명</th>
+<th class="tableblock halign-left valign-top">타입</th>
+<th class="tableblock halign-left valign-top">필수여부</th>
+<th class="tableblock halign-left valign-top">제약조건</th>
+<th class="tableblock halign-left valign-top">설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>type</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>String</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">url_verification 이벤트로 고정</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">url_verification 이벤트 타입</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>challenge</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>String</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">slack api event request url 입력 시 호출되는 값</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">URL 검증용 챌린지 값</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="url_verification_event_http_response"><a class="link" href="#url_verification_event_http_response">HTTP response</a></h4>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight nowrap"><code class="language-http" data-lang="http">HTTP/1.1 200 OK
+Content-Type: application/json;charset=UTF-8
+
+"test-challenge"</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="event"><a class="link" href="#event">슬랙 일반 이벤트 실행</a></h3>
+<div class="sect3">
+<h4 id="event_http_request"><a class="link" href="#event_http_request">HTTP request</a></h4>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight nowrap"><code class="language-http" data-lang="http">POST /slack/events HTTP/1.1
+Content-Type: application/json;charset=UTF-8
+
+{
+  "team_id" : "T1",
+  "event" : {
+    "type" : "member_joined_channel"
+  }
+}</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="event_request_fields"><a class="link" href="#event_request_fields">Request fields</a></h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 20%;">
+<col style="width: 20%;">
+<col style="width: 20%;">
+<col style="width: 20%;">
+<col style="width: 20%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">필드명</th>
+<th class="tableblock halign-left valign-top">타입</th>
+<th class="tableblock halign-left valign-top">필수여부</th>
+<th class="tableblock halign-left valign-top">제약조건</th>
+<th class="tableblock halign-left valign-top">설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>team_id</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>String</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">슬랙 팀(워크스페이스) ID</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>event</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>Object</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">슬랙이 전달하는 이벤트 데이터</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>event.type</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>String</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">member_joined_channel, app_uninstalled 이벤트 타입만 핸들링</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">이벤트 종류</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="event_http_response"><a class="link" href="#event_http_response">HTTP response</a></h4>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight nowrap"><code class="language-http" data-lang="http">HTTP/1.1 200 OK</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-01-28 18:00:30 +0900
+Last updated 2026-01-29 12:55:18 +0900
 </div>
 </div>
 </body>

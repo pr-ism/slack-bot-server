@@ -14,25 +14,19 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Channel extends BaseEntity {
 
-    private String apiKey;
     private String teamId;
     private String channelId;
+    private String channelName;
 
     @Builder
-    private Channel(String apiKey, String teamId, String channelId) {
-        validateApiKey(apiKey);
+    private Channel(String teamId, String channelId, String channelName) {
         validateTeamId(teamId);
         validateChannelId(channelId);
+        validateChannelName(channelName);
 
-        this.apiKey = apiKey;
         this.teamId = teamId;
         this.channelId = channelId;
-    }
-
-    private static void validateApiKey(String apiKey) {
-        if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalArgumentException("채널 API 키는 비어 있을 수 없습니다.");
-        }
+        this.channelName = channelName;
     }
 
     private static void validateTeamId(String teamId) {
@@ -47,8 +41,15 @@ public class Channel extends BaseEntity {
         }
     }
 
-    public void regenerateApiKey(String apiKey) {
-        validateApiKey(apiKey);
-        this.apiKey = apiKey;
+    private static void validateChannelName(String channelName) {
+        if (channelName == null || channelName.isBlank()) {
+            throw new IllegalArgumentException("채널 이름은 비어 있을 수 없습니다.");
+        }
+    }
+
+    public void updateChannelName(String channelName) {
+        validateChannelName(channelName);
+
+        this.channelName = channelName;
     }
 }

@@ -6,14 +6,21 @@ import com.slack.bot.application.command.AccessLinker;
 import com.slack.bot.application.command.MemberConnector;
 import com.slack.bot.application.command.ProjectMemberReader;
 import com.slack.bot.application.command.handler.CommandHandlerRegistry;
+import com.slack.bot.application.event.handler.SlackEventHandler;
+import com.slack.bot.application.event.handler.SlackEventHandlerRegistry;
 import com.slack.bot.global.config.properties.AccessLinkKeyProperties;
 import com.slack.bot.global.config.properties.AppProperties;
 import com.slack.bot.global.config.properties.CommandMessageProperties;
+import com.slack.bot.global.config.properties.EventMessageProperties;
+import com.slack.bot.global.config.properties.SlackEventAsyncProperties;
 import com.slack.bot.global.config.properties.SlackProperties;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.Map;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,9 +31,10 @@ import org.springframework.web.client.RestClient;
 
 @Configuration
 @EnableScheduling
-@EnableConfigurationProperties(
-        {SlackProperties.class, AccessLinkKeyProperties.class, CommandMessageProperties.class, AppProperties.class}
-)
+@EnableConfigurationProperties({
+        SlackProperties.class, AccessLinkKeyProperties.class, CommandMessageProperties.class, AppProperties.class,
+        SlackEventAsyncProperties.class, EventMessageProperties.class
+})
 public class AppConfig {
 
     private static final String DATE_TIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ss";
@@ -74,5 +82,17 @@ public class AppConfig {
                 appProperties,
                 commandMessageProperties
         );
+    }
+
+    @Bean
+    public SlackEventHandlerRegistry slackEventHandlerRegistry(
+            @Qualifier("memberJoinedEventHandler") SlackEventHandler memberJoinedHandler,
+            @Qualifier("appUninstallEventHandler") SlackEventHandler appUninstalledHandler
+    ) {
+        Map<String, SlackEventHandler> handlerMap = new HashMap<>();
+
+        handlerMap.put("member_joined_channel", memberJoinedHandler);
+        handlerMap.put("app_uninstalled", appUninstalledHandler);
+        return SlackEventHandlerRegistry.of(handlerMap);
     }
 }

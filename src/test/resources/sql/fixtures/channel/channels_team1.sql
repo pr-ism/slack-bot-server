@@ -1,5 +1,5 @@
-INSERT INTO channels (id, api_key, team_id, channel_id)
-VALUES (1, 'key-1', 'T1', 'C1');
+INSERT INTO channels (id, team_id, channel_id, channel_name)
+VALUES (1, 'T1', 'C1', 'general');
 
-INSERT INTO channels (id, api_key, team_id, channel_id)
-VALUES (2, 'key-2', 'T1', 'C2');
+INSERT INTO channels (id, team_id, channel_id, channel_name)
+VALUES (2, 'T1', 'C2', 'random');

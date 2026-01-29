@@ -8,8 +8,6 @@ public interface ChannelRepository {
 
     void save(Channel channel);
 
-    Optional<Channel> findByApiKey(String apiKey);
-
     Optional<Channel> findChannelInTeam(String teamId, String channelId);
 
     List<Channel> findAllByTeamId(String teamId);
