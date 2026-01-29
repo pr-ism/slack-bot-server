@@ -20,31 +20,31 @@ class ChannelTest {
         // when & then
         Channel channel = assertDoesNotThrow(
                 () -> Channel.builder()
-                             .apiKey("api-key")
                              .teamId("T1")
                              .channelId("C1")
+                             .channelName("N1")
                              .build()
         );
 
         assertAll(
-                () -> assertThat(channel.getApiKey()).isEqualTo("api-key"),
                 () -> assertThat(channel.getTeamId()).isEqualTo("T1"),
-                () -> assertThat(channel.getChannelId()).isEqualTo("C1")
+                () -> assertThat(channel.getChannelId()).isEqualTo("C1"),
+                () -> assertThat(channel.getChannelName()).isEqualTo("N1")
         );
     }
 
     @ParameterizedTest
     @NullAndEmptySource
-    void apiKey가_비어_있으면_초기화할_수_없다(String apiKey) {
+    void 채널_이름이_비어_있으면_초기화할_수_없다(String channelName) {
         // when & then
         assertThatThrownBy(
                 () -> Channel.builder()
-                             .apiKey(apiKey)
                              .teamId("T1")
                              .channelId("C1")
+                             .channelName(channelName)
                              .build()
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("채널 API 키는 비어 있을 수 없습니다.");
+         .hasMessageContaining("채널 이름은 비어 있을 수 없습니다.");
     }
 
     @ParameterizedTest
@@ -53,9 +53,9 @@ class ChannelTest {
         // when & then
         assertThatThrownBy(
                 () -> Channel.builder()
-                             .apiKey("api-key")
                              .teamId(teamId)
                              .channelId("C1")
+                             .channelName("N1")
                              .build()
         ).isInstanceOf(IllegalArgumentException.class)
          .hasMessageContaining("채널의 team ID는 비어 있을 수 없습니다.");
@@ -67,43 +67,43 @@ class ChannelTest {
         // when & then
         assertThatThrownBy(
                 () -> Channel.builder()
-                             .apiKey("api-key")
                              .teamId("T1")
                              .channelId(channelId)
+                             .channelName("N1")
                              .build()
         ).isInstanceOf(IllegalArgumentException.class)
          .hasMessageContaining("채널 ID는 비어 있을 수 없습니다.");
     }
 
     @Test
-    void apiKey를_갱신한다() {
+    void 채널_이름을_갱신한다() {
         // given
         Channel channel = Channel.builder()
-                                 .apiKey("old-key")
                                  .teamId("T1")
                                  .channelId("C1")
+                                 .channelName("old-name")
                                  .build();
 
         // when
-        channel.regenerateApiKey("new-key");
+        channel.updateChannelName("new-name");
 
         // then
-        assertThat(channel.getApiKey()).isEqualTo("new-key");
+        assertThat(channel.getChannelName()).isEqualTo("new-name");
     }
 
     @ParameterizedTest
     @NullAndEmptySource
-    void apiKey가_비어_있으면_갱신할_수_없다(String apiKey) {
+    void 채널_이름이_비어_있으면_갱신할_수_없다(String channelName) {
         // given
         Channel channel = Channel.builder()
-                                 .apiKey("old-key")
                                  .teamId("T1")
                                  .channelId("C1")
+                                 .channelName("N1")
                                  .build();
 
         // when & then
-        assertThatThrownBy(() -> channel.regenerateApiKey(apiKey))
+        assertThatThrownBy(() -> channel.updateChannelName(channelName))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("채널 API 키는 비어 있을 수 없습니다.");
+                .hasMessageContaining("채널 이름은 비어 있을 수 없습니다.");
     }
 }

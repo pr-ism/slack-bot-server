@@ -26,12 +26,6 @@ public class ChannelRepositoryAdapter implements ChannelRepository {
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<Channel> findByApiKey(String apiKey) {
-        return channelRepository.findByApiKey(apiKey);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public Optional<Channel> findChannelInTeam(String teamId, String channelId) {
         Channel result = queryFactory.selectFrom(channel)
                                      .where(
