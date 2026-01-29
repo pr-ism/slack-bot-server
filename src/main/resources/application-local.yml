@@ -59,3 +59,4 @@ app:
       core-pool-size: 4
       max-pool-size: 8
       thread-name-prefix: slack-events-
+      queue-capacity: 50

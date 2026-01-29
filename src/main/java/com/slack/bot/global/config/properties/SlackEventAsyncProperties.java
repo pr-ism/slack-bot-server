@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record SlackEventAsyncProperties(
         int corePoolSize,
         int maxPoolSize,
-        String threadNamePrefix
+        String threadNamePrefix,
+        int queueCapacity
 ) {
 }

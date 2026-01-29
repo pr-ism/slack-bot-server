@@ -28,6 +28,7 @@ public class AsyncConfig implements AsyncConfigurer {
         executor.setCorePoolSize(slackEventAsyncProperties.corePoolSize());
         executor.setMaxPoolSize(slackEventAsyncProperties.maxPoolSize());
         executor.setThreadNamePrefix(slackEventAsyncProperties.threadNamePrefix());
+        executor.setQueueCapacity(slackEventAsyncProperties.queueCapacity());
         executor.initialize();
         return executor;
     }
