@@ -1,0 +1,12 @@
+[[Event-API]]
+== Event API
+
+[[url_verification_event]]
+=== url_verification 이벤트 실행
+
+operation::slack-event-controller-test/url_verification_이벤트_성공_테스트[snippets='http-request,request-fields,http-response']
+
+[[event]]
+=== 슬랙 일반 이벤트 실행
+
+operation::slack-event-controller-test/일반_이벤트_성공_테스트[snippets='http-request,request-fields,http-response']
