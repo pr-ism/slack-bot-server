@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.slack.bot.application.IntegrationTest;
+import com.slack.bot.application.IntegrationTestConfig;
 import com.slack.bot.application.event.client.SlackEventApiClient;
 import com.slack.bot.application.event.handler.exception.BotUserIdMissingException;
 import com.slack.bot.application.event.handler.exception.UnregisteredWorkspaceException;
@@ -122,7 +123,7 @@ class MemberJoinedChannelEventHandlerTest {
     @Sql(scripts = "classpath:sql/fixtures/event/workspace_team1.sql")
     void Slack_API_호출_중_예외가_발생하면_Fallback_로직으로_채널명을_저장한다() {
         // given
-        String errorChannelId = "error-channel-id"; // 예외를 강제로 발생시키는 채널 ID
+        String errorChannelId = IntegrationTestConfig.ERROR_CHANNEL_NAME; // 예외를 강제로 발생시키는 채널 ID
         JsonNode payload = createPayload(
                 "workspace-id",
                 "bot-user-id",

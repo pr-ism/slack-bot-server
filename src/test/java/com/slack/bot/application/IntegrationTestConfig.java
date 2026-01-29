@@ -14,6 +14,8 @@ import org.springframework.web.client.RestClient;
 @TestConfiguration
 public class IntegrationTestConfig {
 
+    public static final String ERROR_CHANNEL_NAME = "error-channel-id";
+
     @Bean
     @Primary
     public MemberConnectionSlackApiClient memberConnectionSlackApiClient() {
@@ -44,7 +46,7 @@ public class IntegrationTestConfig {
             @Override
             public ChannelInfoDto fetchChannelInfo(String token, String channelId) {
                 if ("error-channel-id".equals(channelId)) {
-                    throw new RuntimeException("Forced Exception for Coverage Test");
+                    throw new RuntimeException("테스트를 위한 실패");
                 }
 
                 return new ChannelInfoDto(channelId, "integration-test-channel");
