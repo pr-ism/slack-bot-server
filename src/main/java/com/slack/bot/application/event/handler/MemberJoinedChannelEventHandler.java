@@ -14,9 +14,9 @@ import com.slack.bot.global.config.properties.EventMessageProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
-@Component
+@Component("memberJoinedEventHandler")
 @RequiredArgsConstructor
 public class MemberJoinedChannelEventHandler implements SlackEventHandler {
 
@@ -25,9 +25,9 @@ public class MemberJoinedChannelEventHandler implements SlackEventHandler {
     private final SlackEventApiClient slackEventApiClient;
     private final MemberJoinedEventParser memberJoinedEventParser;
     private final EventMessageProperties eventMessageProperties;
+    private final TransactionTemplate transactionTemplate;
 
     @Override
-    @Transactional
     @Async("slackEventExecutor")
     public void handle(JsonNode payload) {
         MemberJoinedEventPayload eventPayload = parseEventPayload(payload);
@@ -38,7 +38,7 @@ public class MemberJoinedChannelEventHandler implements SlackEventHandler {
             return;
         }
 
-        synchronizeChannel(eventPayload);
+        transactionTemplate.executeWithoutResult(status -> synchronizeChannel(eventPayload));
         sendMessage(workspace, eventPayload);
     }
 

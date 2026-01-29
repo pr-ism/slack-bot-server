@@ -55,8 +55,6 @@ class MemberJoinedChannelEventHandlerTest {
 
     private MemberJoinedChannelEventHandler memberJoinedChannelEventHandler;
 
-    private TransactionTemplate transactionTemplate;
-
     @Autowired
     PlatformTransactionManager transactionManager;
 
@@ -67,9 +65,9 @@ class MemberJoinedChannelEventHandlerTest {
                 workspaceRepository,
                 slackEventApiClient,
                 memberJoinedEventParser,
-                eventMessageProperties
+                eventMessageProperties,
+                new TransactionTemplate(transactionManager)
         );
-        transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     @Test
@@ -84,7 +82,7 @@ class MemberJoinedChannelEventHandlerTest {
         );
 
         // when
-        executeInTransaction(() -> memberJoinedChannelEventHandler.handle(payload));
+        memberJoinedChannelEventHandler.handle(payload);
 
         // then
         Optional<Channel> actualChannel = channelRepository.findChannelInTeam("workspace-id", "channel-id");
@@ -117,7 +115,7 @@ class MemberJoinedChannelEventHandlerTest {
         );
 
         // when
-        executeInTransaction(() -> memberJoinedChannelEventHandler.handle(payload));
+        memberJoinedChannelEventHandler.handle(payload);
 
         // then
         List<Channel> actual = channelRepository.findAllByTeamId("workspace-id");
@@ -205,12 +203,5 @@ class MemberJoinedChannelEventHandlerTest {
         payload.put("team_id", teamId);
         payload.set("event", event);
         return payload;
-    }
-
-    private void executeInTransaction(Runnable action) {
-        transactionTemplate.execute(status -> {
-            action.run();
-            return null;
-        });
     }
 }

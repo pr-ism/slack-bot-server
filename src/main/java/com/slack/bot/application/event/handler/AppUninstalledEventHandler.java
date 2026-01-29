@@ -6,23 +6,24 @@ import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
-@Component
+@Component("appUninstallEventHandler")
 @RequiredArgsConstructor
 public class AppUninstalledEventHandler implements SlackEventHandler {
 
     private final ChannelRepository channelRepository;
     private final WorkspaceRepository workspaceRepository;
+    private final TransactionTemplate transactionTemplate;
 
     @Override
-    @Transactional
     @Async("slackEventExecutor")
     public void handle(JsonNode payload) {
-        String teamId = payload.path("team_id")
-                               .asText();
+        String teamId = payload.path("team_id").asText();
 
-        channelRepository.deleteByTeamId(teamId);
-        workspaceRepository.deleteByTeamId(teamId);
+        transactionTemplate.executeWithoutResult(status -> {
+            channelRepository.deleteByTeamId(teamId);
+            workspaceRepository.deleteByTeamId(teamId);
+        });
     }
 }
