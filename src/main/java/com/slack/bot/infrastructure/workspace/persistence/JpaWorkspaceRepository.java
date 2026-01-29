@@ -7,4 +7,6 @@ import org.springframework.data.repository.CrudRepository;
 public interface JpaWorkspaceRepository extends CrudRepository<Workspace, Long> {
 
     Optional<Workspace> findByTeamId(String teamId);
+
+    void deleteByTeamId(String teamId);
 }

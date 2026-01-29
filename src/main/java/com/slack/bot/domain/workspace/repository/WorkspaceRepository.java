@@ -8,4 +8,6 @@ public interface WorkspaceRepository {
     void save(Workspace workspace);
 
     Optional<Workspace> findByTeamId(String teamId);
+
+    void deleteByTeamId(String teamId);
 }
