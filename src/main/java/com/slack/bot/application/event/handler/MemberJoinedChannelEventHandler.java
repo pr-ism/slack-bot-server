@@ -13,17 +13,19 @@ import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.EventMessageProperties;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
+@Slf4j
 @Component("memberJoinedEventHandler")
 @RequiredArgsConstructor
 public class MemberJoinedChannelEventHandler implements SlackEventHandler {
 
     private final ChannelRepository channelRepository;
     private final WorkspaceRepository workspaceRepository;
-    private final SlackEventApiClient slackEventApiClient; // conversations.info 기능이 추가되어야 함
+    private final SlackEventApiClient slackEventApiClient;
     private final MemberJoinedEventParser memberJoinedEventParser;
     private final EventMessageProperties eventMessageProperties;
     private final TransactionTemplate transactionTemplate;
@@ -38,15 +40,9 @@ public class MemberJoinedChannelEventHandler implements SlackEventHandler {
             return;
         }
 
-        // 4. [핵심 수정] Slack API를 통해 진짜 채널명 조회
         String realChannelName = fetchChannelName(workspace.getAccessToken(), eventPayload.channelId());
 
-        // 5. DB 동기화 (조회한 채널명 사용)
-        transactionTemplate.executeWithoutResult(status ->
-                synchronizeChannel(eventPayload, realChannelName)
-        );
-
-        // 6. 메시지 전송
+        transactionTemplate.executeWithoutResult(status -> synchronizeChannel(eventPayload, realChannelName));
         sendMessage(workspace, eventPayload);
     }
 
@@ -55,14 +51,15 @@ public class MemberJoinedChannelEventHandler implements SlackEventHandler {
             ChannelInfoDto channelInfoDto = slackEventApiClient.fetchChannelInfo(accessToken, channelId);
 
             return channelInfoDto.name();
-        } catch (Exception e) {
+        } catch (Exception ex) {
+            log.info("채널 정보 조회 실패 : ", ex);
             return "channel-" + channelId;
         }
     }
 
     private Workspace findWorkspace(MemberJoinedEventPayload eventPayload) {
         Workspace workspace = workspaceRepository.findByTeamId(eventPayload.teamId())
-                                                 .orElseThrow(UnregisteredWorkspaceException::new);
+                                                 .orElseThrow(() -> new UnregisteredWorkspaceException());
 
         if (workspace.getBotUserId() == null) {
             throw new BotUserIdMissingException(workspace.getTeamId());
@@ -74,7 +71,6 @@ public class MemberJoinedChannelEventHandler implements SlackEventHandler {
         return !eventPayload.joinedUserId().equals(workspace.getBotUserId());
     }
 
-    // 변경: channelName을 외부에서 주입받도록 수정
     private void synchronizeChannel(MemberJoinedEventPayload eventPayload, String fetchedChannelName) {
         channelRepository.findChannelInTeam(eventPayload.teamId(), eventPayload.channelId())
                          .ifPresentOrElse(
@@ -83,12 +79,11 @@ public class MemberJoinedChannelEventHandler implements SlackEventHandler {
                          );
     }
 
-    // 변경: eventPayload의 null 이름 대신 fetchedChannelName 사용
     private void saveChannel(MemberJoinedEventPayload eventPayload, String fetchedChannelName) {
         Channel channel = Channel.builder()
                                  .teamId(eventPayload.teamId())
                                  .channelId(eventPayload.channelId())
-                                 .channelName(fetchedChannelName) // <--- 여기서 실제 이름 저장
+                                 .channelName(fetchedChannelName)
                                  .build();
 
         channelRepository.save(channel);
