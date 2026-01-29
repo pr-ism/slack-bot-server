@@ -3,9 +3,6 @@ package com.slack.bot.application.event.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,8 +16,8 @@ import com.slack.bot.domain.channel.Channel;
 import com.slack.bot.domain.channel.repository.ChannelRepository;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.EventMessageProperties;
-import java.util.Optional;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -53,10 +50,10 @@ class MemberJoinedChannelEventHandlerTest {
     @Autowired
     EventMessageProperties eventMessageProperties;
 
-    private MemberJoinedChannelEventHandler memberJoinedChannelEventHandler;
-
     @Autowired
     PlatformTransactionManager transactionManager;
+
+    private MemberJoinedChannelEventHandler memberJoinedChannelEventHandler;
 
     @BeforeEach
     void setUp() {
@@ -72,13 +69,14 @@ class MemberJoinedChannelEventHandlerTest {
 
     @Test
     @Sql(scripts = "classpath:sql/fixtures/event/workspace_team1.sql")
-    void 봇이_채널에_초대되면_채널을_등록하고_환영_메시지를_전송한다() {
+    void 봇이_채널에_초대되면_Slack_API로_조회한_채널명으로_DB에_저장된다() {
         // given
+        String expectedChannelName = "integration-test-channel";
+
         JsonNode payload = createPayload(
                 "workspace-id",
                 "bot-user-id",
-                "channel-id",
-                "general-channel"
+                "channel-id"
         );
 
         // when
@@ -89,14 +87,7 @@ class MemberJoinedChannelEventHandlerTest {
 
         assertAll(
                 () -> assertThat(actualChannel).isPresent(),
-                () -> assertThat(actualChannel)
-                        .map(channel -> channel.getChannelName())
-                        .hasValue("general-channel"),
-                () -> verify(slackEventApiClient).sendMessage(
-                        "xoxb-bot-token",
-                        "channel-id",
-                        eventMessageProperties.welcome()
-                )
+                () -> assertThat(actualChannel.get().getChannelName()).isEqualTo(expectedChannelName)
         );
     }
 
@@ -105,13 +96,14 @@ class MemberJoinedChannelEventHandlerTest {
             "classpath:sql/fixtures/event/workspace_team1.sql",
             "classpath:sql/fixtures/event/channel_existing_for_handler.sql"
     })
-    void 기존_채널이_존재하면_채널이름을_업데이트하고_메시지를_전송한다() {
+    void 기존_채널이_존재하면_Slack_API로_조회한_채널명으로_업데이트된다() {
         // given
+        String expectedUpdatedName = "integration-test-channel";
+
         JsonNode payload = createPayload(
                 "workspace-id",
                 "bot-user-id",
-                "channel-id",
-                "general-channel"
+                "channel-id"
         );
 
         // when
@@ -122,26 +114,40 @@ class MemberJoinedChannelEventHandlerTest {
 
         assertAll(
                 () -> assertThat(actual).hasSize(1),
-                () -> assertThat(actual.get(0).getChannelName()).isEqualTo("general-channel"),
-                () -> assertThat(channelRepository.findChannelInTeam("workspace-id", "channel-id"))
-                        .map(channel -> channel.getChannelName())
-                        .hasValue("general-channel"),
-                () -> verify(slackEventApiClient).sendMessage(
-                        "xoxb-bot-token",
-                        "channel-id",
-                        eventMessageProperties.welcome()
-                )
+                () -> assertThat(actual.get(0).getChannelName()).isEqualTo(expectedUpdatedName)
         );
     }
 
     @Test
-    void 등록되지_않은_워크스페이스면_메시지를_전송하지_못한다() {
+    @Sql(scripts = "classpath:sql/fixtures/event/workspace_team1.sql")
+    void Slack_API_호출_중_예외가_발생하면_Fallback_로직으로_채널명을_저장한다() {
+        // given
+        String errorChannelId = "error-channel-id"; // 예외를 강제로 발생시키는 채널 ID
+        JsonNode payload = createPayload(
+                "workspace-id",
+                "bot-user-id",
+                errorChannelId
+        );
+
+        // when
+        memberJoinedChannelEventHandler.handle(payload);
+
+        // then
+        Optional<Channel> actualChannel = channelRepository.findChannelInTeam("workspace-id", errorChannelId);
+
+        assertAll(
+                () -> assertThat(actualChannel).isPresent(),
+                () -> assertThat(actualChannel.get().getChannelName()).isEqualTo("channel-" + errorChannelId)
+        );
+    }
+
+    @Test
+    void 등록되지_않은_워크스페이스면_예외가_발생한다() {
         // given
         JsonNode payload = createPayload(
                 "unknown-workspace-id",
                 "bot-user-id",
-                "channel-id",
-                "general-channel"
+                "channel-id"
         );
 
         // when & then
@@ -151,51 +157,42 @@ class MemberJoinedChannelEventHandlerTest {
 
     @Test
     @Sql(scripts = "classpath:sql/fixtures/event/workspace_team1_no_bot_user.sql")
-    void 봇_User_id가_누락되면_메시지를_전송하지_못한다() {
+    void 봇_User_id가_누락되면_예외가_발생한다() {
         // given
         JsonNode payload = createPayload(
                 "workspace-id",
                 "bot-user-id",
-                "channel-id",
-                "general-channel"
+                "channel-id"
         );
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> memberJoinedChannelEventHandler.handle(payload))
-                        .isInstanceOf(BotUserIdMissingException.class)
-                        .hasMessageContaining("workspace-id"),
-                () -> verify(slackEventApiClient, never()).sendMessage(anyString(), anyString(), anyString())
-        );
+        assertThatThrownBy(() -> memberJoinedChannelEventHandler.handle(payload))
+                .isInstanceOf(BotUserIdMissingException.class)
+                .hasMessageContaining("workspace-id");
     }
 
     @Test
     @Sql(scripts = "classpath:sql/fixtures/event/workspace_team1.sql")
-    void 봇이_아닌_사용자가_채널에_참여하면_아무_동작도_하지_않는다() {
+    void 봇이_아닌_사용자가_채널에_참여하면_DB에_저장되지_않는다() {
         // given
         JsonNode payload = createPayload(
                 "workspace-id",
                 "member-user-id",
-                "channel-id",
-                "general-channel"
+                "channel-id"
         );
 
         // when
         memberJoinedChannelEventHandler.handle(payload);
 
         // then
-        assertAll(
-                () -> assertThat(channelRepository.findChannelInTeam("workspace-id", "channel-id")).isEmpty(),
-                () -> verify(slackEventApiClient, never()).sendMessage(anyString(), anyString(), anyString())
-        );
+        assertThat(channelRepository.findChannelInTeam("workspace-id", "channel-id")).isEmpty();
     }
 
-    private JsonNode createPayload(String teamId, String joinedUserId, String channelId, String channelName) {
+    private JsonNode createPayload(String teamId, String joinedUserId, String channelId) {
         ObjectNode event = objectMapper.createObjectNode();
 
         event.put("user", joinedUserId);
         event.put("channel", channelId);
-        event.put("channel_name", channelName);
         event.put("inviter", "inviter-user-id");
 
         ObjectNode payload = objectMapper.createObjectNode();

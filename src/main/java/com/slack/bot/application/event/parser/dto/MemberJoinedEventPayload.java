@@ -7,7 +7,6 @@ public record MemberJoinedEventPayload(
         String teamId,
         String joinedUserId,
         String channelId,
-        String channelName,
         String inviterId
 ) {
 }

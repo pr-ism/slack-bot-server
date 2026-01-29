@@ -1,5 +1,6 @@
 package com.slack.bot.application.event.client;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.springframework.http.HttpMethod.POST;
@@ -10,6 +11,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.slack.bot.application.event.dto.ChannelInfoDto;
 import com.slack.bot.application.event.client.exception.SlackChatRequestException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -39,6 +41,77 @@ class SlackEventApiClientTest {
         RestClient slackClient = restClientBuilder.build();
 
         slackEventApiClient = new SlackEventApiClient(slackClient);
+    }
+
+    @Test
+    void 채널_정보를_성공적으로_조회한다() {
+        // given
+        String token = "xoxb-test-token";
+        String channelId = "C12345";
+        String channelName = "general";
+        String requestBody = """
+            {
+              "channel": "C12345"
+            }
+            """;
+        String responseBody = """
+            {
+              "ok": true,
+              "channel": {
+                "id": "C12345",
+                "name": "general",
+                "is_channel": true
+              }
+            }
+            """;
+
+        mockServer.expect(requestTo("https://slack.com/api/conversations.info"))
+                  .andExpect(method(POST))
+                  .andExpect(header("Authorization", "Bearer " + token))
+                  .andExpect(content().json(requestBody))
+                  .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
+
+        // when
+        ChannelInfoDto result = slackEventApiClient.fetchChannelInfo(token, channelId);
+
+        // then
+        assertAll(
+                () -> assertThat(result.id()).isEqualTo(channelId),
+                () -> assertThat(result.name()).isEqualTo(channelName),
+                () -> mockServer.verify()
+        );
+    }
+
+    @Test
+    void 채널_정보_조회_시_Slack_로직_에러가_발생하면_예외를_던진다() {
+        // given
+        String token = "xoxb-test-token";
+        String channelId = "INVALID_ID";
+        String requestBody = """
+            {
+              "channel": "INVALID_ID"
+            }
+            """;
+        String responseBody = """
+            {
+              "ok": false,
+              "error": "channel_not_found"
+            }
+            """;
+
+        mockServer.expect(requestTo("https://slack.com/api/conversations.info"))
+                  .andExpect(method(POST))
+                  .andExpect(header("Authorization", "Bearer " + token))
+                  .andExpect(content().json(requestBody))
+                  .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
+
+        // when & then
+        assertAll(
+                () -> assertThatThrownBy(() -> slackEventApiClient.fetchChannelInfo(token, channelId))
+                        .isInstanceOf(SlackChatRequestException.class)
+                        .hasMessageContaining("channel_not_found"),
+                () -> mockServer.verify()
+        );
     }
 
     @Test
@@ -174,7 +247,7 @@ class SlackEventApiClientTest {
         assertAll(
                 () -> assertThatThrownBy(() -> slackEventApiClient.sendMessage(token, channelId, text))
                         .isInstanceOf(SlackChatRequestException.class)
-                        .hasMessageContaining("슬랙 봇으로 채팅을 입력하지 못했습니다."),
+                        .hasMessageContaining("Slack API 요청 처리 실패"),
                 () -> mockServer.verify()
         );
     }
@@ -195,7 +268,7 @@ class SlackEventApiClientTest {
         assertAll(
                 () -> assertThatThrownBy(() -> slackEventApiClient.sendMessage(token, channelId, text))
                         .isInstanceOf(SlackChatRequestException.class)
-                        .hasMessageContaining("슬랙 봇으로 채팅을 입력하지 못했습니다."),
+                        .hasMessageContaining("Slack API 요청 처리 실패"),
                 () -> mockServer.verify()
         );
     }

@@ -2,6 +2,7 @@ package com.slack.bot.application.event.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.slack.bot.application.event.client.SlackEventApiClient;
+import com.slack.bot.application.event.dto.ChannelInfoDto;
 import com.slack.bot.application.event.handler.exception.BotUserIdMissingException;
 import com.slack.bot.application.event.handler.exception.UnregisteredWorkspaceException;
 import com.slack.bot.application.event.parser.MemberJoinedEventParser;
@@ -22,7 +23,7 @@ public class MemberJoinedChannelEventHandler implements SlackEventHandler {
 
     private final ChannelRepository channelRepository;
     private final WorkspaceRepository workspaceRepository;
-    private final SlackEventApiClient slackEventApiClient;
+    private final SlackEventApiClient slackEventApiClient; // conversations.info 기능이 추가되어야 함
     private final MemberJoinedEventParser memberJoinedEventParser;
     private final EventMessageProperties eventMessageProperties;
     private final TransactionTemplate transactionTemplate;
@@ -30,53 +31,67 @@ public class MemberJoinedChannelEventHandler implements SlackEventHandler {
     @Override
     @Async("slackEventExecutor")
     public void handle(JsonNode payload) {
-        MemberJoinedEventPayload eventPayload = parseEventPayload(payload);
+        MemberJoinedEventPayload eventPayload = memberJoinedEventParser.parse(payload);
         Workspace workspace = findWorkspace(eventPayload);
-        validateBotUserId(workspace);
 
         if (isNotBotUserId(eventPayload, workspace)) {
             return;
         }
 
-        transactionTemplate.executeWithoutResult(status -> synchronizeChannel(eventPayload));
+        // 4. [핵심 수정] Slack API를 통해 진짜 채널명 조회
+        String realChannelName = fetchChannelName(workspace.getAccessToken(), eventPayload.channelId());
+
+        // 5. DB 동기화 (조회한 채널명 사용)
+        transactionTemplate.executeWithoutResult(status ->
+                synchronizeChannel(eventPayload, realChannelName)
+        );
+
+        // 6. 메시지 전송
         sendMessage(workspace, eventPayload);
     }
 
-    private MemberJoinedEventPayload parseEventPayload(JsonNode payload) {
-        return memberJoinedEventParser.parse(payload);
+    private String fetchChannelName(String accessToken, String channelId) {
+        try {
+            ChannelInfoDto channelInfoDto = slackEventApiClient.fetchChannelInfo(accessToken, channelId);
+
+            return channelInfoDto.name();
+        } catch (Exception e) {
+            return "channel-" + channelId;
+        }
     }
 
     private Workspace findWorkspace(MemberJoinedEventPayload eventPayload) {
-        return workspaceRepository.findByTeamId(eventPayload.teamId())
-                                  .orElseThrow(() -> new UnregisteredWorkspaceException());
-    }
+        Workspace workspace = workspaceRepository.findByTeamId(eventPayload.teamId())
+                                                 .orElseThrow(UnregisteredWorkspaceException::new);
 
-    private void saveChannel(MemberJoinedEventPayload eventPayload) {
-        Channel channel = Channel.builder()
-                                 .teamId(eventPayload.teamId())
-                                 .channelId(eventPayload.channelId())
-                                 .channelName(eventPayload.channelName())
-                                 .build();
-
-        channelRepository.save(channel);
-    }
-
-    private void validateBotUserId(Workspace workspace) {
         if (workspace.getBotUserId() == null) {
             throw new BotUserIdMissingException(workspace.getTeamId());
         }
+        return workspace;
     }
 
     private boolean isNotBotUserId(MemberJoinedEventPayload eventPayload, Workspace workspace) {
         return !eventPayload.joinedUserId().equals(workspace.getBotUserId());
     }
 
-    private void synchronizeChannel(MemberJoinedEventPayload eventPayload) {
+    // 변경: channelName을 외부에서 주입받도록 수정
+    private void synchronizeChannel(MemberJoinedEventPayload eventPayload, String fetchedChannelName) {
         channelRepository.findChannelInTeam(eventPayload.teamId(), eventPayload.channelId())
                          .ifPresentOrElse(
-                                 existing -> existing.updateChannelName(eventPayload.channelName()),
-                                 () -> saveChannel(eventPayload)
+                                 existing -> existing.updateChannelName(fetchedChannelName),
+                                 () -> saveChannel(eventPayload, fetchedChannelName)
                          );
+    }
+
+    // 변경: eventPayload의 null 이름 대신 fetchedChannelName 사용
+    private void saveChannel(MemberJoinedEventPayload eventPayload, String fetchedChannelName) {
+        Channel channel = Channel.builder()
+                                 .teamId(eventPayload.teamId())
+                                 .channelId(eventPayload.channelId())
+                                 .channelName(fetchedChannelName) // <--- 여기서 실제 이름 저장
+                                 .build();
+
+        channelRepository.save(channel);
     }
 
     private void sendMessage(Workspace workspace, MemberJoinedEventPayload eventPayload) {

@@ -9,17 +9,16 @@ public class MemberJoinedEventParser {
 
     public MemberJoinedEventPayload parse(JsonNode payload) {
         JsonNode event = payload.path("event");
+
         String teamId = payload.path("team_id").asText();
         String joinedUserId = event.path("user").asText();
         String channelId = event.path("channel").asText();
-        String channelName = extractText(event, "channel_name");
         String inviterId = extractText(event, "inviter");
 
         return MemberJoinedEventPayload.builder()
                                        .teamId(teamId)
                                        .joinedUserId(joinedUserId)
                                        .channelId(channelId)
-                                       .channelName(channelName)
                                        .inviterId(inviterId)
                                        .build();
     }

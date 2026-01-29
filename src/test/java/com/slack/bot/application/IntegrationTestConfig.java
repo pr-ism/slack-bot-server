@@ -1,6 +1,8 @@
 package com.slack.bot.application;
 
 import com.slack.bot.application.command.client.MemberConnectionSlackApiClient;
+import com.slack.bot.application.event.client.SlackEventApiClient;
+import com.slack.bot.application.event.dto.ChannelInfoDto;
 import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
 import java.sql.SQLException;
 import org.hibernate.exception.ConstraintViolationException;
@@ -25,6 +27,35 @@ public class IntegrationTestConfig {
             @Override
             public String resolveUserName(String token, String slackUserId) {
                 return "신규 사용자";
+            }
+        };
+    }
+
+    @Bean
+    @Primary
+    public SlackEventApiClient slackEventApiClient() {
+        String baseUrl = "https://slack.com/api/";
+        RestClient slackClient = RestClient.builder()
+                                           .baseUrl(baseUrl)
+                                           .build();
+
+        return new SlackEventApiClient(slackClient) {
+
+            @Override
+            public ChannelInfoDto fetchChannelInfo(String token, String channelId) {
+                if ("error-channel-id".equals(channelId)) {
+                    throw new RuntimeException("Forced Exception for Coverage Test");
+                }
+
+                return new ChannelInfoDto(channelId, "integration-test-channel");
+            }
+
+            @Override
+            public void sendMessage(String token, String channelId, String text) {
+            }
+
+            @Override
+            public void sendEphemeralMessage(String token, String channelId, String targetUserId, String text) {
             }
         };
     }

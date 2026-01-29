@@ -27,7 +27,6 @@ class MemberJoinedEventParserTest {
                     "event": {
                         "user": "U98765",
                         "channel": "C12345",
-                        "channel_name": "general",
                         "inviter": "U11111"
                     }
                 }
@@ -42,7 +41,6 @@ class MemberJoinedEventParserTest {
                 () -> assertThat(actual.teamId()).isEqualTo("T12345"),
                 () -> assertThat(actual.joinedUserId()).isEqualTo("U98765"),
                 () -> assertThat(actual.channelId()).isEqualTo("C12345"),
-                () -> assertThat(actual.channelName()).isEqualTo("general"),
                 () -> assertThat(actual.inviterId()).isEqualTo("U11111")
         );
     }
@@ -67,7 +65,6 @@ class MemberJoinedEventParserTest {
         // then
         assertAll(
                 () -> assertThat(actual.teamId()).isEqualTo("T12345"),
-                () -> assertThat(actual.channelName()).isNull(),
                 () -> assertThat(actual.inviterId()).isNull()
         );
     }

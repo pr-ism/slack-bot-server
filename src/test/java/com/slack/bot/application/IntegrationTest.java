@@ -1,6 +1,5 @@
 package com.slack.bot.application;
 
-import com.slack.bot.application.event.client.SlackEventApiClient;
 import com.slack.bot.application.event.handler.SlackEventHandlerRegistry;
 import com.slack.bot.context.CleanupExecutionListener;
 import com.slack.bot.domain.auth.TokenDecoder;
@@ -19,7 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @SpringBootTest
 @Import(IntegrationTestConfig.class)
 @MockitoBean(types = {
-        DateTimeProvider.class, TokenDecoder.class, SlackEventApiClient.class, SlackEventHandlerRegistry.class
+        DateTimeProvider.class, TokenDecoder.class, SlackEventHandlerRegistry.class
 })
 @TestExecutionListeners(listeners = CleanupExecutionListener.class, mergeMode = TestExecutionListeners.MergeMode.MERGE_WITH_DEFAULTS)
 public @interface IntegrationTest {
