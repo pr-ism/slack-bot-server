@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Collections;
 import java.util.Map;
 
-public final class SlackEventHandlerRegistry {
+public class SlackEventHandlerRegistry {
 
     private final Map<String, SlackEventHandler> handlers;
 
