@@ -2,7 +2,7 @@ package com.slack.bot.application.event.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.slack.bot.application.event.client.SlackEventApiClient;
-import com.slack.bot.application.event.dto.ChannelInfoDto;
+import com.slack.bot.application.event.dto.ChannelNameWrapper;
 import com.slack.bot.application.event.handler.exception.BotUserIdMissingException;
 import com.slack.bot.application.event.handler.exception.UnregisteredWorkspaceException;
 import com.slack.bot.application.event.parser.MemberJoinedEventParser;
@@ -48,11 +48,12 @@ public class MemberJoinedChannelEventHandler implements SlackEventHandler {
 
     private String fetchChannelName(String accessToken, String channelId) {
         try {
-            ChannelInfoDto channelInfoDto = slackEventApiClient.fetchChannelInfo(accessToken, channelId);
+            ChannelNameWrapper channelNameWrapper = slackEventApiClient.fetchChannelInfo(accessToken, channelId);
 
-            return channelInfoDto.name();
+            return channelNameWrapper.name();
         } catch (Exception ex) {
             log.info("채널 정보 조회 실패 : ", ex);
+
             return "channel-" + channelId;
         }
     }

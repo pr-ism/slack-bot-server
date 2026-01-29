@@ -1,7 +1,7 @@
 package com.slack.bot.application.event.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.slack.bot.application.event.dto.ChannelInfoDto;
+import com.slack.bot.application.event.dto.ChannelNameWrapper;
 import com.slack.bot.application.event.client.exception.SlackChatRequestException;
 import java.util.HashMap;
 import java.util.Map;
@@ -45,7 +45,7 @@ public class SlackEventApiClient {
         return body;
     }
 
-    public ChannelInfoDto fetchChannelInfo(String token, String channelId) {
+    public ChannelNameWrapper fetchChannelInfo(String token, String channelId) {
         Map<String, Object> body = createChannelInfoMessageBody(channelId);
         JsonNode responseNode = sendPostRequest(token, "conversations.info", body);
 
@@ -89,13 +89,11 @@ public class SlackEventApiClient {
         return response;
     }
 
-    private ChannelInfoDto extractChannelInfo(JsonNode response) {
+    private ChannelNameWrapper extractChannelInfo(JsonNode response) {
         JsonNode channelNode = response.path("channel");
+        String channelName = channelNode.path("name").asText();
 
-        return new ChannelInfoDto(
-                channelNode.path("id").asText(),
-                channelNode.path("name").asText()
-        );
+        return new ChannelNameWrapper(channelName);
     }
 
     private String createAuthorizationHeader(String token) {

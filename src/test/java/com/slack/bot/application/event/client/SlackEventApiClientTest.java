@@ -11,7 +11,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-import com.slack.bot.application.event.dto.ChannelInfoDto;
+import com.slack.bot.application.event.dto.ChannelNameWrapper;
 import com.slack.bot.application.event.client.exception.SlackChatRequestException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -72,11 +72,10 @@ class SlackEventApiClientTest {
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when
-        ChannelInfoDto result = slackEventApiClient.fetchChannelInfo(token, channelId);
+        ChannelNameWrapper result = slackEventApiClient.fetchChannelInfo(token, channelId);
 
         // then
         assertAll(
-                () -> assertThat(result.id()).isEqualTo(channelId),
                 () -> assertThat(result.name()).isEqualTo(channelName),
                 () -> mockServer.verify()
         );

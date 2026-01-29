@@ -2,7 +2,7 @@ package com.slack.bot.application;
 
 import com.slack.bot.application.command.client.MemberConnectionSlackApiClient;
 import com.slack.bot.application.event.client.SlackEventApiClient;
-import com.slack.bot.application.event.dto.ChannelInfoDto;
+import com.slack.bot.application.event.dto.ChannelNameWrapper;
 import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
 import java.sql.SQLException;
 import org.hibernate.exception.ConstraintViolationException;
@@ -44,12 +44,12 @@ public class IntegrationTestConfig {
         return new SlackEventApiClient(slackClient) {
 
             @Override
-            public ChannelInfoDto fetchChannelInfo(String token, String channelId) {
+            public ChannelNameWrapper fetchChannelInfo(String token, String channelId) {
                 if ("error-channel-id".equals(channelId)) {
                     throw new RuntimeException("테스트를 위한 실패");
                 }
 
-                return new ChannelInfoDto(channelId, "integration-test-channel");
+                return new ChannelNameWrapper("integration-test-channel");
             }
 
             @Override
