@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 public class MemberJoinedEventParser {
 
     public MemberJoinedEventPayload parse(JsonNode payload) {
-        JsonNode event = payload.get("event");
+        JsonNode event = payload.path("event");
         String teamId = payload.path("team_id").asText();
         String joinedUserId = event.path("user").asText();
         String channelId = event.path("channel").asText();
