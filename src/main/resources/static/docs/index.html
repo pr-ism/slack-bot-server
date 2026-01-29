@@ -452,12 +452,12 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <div class="content">
 <pre class="highlight nowrap"><code class="language-http" data-lang="http">GET /slack/install HTTP/1.1
 Accept: application/json
-Cookie: accessToken=test-access-token</code></pre>
+Authorization: Bearer test-access-token</code></pre>
 </div>
 </div>
 </div>
 <div class="sect3">
-<h4 id="Install_request_cookies"><a class="link" href="#Install_request_cookies">Request cookies</a></h4>
+<h4 id="Install_request_headers"><a class="link" href="#Install_request_headers">Request headers</a></h4>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
 <col style="width: 33.3333%;">
@@ -473,7 +473,7 @@ Cookie: accessToken=test-access-token</code></pre>
 </thead>
 <tbody>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><code>accessToken</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>Authorization</code></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">로그인한 사용자의 액세스 토큰</p></td>
 </tr>
@@ -865,7 +865,7 @@ Content-Type: application/json;charset=UTF-8
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-01-29 12:55:18 +0900
+Last updated 2026-01-29 23:41:37 +0900
 </div>
 </div>
 </body>
