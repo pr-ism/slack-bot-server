@@ -18,19 +18,19 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         CorsRegistration registration = registry.addMapping("/**")
-                                                .allowedMethods(corsProperties.allowedMethods().toArray(String[]::new))
-                                                .allowedHeaders(corsProperties.allowedHeaders().toArray(String[]::new))
+                                                .allowedMethods(corsProperties.allowedMethods().toArray(new String[0]))
+                                                .allowedHeaders(corsProperties.allowedHeaders().toArray(new String[0]))
                                                 .maxAge(corsProperties.maxAge())
                                                 .allowCredentials(true);
 
         if (corsProperties.hasOriginPatterns()) {
-            registration.allowedOriginPatterns(corsProperties.allowedOriginPatterns().toArray(String[]::new));
+            registration.allowedOriginPatterns(corsProperties.allowedOriginPatterns().toArray(new String[0]));
         } else {
-            registration.allowedOrigins(corsProperties.allowedOrigins().toArray(String[]::new));
+            registration.allowedOrigins(corsProperties.allowedOrigins().toArray(new String[0]));
         }
 
         if (corsProperties.hasExposedHeaders()) {
-            registration.exposedHeaders(corsProperties.exposedHeaders().toArray(String[]::new));
+            registration.exposedHeaders(corsProperties.exposedHeaders().toArray(new String[0]));
         }
     }
 }
