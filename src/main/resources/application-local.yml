@@ -60,3 +60,20 @@ app:
       max-pool-size: 8
       thread-name-prefix: slack-events-
       queue-capacity: 50
+
+cors:
+  allowed-origins:
+    - http://localhost:3000
+    - http://localhost:8080
+  allowed-origin-patterns: []
+  allowed-methods:
+    - GET
+    - POST
+    - PUT
+    - PATCH
+    - DELETE
+    - OPTIONS
+  allowed-headers:
+    - "*"
+  exposed-headers: []
+  max-age: 3600

@@ -11,8 +11,9 @@ import com.slack.bot.presentation.oauth.dto.response.SlackInstallUrlResponse;
 import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,10 +32,12 @@ public class SlackOauthController {
 
     @GetMapping("/install")
     public ResponseEntity<SlackInstallUrlResponse> getInstallUrl(
-            @CookieValue(value = "accessToken") String accessToken
+            @RequestHeader("Authorization") String authorizationHeader
     ) {
+        String accessToken = resolveToken(authorizationHeader);
         Long userId = tokenParsingService.extractUserId(accessToken);
         String state = oauthVerificationStateService.generateSlackOauthState(userId);
+
         String slackOauthUrl = UriComponentsBuilder.fromUriString("https://slack.com/oauth/v2/authorize")
                                                    .queryParam("client_id", slackProperties.clientId())
                                                    .queryParam("scope", slackProperties.scopes())
@@ -46,6 +49,14 @@ public class SlackOauthController {
         SlackInstallUrlResponse response = new SlackInstallUrlResponse(slackOauthUrl);
 
         return ResponseEntity.ok(response);
+    }
+
+    private String resolveToken(String authorizationHeader) {
+        if (StringUtils.hasText(authorizationHeader) && authorizationHeader.startsWith("Bearer ")) {
+            return authorizationHeader.substring(7);
+        }
+
+        return authorizationHeader;
     }
 
     @GetMapping("/callback")
