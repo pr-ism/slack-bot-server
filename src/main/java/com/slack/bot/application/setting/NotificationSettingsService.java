@@ -17,9 +17,8 @@ public class NotificationSettingsService {
     private final NotificationSettingsRepository notificationSettingsRepository;
 
     @Transactional
-    public NotificationSettingsResponse getOrCreateSettings(Long projectMemberId) {
-        NotificationSettings settings = notificationSettingsRepository.findByProjectMemberId(projectMemberId)
-                                                     .orElseGet(() -> createDefaultSettings(projectMemberId));
+    public NotificationSettingsResponse findSettings(Long projectMemberId) {
+        NotificationSettings settings = findOrCreateSettingsEntity(projectMemberId);
 
         return NotificationSettingsResponse.from(settings);
     }
@@ -29,24 +28,18 @@ public class NotificationSettingsService {
             Long projectMemberId,
             UpdateNotificationSettingsRequest request
     ) {
-        NotificationSettings settings = getOrCreateSettingsEntity(projectMemberId);
+        NotificationSettings settings = findOrCreateSettingsEntity(projectMemberId);
 
         notificationSettingsUpdater.update(settings, request);
         return NotificationSettingsResponse.from(settings);
     }
 
-    private NotificationSettings createDefaultSettings(Long projectMemberId) {
-        NotificationSettings settings = NotificationSettings.defaults(projectMemberId);
-
-        return notificationSettingsRepository.save(settings);
-    }
-
-    private NotificationSettings getOrCreateSettingsEntity(Long projectMemberId) {
+    private NotificationSettings findOrCreateSettingsEntity(Long projectMemberId) {
         return notificationSettingsRepository.findByProjectMemberId(projectMemberId)
                      .orElseGet(() -> {
                          NotificationSettings notificationSettings = NotificationSettings.defaults(projectMemberId);
 
-                         return notificationSettingsRepository.saveOrGetOnDuplicate(notificationSettings);
+                         return notificationSettingsRepository.saveOrFindOnDuplicate(notificationSettings);
                      });
     }
 }

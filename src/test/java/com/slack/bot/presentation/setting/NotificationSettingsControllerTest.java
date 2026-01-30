@@ -44,7 +44,7 @@ class NotificationSettingsControllerTest extends CommonControllerSliceTestSuppor
                 true
         );
 
-        given(notificationSettingsService.getOrCreateSettings(projectMemberId)).willReturn(response);
+        given(notificationSettingsService.findSettings(projectMemberId)).willReturn(response);
 
         // when & then
         ResultActions resultActions = mockMvc.perform(

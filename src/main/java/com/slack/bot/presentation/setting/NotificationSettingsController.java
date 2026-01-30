@@ -19,7 +19,7 @@ public class NotificationSettingsController {
     public ResponseEntity<NotificationSettingsResponse> findNotificationSettings(
             @RequestParam Long projectMemberId
     ) {
-        NotificationSettingsResponse response = notificationSettingsService.getOrCreateSettings(projectMemberId);
+        NotificationSettingsResponse response = notificationSettingsService.findSettings(projectMemberId);
 
         return ResponseEntity.ok(response);
     }

@@ -33,7 +33,7 @@ class NotificationSettingsServiceTest {
         Long projectMemberId = 1L;
 
         // when
-        NotificationSettingsResponse actual = notificationSettingsService.getOrCreateSettings(projectMemberId);
+        NotificationSettingsResponse actual = notificationSettingsService.findSettings(projectMemberId);
 
         // then
         NotificationSettings saved = jpaNotificationSettings.findByProjectMemberId(projectMemberId)
@@ -65,7 +65,7 @@ class NotificationSettingsServiceTest {
         jpaNotificationSettings.save(settings);
 
         // when
-        NotificationSettingsResponse actual = notificationSettingsService.getOrCreateSettings(projectMemberId);
+        NotificationSettingsResponse actual = notificationSettingsService.findSettings(projectMemberId);
 
         // then
         assertAll(

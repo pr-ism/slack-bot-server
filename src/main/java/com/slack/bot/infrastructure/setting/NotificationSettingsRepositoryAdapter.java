@@ -33,7 +33,7 @@ public class NotificationSettingsRepositoryAdapter implements NotificationSettin
     }
 
     @Override
-    public NotificationSettings saveOrGetOnDuplicate(NotificationSettings notificationSettings) {
+    public NotificationSettings saveOrFindOnDuplicate(NotificationSettings notificationSettings) {
         TransactionTemplate requiresNew = new TransactionTemplate(transactionManager);
 
         requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);

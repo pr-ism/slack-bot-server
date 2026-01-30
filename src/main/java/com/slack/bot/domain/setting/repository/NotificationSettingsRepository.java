@@ -9,5 +9,5 @@ public interface NotificationSettingsRepository {
 
     NotificationSettings save(NotificationSettings notificationSettings);
 
-    NotificationSettings saveOrGetOnDuplicate(NotificationSettings notificationSettings);
+    NotificationSettings saveOrFindOnDuplicate(NotificationSettings notificationSettings);
 }
