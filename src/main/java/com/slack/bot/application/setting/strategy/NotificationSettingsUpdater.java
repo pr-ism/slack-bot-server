@@ -3,9 +3,7 @@ package com.slack.bot.application.setting.strategy;
 import com.slack.bot.application.setting.dto.request.UpdateNotificationSettingsRequest;
 import com.slack.bot.domain.setting.NotificationSettings;
 import java.util.List;
-import org.springframework.stereotype.Component;
 
-@Component
 public class NotificationSettingsUpdater {
 
     private final List<SettingUpdateStrategy> strategies;

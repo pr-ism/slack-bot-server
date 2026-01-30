@@ -3,7 +3,6 @@ package com.slack.bot.application;
 import com.slack.bot.application.command.client.MemberConnectionSlackApiClient;
 import com.slack.bot.application.event.client.SlackEventApiClient;
 import com.slack.bot.application.event.dto.ChannelNameWrapper;
-import com.slack.bot.application.setting.strategy.NotificationSettingsUpdater;
 import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
 import java.sql.SQLException;
 import org.hibernate.exception.ConstraintViolationException;
@@ -103,9 +102,4 @@ public class IntegrationTestConfig {
         };
     }
 
-    @Bean
-    @Primary
-    public NotificationSettingsUpdater notificationSettingsUpdater() {
-        return NotificationSettingsUpdater.create();
-    }
 }
