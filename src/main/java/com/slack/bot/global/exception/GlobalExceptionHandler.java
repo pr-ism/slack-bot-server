@@ -13,9 +13,11 @@ import com.slack.bot.global.exception.dto.response.OauthErrorCode;
 import com.slack.bot.global.exception.dto.response.DefaultErrorCode;
 import com.slack.bot.global.exception.dto.response.ErrorCode;
 import com.slack.bot.global.exception.dto.response.ExceptionResponse;
+import com.slack.bot.global.exception.dto.response.SettingErrorCode;
 import com.slack.bot.infrastructure.auth.jwt.exception.InvalidTokenException;
 import com.slack.bot.infrastructure.link.persistence.exception.AccessLinkDuplicateKeyException;
 import com.slack.bot.infrastructure.link.persistence.exception.AccessLinkSequenceStateException;
+import com.slack.bot.infrastructure.setting.exception.NotificationSettingsCreationConflictException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
@@ -112,6 +114,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.info("AccessLinkSequenceStateException : {}", ex.getMessage());
 
         return createResponseEntity(CommandErrorCode.LINK_SEQUENCE_NOT_EXISTS);
+    }
+
+    @ExceptionHandler(NotificationSettingsCreationConflictException.class)
+    public ResponseEntity<Object> handleNotificationSettingsCreationConflictException(NotificationSettingsCreationConflictException ex) {
+        log.info("NotificationSettingsCreationConflictException : {}", ex.getMessage());
+
+        return createResponseEntity(SettingErrorCode.NOTIFICATION_SETTINGS_CONFLICT);
     }
 
     @Override
