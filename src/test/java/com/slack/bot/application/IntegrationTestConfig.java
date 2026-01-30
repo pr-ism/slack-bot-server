@@ -3,6 +3,7 @@ package com.slack.bot.application;
 import com.slack.bot.application.command.client.MemberConnectionSlackApiClient;
 import com.slack.bot.application.event.client.SlackEventApiClient;
 import com.slack.bot.application.event.dto.ChannelNameWrapper;
+import com.slack.bot.application.setting.strategy.NotificationSettingsUpdater;
 import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
 import java.sql.SQLException;
 import org.hibernate.exception.ConstraintViolationException;
@@ -77,6 +78,7 @@ public class IntegrationTestConfig {
 
             private boolean isH2DuplicateKey(Throwable throwable) {
                 Throwable current = throwable;
+
                 while (current != null) {
                     if (current instanceof ConstraintViolationException cve && isH2SqlState(cve.getSQLException())) {
                         return true;
@@ -88,6 +90,7 @@ public class IntegrationTestConfig {
 
                     current = current.getCause();
                 }
+
                 return false;
             }
 
@@ -98,5 +101,11 @@ public class IntegrationTestConfig {
                 return "23505".equals(sqlException.getSQLState());
             }
         };
+    }
+
+    @Bean
+    @Primary
+    public NotificationSettingsUpdater notificationSettingsUpdater() {
+        return NotificationSettingsUpdater.create();
     }
 }
