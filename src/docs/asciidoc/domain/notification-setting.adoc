@@ -1,0 +1,12 @@
+[[Notification-Setting-API]]
+== 알림 설정 API
+
+[[Find-Notification]]
+=== 개인 알림 설정 조회
+
+operation::notification-settings-controller-test/알림_설정_조회_성공_테스트[snippets='http-request,query-parameters,http-response,response-fields']
+
+[[Update-Notification]]
+=== 개인 알림 설정 수정
+
+operation::notification-settings-controller-test/알림_설정_수정_성공_테스트[snippets='http-request,query-parameters,request-fields,http-response,response-fields']
