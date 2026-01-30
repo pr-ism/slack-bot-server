@@ -1,0 +1,54 @@
+package com.slack.bot.infrastructure.setting;
+
+import com.slack.bot.domain.setting.NotificationSettings;
+import com.slack.bot.domain.setting.repository.NotificationSettingsRepository;
+import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
+import com.slack.bot.infrastructure.setting.exception.NotificationSettingsCreationConflictException;
+import jakarta.persistence.EntityManager;
+import java.util.Optional;
+import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
+
+@Repository
+@RequiredArgsConstructor
+public class NotificationSettingsRepositoryAdapter implements NotificationSettingsRepository {
+
+    private final EntityManager entityManager;
+    private final PlatformTransactionManager transactionManager;
+    private final JpaNotificationSettings jpaNotificationSettings;
+    private final MysqlDuplicateKeyDetector mysqlDuplicateKeyDetector;
+
+    @Override
+    public Optional<NotificationSettings> findByProjectMemberId(Long projectMemberId) {
+        return jpaNotificationSettings.findByProjectMemberId(projectMemberId);
+    }
+
+    @Override
+    public NotificationSettings save(NotificationSettings notificationSettings) {
+        return jpaNotificationSettings.save(notificationSettings);
+    }
+
+    @Override
+    public NotificationSettings saveOrGetOnDuplicate(NotificationSettings notificationSettings) {
+        TransactionTemplate requiresNew = new TransactionTemplate(transactionManager);
+
+        requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
+        try {
+            return requiresNew.execute(status -> jpaNotificationSettings.save(notificationSettings));
+        } catch (DataIntegrityViolationException ex) {
+            if (mysqlDuplicateKeyDetector.isNotDuplicateKey(ex)) {
+                throw ex;
+            }
+            return requiresNew.execute(status -> {
+                entityManager.clear();
+                return jpaNotificationSettings.findByProjectMemberId(notificationSettings.getProjectMemberId())
+                                              .orElseThrow(() -> new NotificationSettingsCreationConflictException(notificationSettings.getProjectMemberId(), ex));
+            });
+        }
+    }
+}
