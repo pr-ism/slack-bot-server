@@ -32,13 +32,9 @@ class NotificationSettingsTest {
     }
 
     @Test
-    void 프로젝트_멤버_식별자가_비어_있다면_알림_설정을_생성할_수_없다() {
-        // given
-        ReservationConfirmed reservationConfirmed = ReservationConfirmed.defaults();
-        OptionalNotifications optional = OptionalNotifications.defaults();
-
+    void 프로젝트_멤버_식별자가_비어_있다면_알림_설정을_기본값으로_생성할_수_없다() {
         // when & then
-        assertThatThrownBy(() -> NotificationSettings.create(null, reservationConfirmed, optional))
+        assertThatThrownBy(() -> NotificationSettings.defaults(null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("프로젝트 멤버의 식별자는 비어 있을 수 없습니다.");
     }

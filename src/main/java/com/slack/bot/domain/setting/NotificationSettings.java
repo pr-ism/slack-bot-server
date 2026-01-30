@@ -28,7 +28,7 @@ public class NotificationSettings extends BaseEntity {
         ReservationConfirmed reservationConfirmed = ReservationConfirmed.defaults();
         OptionalNotifications optionalNotifications = OptionalNotifications.defaults();
 
-        return new NotificationSettings(projectMemberId, reservationConfirmed, optionalNotifications);
+        return create(projectMemberId, reservationConfirmed, optionalNotifications);
     }
 
     public static NotificationSettings create(
