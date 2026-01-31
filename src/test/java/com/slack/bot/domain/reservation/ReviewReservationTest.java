@@ -12,6 +12,7 @@ import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
@@ -52,6 +53,7 @@ class ReviewReservationTest {
 
     @ParameterizedTest
     @NullAndEmptySource
+    @ValueSource(strings = {" ", "\t"})
     void Team_ID가_비어_있으면_초기화할_수_없다(String teamId) {
         // when & then
         assertThatThrownBy(() -> ReviewReservation.builder()
@@ -70,6 +72,7 @@ class ReviewReservationTest {
 
     @ParameterizedTest
     @NullAndEmptySource
+    @ValueSource(strings = {" ", "\t"})
     void Channel_ID가_비어_있으면_초기화할_수_없다(String channelId) {
         // when & then
         assertThatThrownBy(() -> ReviewReservation.builder()
@@ -122,6 +125,7 @@ class ReviewReservationTest {
 
     @ParameterizedTest
     @NullAndEmptySource
+    @ValueSource(strings = {" ", "\t"})
     void 요청자_Slack_ID가_비어_있으면_초기화할_수_없다(String authorSlackId) {
         // when & then
         assertThatThrownBy(() -> ReviewReservation.builder()
@@ -140,6 +144,7 @@ class ReviewReservationTest {
 
     @ParameterizedTest
     @NullAndEmptySource
+    @ValueSource(strings = {" ", "\t"})
     void 리뷰어_Slack_ID가_비어_있으면_초기화할_수_없다(String reviewerSlackId) {
         // when & then
         assertThatThrownBy(() -> ReviewReservation.builder()
