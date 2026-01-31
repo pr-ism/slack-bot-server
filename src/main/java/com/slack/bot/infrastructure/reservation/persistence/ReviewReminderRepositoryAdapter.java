@@ -22,12 +22,12 @@ public class ReviewReminderRepositoryAdapter implements ReviewReminderRepository
     @Override
     @Transactional(readOnly = true)
     public Optional<ReviewReminder> findByReservationId(Long reservationId) {
-        return jpaReviewReminderRepository.findById(reservationId);
+        return jpaReviewReminderRepository.findByReservationId(reservationId);
     }
 
     @Override
     @Transactional
     public void deleteByReservationId(Long reservationId) {
-        jpaReviewReminderRepository.deleteById(reservationId);
+        jpaReviewReminderRepository.deleteByReservationId(reservationId);
     }
 }
