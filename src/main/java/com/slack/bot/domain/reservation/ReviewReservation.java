@@ -39,7 +39,6 @@ public class ReviewReservation extends BaseTimeEntity {
 
     @Builder
     private ReviewReservation(
-            Long id,
             String teamId,
             String channelId,
             Long projectId,
