@@ -11,3 +11,4 @@
 include::{docdir}/domain/oauth.adoc[]
 include::{docdir}/domain/command.adoc[]
 include::{docdir}/domain/event.adoc[]
+include::{docdir}/domain/notification-setting.adoc[]

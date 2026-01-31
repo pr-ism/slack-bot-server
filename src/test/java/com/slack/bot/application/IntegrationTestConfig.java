@@ -77,6 +77,7 @@ public class IntegrationTestConfig {
 
             private boolean isH2DuplicateKey(Throwable throwable) {
                 Throwable current = throwable;
+
                 while (current != null) {
                     if (current instanceof ConstraintViolationException cve && isH2SqlState(cve.getSQLException())) {
                         return true;
@@ -88,6 +89,7 @@ public class IntegrationTestConfig {
 
                     current = current.getCause();
                 }
+
                 return false;
             }
 
@@ -99,4 +101,5 @@ public class IntegrationTestConfig {
             }
         };
     }
+
 }

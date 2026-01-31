@@ -8,6 +8,7 @@ import com.slack.bot.application.command.ProjectMemberReader;
 import com.slack.bot.application.command.handler.CommandHandlerRegistry;
 import com.slack.bot.application.event.handler.SlackEventHandler;
 import com.slack.bot.application.event.handler.SlackEventHandlerRegistry;
+import com.slack.bot.application.setting.strategy.NotificationSettingsUpdater;
 import com.slack.bot.global.config.properties.AccessLinkKeyProperties;
 import com.slack.bot.global.config.properties.AppProperties;
 import com.slack.bot.global.config.properties.CommandMessageProperties;
@@ -94,5 +95,10 @@ public class AppConfig {
         handlerMap.put("member_joined_channel", memberJoinedHandler);
         handlerMap.put("app_uninstalled", appUninstalledHandler);
         return SlackEventHandlerRegistry.of(handlerMap);
+    }
+
+    @Bean
+    public NotificationSettingsUpdater notificationSettingsUpdater() {
+        return NotificationSettingsUpdater.create();
     }
 }

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.context.ControllerMockInjectionSupport;
 import com.slack.bot.context.ResetMockTestExecutionListener;
 import com.slack.bot.docs.RestDocsConfiguration;
+import com.slack.bot.global.resolver.ProjectMemberIdArgumentResolver;
 import com.slack.bot.global.exception.GlobalExceptionHandler;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +31,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.test.web.servlet.setup.StandaloneMockMvcBuilder;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.filter.CharacterEncodingFilter;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 
 @Import(RestDocsConfiguration.class)
 @ExtendWith(SpringExtension.class)
@@ -55,14 +57,16 @@ public abstract class CommonControllerSliceTestSupport {
     @BeforeEach
     void beforeEach() {
         StandaloneMockMvcBuilder standaloneMockMvcBuilder = MockMvcBuilders.standaloneSetup(findRestControllers());
+        ProjectMemberIdArgumentResolver projectMemberIdArgumentResolver = new ProjectMemberIdArgumentResolver();
 
-        this.mockMvc = new FixedStandaloneMockMvcBuilder(standaloneMockMvcBuilder).configureMessageConverters()
-                                                                                  .configureArgumentResolvers()
-                                                                                  .configureInterceptors()
-                                                                                  .configureControllerAdvice()
-                                                                                  .configureRestDocs()
-                                                                                  .configureFilters()
-                                                                                  .build();
+        this.mockMvc = new FixedStandaloneMockMvcBuilder(standaloneMockMvcBuilder)
+                .configureMessageConverters()
+                .configureArgumentResolvers(projectMemberIdArgumentResolver)
+                .configureInterceptors()
+                .configureControllerAdvice()
+                .configureRestDocs()
+                .configureFilters()
+                .build();
     }
 
     private Object[] findRestControllers() {
@@ -99,7 +103,8 @@ public abstract class CommonControllerSliceTestSupport {
             return this;
         }
 
-        FixedStandaloneMockMvcBuilder configureArgumentResolvers() {
+        FixedStandaloneMockMvcBuilder configureArgumentResolvers(HandlerMethodArgumentResolver... resolvers) {
+            builder.setCustomArgumentResolvers(resolvers);
             return this;
         }
 
@@ -125,5 +130,3 @@ public abstract class CommonControllerSliceTestSupport {
         }
     }
 }
-
-
