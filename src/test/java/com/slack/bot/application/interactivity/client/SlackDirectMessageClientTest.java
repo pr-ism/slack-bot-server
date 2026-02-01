@@ -116,6 +116,85 @@ class SlackDirectMessageClientTest {
     }
 
     @Test
+    void DM_전송_응답이_ok_false이면_예외를_던진다() {
+        // given
+        String token = "xoxb-token";
+        String userId = "U123";
+
+        String openResponseBody = """
+                {
+                  "ok": true,
+                  "channel": {
+                    "id": "D234"
+                  }
+                }
+                """;
+        mockServer.expect(requestTo("https://slack.com/api/conversations.open"))
+                  .andExpect(method(POST))
+                  .andExpect(header("Authorization", "Bearer " + token))
+                  .andExpect(content().json("{\"users\":\"U123\"}"))
+                  .andRespond(withSuccess(openResponseBody, MediaType.APPLICATION_JSON));
+
+        String postResponseBody = """
+                {
+                  "ok": false,
+                  "error": "not_in_channel"
+                }
+                """;
+        mockServer.expect(requestTo("https://slack.com/api/chat.postMessage"))
+                  .andExpect(method(POST))
+                  .andExpect(header("Authorization", "Bearer " + token))
+                  .andRespond(withSuccess(postResponseBody, MediaType.APPLICATION_JSON));
+
+        // when & then
+        assertAll(
+                () -> assertThatThrownBy(() -> slackDirectMessageClient.send(token, userId, "message"))
+                        .isInstanceOf(SlackDmException.class)
+                        .hasMessageContaining("not_in_channel"),
+                () -> mockServer.verify()
+        );
+    }
+
+    @Test
+    void DM_전송_응답에_오류_메시지가_없으면_기본_오류를_사용한다() {
+        // given
+        String token = "xoxb-token";
+        String userId = "U123";
+
+        String openResponseBody = """
+                {
+                  "ok": true,
+                  "channel": {
+                    "id": "D234"
+                  }
+                }
+                """;
+        mockServer.expect(requestTo("https://slack.com/api/conversations.open"))
+                  .andExpect(method(POST))
+                  .andExpect(header("Authorization", "Bearer " + token))
+                  .andExpect(content().json("{\"users\":\"U123\"}"))
+                  .andRespond(withSuccess(openResponseBody, MediaType.APPLICATION_JSON));
+
+        String postResponseBody = """
+                {
+                  "ok": false
+                }
+                """;
+        mockServer.expect(requestTo("https://slack.com/api/chat.postMessage"))
+                  .andExpect(method(POST))
+                  .andExpect(header("Authorization", "Bearer " + token))
+                  .andRespond(withSuccess(postResponseBody, MediaType.APPLICATION_JSON));
+
+        // when & then
+        assertAll(
+                () -> assertThatThrownBy(() -> slackDirectMessageClient.send(token, userId, "message"))
+                        .isInstanceOf(SlackDmException.class)
+                        .hasMessageContaining("알 수 없는 오류"),
+                () -> mockServer.verify()
+        );
+    }
+
+    @Test
     void 메시지_전송_HTTP_오류가_나면_예외를_던진다() {
         // given
         String token = "xoxb-token";

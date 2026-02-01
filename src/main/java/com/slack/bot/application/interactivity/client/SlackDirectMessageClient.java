@@ -2,6 +2,7 @@ package com.slack.bot.application.interactivity.client;
 
 import com.slack.bot.application.interactivity.client.dto.response.SlackConversationsOpenResponse;
 import com.slack.bot.application.interactivity.client.dto.response.SlackConversationsOpenResponse.SlackChannel;
+import com.slack.bot.application.interactivity.client.dto.response.SlackChatPostMessageResponse;
 import com.slack.bot.application.interactivity.client.exception.SlackDmException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -53,14 +54,16 @@ public class SlackDirectMessageClient {
     }
 
     private void postDirectMessage(String botToken, String channelId, String message) {
-        slackClient.post()
+        SlackChatPostMessageResponse response = slackClient.post()
                    .uri("chat.postMessage")
                    .header("Authorization", "Bearer " + botToken)
                    .contentType(MediaType.APPLICATION_JSON)
                    .body(Map.of("channel", channelId, "text", message))
                    .retrieve()
                    .onStatus(status -> status.isError(), slackApiErrorHandler("chat.postMessage"))
-                   .toBodilessEntity();
+                   .body(SlackChatPostMessageResponse.class);
+
+        validatePostMessageResponse(response);
     }
 
     private RestClient.ResponseSpec.ErrorHandler slackApiErrorHandler(String apiName) {
@@ -116,13 +119,24 @@ public class SlackDirectMessageClient {
         return channel.id();
     }
 
-    private String resolveError(SlackConversationsOpenResponse response) {
-        String error = response.error();
+    private void validatePostMessageResponse(SlackChatPostMessageResponse response) {
+        if (response == null) {
+            throw new SlackDmException("Slack DM 전송 실패: 응답이 비어 있습니다.");
+        }
+        if (!response.ok()) {
+            String error = resolveError(response.error());
+            throw new SlackDmException("Slack DM 전송 실패: " + error);
+        }
+    }
 
+    private String resolveError(SlackConversationsOpenResponse response) {
+        return resolveError(response.error());
+    }
+
+    private String resolveError(String error) {
         if (error == null || error.isBlank()) {
             return "알 수 없는 오류";
         }
-
         return error;
     }
 }
