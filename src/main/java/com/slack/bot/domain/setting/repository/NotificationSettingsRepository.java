@@ -7,6 +7,8 @@ public interface NotificationSettingsRepository {
 
     Optional<NotificationSettings> findByProjectMemberId(Long projectMemberId);
 
+    Optional<NotificationSettings> findBySlackUser(String teamId, String slackUserId);
+
     NotificationSettings save(NotificationSettings notificationSettings);
 
     NotificationSettings saveOrFindOnDuplicate(NotificationSettings notificationSettings);

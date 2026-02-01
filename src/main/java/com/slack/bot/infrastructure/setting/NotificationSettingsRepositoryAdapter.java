@@ -1,5 +1,9 @@
 package com.slack.bot.infrastructure.setting;
 
+import static com.slack.bot.domain.member.QProjectMember.projectMember;
+import static com.slack.bot.domain.setting.QNotificationSettings.notificationSettings;
+
+import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.domain.setting.NotificationSettings;
 import com.slack.bot.domain.setting.repository.NotificationSettingsRepository;
 import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
@@ -11,6 +15,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Repository
@@ -18,6 +23,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class NotificationSettingsRepositoryAdapter implements NotificationSettingsRepository {
 
     private final EntityManager entityManager;
+    private final JPAQueryFactory queryFactory;
     private final PlatformTransactionManager transactionManager;
     private final JpaNotificationSettings jpaNotificationSettings;
     private final MysqlDuplicateKeyDetector mysqlDuplicateKeyDetector;
@@ -25,6 +31,22 @@ public class NotificationSettingsRepositoryAdapter implements NotificationSettin
     @Override
     public Optional<NotificationSettings> findByProjectMemberId(Long projectMemberId) {
         return jpaNotificationSettings.findByProjectMemberId(projectMemberId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<NotificationSettings> findBySlackUser(String teamId, String slackUserId) {
+        NotificationSettings result = queryFactory
+                .selectFrom(notificationSettings)
+                .innerJoin(projectMember)
+                .on(projectMember.id.eq(notificationSettings.projectMemberId))
+                .where(
+                        projectMember.teamId.eq(teamId),
+                        projectMember.slackUserId.eq(slackUserId)
+                )
+                .fetchOne();
+
+        return Optional.ofNullable(result);
     }
 
     @Override

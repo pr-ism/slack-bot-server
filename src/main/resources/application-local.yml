@@ -38,6 +38,15 @@ slack:
         
         👉 `/prism connect [Github-ID]`
         예시: `/prism connect hello-world`
+  reminder:
+    messages:
+      reviewee: |-
+        리뷰가 시작되었습니다.
+        리뷰어: %s
+        PR: %s
+      reviewer: |-
+        리뷰 예약 시간이 되었습니다.
+        PR: %s
 
 token:
   access-key: thisIsA32ByteAccessTokenKeyForHS
