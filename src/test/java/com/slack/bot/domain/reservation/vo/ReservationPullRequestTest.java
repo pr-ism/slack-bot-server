@@ -66,6 +66,20 @@ class ReservationPullRequestTest {
          .hasMessageContaining("Pull Request 번호는 0보다 커야 합니다.");
     }
 
+    @Test
+    void pull_request_ID가_비어_있다면_초기화할_수_없다() {
+        // when & then
+        assertThatThrownBy(
+                () -> ReservationPullRequest.builder()
+                                            .pullRequestId(null)
+                                            .pullRequestNumber(123)
+                                            .pullRequestTitle("feat: 기능 추가")
+                                            .pullRequestUrl("https://github.com/org/repo/pull/123")
+                                            .build()
+        ).isInstanceOf(IllegalArgumentException.class)
+         .hasMessageContaining("Pull Request ID는 0보다 커야 합니다.");
+    }
+
     @ParameterizedTest
     @NullAndEmptySource
     @ValueSource(strings = {" ", "\t"})
