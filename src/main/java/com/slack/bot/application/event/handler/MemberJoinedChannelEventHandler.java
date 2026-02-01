@@ -40,21 +40,22 @@ public class MemberJoinedChannelEventHandler implements SlackEventHandler {
             return;
         }
 
-        String realChannelName = fetchChannelName(workspace.getAccessToken(), eventPayload.channelId());
+        String slackChannelId = eventPayload.channelId();
+        String realChannelName = fetchChannelName(workspace.getAccessToken(), slackChannelId);
 
         transactionTemplate.executeWithoutResult(status -> synchronizeChannel(eventPayload, realChannelName));
-        sendMessage(workspace, eventPayload);
+        sendMessage(workspace, slackChannelId);
     }
 
-    private String fetchChannelName(String accessToken, String channelId) {
+    private String fetchChannelName(String accessToken, String slackChannelId) {
         try {
-            ChannelNameWrapper channelNameWrapper = slackEventApiClient.fetchChannelInfo(accessToken, channelId);
+            ChannelNameWrapper channelNameWrapper = slackEventApiClient.fetchChannelInfo(accessToken, slackChannelId);
 
             return channelNameWrapper.name();
         } catch (Exception ex) {
             log.info("채널 정보 조회 실패 : ", ex);
 
-            return "channel-" + channelId;
+            return "channel-" + slackChannelId;
         }
     }
 
@@ -83,17 +84,17 @@ public class MemberJoinedChannelEventHandler implements SlackEventHandler {
     private void saveChannel(MemberJoinedEventPayload eventPayload, String fetchedChannelName) {
         Channel channel = Channel.builder()
                                  .teamId(eventPayload.teamId())
-                                 .channelId(eventPayload.channelId())
+                                 .slackChannelId(eventPayload.channelId())
                                  .channelName(fetchedChannelName)
                                  .build();
 
         channelRepository.save(channel);
     }
 
-    private void sendMessage(Workspace workspace, MemberJoinedEventPayload eventPayload) {
+    private void sendMessage(Workspace workspace, String slackChannelId) {
         slackEventApiClient.sendMessage(
                 workspace.getAccessToken(),
-                eventPayload.channelId(),
+                slackChannelId,
                 eventMessageProperties.welcome()
         );
     }

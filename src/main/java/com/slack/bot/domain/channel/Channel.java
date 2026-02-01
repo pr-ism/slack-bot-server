@@ -1,6 +1,7 @@
 package com.slack.bot.domain.channel;
 
 import com.slack.bot.domain.common.BaseEntity;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
@@ -15,17 +16,18 @@ import lombok.NoArgsConstructor;
 public class Channel extends BaseEntity {
 
     private String teamId;
-    private String channelId;
+    @Column(name = "slack_channel_id")
+    private String slackChannelId;
     private String channelName;
 
     @Builder
-    private Channel(String teamId, String channelId, String channelName) {
+    private Channel(String teamId, String slackChannelId, String channelName) {
         validateTeamId(teamId);
-        validateChannelId(channelId);
+        validateSlackChannelId(slackChannelId);
         validateChannelName(channelName);
 
         this.teamId = teamId;
-        this.channelId = channelId;
+        this.slackChannelId = slackChannelId;
         this.channelName = channelName;
     }
 
@@ -35,9 +37,9 @@ public class Channel extends BaseEntity {
         }
     }
 
-    private static void validateChannelId(String channelId) {
-        if (channelId == null || channelId.isBlank()) {
-            throw new IllegalArgumentException("채널 ID는 비어 있을 수 없습니다.");
+    private static void validateSlackChannelId(String slackChannelId) {
+        if (slackChannelId == null || slackChannelId.isBlank()) {
+            throw new IllegalArgumentException("슬랙 채널 ID는 비어 있을 수 없습니다.");
         }
     }
 
