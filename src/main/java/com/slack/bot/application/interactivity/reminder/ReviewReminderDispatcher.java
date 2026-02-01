@@ -130,8 +130,12 @@ public class ReviewReminderDispatcher {
         String title = reminder.getPullRequest().getPullRequestTitle();
 
         if (url == null || url.isBlank()) {
-            return title == null ? "" : title;
+            if (title != null) {
+                return title;
+            }
+            return "";
         }
+
         if (title == null || title.isBlank()) {
             return url;
         }
