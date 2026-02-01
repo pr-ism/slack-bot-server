@@ -21,14 +21,14 @@ class ChannelTest {
         Channel channel = assertDoesNotThrow(
                 () -> Channel.builder()
                              .teamId("T1")
-                             .channelId("C1")
+                             .slackChannelId("C1")
                              .channelName("N1")
                              .build()
         );
 
         assertAll(
                 () -> assertThat(channel.getTeamId()).isEqualTo("T1"),
-                () -> assertThat(channel.getChannelId()).isEqualTo("C1"),
+                () -> assertThat(channel.getSlackChannelId()).isEqualTo("C1"),
                 () -> assertThat(channel.getChannelName()).isEqualTo("N1")
         );
     }
@@ -40,7 +40,7 @@ class ChannelTest {
         assertThatThrownBy(
                 () -> Channel.builder()
                              .teamId("T1")
-                             .channelId("C1")
+                             .slackChannelId("C1")
                              .channelName(channelName)
                              .build()
         ).isInstanceOf(IllegalArgumentException.class)
@@ -54,7 +54,7 @@ class ChannelTest {
         assertThatThrownBy(
                 () -> Channel.builder()
                              .teamId(teamId)
-                             .channelId("C1")
+                             .slackChannelId("C1")
                              .channelName("N1")
                              .build()
         ).isInstanceOf(IllegalArgumentException.class)
@@ -63,16 +63,16 @@ class ChannelTest {
 
     @ParameterizedTest
     @NullAndEmptySource
-    void channelId가_비어_있으면_초기화할_수_없다(String channelId) {
+    void slackChannelId가_비어_있으면_초기화할_수_없다(String slackChannelId) {
         // when & then
         assertThatThrownBy(
                 () -> Channel.builder()
                              .teamId("T1")
-                             .channelId(channelId)
+                             .slackChannelId(slackChannelId)
                              .channelName("N1")
                              .build()
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("채널 ID는 비어 있을 수 없습니다.");
+         .hasMessageContaining("슬랙 채널 ID는 비어 있을 수 없습니다.");
     }
 
     @Test
@@ -80,7 +80,7 @@ class ChannelTest {
         // given
         Channel channel = Channel.builder()
                                  .teamId("T1")
-                                 .channelId("C1")
+                                 .slackChannelId("C1")
                                  .channelName("old-name")
                                  .build();
 
@@ -97,7 +97,7 @@ class ChannelTest {
         // given
         Channel channel = Channel.builder()
                                  .teamId("T1")
-                                 .channelId("C1")
+                                 .slackChannelId("C1")
                                  .channelName("N1")
                                  .build();
 

@@ -23,7 +23,7 @@ public class SpyChannelRepository implements ChannelRepository {
     }
 
     @Override
-    public Optional<Channel> findChannelInTeam(String teamId, String channelId) {
+    public Optional<Channel> findChannelInTeam(String teamId, String slackChannelId) {
         return Optional.empty();
     }
 

@@ -26,11 +26,11 @@ public class ChannelRepositoryAdapter implements ChannelRepository {
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<Channel> findChannelInTeam(String teamId, String channelId) {
+    public Optional<Channel> findChannelInTeam(String teamId, String slackChannelId) {
         Channel result = queryFactory.selectFrom(channel)
                                      .where(
                                              channel.teamId.eq(teamId),
-                                             channel.channelId.eq(channelId)
+                                             channel.slackChannelId.eq(slackChannelId)
                                      )
                                      .fetchOne();
 

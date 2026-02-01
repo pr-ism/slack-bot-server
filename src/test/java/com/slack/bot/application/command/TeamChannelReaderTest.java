@@ -29,7 +29,8 @@ class TeamChannelReaderTest {
         // then
         assertAll(
                 () -> assertThat(actualChannels).hasSize(2),
-                () -> assertThat(actualChannels).extracting(Channel::getChannelId).contains("C1", "C2")
+                () -> assertThat(actualChannels).extracting(channel -> channel.getSlackChannelId())
+                                               .contains("C1", "C2")
         );
     }
 }
