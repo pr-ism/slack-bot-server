@@ -3,6 +3,8 @@ package com.slack.bot.application.interactivity.reminder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -149,13 +151,13 @@ class ReviewReminderDispatcherTest {
         String expectedAuthorMessage = "리뷰어 <@U-REVIEWER> <https://github.com/org/repo/pull/1|Great PR>";
         String expectedReviewerMessage = "PR: Great PR (https://github.com/org/repo/pull/1)";
 
-        verify(slackDirectMessageClient).send(TOKEN, AUTHOR_ID, expectedAuthorMessage);
-        verify(slackDirectMessageClient).send(TOKEN, REVIEWER_ID, expectedReviewerMessage);
-
         ArgumentCaptor<ReviewReminder> savedReminderCaptor = ArgumentCaptor.forClass(ReviewReminder.class);
-        verify(reviewReminderRepository).save(savedReminderCaptor.capture());
-
-        assertThat(savedReminderCaptor.getValue().isFired()).isTrue();
+        assertAll(
+                () -> verify(slackDirectMessageClient).send(TOKEN, AUTHOR_ID, expectedAuthorMessage),
+                () -> verify(slackDirectMessageClient).send(TOKEN, REVIEWER_ID, expectedReviewerMessage),
+                () -> verify(reviewReminderRepository).save(savedReminderCaptor.capture()),
+                () -> assertThat(savedReminderCaptor.getValue().isFired()).isTrue()
+        );
     }
 
     @Test
@@ -178,8 +180,14 @@ class ReviewReminderDispatcherTest {
         dispatcher.send(reminder);
 
         // then
-        verify(slackDirectMessageClient, never()).send(TOKEN, "", "anything");
-        verify(slackDirectMessageClient).send(TOKEN, REVIEWER_ID, "PR: Great PR (https://github.com/org/repo/pull/1)");
+        assertAll(
+                () -> verify(slackDirectMessageClient, never()).send(eq(TOKEN), eq(""), anyString()),
+                () -> verify(slackDirectMessageClient).send(
+                        TOKEN,
+                        REVIEWER_ID,
+                        "PR: Great PR (https://github.com/org/repo/pull/1)"
+                )
+        );
     }
 
     @Test
