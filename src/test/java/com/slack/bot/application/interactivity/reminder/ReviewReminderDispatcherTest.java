@@ -126,8 +126,12 @@ class ReviewReminderDispatcherTest {
         dispatcher.send(reminder);
 
         // then
-        verify(reviewReminderRepository).save(any());
-        verifyNoInteractions(notificationSettingsRepository, reviewReminderSlackDirectMessageClient);
+        ArgumentCaptor<ReviewReminder> savedReminderCaptor = ArgumentCaptor.forClass(ReviewReminder.class);
+        assertAll(
+                () -> verify(reviewReminderRepository).save(savedReminderCaptor.capture()),
+                () -> assertThat(savedReminderCaptor.getValue().isFired()).isTrue(),
+                () -> verifyNoInteractions(notificationSettingsRepository, reviewReminderSlackDirectMessageClient)
+        );
     }
 
     @Test
