@@ -68,6 +68,7 @@ class ReservationPullRequestTest {
 
     @ParameterizedTest
     @NullAndEmptySource
+    @ValueSource(strings = {" ", "\t"})
     void pull_request_제목이_비어_있으면_초기화할_수_없다(String pullRequestTitle) {
         // when & then
         assertThatThrownBy(
