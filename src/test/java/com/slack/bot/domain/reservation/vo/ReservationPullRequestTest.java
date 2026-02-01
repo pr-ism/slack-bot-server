@@ -17,7 +17,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 class ReservationPullRequestTest {
 
     @Test
-    void Pull_Request_정보를_초기화한다() {
+    void pull_request_정보를_초기화한다() {
         // when & then
         ReservationPullRequest pullRequest = assertDoesNotThrow(
                 () -> ReservationPullRequest.builder()
@@ -38,7 +38,7 @@ class ReservationPullRequestTest {
 
     @ParameterizedTest
     @ValueSource(longs = {0, -1})
-    void Pull_Request_ID가_0_이하이면_초기화할_수_없다(Long pullRequestId) {
+    void pull_request_ID가_0_이하이면_초기화할_수_없다(Long pullRequestId) {
         // when & then
         assertThatThrownBy(
                 () -> ReservationPullRequest.builder()
@@ -53,7 +53,7 @@ class ReservationPullRequestTest {
 
     @ParameterizedTest
     @ValueSource(ints = {0, -1})
-    void Pull_Request_번호가_0_이하이면_초기화할_수_없다(int pullRequestNumber) {
+    void pull_request_번호가_0_이하이면_초기화할_수_없다(int pullRequestNumber) {
         // when & then
         assertThatThrownBy(
                 () -> ReservationPullRequest.builder()
@@ -68,7 +68,7 @@ class ReservationPullRequestTest {
 
     @ParameterizedTest
     @NullAndEmptySource
-    void Pull_Request_제목이_비어_있으면_초기화할_수_없다(String pullRequestTitle) {
+    void pull_request_제목이_비어_있으면_초기화할_수_없다(String pullRequestTitle) {
         // when & then
         assertThatThrownBy(
                 () -> ReservationPullRequest.builder()
@@ -83,7 +83,8 @@ class ReservationPullRequestTest {
 
     @ParameterizedTest
     @NullAndEmptySource
-    void Pull_Request_URL이_비어_있으면_초기화할_수_없다(String pullRequestUrl) {
+    @ValueSource(strings = {" ", "\t"})
+    void pull_request_URL이_비어_있으면_초기화할_수_없다(String pullRequestUrl) {
         // when & then
         assertThatThrownBy(
                 () -> ReservationPullRequest.builder()
