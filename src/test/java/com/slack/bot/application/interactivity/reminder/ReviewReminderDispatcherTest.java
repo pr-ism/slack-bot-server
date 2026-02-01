@@ -6,11 +6,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.slack.bot.application.interactivity.client.SlackDirectMessageClient;
+import com.slack.bot.application.interactivity.client.exception.SlackDmException;
 import com.slack.bot.domain.reservation.ReviewReminder;
 import com.slack.bot.domain.reservation.repository.ReviewReminderRepository;
 import com.slack.bot.domain.reservation.vo.ReminderDestination;
@@ -342,7 +344,7 @@ class ReviewReminderDispatcherTest {
     }
 
     @Test
-    void 제목이_없고_URL만_있으면_URL을_전달한다() {
+    void 제목이_없고_URL만_있으면_템플릿을_유지한다() {
         // given
         ReviewReminder reminder = ReviewReminder.builder()
                                                .reservationId(320L)
@@ -394,9 +396,9 @@ class ReviewReminderDispatcherTest {
         given(workspaceRepository.findByTeamId(TEAM_ID)).willReturn(Optional.of(workspace));
         given(notificationSettingsRepository.findBySlackUser(TEAM_ID, REVIEWER_ID))
                 .willReturn(Optional.of(notificationSettings));
-        org.mockito.BDDMockito.willThrow(new RuntimeException("send fail"))
-                              .given(slackDirectMessageClient)
-                              .send(TOKEN, AUTHOR_ID, "리뷰어 <@U-REVIEWER> <https://github.com/org/repo/pull/1|Great PR>");
+        willThrow(new SlackDmException("전송 실패"))
+                .given(slackDirectMessageClient)
+                .send(TOKEN, AUTHOR_ID, "리뷰어 <@U-REVIEWER> <https://github.com/org/repo/pull/1|Great PR>");
 
         // when
         dispatcher.send(reminder);
