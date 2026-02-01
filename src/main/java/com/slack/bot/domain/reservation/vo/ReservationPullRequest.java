@@ -2,6 +2,7 @@ package com.slack.bot.domain.reservation.vo;
 
 import jakarta.persistence.Embeddable;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -12,14 +13,15 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ReservationPullRequest {
 
-    private String pullRequestId;
-    private String pullRequestNumber;
+    private Long pullRequestId;
+    private int pullRequestNumber;
     private String pullRequestTitle;
     private String pullRequestUrl;
 
+    @Builder
     private ReservationPullRequest(
-            String pullRequestId,
-            String pullRequestNumber,
+            Long pullRequestId,
+            int pullRequestNumber,
             String pullRequestTitle,
             String pullRequestUrl
     ) {
@@ -34,24 +36,15 @@ public class ReservationPullRequest {
         this.pullRequestUrl = pullRequestUrl;
     }
 
-    public static ReservationPullRequest of(
-            String pullRequestId,
-            String pullRequestNumber,
-            String pullRequestTitle,
-            String pullRequestUrl
-    ) {
-        return new ReservationPullRequest(pullRequestId, pullRequestNumber, pullRequestTitle, pullRequestUrl);
-    }
-
-    private static void validatePullRequestId(String pullRequestId) {
-        if (pullRequestId == null || pullRequestId.isBlank()) {
-            throw new IllegalArgumentException("Pull Request ID는 비어 있을 수 없습니다.");
+    private static void validatePullRequestId(Long pullRequestId) {
+        if (pullRequestId == null || pullRequestId <= 0) {
+            throw new IllegalArgumentException("Pull Request ID는 0보다 커야 합니다.");
         }
     }
 
-    private static void validatePullRequestNumber(String pullRequestNumber) {
-        if (pullRequestNumber == null || pullRequestNumber.isBlank()) {
-            throw new IllegalArgumentException("Pull Request 번호는 비어 있을 수 없습니다.");
+    private static void validatePullRequestNumber(int pullRequestNumber) {
+        if (pullRequestNumber <= 0) {
+            throw new IllegalArgumentException("Pull Request 번호는 0보다 커야 합니다.");
         }
     }
 

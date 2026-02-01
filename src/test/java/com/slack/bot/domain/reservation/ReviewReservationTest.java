@@ -252,11 +252,11 @@ class ReviewReservationTest {
     }
 
     private ReservationPullRequest createValidPullRequest() {
-        return ReservationPullRequest.of(
-                "PR_1",
-                "123",
-                "feat: 기능 추가",
-                "https://github.com/org/repo/pull/123"
-        );
+        return ReservationPullRequest.builder()
+                .pullRequestId(1L)
+                .pullRequestNumber(123)
+                .pullRequestTitle("feat: 기능 추가")
+                .pullRequestUrl("https://github.com/org/repo/pull/123")
+                .build();
     }
 }

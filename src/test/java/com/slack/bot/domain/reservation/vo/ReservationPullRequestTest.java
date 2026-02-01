@@ -10,6 +10,7 @@ import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
@@ -19,50 +20,50 @@ class ReservationPullRequestTest {
     void Pull_Request_정보를_초기화한다() {
         // when & then
         ReservationPullRequest pullRequest = assertDoesNotThrow(
-                () -> ReservationPullRequest.of(
-                        "PR_1",
-                        "123",
-                        "feat: 기능 추가",
-                        "https://github.com/org/repo/pull/123"
-                )
+                () -> ReservationPullRequest.builder()
+                        .pullRequestId(1L)
+                        .pullRequestNumber(123)
+                        .pullRequestTitle("feat: 기능 추가")
+                        .pullRequestUrl("https://github.com/org/repo/pull/123")
+                        .build()
         );
 
         assertAll(
-                () -> assertThat(pullRequest.getPullRequestId()).isEqualTo("PR_1"),
-                () -> assertThat(pullRequest.getPullRequestNumber()).isEqualTo("123"),
+                () -> assertThat(pullRequest.getPullRequestId()).isEqualTo(1L),
+                () -> assertThat(pullRequest.getPullRequestNumber()).isEqualTo(123),
                 () -> assertThat(pullRequest.getPullRequestTitle()).isEqualTo("feat: 기능 추가"),
                 () -> assertThat(pullRequest.getPullRequestUrl()).isEqualTo("https://github.com/org/repo/pull/123")
         );
     }
 
     @ParameterizedTest
-    @NullAndEmptySource
-    void Pull_Request_ID가_비어_있으면_초기화할_수_없다(String pullRequestId) {
+    @ValueSource(longs = {0, -1})
+    void Pull_Request_ID가_0_이하이면_초기화할_수_없다(Long pullRequestId) {
         // when & then
         assertThatThrownBy(
-                () -> ReservationPullRequest.of(
-                        pullRequestId,
-                        "123",
-                        "feat: 기능 추가",
-                        "https://github.com/org/repo/pull/123"
-                )
+                () -> ReservationPullRequest.builder()
+                        .pullRequestId(pullRequestId)
+                        .pullRequestNumber(123)
+                        .pullRequestTitle("feat: 기능 추가")
+                        .pullRequestUrl("https://github.com/org/repo/pull/123")
+                        .build()
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("Pull Request ID는 비어 있을 수 없습니다.");
+         .hasMessageContaining("Pull Request ID는 0보다 커야 합니다.");
     }
 
     @ParameterizedTest
-    @NullAndEmptySource
-    void Pull_Request_번호가_비어_있으면_초기화할_수_없다(String pullRequestNumber) {
+    @ValueSource(ints = {0, -1})
+    void Pull_Request_번호가_0_이하이면_초기화할_수_없다(int pullRequestNumber) {
         // when & then
         assertThatThrownBy(
-                () -> ReservationPullRequest.of(
-                        "PR_1",
-                        pullRequestNumber,
-                        "feat: 기능 추가",
-                        "https://github.com/org/repo/pull/123"
-                )
+                () -> ReservationPullRequest.builder()
+                        .pullRequestId(1L)
+                        .pullRequestNumber(pullRequestNumber)
+                        .pullRequestTitle("feat: 기능 추가")
+                        .pullRequestUrl("https://github.com/org/repo/pull/123")
+                        .build()
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("Pull Request 번호는 비어 있을 수 없습니다.");
+         .hasMessageContaining("Pull Request 번호는 0보다 커야 합니다.");
     }
 
     @ParameterizedTest
@@ -70,12 +71,12 @@ class ReservationPullRequestTest {
     void Pull_Request_제목이_비어_있으면_초기화할_수_없다(String pullRequestTitle) {
         // when & then
         assertThatThrownBy(
-                () -> ReservationPullRequest.of(
-                        "PR_1",
-                        "123",
-                        pullRequestTitle,
-                        "https://github.com/org/repo/pull/123"
-                )
+                () -> ReservationPullRequest.builder()
+                        .pullRequestId(1L)
+                        .pullRequestNumber(123)
+                        .pullRequestTitle(pullRequestTitle)
+                        .pullRequestUrl("https://github.com/org/repo/pull/123")
+                        .build()
         ).isInstanceOf(IllegalArgumentException.class)
          .hasMessageContaining("Pull Request 제목은 비어 있을 수 없습니다.");
     }
@@ -85,12 +86,12 @@ class ReservationPullRequestTest {
     void Pull_Request_URL이_비어_있으면_초기화할_수_없다(String pullRequestUrl) {
         // when & then
         assertThatThrownBy(
-                () -> ReservationPullRequest.of(
-                        "PR_1",
-                        "123",
-                        "feat: 기능 추가",
-                        pullRequestUrl
-                )
+                () -> ReservationPullRequest.builder()
+                        .pullRequestId(1L)
+                        .pullRequestNumber(123)
+                        .pullRequestTitle("feat: 기능 추가")
+                        .pullRequestUrl(pullRequestUrl)
+                        .build()
         ).isInstanceOf(IllegalArgumentException.class)
          .hasMessageContaining("Pull Request URL은 비어 있을 수 없습니다.");
     }
