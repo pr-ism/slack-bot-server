@@ -46,6 +46,12 @@ public class ReviewReminderDispatcher {
         String teamId = reviewReminder.getDestination().getTeamId();
         String reviewerSlackId = reviewReminder.getParticipants().getReviewerSlackId();
 
+        if (reviewerSlackId == null || reviewerSlackId.isBlank()) {
+            sendDirectMessages(token, reviewReminder);
+            markFired(reviewReminder);
+            return;
+        }
+
         if (isNotReviewReminderNotificationActive(teamId, reviewerSlackId)) {
             markFired(reviewReminder);
             return;
