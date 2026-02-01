@@ -293,11 +293,7 @@ class ReviewReminderDispatcherTest {
                                        .botUserId("B1")
                                        .userId(1L)
                                        .build();
-        NotificationSettings notificationSettings = NotificationSettings.defaults(1L);
-
         given(workspaceRepository.findByTeamId(TEAM_ID)).willReturn(Optional.of(workspace));
-        given(notificationSettingsRepository.findBySlackUser(TEAM_ID, null))
-                .willReturn(Optional.of(notificationSettings));
 
         // when
         dispatcher.send(reminder);
@@ -331,10 +327,7 @@ class ReviewReminderDispatcherTest {
                                        .botUserId("B1")
                                        .userId(1L)
                                        .build();
-        NotificationSettings notificationSettings = NotificationSettings.defaults(1L);
-
         given(workspaceRepository.findByTeamId(TEAM_ID)).willReturn(Optional.of(workspace));
-        given(notificationSettingsRepository.findBySlackUser(TEAM_ID, "")).willReturn(Optional.of(notificationSettings));
 
         // when
         dispatcher.send(reminder);
