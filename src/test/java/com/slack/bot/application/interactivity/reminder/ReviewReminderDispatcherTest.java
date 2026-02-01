@@ -1,6 +1,7 @@
 package com.slack.bot.application.interactivity.reminder;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -368,6 +369,37 @@ class ReviewReminderDispatcherTest {
 
         // then
         verify(slackDirectMessageClient).send(TOKEN, REVIEWER_ID, "PR:  (https://github.com/org/repo/pull/1)");
+    }
+
+    @Test
+    void DM_전송_실패시에도_fired로_저장한다() {
+        // given
+        ReviewReminder reminder = createReminder(AUTHOR_ID, REVIEWER_ID);
+        Workspace workspace = Workspace.builder()
+                                       .teamId(TEAM_ID)
+                                       .accessToken(TOKEN)
+                                       .botUserId("B1")
+                                       .userId(1L)
+                                       .build();
+        NotificationSettings notificationSettings = NotificationSettings.defaults(1L);
+
+        given(workspaceRepository.findByTeamId(TEAM_ID)).willReturn(Optional.of(workspace));
+        given(notificationSettingsRepository.findBySlackUser(TEAM_ID, REVIEWER_ID))
+                .willReturn(Optional.of(notificationSettings));
+        org.mockito.BDDMockito.willThrow(new RuntimeException("send fail"))
+                              .given(slackDirectMessageClient)
+                              .send(TOKEN, AUTHOR_ID, "리뷰어 <@U-REVIEWER> <https://github.com/org/repo/pull/1|Great PR>");
+
+        // when
+        dispatcher.send(reminder);
+
+        // then
+        ArgumentCaptor<ReviewReminder> savedReminderCaptor = ArgumentCaptor.forClass(ReviewReminder.class);
+
+        assertAll(
+                () -> verify(reviewReminderRepository).save(savedReminderCaptor.capture()),
+                () -> assertThat(savedReminderCaptor.getValue().isFired()).isTrue()
+        );
     }
 
     private ReviewReminder createReminder(String authorId, String reviewerId) {
