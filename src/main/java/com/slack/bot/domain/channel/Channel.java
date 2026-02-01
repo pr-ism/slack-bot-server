@@ -1,7 +1,6 @@
 package com.slack.bot.domain.channel;
 
 import com.slack.bot.domain.common.BaseEntity;
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
@@ -16,8 +15,9 @@ import lombok.NoArgsConstructor;
 public class Channel extends BaseEntity {
 
     private String teamId;
-    @Column(name = "slack_channel_id")
+
     private String slackChannelId;
+
     private String channelName;
 
     @Builder
