@@ -14,7 +14,7 @@ import org.springframework.web.client.RestClient;
 
 @Component
 @RequiredArgsConstructor
-public class SlackDirectMessageClient {
+public class ReviewReminderSlackDirectMessageClient {
 
     private static final int ERROR_BODY_MAX_LENGTH = 500;
 

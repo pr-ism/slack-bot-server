@@ -11,7 +11,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-import com.slack.bot.application.interactivity.client.SlackDirectMessageClient;
+import com.slack.bot.application.interactivity.client.ReviewReminderSlackDirectMessageClient;
 import com.slack.bot.application.interactivity.client.exception.SlackDmException;
 import com.slack.bot.domain.reservation.ReviewReminder;
 import com.slack.bot.domain.reservation.repository.ReviewReminderRepository;
@@ -59,7 +59,7 @@ class ReviewReminderDispatcherTest {
     NotificationSettingsRepository notificationSettingsRepository;
 
     @Mock
-    SlackDirectMessageClient slackDirectMessageClient;
+    ReviewReminderSlackDirectMessageClient reviewReminderSlackDirectMessageClient;
 
     private ReviewReminderDispatcher dispatcher;
 
@@ -75,7 +75,7 @@ class ReviewReminderDispatcherTest {
                 clock,
                 workspaceRepository,
                 reviewReminderRepository,
-                slackDirectMessageClient,
+                reviewReminderSlackDirectMessageClient,
                 messageProperties,
                 notificationSettingsRepository
         );
@@ -113,7 +113,7 @@ class ReviewReminderDispatcherTest {
         verify(reviewReminderRepository).save(savedReminderCaptor.capture());
 
         assertThat(savedReminderCaptor.getValue().isFired()).isTrue();
-        verify(slackDirectMessageClient, never()).send(any(), any(), any());
+        verify(reviewReminderSlackDirectMessageClient, never()).send(any(), any(), any());
     }
 
     @Test
@@ -127,7 +127,7 @@ class ReviewReminderDispatcherTest {
 
         // then
         verify(reviewReminderRepository).save(any());
-        verifyNoInteractions(notificationSettingsRepository, slackDirectMessageClient);
+        verifyNoInteractions(notificationSettingsRepository, reviewReminderSlackDirectMessageClient);
     }
 
     @Test
@@ -155,8 +155,8 @@ class ReviewReminderDispatcherTest {
 
         ArgumentCaptor<ReviewReminder> savedReminderCaptor = ArgumentCaptor.forClass(ReviewReminder.class);
         assertAll(
-                () -> verify(slackDirectMessageClient).send(TOKEN, AUTHOR_ID, expectedAuthorMessage),
-                () -> verify(slackDirectMessageClient).send(TOKEN, REVIEWER_ID, expectedReviewerMessage),
+                () -> verify(reviewReminderSlackDirectMessageClient).send(TOKEN, AUTHOR_ID, expectedAuthorMessage),
+                () -> verify(reviewReminderSlackDirectMessageClient).send(TOKEN, REVIEWER_ID, expectedReviewerMessage),
                 () -> verify(reviewReminderRepository).save(savedReminderCaptor.capture()),
                 () -> assertThat(savedReminderCaptor.getValue().isFired()).isTrue()
         );
@@ -183,8 +183,8 @@ class ReviewReminderDispatcherTest {
 
         // then
         assertAll(
-                () -> verify(slackDirectMessageClient, never()).send(eq(TOKEN), eq(""), anyString()),
-                () -> verify(slackDirectMessageClient).send(
+                () -> verify(reviewReminderSlackDirectMessageClient, never()).send(eq(TOKEN), eq(""), anyString()),
+                () -> verify(reviewReminderSlackDirectMessageClient).send(
                         TOKEN,
                         REVIEWER_ID,
                         "PR: Great PR (https://github.com/org/repo/pull/1)"
@@ -227,7 +227,7 @@ class ReviewReminderDispatcherTest {
         dispatcher.send(reminder);
 
         // then
-        verify(slackDirectMessageClient).send(TOKEN, AUTHOR_ID, "리뷰어 <@U-REVIEWER> OnlyTitle");
+        verify(reviewReminderSlackDirectMessageClient).send(TOKEN, AUTHOR_ID, "리뷰어 <@U-REVIEWER> OnlyTitle");
     }
 
     @Test
@@ -265,7 +265,7 @@ class ReviewReminderDispatcherTest {
         dispatcher.send(reminder);
 
         // then
-        verify(slackDirectMessageClient).send(TOKEN, AUTHOR_ID, "리뷰어 <@U-REVIEWER> ");
+        verify(reviewReminderSlackDirectMessageClient).send(TOKEN, AUTHOR_ID, "리뷰어 <@U-REVIEWER> ");
     }
 
     @Test
@@ -303,7 +303,7 @@ class ReviewReminderDispatcherTest {
         dispatcher.send(reminder);
 
         // then
-        verify(slackDirectMessageClient).send(TOKEN, AUTHOR_ID, "리뷰어  <https://github.com/org/repo/pull/1|Great PR>");
+        verify(reviewReminderSlackDirectMessageClient).send(TOKEN, AUTHOR_ID, "리뷰어  <https://github.com/org/repo/pull/1|Great PR>");
     }
 
     @Test
@@ -340,7 +340,7 @@ class ReviewReminderDispatcherTest {
         dispatcher.send(reminder);
 
         // then
-        verify(slackDirectMessageClient).send(TOKEN, AUTHOR_ID, "리뷰어  <https://github.com/org/repo/pull/1|Great PR>");
+        verify(reviewReminderSlackDirectMessageClient).send(TOKEN, AUTHOR_ID, "리뷰어  <https://github.com/org/repo/pull/1|Great PR>");
     }
 
     @Test
@@ -378,7 +378,7 @@ class ReviewReminderDispatcherTest {
         dispatcher.send(reminder);
 
         // then
-        verify(slackDirectMessageClient).send(TOKEN, REVIEWER_ID, "PR:  (https://github.com/org/repo/pull/1)");
+        verify(reviewReminderSlackDirectMessageClient).send(TOKEN, REVIEWER_ID, "PR:  (https://github.com/org/repo/pull/1)");
     }
 
     @Test
@@ -397,7 +397,7 @@ class ReviewReminderDispatcherTest {
         given(notificationSettingsRepository.findBySlackUser(TEAM_ID, REVIEWER_ID))
                 .willReturn(Optional.of(notificationSettings));
         willThrow(new SlackDmException("전송 실패"))
-                .given(slackDirectMessageClient)
+                .given(reviewReminderSlackDirectMessageClient)
                 .send(TOKEN, AUTHOR_ID, "리뷰어 <@U-REVIEWER> <https://github.com/org/repo/pull/1|Great PR>");
 
         // when

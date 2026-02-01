@@ -25,10 +25,10 @@ import org.springframework.web.client.RestClient;
 
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
-class SlackDirectMessageClientTest {
+class ReviewReminderSlackDirectMessageClientTest {
 
     private MockRestServiceServer mockServer;
-    private SlackDirectMessageClient slackDirectMessageClient;
+    private ReviewReminderSlackDirectMessageClient slackDirectMessageClient;
 
     @BeforeEach
     void setUp() {
@@ -40,7 +40,7 @@ class SlackDirectMessageClientTest {
                                           .build();
 
         RestClient slackClient = restClientBuilder.build();
-        slackDirectMessageClient = new SlackDirectMessageClient(slackClient);
+        slackDirectMessageClient = new ReviewReminderSlackDirectMessageClient(slackClient);
     }
 
     @Test

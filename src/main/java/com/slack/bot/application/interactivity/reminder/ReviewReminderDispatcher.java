@@ -1,6 +1,6 @@
 package com.slack.bot.application.interactivity.reminder;
 
-import com.slack.bot.application.interactivity.client.SlackDirectMessageClient;
+import com.slack.bot.application.interactivity.client.ReviewReminderSlackDirectMessageClient;
 import com.slack.bot.domain.reservation.ReviewReminder;
 import com.slack.bot.domain.reservation.repository.ReviewReminderRepository;
 import com.slack.bot.domain.reservation.vo.ReminderParticipants;
@@ -22,7 +22,7 @@ public class ReviewReminderDispatcher {
     private final Clock clock;
     private final WorkspaceRepository workspaceRepository;
     private final ReviewReminderRepository reviewReminderRepository;
-    private final SlackDirectMessageClient slackDirectMessageClient;
+    private final ReviewReminderSlackDirectMessageClient reviewReminderSlackDirectMessageClient;
     private final ReviewReminderMessageProperties messageProperties;
     private final NotificationSettingsRepository notificationSettingsRepository;
 
@@ -93,7 +93,7 @@ public class ReviewReminderDispatcher {
             return;
         }
 
-        slackDirectMessageClient.send(token, slackId, message);
+        reviewReminderSlackDirectMessageClient.send(token, slackId, message);
     }
 
     private void markFired(ReviewReminder reviewReminder) {
