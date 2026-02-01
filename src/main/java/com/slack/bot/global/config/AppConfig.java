@@ -13,6 +13,7 @@ import com.slack.bot.global.config.properties.AccessLinkKeyProperties;
 import com.slack.bot.global.config.properties.AppProperties;
 import com.slack.bot.global.config.properties.CommandMessageProperties;
 import com.slack.bot.global.config.properties.EventMessageProperties;
+import com.slack.bot.global.config.properties.ReviewReminderMessageProperties;
 import com.slack.bot.global.config.properties.SlackEventAsyncProperties;
 import com.slack.bot.global.config.properties.SlackProperties;
 import java.time.Clock;
@@ -34,7 +35,7 @@ import org.springframework.web.client.RestClient;
 @EnableScheduling
 @EnableConfigurationProperties({
         SlackProperties.class, AccessLinkKeyProperties.class, CommandMessageProperties.class, AppProperties.class,
-        SlackEventAsyncProperties.class, EventMessageProperties.class
+        SlackEventAsyncProperties.class, EventMessageProperties.class, ReviewReminderMessageProperties.class
 })
 public class AppConfig {
 
