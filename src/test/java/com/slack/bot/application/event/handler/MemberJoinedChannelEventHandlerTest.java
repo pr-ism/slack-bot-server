@@ -17,7 +17,6 @@ import com.slack.bot.domain.channel.Channel;
 import com.slack.bot.domain.channel.repository.ChannelRepository;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.EventMessageProperties;
-import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -84,7 +83,7 @@ class MemberJoinedChannelEventHandlerTest {
         memberJoinedChannelEventHandler.handle(payload);
 
         // then
-        Optional<Channel> actualChannel = channelRepository.findChannelInTeam("workspace-id", "channel-id");
+        Optional<Channel> actualChannel = channelRepository.findByTeamId("workspace-id");
 
         assertAll(
                 () -> assertThat(actualChannel).isPresent(),
@@ -100,7 +99,6 @@ class MemberJoinedChannelEventHandlerTest {
     void 기존_채널이_존재하면_Slack_API로_조회한_채널명으로_업데이트된다() {
         // given
         String expectedUpdatedName = "integration-test-channel";
-
         JsonNode payload = createPayload(
                 "workspace-id",
                 "bot-user-id",
@@ -111,11 +109,11 @@ class MemberJoinedChannelEventHandlerTest {
         memberJoinedChannelEventHandler.handle(payload);
 
         // then
-        List<Channel> actual = channelRepository.findAllByTeamId("workspace-id");
+        Optional<Channel> actual = channelRepository.findByTeamId("workspace-id");
 
         assertAll(
-                () -> assertThat(actual).hasSize(1),
-                () -> assertThat(actual.get(0).getChannelName()).isEqualTo(expectedUpdatedName)
+                () -> assertThat(actual).isPresent(),
+                () -> assertThat(actual.get().getChannelName()).isEqualTo(expectedUpdatedName)
         );
     }
 
@@ -134,7 +132,7 @@ class MemberJoinedChannelEventHandlerTest {
         memberJoinedChannelEventHandler.handle(payload);
 
         // then
-        Optional<Channel> actualChannel = channelRepository.findChannelInTeam("workspace-id", errorChannelId);
+        Optional<Channel> actualChannel = channelRepository.findByTeamId("workspace-id");
 
         assertAll(
                 () -> assertThat(actualChannel).isPresent(),
@@ -186,7 +184,7 @@ class MemberJoinedChannelEventHandlerTest {
         memberJoinedChannelEventHandler.handle(payload);
 
         // then
-        assertThat(channelRepository.findChannelInTeam("workspace-id", "channel-id")).isEmpty();
+        assertThat(channelRepository.findByTeamId("workspace-id")).isEmpty();
     }
 
     private JsonNode createPayload(String teamId, String joinedUserId, String channelId) {

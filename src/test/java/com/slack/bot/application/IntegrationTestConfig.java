@@ -1,9 +1,16 @@
 package com.slack.bot.application;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.command.client.MemberConnectionSlackApiClient;
 import com.slack.bot.application.event.client.SlackEventApiClient;
 import com.slack.bot.application.event.dto.ChannelNameWrapper;
+import com.slack.bot.application.review.ReviewBlockCreator;
+import com.slack.bot.application.review.client.ReviewSlackApiClient;
+import com.slack.bot.application.review.channel.ReviewSlackChannelResolver;
+import com.slack.bot.application.review.meta.ReviewActionMetaBuilder;
 import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
+import com.slack.bot.infrastructure.review.batch.SpyReviewNotificationService;
 import java.sql.SQLException;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -60,6 +67,41 @@ public class IntegrationTestConfig {
             public void sendEphemeralMessage(String token, String channelId, String targetUserId, String text) {
             }
         };
+    }
+
+    @Bean
+    @Primary
+    public ReviewSlackApiClient reviewSlackApiClient() {
+        RestClient slackClient = RestClient.builder()
+                                           .baseUrl("https://slack.com/api/")
+                                           .build();
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        return new ReviewSlackApiClient(slackClient, objectMapper) {
+
+            @Override
+            public void sendBlockMessage(
+                    String token,
+                    String channelId,
+                    JsonNode blocks,
+                    JsonNode attachments,
+                    String fallbackText
+            ) {
+            }
+        };
+    }
+
+    @Bean
+    @Primary
+    public SpyReviewNotificationService spyReviewNotificationService(
+            ReviewBlockCreator blockCreator,
+            ReviewSlackApiClient slackApiClient,
+            ReviewActionMetaBuilder actionMetaBuilder,
+            ReviewSlackChannelResolver channelResolver
+    ) {
+        return new SpyReviewNotificationService(
+                blockCreator, slackApiClient, actionMetaBuilder, channelResolver
+        );
     }
 
     @Bean

@@ -49,6 +49,11 @@ app:
       thread-name-prefix: slack-events-
       queue-capacity: 50
 
+review:
+  notification:
+    batch:
+      window-millis: 500
+
 access-link:
   key-secret: access-link-secret
 

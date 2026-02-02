@@ -48,6 +48,11 @@ slack:
         리뷰 예약 시간이 되었습니다.
         PR: %s
 
+review:
+  notification:
+    batch:
+      window-millis: 5000
+
 token:
   access-key: thisIsA32ByteAccessTokenKeyForHS
   refresh-key: thisIsA32ByteRefreshTokenKeyForH

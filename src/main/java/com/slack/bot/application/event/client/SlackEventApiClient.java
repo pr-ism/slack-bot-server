@@ -46,14 +46,25 @@ public class SlackEventApiClient {
     }
 
     public ChannelNameWrapper fetchChannelInfo(String token, String channelId) {
-        Map<String, Object> body = createChannelInfoMessageBody(channelId);
-        JsonNode responseNode = sendPostRequest(token, "conversations.info", body);
+        String authorization = createAuthorizationHeader(token);
 
-        return extractChannelInfo(responseNode);
-    }
+        JsonNode response = slackClient.get()
+                                       .uri(uriBuilder -> uriBuilder
+                                               .path("conversations.info")
+                                               .queryParam("channel", channelId)
+                                               .build())
+                                       .header("Authorization", authorization)
+                                       .retrieve()
+                                       .onStatus(status -> status.isError(), (request, resp) -> {
+                                           String message = "Slack API HTTP 요청 실패. Status: %s".formatted(
+                                                   resp.getStatusCode()
+                                           );
 
-    private Map<String, Object> createChannelInfoMessageBody(String channelId) {
-        return Map.of("channel", channelId);
+                                           throw new SlackChatRequestException(message);
+                                       })
+                                       .body(JsonNode.class);
+
+        return extractChannelInfo(validateResponse(response));
     }
 
     private JsonNode sendPostRequest(String token, String uri, Map<String, Object> body) {
@@ -69,6 +80,7 @@ public class SlackEventApiClient {
                                            String message = "Slack API HTTP 요청 실패. Status: %s".formatted(
                                                    resp.getStatusCode()
                                            );
+
                                            throw new SlackChatRequestException(message);
                                        })
                                        .body(JsonNode.class);

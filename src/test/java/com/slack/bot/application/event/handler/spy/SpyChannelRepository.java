@@ -2,7 +2,6 @@ package com.slack.bot.application.event.handler.spy;
 
 import com.slack.bot.domain.channel.Channel;
 import com.slack.bot.domain.channel.repository.ChannelRepository;
-import java.util.List;
 import java.util.Optional;
 import lombok.Getter;
 
@@ -23,12 +22,7 @@ public class SpyChannelRepository implements ChannelRepository {
     }
 
     @Override
-    public Optional<Channel> findChannelInTeam(String teamId, String slackChannelId) {
+    public Optional<Channel> findByTeamId(String teamId) {
         return Optional.empty();
-    }
-
-    @Override
-    public List<Channel> findAllByTeamId(String teamId) {
-        return List.of();
     }
 }

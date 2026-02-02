@@ -1,11 +1,7 @@
 package com.slack.bot.infrastructure.channel.persistence;
 
-import static com.slack.bot.domain.channel.QChannel.channel;
-
-import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.domain.channel.Channel;
 import com.slack.bot.domain.channel.repository.ChannelRepository;
-import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -15,37 +11,23 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ChannelRepositoryAdapter implements ChannelRepository {
 
-    private final JPAQueryFactory queryFactory;
-    private final JpaChannelRepository channelRepository;
+    private final JpaChannelRepository jpaChannelRepository;
 
     @Override
     @Transactional
     public void save(Channel channel) {
-        channelRepository.save(channel);
+        jpaChannelRepository.save(channel);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<Channel> findChannelInTeam(String teamId, String slackChannelId) {
-        Channel result = queryFactory.selectFrom(channel)
-                                     .where(
-                                             channel.teamId.eq(teamId),
-                                             channel.slackChannelId.eq(slackChannelId)
-                                     )
-                                     .fetchOne();
-
-        return Optional.ofNullable(result);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<Channel> findAllByTeamId(String teamId) {
-        return channelRepository.findAllByTeamId(teamId);
+    public Optional<Channel> findByTeamId(String teamId) {
+        return jpaChannelRepository.findByTeamId(teamId);
     }
 
     @Override
     @Transactional
     public void deleteByTeamId(String teamId) {
-        channelRepository.deleteByTeamId(teamId);
+        jpaChannelRepository.deleteByTeamId(teamId);
     }
 }

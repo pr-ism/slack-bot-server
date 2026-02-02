@@ -9,4 +9,5 @@ public interface ProjectMemberRepository {
 
     Optional<ProjectMember> findBySlackUser(String teamId, String slackUserId);
 
+    Optional<ProjectMember> findByGithubUser(String teamId, String githubId);
 }

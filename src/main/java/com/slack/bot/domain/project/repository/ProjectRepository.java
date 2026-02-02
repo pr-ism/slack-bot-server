@@ -6,4 +6,6 @@ import java.util.Optional;
 public interface ProjectRepository {
 
     Optional<Project> findByApiKey(String apiKey);
+
+    Optional<Long> findIdByApiKey(String apiKey);
 }

@@ -33,7 +33,7 @@ class ReviewReservationTest {
                                        .reservationPullRequest(pullRequest)
                                        .authorSlackId("U1")
                                        .reviewerSlackId("U2")
-                                       .when(now)
+                                       .scheduledAt(now)
                                        .status(ReservationStatus.ACTIVE)
                                        .build()
         );
@@ -46,7 +46,7 @@ class ReviewReservationTest {
                 () -> assertThat(reservation.getReservationPullRequest()).isEqualTo(pullRequest),
                 () -> assertThat(reservation.getAuthorSlackId()).isEqualTo("U1"),
                 () -> assertThat(reservation.getReviewerSlackId()).isEqualTo("U2"),
-                () -> assertThat(reservation.getWhen()).isEqualTo(now),
+                () -> assertThat(reservation.getScheduledAt()).isEqualTo(now),
                 () -> assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.ACTIVE)
         );
     }
@@ -63,7 +63,7 @@ class ReviewReservationTest {
                                                   .reservationPullRequest(createValidPullRequest())
                                                   .authorSlackId("U1")
                                                   .reviewerSlackId("U2")
-                                                  .when(Instant.now())
+                                                  .scheduledAt(Instant.now())
                                                   .status(ReservationStatus.ACTIVE)
                                                   .build()
         ).isInstanceOf(IllegalArgumentException.class)
@@ -82,7 +82,7 @@ class ReviewReservationTest {
                                                   .reservationPullRequest(createValidPullRequest())
                                                   .authorSlackId("U1")
                                                   .reviewerSlackId("U2")
-                                                  .when(Instant.now())
+                                                  .scheduledAt(Instant.now())
                                                   .status(ReservationStatus.ACTIVE)
                                                   .build()
         ).isInstanceOf(IllegalArgumentException.class)
@@ -99,7 +99,7 @@ class ReviewReservationTest {
                                                   .reservationPullRequest(createValidPullRequest())
                                                   .authorSlackId("U1")
                                                   .reviewerSlackId("U2")
-                                                  .when(Instant.now())
+                                                  .scheduledAt(Instant.now())
                                                   .status(ReservationStatus.ACTIVE)
                                                   .build()
         ).isInstanceOf(IllegalArgumentException.class)
@@ -116,7 +116,7 @@ class ReviewReservationTest {
                                                   .reservationPullRequest(null)
                                                   .authorSlackId("U1")
                                                   .reviewerSlackId("U2")
-                                                  .when(Instant.now())
+                                                  .scheduledAt(Instant.now())
                                                   .status(ReservationStatus.ACTIVE)
                                                   .build()
         ).isInstanceOf(IllegalArgumentException.class)
@@ -135,7 +135,7 @@ class ReviewReservationTest {
                                                   .reservationPullRequest(createValidPullRequest())
                                                   .authorSlackId(authorSlackId)
                                                   .reviewerSlackId("U2")
-                                                  .when(Instant.now())
+                                                  .scheduledAt(Instant.now())
                                                   .status(ReservationStatus.ACTIVE)
                                                   .build()
         ).isInstanceOf(IllegalArgumentException.class)
@@ -154,7 +154,7 @@ class ReviewReservationTest {
                                                   .reservationPullRequest(createValidPullRequest())
                                                   .authorSlackId("U1")
                                                   .reviewerSlackId(reviewerSlackId)
-                                                  .when(Instant.now())
+                                                  .scheduledAt(Instant.now())
                                                   .status(ReservationStatus.ACTIVE)
                                                   .build()
         ).isInstanceOf(IllegalArgumentException.class)
@@ -171,7 +171,7 @@ class ReviewReservationTest {
                                                   .reservationPullRequest(createValidPullRequest())
                                                   .authorSlackId("U1")
                                                   .reviewerSlackId("U2")
-                                                  .when(null)
+                                                  .scheduledAt(null)
                                                   .status(ReservationStatus.ACTIVE)
                                                   .build()
         ).isInstanceOf(IllegalArgumentException.class)
@@ -188,7 +188,7 @@ class ReviewReservationTest {
                                                   .reservationPullRequest(createValidPullRequest())
                                                   .authorSlackId("U1")
                                                   .reviewerSlackId("U2")
-                                                  .when(Instant.now())
+                                                  .scheduledAt(Instant.now())
                                                   .status(null)
                                                   .build()
         ).isInstanceOf(IllegalArgumentException.class)
@@ -205,7 +205,7 @@ class ReviewReservationTest {
                                                                .reservationPullRequest(createValidPullRequest())
                                                                .authorSlackId("U1")
                                                                .reviewerSlackId("U2")
-                                                               .when(Instant.now())
+                                                               .scheduledAt(Instant.now())
                                                                .status(ReservationStatus.ACTIVE)
                                                                .build();
 
@@ -216,7 +216,7 @@ class ReviewReservationTest {
                                                                   .reservationPullRequest(createValidPullRequest())
                                                                   .authorSlackId("U1")
                                                                   .reviewerSlackId("U2")
-                                                                  .when(Instant.now())
+                                                                  .scheduledAt(Instant.now())
                                                                   .status(ReservationStatus.CANCELLED)
                                                                   .build();
 
@@ -237,7 +237,7 @@ class ReviewReservationTest {
                                                          .reservationPullRequest(createValidPullRequest())
                                                          .authorSlackId("U1")
                                                          .reviewerSlackId("U2")
-                                                         .when(Instant.now())
+                                                         .scheduledAt(Instant.now())
                                                          .status(ReservationStatus.ACTIVE)
                                                          .build();
 

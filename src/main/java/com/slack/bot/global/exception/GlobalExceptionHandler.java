@@ -7,12 +7,17 @@ import com.slack.bot.application.oauth.exception.ExpiredSlackOauthStateException
 import com.slack.bot.application.oauth.exception.SlackOauthEmptyResponseException;
 import com.slack.bot.application.oauth.exception.SlackOauthErrorResponseException;
 import com.slack.bot.application.oauth.exception.SlackOauthStateNotFoundException;
+import com.slack.bot.application.review.channel.exception.ReviewChannelResolveException;
+import com.slack.bot.application.review.client.exception.ReviewSlackApiException;
+import com.slack.bot.application.review.meta.exception.ProjectNotFoundException;
+import com.slack.bot.application.review.meta.exception.ReviewActionMetaException;
 import com.slack.bot.global.exception.dto.response.AuthErrorCode;
 import com.slack.bot.global.exception.dto.response.CommandErrorCode;
 import com.slack.bot.global.exception.dto.response.OauthErrorCode;
 import com.slack.bot.global.exception.dto.response.DefaultErrorCode;
 import com.slack.bot.global.exception.dto.response.ErrorCode;
 import com.slack.bot.global.exception.dto.response.ExceptionResponse;
+import com.slack.bot.global.exception.dto.response.ReviewErrorCode;
 import com.slack.bot.global.exception.dto.response.SettingErrorCode;
 import com.slack.bot.infrastructure.auth.jwt.exception.InvalidTokenException;
 import com.slack.bot.infrastructure.link.persistence.exception.AccessLinkDuplicateKeyException;
@@ -123,6 +128,34 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return createResponseEntity(SettingErrorCode.NOTIFICATION_SETTINGS_CONFLICT);
     }
 
+    @ExceptionHandler(ReviewChannelResolveException.class)
+    public ResponseEntity<Object> handleReviewChannelResolveException(ReviewChannelResolveException ex) {
+        log.info("ReviewChannelResolveException : {}", ex.getMessage());
+
+        return createResponseEntity(ReviewErrorCode.REVIEW_CHANNEL_NOT_FOUND);
+    }
+
+    @ExceptionHandler(ProjectNotFoundException.class)
+    public ResponseEntity<Object> handleProjectNotFoundException(ProjectNotFoundException ex) {
+        log.info("ProjectNotFoundException : {}", ex.getMessage());
+
+        return createResponseEntity(ReviewErrorCode.REVIEW_PROJECT_NOT_FOUND);
+    }
+
+    @ExceptionHandler(ReviewActionMetaException.class)
+    public ResponseEntity<Object> handleReviewActionMetaException(ReviewActionMetaException ex) {
+        log.info("ReviewActionMetaException : {}", ex.getMessage());
+
+        return createResponseEntity(ReviewErrorCode.REVIEW_ACTION_META_BUILD_FAILED);
+    }
+
+    @ExceptionHandler(ReviewSlackApiException.class)
+    public ResponseEntity<Object> handleReviewSlackApiException(ReviewSlackApiException ex) {
+        log.info("ReviewSlackApiException : {}", ex.getMessage());
+
+        return createResponseEntity(ReviewErrorCode.REVIEW_SLACK_API_FAILED);
+    }
+
     @Override
     protected ResponseEntity<Object> handleMissingServletRequestParameter(
             MissingServletRequestParameterException ex,
@@ -132,8 +165,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     ) {
         log.info("MissingServletRequestParameterException : {}", ex.getMessage());
 
+        DefaultErrorCode errorCode = DefaultErrorCode.EMPTY_REQUIRED_PARAMETER;
+        ExceptionResponse exceptionResponse = new ExceptionResponse(errorCode.getErrorCode(), errorCode.getMessage());
 
-        return createResponseEntity(DefaultErrorCode.EMPTY_REQUIRED_PARAMETER);
+        return handleExceptionInternal(
+                ex,
+                exceptionResponse,
+                headers,
+                errorCode.getHttpStatus(),
+                request
+        );
     }
 
     private ResponseEntity<Object> createResponseEntity(ErrorCode errorCode) {

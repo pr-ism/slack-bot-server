@@ -49,9 +49,11 @@ public class Channel extends BaseEntity {
         }
     }
 
-    public void updateChannelName(String channelName) {
+    public void updateChannel(String slackChannelId, String channelName) {
+        validateSlackChannelId(slackChannelId);
         validateChannelName(channelName);
 
+        this.slackChannelId = slackChannelId;
         this.channelName = channelName;
     }
 }
