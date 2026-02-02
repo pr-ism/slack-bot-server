@@ -15,11 +15,11 @@ public class ReviewParticipantFormatter {
 
     private final ProjectMemberRepository projectMemberRepository;
 
-    public ReviewParticipantsDto format(String teamId, ReviewRequestEventRequest report) {
+    public ReviewParticipantsDto format(String teamId, ReviewRequestEventRequest event) {
         List<String> unmappedGithubIds = new ArrayList<>();
 
-        String authorText = resolveSlackMention(teamId, report.authorGithubId(), unmappedGithubIds);
-        String pendingText = formatReviewers(teamId, report.pendingReviewers(), unmappedGithubIds);
+        String authorText = resolveSlackMention(teamId, event.authorGithubId(), unmappedGithubIds);
+        String pendingText = formatReviewers(teamId, event.pendingReviewers(), unmappedGithubIds);
         return new ReviewParticipantsDto(authorText, pendingText, List.copyOf(unmappedGithubIds));
     }
 
