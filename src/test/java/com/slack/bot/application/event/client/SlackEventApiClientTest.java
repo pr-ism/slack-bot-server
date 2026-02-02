@@ -3,6 +3,7 @@ package com.slack.bot.application.event.client;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.springframework.http.HttpMethod.GET;
 import static org.springframework.http.HttpMethod.POST;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
@@ -49,11 +50,6 @@ class SlackEventApiClientTest {
         String token = "xoxb-test-token";
         String channelId = "C12345";
         String channelName = "general";
-        String requestBody = """
-            {
-              "channel": "C12345"
-            }
-            """;
         String responseBody = """
             {
               "ok": true,
@@ -65,10 +61,9 @@ class SlackEventApiClientTest {
             }
             """;
 
-        mockServer.expect(requestTo("https://slack.com/api/conversations.info"))
-                  .andExpect(method(POST))
+        mockServer.expect(requestTo("https://slack.com/api/conversations.info?channel=C12345"))
+                  .andExpect(method(GET))
                   .andExpect(header("Authorization", "Bearer " + token))
-                  .andExpect(content().json(requestBody))
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when
@@ -86,11 +81,6 @@ class SlackEventApiClientTest {
         // given
         String token = "xoxb-test-token";
         String channelId = "INVALID_ID";
-        String requestBody = """
-            {
-              "channel": "INVALID_ID"
-            }
-            """;
         String responseBody = """
             {
               "ok": false,
@@ -98,10 +88,9 @@ class SlackEventApiClientTest {
             }
             """;
 
-        mockServer.expect(requestTo("https://slack.com/api/conversations.info"))
-                  .andExpect(method(POST))
+        mockServer.expect(requestTo("https://slack.com/api/conversations.info?channel=INVALID_ID"))
+                  .andExpect(method(GET))
                   .andExpect(header("Authorization", "Bearer " + token))
-                  .andExpect(content().json(requestBody))
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when & then
