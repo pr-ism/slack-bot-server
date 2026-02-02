@@ -32,7 +32,7 @@ public class ReviewReservation extends BaseTimeEntity {
 
     private String reviewerSlackId;
 
-    private Instant when;
+    private Instant scheduledAt;
 
     @Enumerated(EnumType.STRING)
     private ReservationStatus status;
@@ -45,7 +45,7 @@ public class ReviewReservation extends BaseTimeEntity {
             ReservationPullRequest reservationPullRequest,
             String authorSlackId,
             String reviewerSlackId,
-            Instant when,
+            Instant scheduledAt,
             ReservationStatus status
     ) {
         validateTeamId(teamId);
@@ -54,7 +54,7 @@ public class ReviewReservation extends BaseTimeEntity {
         validateReservationPullRequest(reservationPullRequest);
         validateAuthorSlackId(authorSlackId);
         validateReviewerSlackId(reviewerSlackId);
-        validateWhen(when);
+        validateWhen(scheduledAt);
         validateStatus(status);
 
         this.teamId = teamId;
@@ -63,7 +63,7 @@ public class ReviewReservation extends BaseTimeEntity {
         this.reservationPullRequest = reservationPullRequest;
         this.authorSlackId = authorSlackId;
         this.reviewerSlackId = reviewerSlackId;
-        this.when = when;
+        this.scheduledAt = scheduledAt;
         this.status = status;
     }
 
