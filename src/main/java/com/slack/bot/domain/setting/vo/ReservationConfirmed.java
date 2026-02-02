@@ -16,7 +16,7 @@ public class ReservationConfirmed {
     private DeliverySpace deliverySpace;
 
     public static ReservationConfirmed defaults() {
-        return new ReservationConfirmed(DeliverySpace.DM);
+        return new ReservationConfirmed(DeliverySpace.DIRECT_MESSAGE);
     }
 
     private ReservationConfirmed(DeliverySpace deliverySpace) {

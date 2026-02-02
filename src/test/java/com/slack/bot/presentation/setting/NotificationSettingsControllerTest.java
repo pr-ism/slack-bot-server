@@ -37,7 +37,7 @@ class NotificationSettingsControllerTest extends CommonControllerSliceTestSuppor
         Long projectMemberId = 1L;
         NotificationSettingsResponse response = new NotificationSettingsResponse(
                 projectMemberId,
-                DeliverySpace.DM,
+                DeliverySpace.DIRECT_MESSAGE,
                 true,
                 true,
                 true,
@@ -54,7 +54,7 @@ class NotificationSettingsControllerTest extends CommonControllerSliceTestSuppor
                                              )
                                              .andExpect(status().isOk())
                                              .andExpect(jsonPath("$.projectMemberId").value(projectMemberId))
-                                             .andExpect(jsonPath("$.reservationConfirmedSpace").value("DM"))
+                                             .andExpect(jsonPath("$.reservationConfirmedSpace").value("DIRECT_MESSAGE"))
                                              .andExpect(jsonPath("$.reservationCanceledConfirmationEnabled").value(true))
                                              .andExpect(jsonPath("$.reviewReminderEnabled").value(true))
                                              .andExpect(jsonPath("$.prMentionEnabled").value(true))

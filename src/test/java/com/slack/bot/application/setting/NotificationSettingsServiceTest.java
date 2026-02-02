@@ -41,7 +41,7 @@ class NotificationSettingsServiceTest {
 
         assertAll(
                 () -> assertThat(actual.projectMemberId()).isEqualTo(projectMemberId),
-                () -> assertThat(actual.reservationConfirmedSpace()).isEqualTo(DeliverySpace.DM),
+                () -> assertThat(actual.reservationConfirmedSpace()).isEqualTo(DeliverySpace.DIRECT_MESSAGE),
                 () -> assertThat(actual.reservationCanceledConfirmationEnabled()).isTrue(),
                 () -> assertThat(actual.reviewReminderEnabled()).isTrue(),
                 () -> assertThat(actual.prMentionEnabled()).isTrue(),

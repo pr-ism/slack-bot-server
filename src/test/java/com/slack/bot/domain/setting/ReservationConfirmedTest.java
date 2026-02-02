@@ -18,7 +18,7 @@ class ReservationConfirmedTest {
         // when & then
         ReservationConfirmed reservationConfirmed = assertDoesNotThrow(ReservationConfirmed::defaults);
 
-        assertThat(reservationConfirmed.getDeliverySpace()).isEqualTo(DeliverySpace.DM);
+        assertThat(reservationConfirmed.getDeliverySpace()).isEqualTo(DeliverySpace.DIRECT_MESSAGE);
     }
 
     @Test
