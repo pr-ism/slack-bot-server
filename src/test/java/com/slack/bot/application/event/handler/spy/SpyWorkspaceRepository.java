@@ -25,4 +25,9 @@ public class SpyWorkspaceRepository implements WorkspaceRepository {
     public Optional<Workspace> findByTeamId(String teamId) {
         return Optional.empty();
     }
+
+    @Override
+    public Optional<Workspace> findByUserId(Long userId) {
+        return Optional.empty();
+    }
 }

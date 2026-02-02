@@ -8,5 +8,7 @@ public interface JpaWorkspaceRepository extends CrudRepository<Workspace, Long> 
 
     Optional<Workspace> findByTeamId(String teamId);
 
+    Optional<Workspace> findByUserId(Long userId);
+
     void deleteByTeamId(String teamId);
 }
