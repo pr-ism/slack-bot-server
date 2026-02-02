@@ -7,8 +7,6 @@ public interface ChannelRepository {
 
     void save(Channel channel);
 
-    Optional<Channel> findChannelInTeam(String teamId, String slackChannelId);
-
     Optional<Channel> findByTeamId(String teamId);
 
     void deleteByTeamId(String teamId);

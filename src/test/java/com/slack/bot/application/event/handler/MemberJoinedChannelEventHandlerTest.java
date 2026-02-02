@@ -83,7 +83,7 @@ class MemberJoinedChannelEventHandlerTest {
         memberJoinedChannelEventHandler.handle(payload);
 
         // then
-        Optional<Channel> actualChannel = channelRepository.findChannelInTeam("workspace-id", "channel-id");
+        Optional<Channel> actualChannel = channelRepository.findByTeamId("workspace-id");
 
         assertAll(
                 () -> assertThat(actualChannel).isPresent(),
@@ -132,7 +132,7 @@ class MemberJoinedChannelEventHandlerTest {
         memberJoinedChannelEventHandler.handle(payload);
 
         // then
-        Optional<Channel> actualChannel = channelRepository.findChannelInTeam("workspace-id", errorChannelId);
+        Optional<Channel> actualChannel = channelRepository.findByTeamId("workspace-id");
 
         assertAll(
                 () -> assertThat(actualChannel).isPresent(),
@@ -184,7 +184,7 @@ class MemberJoinedChannelEventHandlerTest {
         memberJoinedChannelEventHandler.handle(payload);
 
         // then
-        assertThat(channelRepository.findChannelInTeam("workspace-id", "channel-id")).isEmpty();
+        assertThat(channelRepository.findByTeamId("workspace-id")).isEmpty();
     }
 
     private JsonNode createPayload(String teamId, String joinedUserId, String channelId) {

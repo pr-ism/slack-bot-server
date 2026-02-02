@@ -22,11 +22,6 @@ public class SpyChannelRepository implements ChannelRepository {
     }
 
     @Override
-    public Optional<Channel> findChannelInTeam(String teamId, String slackChannelId) {
-        return Optional.empty();
-    }
-
-    @Override
     public Optional<Channel> findByTeamId(String teamId) {
         return Optional.empty();
     }
