@@ -35,10 +35,15 @@ class ReviewActionMetaBuilderTest {
     void 메타데이터_JSON에_필수_필드가_포함된다() throws Exception {
         // given
         ReviewRequestEventRequest request = new ReviewRequestEventRequest(
-                "test-api-key", "my-repo", "PR-1", 42,
-                "Fix bug", "https://github.com/pr/1",
-                "author-gh", "opened",
-                List.of("reviewer-gh-1"), List.of()
+                "test-api-key",
+                "my-repo",
+                "PR-1",
+                42,
+                "Fix bug",
+                "https://github.com/pr/1",
+                "author-gh",
+                List.of("reviewer-gh-1"),
+                List.of()
         );
 
         // when
@@ -63,10 +68,15 @@ class ReviewActionMetaBuilderTest {
     void 프로젝트가_없으면_예외가_발생한다() {
         // given
         ReviewRequestEventRequest request = new ReviewRequestEventRequest(
-                "unknown-key", "my-repo", "PR-1", 1,
-                "Title", "https://github.com/pr/1",
-                "author-gh", "opened",
-                List.of(), List.of()
+                "unknown-key",
+                "my-repo",
+                "PR-1",
+                1,
+                "Title",
+                "https://github.com/pr/1",
+                "author-gh",
+                List.of(),
+                List.of()
         );
 
         // when & then

@@ -60,16 +60,26 @@ class InMemoryReviewEventBatchTest {
         spyNotificationService.resetCount();
 
         ReviewRequestEventRequest requestA = new ReviewRequestEventRequest(
-                "test-api-key", "my-repo", "PR-A", 1,
-                "Title A", "https://github.com/pr/a",
-                "author-gh", "opened",
-                List.of("reviewer-gh-1"), List.of()
+                "test-api-key",
+                "my-repo",
+                "PR-A",
+                1,
+                "Title A",
+                "https://github.com/pr/a",
+                "author-gh",
+                List.of("reviewer-gh-1"),
+                List.of()
         );
         ReviewRequestEventRequest requestB = new ReviewRequestEventRequest(
-                "test-api-key", "my-repo", "PR-B", 2,
-                "Title B", "https://github.com/pr/b",
-                "author-gh", "opened",
-                List.of("reviewer-gh-1"), List.of()
+                "test-api-key",
+                "my-repo",
+                "PR-B",
+                2,
+                "Title B",
+                "https://github.com/pr/b",
+                "author-gh",
+                List.of("reviewer-gh-1"),
+                List.of()
         );
 
         // when
@@ -90,7 +100,6 @@ class InMemoryReviewEventBatchTest {
                 "Fix bug",
                 "https://github.com/pr/1",
                 "author-gh",
-                "opened",
                 reviewers,
                 List.of()
         );

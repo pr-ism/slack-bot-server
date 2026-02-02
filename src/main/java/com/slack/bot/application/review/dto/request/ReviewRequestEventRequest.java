@@ -28,8 +28,6 @@ public record ReviewRequestEventRequest(
         @NotBlank(message = "authorGithubId는 필수입니다.")
         String authorGithubId,
 
-        String status,
-
         @JsonFormat(with = JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
         List<String> pendingReviewers,
 

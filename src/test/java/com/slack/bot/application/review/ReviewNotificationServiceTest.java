@@ -29,10 +29,15 @@ class ReviewNotificationServiceTest {
     void 리뷰_요청_알림을_정상적으로_발송한다() {
         // given
         ReviewRequestEventRequest request = new ReviewRequestEventRequest(
-                "test-api-key", "my-repo", "PR-1", 42,
-                "Fix bug", "https://github.com/pr/1",
-                "author-gh", "opened",
-                List.of("reviewer-gh-1"), List.of()
+                "test-api-key",
+                "my-repo",
+                "PR-1",
+                42,
+                "Fix bug",
+                "https://github.com/pr/1",
+                "author-gh",
+                List.of("reviewer-gh-1"),
+                List.of()
         );
 
         // when & then
