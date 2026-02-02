@@ -65,4 +65,16 @@ public class ProjectMemberRepositoryAdapter implements ProjectMemberRepository {
 
         return Optional.ofNullable(result);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ProjectMember> findByGithubUser(String teamId, String githubId) {
+        ProjectMember result = queryFactory.selectFrom(projectMember)
+                                           .where(
+                                                   projectMember.teamId.eq(teamId),
+                                                   projectMember.githubId.value.eq(githubId))
+                                           .fetchOne();
+
+        return Optional.ofNullable(result);
+    }
 }
