@@ -55,6 +55,13 @@ public class SlackEventApiClient {
                                                .build())
                                        .header("Authorization", authorization)
                                        .retrieve()
+                                       .onStatus(status -> status.isError(), (request, resp) -> {
+                                           String message = "Slack API HTTP 요청 실패. Status: %s".formatted(
+                                                   resp.getStatusCode()
+                                           );
+
+                                           throw new SlackChatRequestException(message);
+                                       })
                                        .body(JsonNode.class);
 
         return extractChannelInfo(validateResponse(response));
