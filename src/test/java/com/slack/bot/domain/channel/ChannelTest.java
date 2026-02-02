@@ -85,7 +85,7 @@ class ChannelTest {
                                  .build();
 
         // when
-        channel.updateChannelName("new-name");
+        channel.updateChannel("C1", "new-name");
 
         // then
         assertThat(channel.getChannelName()).isEqualTo("new-name");
@@ -102,7 +102,7 @@ class ChannelTest {
                                  .build();
 
         // when & then
-        assertThatThrownBy(() -> channel.updateChannelName(channelName))
+        assertThatThrownBy(() -> channel.updateChannel("C1", channelName))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("채널 이름은 비어 있을 수 없습니다.");
     }

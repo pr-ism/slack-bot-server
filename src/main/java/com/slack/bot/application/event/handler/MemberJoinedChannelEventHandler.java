@@ -76,7 +76,7 @@ public class MemberJoinedChannelEventHandler implements SlackEventHandler {
     private void synchronizeChannel(MemberJoinedEventPayload eventPayload, String fetchedChannelName) {
         channelRepository.findByTeamId(eventPayload.teamId())
                          .ifPresentOrElse(
-                                 existing -> existing.updateChannelName(fetchedChannelName),
+                                 existing -> existing.updateChannel(eventPayload.channelId(), fetchedChannelName),
                                  () -> saveChannel(eventPayload, fetchedChannelName)
                          );
     }
