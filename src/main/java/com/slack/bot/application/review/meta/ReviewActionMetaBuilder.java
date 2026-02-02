@@ -3,7 +3,7 @@ package com.slack.bot.application.review.meta;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.slack.bot.application.review.dto.request.ReviewRequestEventRequest;
+import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
 import com.slack.bot.application.review.meta.exception.ProjectNotFoundException;
 import com.slack.bot.application.review.meta.exception.ReviewActionMetaException;
 import com.slack.bot.domain.member.repository.ProjectMemberRepository;
@@ -19,7 +19,7 @@ public class ReviewActionMetaBuilder {
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
 
-    public String build(String teamId, String channelId, String apiKey, ReviewRequestEventRequest report) {
+    public String build(String teamId, String channelId, String apiKey, ReviewAssignmentRequest report) {
         Long projectId = projectRepository.findIdByApiKey(apiKey)
                                           .orElseThrow(() -> new ProjectNotFoundException(apiKey));
 

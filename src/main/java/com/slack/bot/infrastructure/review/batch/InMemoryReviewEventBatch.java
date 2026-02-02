@@ -2,7 +2,7 @@ package com.slack.bot.infrastructure.review.batch;
 
 import com.slack.bot.application.review.ReviewNotificationService;
 import com.slack.bot.application.review.ReviewEventBatch;
-import com.slack.bot.application.review.dto.request.ReviewRequestEventRequest;
+import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
 import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
@@ -28,7 +28,7 @@ public class InMemoryReviewEventBatch implements ReviewEventBatch {
     private long batchWindowMillis;
 
     @Override
-    public void buffer(String apiKey, ReviewRequestEventRequest report) {
+    public void buffer(String apiKey, ReviewAssignmentRequest report) {
         BatchKey key = new BatchKey(apiKey, report.pullRequestId());
 
         batchLock.lock();
@@ -64,6 +64,6 @@ public class InMemoryReviewEventBatch implements ReviewEventBatch {
     private record BatchKey(String apiKey, String pullRequestId) {
     }
 
-    private record PendingEvent(String apiKey, ReviewRequestEventRequest request) {
+    private record PendingEvent(String apiKey, ReviewAssignmentRequest request) {
     }
 }

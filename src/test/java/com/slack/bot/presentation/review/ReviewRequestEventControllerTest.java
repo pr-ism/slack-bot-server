@@ -14,7 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.slack.bot.application.review.ReviewEventBatch;
 import com.slack.bot.application.review.channel.exception.ReviewChannelResolveException;
 import com.slack.bot.application.review.client.exception.ReviewSlackApiException;
-import com.slack.bot.application.review.dto.request.ReviewRequestEventRequest;
+import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
 import com.slack.bot.presentation.CommonControllerSliceTestSupport;
 import java.util.List;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -35,7 +35,7 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
     @Test
     void 리뷰_요청_이벤트_수신_성공_테스트() throws Exception {
         // given
-        ReviewRequestEventRequest body = new ReviewRequestEventRequest(
+        ReviewAssignmentRequest body = new ReviewAssignmentRequest(
                 "my-repo",
                 "PR-1",
                 42,
@@ -46,7 +46,7 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
                 List.of()
         );
 
-        willDoNothing().given(reviewEventBatch).buffer(any(String.class), any(ReviewRequestEventRequest.class));
+        willDoNothing().given(reviewEventBatch).buffer(any(String.class), any(ReviewAssignmentRequest.class));
 
         // when & then
         ResultActions resultActions = mockMvc.perform(
@@ -100,11 +100,11 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
     @Test
     void 리뷰_채널을_찾을_수_없으면_예외_응답을_반환한다() throws Exception {
         // given
-        ReviewRequestEventRequest body = defaultBody();
+        ReviewAssignmentRequest body = defaultBody();
 
         willThrow(new ReviewChannelResolveException("채널 정보가 없습니다."))
                 .given(reviewEventBatch)
-                .buffer(any(String.class), any(ReviewRequestEventRequest.class));
+                .buffer(any(String.class), any(ReviewAssignmentRequest.class));
 
         // when & then
         mockMvc.perform(
@@ -121,11 +121,11 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
     @Test
     void 슬랙_API_예외가_발생하면_서버_에러_응답을_반환한다() throws Exception {
         // given
-        ReviewRequestEventRequest body = defaultBody();
+        ReviewAssignmentRequest body = defaultBody();
 
         willThrow(new ReviewSlackApiException("Slack API 요청 실패"))
                 .given(reviewEventBatch)
-                .buffer(any(String.class), any(ReviewRequestEventRequest.class));
+                .buffer(any(String.class), any(ReviewAssignmentRequest.class));
 
         // when & then
         mockMvc.perform(
@@ -139,8 +139,8 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
                 .andExpect(jsonPath("$.message").value("리뷰 알림 Slack API 요청 실패"));
     }
 
-    private ReviewRequestEventRequest defaultBody() {
-        return new ReviewRequestEventRequest(
+    private ReviewAssignmentRequest defaultBody() {
+        return new ReviewAssignmentRequest(
                 "my-repo",
                 "PR-1",
                 42,

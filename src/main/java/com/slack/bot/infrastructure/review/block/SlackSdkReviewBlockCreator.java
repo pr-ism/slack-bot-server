@@ -15,7 +15,7 @@ import com.slack.api.util.json.GsonFactory;
 import com.slack.bot.application.review.ReviewBlockCreator;
 import com.slack.bot.application.review.dto.ReviewMessageDto;
 import com.slack.bot.application.review.participant.ReviewParticipantFormatter;
-import com.slack.bot.application.review.dto.request.ReviewRequestEventRequest;
+import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
 import com.slack.bot.application.review.participant.dto.ReviewParticipantsDto;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,7 +35,7 @@ public class SlackSdkReviewBlockCreator implements ReviewBlockCreator {
     private final ReviewParticipantFormatter mentionFormatter;
 
     @Override
-    public ReviewMessageDto create(String teamId, ReviewRequestEventRequest event, String actionMetaJson) {
+    public ReviewMessageDto create(String teamId, ReviewAssignmentRequest event, String actionMetaJson) {
         ReviewParticipantsDto participants = mentionFormatter.format(teamId, event);
         List<LayoutBlock> topBlocks = buildTopBlocks(event);
         Attachment attachment = buildAttachment(event, actionMetaJson, participants);
@@ -48,7 +48,7 @@ public class SlackSdkReviewBlockCreator implements ReviewBlockCreator {
         );
     }
 
-    private SectionBlock buildTitleBlock(ReviewRequestEventRequest event) {
+    private SectionBlock buildTitleBlock(ReviewAssignmentRequest event) {
         return SectionBlock.builder()
                            .text(MarkdownTextObject.builder()
                                                    .text(formatTitleMarkdown(event))
@@ -56,7 +56,7 @@ public class SlackSdkReviewBlockCreator implements ReviewBlockCreator {
                            .build();
     }
 
-    private String formatTitleMarkdown(ReviewRequestEventRequest event) {
+    private String formatTitleMarkdown(ReviewAssignmentRequest event) {
         return "🚀 *New PR:* <%s|%s (#%d)>".formatted(
                 event.pullRequestUrl(),
                 event.pullRequestTitle(),
@@ -64,7 +64,7 @@ public class SlackSdkReviewBlockCreator implements ReviewBlockCreator {
         );
     }
 
-    private List<LayoutBlock> buildTopBlocks(ReviewRequestEventRequest event) {
+    private List<LayoutBlock> buildTopBlocks(ReviewAssignmentRequest event) {
         List<LayoutBlock> blocks = new ArrayList<>();
 
         blocks.add(buildTitleBlock(event));
@@ -72,7 +72,7 @@ public class SlackSdkReviewBlockCreator implements ReviewBlockCreator {
     }
 
     private Attachment buildAttachment(
-            ReviewRequestEventRequest event,
+            ReviewAssignmentRequest event,
             String actionMetaJson,
             ReviewParticipantsDto participants
     ) {
@@ -115,7 +115,7 @@ public class SlackSdkReviewBlockCreator implements ReviewBlockCreator {
                            .build();
     }
 
-    private ActionsBlock buildActionButtons(ReviewRequestEventRequest report, String actionMetaJson) {
+    private ActionsBlock buildActionButtons(ReviewAssignmentRequest report, String actionMetaJson) {
         List<BlockElement> elements = new ArrayList<>();
 
         if (actionMetaJson != null && !actionMetaJson.isBlank()) {
@@ -154,7 +154,7 @@ public class SlackSdkReviewBlockCreator implements ReviewBlockCreator {
                            .build();
     }
 
-    private String buildFallbackText(ReviewRequestEventRequest event) {
+    private String buildFallbackText(ReviewAssignmentRequest event) {
         return "🚀 New PR: " + event.pullRequestTitle() + " (#" + event.pullRequestNumber() + ")";
     }
 

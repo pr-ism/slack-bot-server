@@ -1,7 +1,7 @@
 package com.slack.bot.presentation.review;
 
 import com.slack.bot.application.review.ReviewEventBatch;
-import com.slack.bot.application.review.dto.request.ReviewRequestEventRequest;
+import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,10 +21,9 @@ public class ReviewRequestEventController {
     @PostMapping("/review-request")
     public ResponseEntity<Void> handleReviewRequestEvent(
             @RequestHeader("X-API-Key") String apiKey,
-            @Valid @RequestBody ReviewRequestEventRequest request
+            @Valid @RequestBody ReviewAssignmentRequest request
     ) {
         eventBatch.buffer(apiKey, request);
-
         return ResponseEntity.ok().build();
     }
 }

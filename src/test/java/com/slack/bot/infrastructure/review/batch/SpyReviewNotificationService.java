@@ -4,7 +4,7 @@ import com.slack.bot.application.review.ReviewBlockCreator;
 import com.slack.bot.application.review.ReviewNotificationService;
 import com.slack.bot.application.review.channel.ReviewSlackChannelResolver;
 import com.slack.bot.application.review.client.ReviewSlackApiClient;
-import com.slack.bot.application.review.dto.request.ReviewRequestEventRequest;
+import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
 import com.slack.bot.application.review.meta.ReviewActionMetaBuilder;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -22,7 +22,7 @@ public class SpyReviewNotificationService extends ReviewNotificationService {
     }
 
     @Override
-    public void sendSimpleNotification(String apiKey, ReviewRequestEventRequest request) {
+    public void sendSimpleNotification(String apiKey, ReviewAssignmentRequest request) {
         super.sendSimpleNotification(apiKey, request);
         sendCount.incrementAndGet();
     }

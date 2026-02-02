@@ -6,7 +6,7 @@ import static org.awaitility.Awaitility.await;
 
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.review.ReviewEventBatch;
-import com.slack.bot.application.review.dto.request.ReviewRequestEventRequest;
+import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
 import java.util.List;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -36,8 +36,8 @@ class InMemoryReviewEventBatchTest {
         // given
         spyNotificationService.resetCount();
 
-        ReviewRequestEventRequest request1 = createRequest(List.of("reviewer-gh-1"));
-        ReviewRequestEventRequest request2 = createRequest(List.of("reviewer-gh-1", "unknown-reviewer"));
+        ReviewAssignmentRequest request1 = createRequest(List.of("reviewer-gh-1"));
+        ReviewAssignmentRequest request2 = createRequest(List.of("reviewer-gh-1", "unknown-reviewer"));
 
         // when
         eventBatch.buffer("test-api-key", request1);
@@ -59,7 +59,7 @@ class InMemoryReviewEventBatchTest {
         // given
         spyNotificationService.resetCount();
 
-        ReviewRequestEventRequest requestA = new ReviewRequestEventRequest(
+        ReviewAssignmentRequest requestA = new ReviewAssignmentRequest(
                 "my-repo",
                 "PR-A",
                 1,
@@ -69,7 +69,7 @@ class InMemoryReviewEventBatchTest {
                 List.of("reviewer-gh-1"),
                 List.of()
         );
-        ReviewRequestEventRequest requestB = new ReviewRequestEventRequest(
+        ReviewAssignmentRequest requestB = new ReviewAssignmentRequest(
                 "my-repo",
                 "PR-B",
                 2,
@@ -89,8 +89,8 @@ class InMemoryReviewEventBatchTest {
                .untilAsserted(() -> assertThat(spyNotificationService.getSendCount()).isEqualTo(2));
     }
 
-    private ReviewRequestEventRequest createRequest(List<String> reviewers) {
-        return new ReviewRequestEventRequest(
+    private ReviewAssignmentRequest createRequest(List<String> reviewers) {
+        return new ReviewAssignmentRequest(
                 "my-repo",
                 "PR-1",
                 42,

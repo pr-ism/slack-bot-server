@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.IntegrationTest;
-import com.slack.bot.application.review.dto.request.ReviewRequestEventRequest;
+import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
 import com.slack.bot.application.review.meta.exception.ProjectNotFoundException;
 import java.util.List;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -34,7 +34,7 @@ class ReviewActionMetaBuilderTest {
     })
     void 메타데이터_JSON에_필수_필드가_포함된다() throws Exception {
         // given
-        ReviewRequestEventRequest request = new ReviewRequestEventRequest(
+        ReviewAssignmentRequest request = new ReviewAssignmentRequest(
                 "my-repo",
                 "PR-1",
                 42,
@@ -66,7 +66,7 @@ class ReviewActionMetaBuilderTest {
     @Test
     void 프로젝트가_없으면_예외가_발생한다() {
         // given
-        ReviewRequestEventRequest request = new ReviewRequestEventRequest(
+        ReviewAssignmentRequest request = new ReviewAssignmentRequest(
                 "my-repo",
                 "PR-1",
                 1,

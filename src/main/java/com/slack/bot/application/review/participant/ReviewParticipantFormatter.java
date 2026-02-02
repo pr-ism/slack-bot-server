@@ -1,6 +1,6 @@
 package com.slack.bot.application.review.participant;
 
-import com.slack.bot.application.review.dto.request.ReviewRequestEventRequest;
+import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
 import com.slack.bot.application.review.participant.dto.ReviewParticipantsDto;
 import com.slack.bot.domain.member.repository.ProjectMemberRepository;
 import java.util.ArrayList;
@@ -15,7 +15,7 @@ public class ReviewParticipantFormatter {
 
     private final ProjectMemberRepository projectMemberRepository;
 
-    public ReviewParticipantsDto format(String teamId, ReviewRequestEventRequest event) {
+    public ReviewParticipantsDto format(String teamId, ReviewAssignmentRequest event) {
         List<String> unmappedGithubIds = new ArrayList<>();
 
         String authorText = resolveSlackMention(teamId, event.authorGithubId(), unmappedGithubIds);

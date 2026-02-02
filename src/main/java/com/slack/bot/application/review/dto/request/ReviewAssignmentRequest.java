@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import java.util.List;
 
-public record ReviewRequestEventRequest(
+public record ReviewAssignmentRequest(
 
         @NotBlank(message = "repositoryName은 필수입니다.")
         String repositoryName,
