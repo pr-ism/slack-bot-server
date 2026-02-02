@@ -1,0 +1,7 @@
+[[Review-Event-API]]
+== Review-Event-API
+
+[[Review-Requested]]
+=== PR 리뷰 요청 이벤트 처리
+
+operation::review-request-event-controller-test/리뷰_요청_이벤트_수신_성공_테스트[snippets='http-request,request-headers,request-fields,http-response']
