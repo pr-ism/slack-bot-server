@@ -26,7 +26,6 @@ class ReviewParticipantFormatterTest {
     void 매핑된_사용자는_슬랙_멘션으로_변환된다() {
         // given
         ReviewRequestEventRequest request = new ReviewRequestEventRequest(
-                "key",
                 "repo",
                 "PR-1",
                 1,
@@ -53,7 +52,6 @@ class ReviewParticipantFormatterTest {
     void 매핑되지_않은_사용자는_GitHub_ID로_표시되고_unmapped_목록에_포함된다() {
         // given
         ReviewRequestEventRequest request = new ReviewRequestEventRequest(
-                "key",
                 "repo",
                 "PR-1",
                 1,
@@ -78,7 +76,6 @@ class ReviewParticipantFormatterTest {
     void 리뷰어가_없으면_none으로_표시된다() {
         // given
         ReviewRequestEventRequest request = new ReviewRequestEventRequest(
-                "key",
                 "repo",
                 "PR-1",
                 1,

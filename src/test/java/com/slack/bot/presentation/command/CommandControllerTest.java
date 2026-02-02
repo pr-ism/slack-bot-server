@@ -1,5 +1,6 @@
 package com.slack.bot.presentation.command;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.post;
@@ -30,9 +31,7 @@ class CommandControllerTest extends CommonControllerSliceTestSupport {
     @Test
     void 커맨드_처리_성공_테스트() throws Exception {
         // given
-        SlackCommandRequest request = new SlackCommandRequest("help", "U123", "T456");
-
-        given(commandService.handle(request)).willReturn("ok");
+        given(commandService.handle(any(SlackCommandRequest.class))).willReturn("ok");
 
         // when & then
         ResultActions resultActions = mockMvc.perform(
@@ -63,9 +62,7 @@ class CommandControllerTest extends CommonControllerSliceTestSupport {
     @Test
     void 워크스페이스가_없으면_커맨드_처리는_실패한다() throws Exception {
         // given
-        SlackCommandRequest request = new SlackCommandRequest("help", "U123", "T456");
-
-        willThrow(new WorkspaceNotFoundException()).given(commandService).handle(request);
+        willThrow(new WorkspaceNotFoundException()).given(commandService).handle(any(SlackCommandRequest.class));
 
         // when & then
         mockMvc.perform(

@@ -29,7 +29,6 @@ class ReviewNotificationServiceTest {
     void 리뷰_요청_알림을_정상적으로_발송한다() {
         // given
         ReviewRequestEventRequest request = new ReviewRequestEventRequest(
-                "test-api-key",
                 "my-repo",
                 "PR-1",
                 42,
@@ -41,6 +40,6 @@ class ReviewNotificationServiceTest {
         );
 
         // when & then
-        assertDoesNotThrow(() -> notificationService.sendSimpleNotification(request));
+        assertDoesNotThrow(() -> notificationService.sendSimpleNotification("test-api-key", request));
     }
 }

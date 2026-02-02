@@ -4,5 +4,5 @@ import com.slack.bot.application.review.dto.request.ReviewRequestEventRequest;
 
 public interface ReviewEventBatch {
 
-    void buffer(ReviewRequestEventRequest request);
+    void buffer(String apiKey, ReviewRequestEventRequest request);
 }

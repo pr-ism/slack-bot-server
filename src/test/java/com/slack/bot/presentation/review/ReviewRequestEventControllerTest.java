@@ -4,6 +4,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.post;
+import static org.springframework.restdocs.headers.HeaderDocumentation.headerWithName;
+import static org.springframework.restdocs.headers.HeaderDocumentation.requestHeaders;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -33,8 +35,7 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
     @Test
     void 리뷰_요청_이벤트_수신_성공_테스트() throws Exception {
         // given
-        ReviewRequestEventRequest request = new ReviewRequestEventRequest(
-                "test-api-key",
+        ReviewRequestEventRequest body = new ReviewRequestEventRequest(
                 "my-repo",
                 "PR-1",
                 42,
@@ -45,14 +46,15 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
                 List.of()
         );
 
-        willDoNothing().given(reviewEventBatch).buffer(request);
+        willDoNothing().given(reviewEventBatch).buffer(any(String.class), any(ReviewRequestEventRequest.class));
 
         // when & then
         ResultActions resultActions = mockMvc.perform(
-                post("/events/review-request")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request))
-        ).andExpect(status().isOk());
+                        post("/events/review-request")
+                                .header("X-API-Key", "test-api-key")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(body))
+                ).andExpect(status().isOk());
 
         리뷰_요청_이벤트_수신_문서화(resultActions);
     }
@@ -60,8 +62,10 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
     private void 리뷰_요청_이벤트_수신_문서화(ResultActions resultActions) throws Exception {
         resultActions.andDo(
                 restDocs.document(
+                        requestHeaders(
+                                headerWithName("X-API-Key").description("프로젝트 API 키")
+                        ),
                         requestFields(
-                                fieldWithPath("apiKey").type(JsonFieldType.STRING).description("프로젝트 API 키"),
                                 fieldWithPath("repositoryName").type(JsonFieldType.STRING).description("GitHub 레포지토리 이름"),
                                 fieldWithPath("pullRequestId").type(JsonFieldType.STRING).description("Pull Request 식별자"),
                                 fieldWithPath("pullRequestNumber").type(JsonFieldType.NUMBER).description("Pull Request 번호"),
@@ -87,6 +91,7 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
         // when & then
         mockMvc.perform(
                 post("/events/review-request")
+                        .header("X-API-Key", "test-api-key")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalidBody)
         ).andExpect(status().isBadRequest());
@@ -95,27 +100,18 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
     @Test
     void 리뷰_채널을_찾을_수_없으면_예외_응답을_반환한다() throws Exception {
         // given
-        ReviewRequestEventRequest request = new ReviewRequestEventRequest(
-                "test-api-key",
-                "my-repo",
-                "PR-1",
-                42,
-                "Fix bug",
-                "https://github.com/pr/1",
-                "author-gh",
-                List.of("reviewer-gh-1"),
-                List.of()
-        );
+        ReviewRequestEventRequest body = defaultBody();
 
         willThrow(new ReviewChannelResolveException("채널 정보가 없습니다."))
                 .given(reviewEventBatch)
-                .buffer(any(ReviewRequestEventRequest.class));
+                .buffer(any(String.class), any(ReviewRequestEventRequest.class));
 
         // when & then
         mockMvc.perform(
                         post("/events/review-request")
+                                .header("X-API-Key", "test-api-key")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request))
+                                .content(objectMapper.writeValueAsString(body))
                 )
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("R00"))
@@ -125,8 +121,26 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
     @Test
     void 슬랙_API_예외가_발생하면_서버_에러_응답을_반환한다() throws Exception {
         // given
-        ReviewRequestEventRequest request = new ReviewRequestEventRequest(
-                "test-api-key",
+        ReviewRequestEventRequest body = defaultBody();
+
+        willThrow(new ReviewSlackApiException("Slack API 요청 실패"))
+                .given(reviewEventBatch)
+                .buffer(any(String.class), any(ReviewRequestEventRequest.class));
+
+        // when & then
+        mockMvc.perform(
+                        post("/events/review-request")
+                                .header("X-API-Key", "test-api-key")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(body))
+                )
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.errorCode").value("R03"))
+                .andExpect(jsonPath("$.message").value("리뷰 알림 Slack API 요청 실패"));
+    }
+
+    private ReviewRequestEventRequest defaultBody() {
+        return new ReviewRequestEventRequest(
                 "my-repo",
                 "PR-1",
                 42,
@@ -136,19 +150,5 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
                 List.of("reviewer-gh-1"),
                 List.of()
         );
-
-        willThrow(new ReviewSlackApiException("Slack API 요청 실패"))
-                .given(reviewEventBatch)
-                .buffer(any(ReviewRequestEventRequest.class));
-
-        // when & then
-        mockMvc.perform(
-                        post("/events/review-request")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request))
-                )
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.errorCode").value("R03"))
-                .andExpect(jsonPath("$.message").value("리뷰 알림 Slack API 요청 실패"));
     }
 }

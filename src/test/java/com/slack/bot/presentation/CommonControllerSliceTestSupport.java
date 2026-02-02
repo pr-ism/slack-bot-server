@@ -8,6 +8,7 @@ import com.slack.bot.context.ResetMockTestExecutionListener;
 import com.slack.bot.docs.RestDocsConfiguration;
 import com.slack.bot.global.resolver.ProjectMemberIdArgumentResolver;
 import com.slack.bot.global.exception.GlobalExceptionHandler;
+import com.slack.bot.global.resolver.SlackCommandRequestArgumentResolver;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -58,10 +59,11 @@ public abstract class CommonControllerSliceTestSupport {
     void beforeEach() {
         StandaloneMockMvcBuilder standaloneMockMvcBuilder = MockMvcBuilders.standaloneSetup(findRestControllers());
         ProjectMemberIdArgumentResolver projectMemberIdArgumentResolver = new ProjectMemberIdArgumentResolver();
+        SlackCommandRequestArgumentResolver slackCommandRequestArgumentResolver = new SlackCommandRequestArgumentResolver();
 
         this.mockMvc = new FixedStandaloneMockMvcBuilder(standaloneMockMvcBuilder)
                 .configureMessageConverters()
-                .configureArgumentResolvers(projectMemberIdArgumentResolver)
+                .configureArgumentResolvers(projectMemberIdArgumentResolver, slackCommandRequestArgumentResolver)
                 .configureInterceptors()
                 .configureControllerAdvice()
                 .configureRestDocs()

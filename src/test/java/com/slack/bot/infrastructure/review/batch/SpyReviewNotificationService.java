@@ -22,8 +22,8 @@ public class SpyReviewNotificationService extends ReviewNotificationService {
     }
 
     @Override
-    public void sendSimpleNotification(ReviewRequestEventRequest request) {
-        super.sendSimpleNotification(request);
+    public void sendSimpleNotification(String apiKey, ReviewRequestEventRequest request) {
+        super.sendSimpleNotification(apiKey, request);
         sendCount.incrementAndGet();
     }
 

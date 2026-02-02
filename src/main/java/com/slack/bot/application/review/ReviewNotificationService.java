@@ -18,12 +18,12 @@ public class ReviewNotificationService {
     private final ReviewActionMetaBuilder actionMetaBuilder;
     private final ReviewSlackChannelResolver channelResolver;
 
-    public void sendSimpleNotification(ReviewRequestEventRequest request) {
-        SlackChannelDto channel = channelResolver.resolve(request.apiKey());
+    public void sendSimpleNotification(String apiKey, ReviewRequestEventRequest request) {
+        SlackChannelDto channel = channelResolver.resolve(apiKey);
         String actionMeta = actionMetaBuilder.build(
                 channel.teamId(),
                 channel.channelId(),
-                request.apiKey(),
+                apiKey,
                 request
         );
         ReviewMessageDto message = blockFactory.create(channel.teamId(), request, actionMeta);

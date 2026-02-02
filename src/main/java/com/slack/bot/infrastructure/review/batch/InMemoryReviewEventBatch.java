@@ -19,17 +19,17 @@ public class InMemoryReviewEventBatch implements ReviewEventBatch {
 
     private final TaskScheduler taskScheduler;
     private final ReviewNotificationService notificationService;
-    private final ConcurrentHashMap<BatchKey, ReviewRequestEventRequest> pendingEvents = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<BatchKey, PendingEvent> pendingEvents = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<BatchKey, ScheduledFuture<?>> scheduledTasks = new ConcurrentHashMap<>();
 
     @Value("${review.notification.batch.window-millis:" + DEFAULT_BATCH_WINDOW_MILLIS + "}")
     private long batchWindowMillis;
 
     @Override
-    public void buffer(ReviewRequestEventRequest report) {
-        BatchKey key = new BatchKey(report.apiKey(), report.pullRequestId());
+    public void buffer(String apiKey, ReviewRequestEventRequest report) {
+        BatchKey key = new BatchKey(apiKey, report.pullRequestId());
 
-        pendingEvents.put(key, report);
+        pendingEvents.put(key, new PendingEvent(apiKey, report));
 
         scheduledTasks.computeIfAbsent(key, k -> taskScheduler.schedule(
                 () -> flush(k),
@@ -40,15 +40,18 @@ public class InMemoryReviewEventBatch implements ReviewEventBatch {
     private void flush(BatchKey key) {
         scheduledTasks.remove(key);
 
-        ReviewRequestEventRequest report = pendingEvents.remove(key);
+        PendingEvent pendingEvent = pendingEvents.remove(key);
 
-        if (report == null) {
+        if (pendingEvent == null) {
             return;
         }
 
-        notificationService.sendSimpleNotification(report);
+        notificationService.sendSimpleNotification(pendingEvent.apiKey(), pendingEvent.request());
     }
 
     private record BatchKey(String apiKey, String pullRequestId) {
+    }
+
+    private record PendingEvent(String apiKey, ReviewRequestEventRequest request) {
     }
 }

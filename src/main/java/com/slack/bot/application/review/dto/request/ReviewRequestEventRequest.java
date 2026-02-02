@@ -7,9 +7,6 @@ import java.util.List;
 
 public record ReviewRequestEventRequest(
 
-        @NotBlank(message = "apiKey는 필수입니다.")
-        String apiKey,
-
         @NotBlank(message = "repositoryName은 필수입니다.")
         String repositoryName,
 

@@ -40,8 +40,8 @@ class InMemoryReviewEventBatchTest {
         ReviewRequestEventRequest request2 = createRequest(List.of("reviewer-gh-1", "unknown-reviewer"));
 
         // when
-        eventBatch.buffer(request1);
-        eventBatch.buffer(request2);
+        eventBatch.buffer("test-api-key", request1);
+        eventBatch.buffer("test-api-key", request2);
 
         // then
         await().atMost(3, SECONDS)
@@ -60,7 +60,6 @@ class InMemoryReviewEventBatchTest {
         spyNotificationService.resetCount();
 
         ReviewRequestEventRequest requestA = new ReviewRequestEventRequest(
-                "test-api-key",
                 "my-repo",
                 "PR-A",
                 1,
@@ -71,7 +70,6 @@ class InMemoryReviewEventBatchTest {
                 List.of()
         );
         ReviewRequestEventRequest requestB = new ReviewRequestEventRequest(
-                "test-api-key",
                 "my-repo",
                 "PR-B",
                 2,
@@ -83,8 +81,8 @@ class InMemoryReviewEventBatchTest {
         );
 
         // when
-        eventBatch.buffer(requestA);
-        eventBatch.buffer(requestB);
+        eventBatch.buffer("test-api-key", requestA);
+        eventBatch.buffer("test-api-key", requestB);
 
         // then
         await().atMost(3, SECONDS)
@@ -93,7 +91,6 @@ class InMemoryReviewEventBatchTest {
 
     private ReviewRequestEventRequest createRequest(List<String> reviewers) {
         return new ReviewRequestEventRequest(
-                "test-api-key",
                 "my-repo",
                 "PR-1",
                 42,
