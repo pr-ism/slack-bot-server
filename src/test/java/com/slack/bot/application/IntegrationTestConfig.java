@@ -1,8 +1,11 @@
 package com.slack.bot.application;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.command.client.MemberConnectionSlackApiClient;
 import com.slack.bot.application.event.client.SlackEventApiClient;
 import com.slack.bot.application.event.dto.ChannelNameWrapper;
+import com.slack.bot.application.review.client.ReviewSlackApiClient;
 import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
 import java.sql.SQLException;
 import org.hibernate.exception.ConstraintViolationException;
@@ -58,6 +61,28 @@ public class IntegrationTestConfig {
 
             @Override
             public void sendEphemeralMessage(String token, String channelId, String targetUserId, String text) {
+            }
+        };
+    }
+
+    @Bean
+    @Primary
+    public ReviewSlackApiClient reviewSlackApiClient() {
+        RestClient slackClient = RestClient.builder()
+                                           .baseUrl("https://slack.com/api/")
+                                           .build();
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        return new ReviewSlackApiClient(slackClient, objectMapper) {
+
+            @Override
+            public void sendBlockMessage(
+                    String token,
+                    String channelId,
+                    JsonNode blocks,
+                    JsonNode attachments,
+                    String fallbackText
+            ) {
             }
         };
     }
