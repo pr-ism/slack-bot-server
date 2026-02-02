@@ -103,6 +103,26 @@ class SlackEventApiClientTest {
     }
 
     @Test
+    void 채널_정보_조회_시_HTTP_에러가_발생하면_예외를_던진다() {
+        // given
+        String token = "xoxb-test-token";
+        String channelId = "C12345";
+
+        mockServer.expect(requestTo("https://slack.com/api/conversations.info?channel=C12345"))
+                  .andExpect(method(GET))
+                  .andExpect(header("Authorization", "Bearer " + token))
+                  .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+
+        // when & then
+        assertAll(
+                () -> assertThatThrownBy(() -> slackEventApiClient.fetchChannelInfo(token, channelId))
+                        .isInstanceOf(SlackChatRequestException.class)
+                        .hasMessageContaining("HTTP 요청 실패"),
+                () -> mockServer.verify()
+        );
+    }
+
+    @Test
     void 채널에_특정_회원에게만_보이는_메시지를_전달한다() {
         // given
         String token = "xoxb-test-token";

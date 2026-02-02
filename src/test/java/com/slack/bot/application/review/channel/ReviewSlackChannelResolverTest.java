@@ -64,6 +64,7 @@ class ReviewSlackChannelResolverTest {
     void 프로젝트가_없으면_예외가_발생한다() {
         // when & then
         assertThatThrownBy(() -> channelResolver.resolve("non-existent-key"))
-                .isInstanceOf(RuntimeException.class);
+                .isInstanceOf(ReviewChannelResolveException.class)
+                .hasMessageContaining("유효하지 않은 API Key입니다.");
     }
 }
