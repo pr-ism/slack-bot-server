@@ -14,7 +14,7 @@ public class OptionalNotifications {
 
     private boolean reservationCanceledConfirmationEnabled;
     private boolean reviewReminderEnabled;
-    private boolean prMentionEnabled;
+    private boolean pullRequestMentionEnabled;
     private boolean reviewCompletedEnabled;
 
     public static OptionalNotifications defaults() {
@@ -24,28 +24,48 @@ public class OptionalNotifications {
     private OptionalNotifications(
             boolean reservationCanceledConfirmationEnabled,
             boolean reviewReminderEnabled,
-            boolean prMentionEnabled,
+            boolean pullRequestMentionEnabled,
             boolean reviewCompletedEnabled
     ) {
         this.reservationCanceledConfirmationEnabled = reservationCanceledConfirmationEnabled;
         this.reviewReminderEnabled = reviewReminderEnabled;
-        this.prMentionEnabled = prMentionEnabled;
+        this.pullRequestMentionEnabled = pullRequestMentionEnabled;
         this.reviewCompletedEnabled = reviewCompletedEnabled;
     }
 
     public OptionalNotifications updateReservationCanceledConfirmation(boolean enabled) {
-        return new OptionalNotifications(enabled, reviewReminderEnabled, prMentionEnabled, reviewCompletedEnabled);
+        return new OptionalNotifications(
+                enabled,
+                reviewReminderEnabled,
+                pullRequestMentionEnabled,
+                reviewCompletedEnabled
+        );
     }
 
     public OptionalNotifications updateReviewReminder(boolean enabled) {
-        return new OptionalNotifications(reservationCanceledConfirmationEnabled, enabled, prMentionEnabled, reviewCompletedEnabled);
+        return new OptionalNotifications(
+                reservationCanceledConfirmationEnabled,
+                enabled,
+                pullRequestMentionEnabled,
+                reviewCompletedEnabled
+        );
     }
 
     public OptionalNotifications updatePrMention(boolean enabled) {
-        return new OptionalNotifications(reservationCanceledConfirmationEnabled, reviewReminderEnabled, enabled, reviewCompletedEnabled);
+        return new OptionalNotifications(
+                reservationCanceledConfirmationEnabled,
+                reviewReminderEnabled,
+                enabled,
+                reviewCompletedEnabled
+        );
     }
 
     public OptionalNotifications updateReviewCompleted(boolean enabled) {
-        return new OptionalNotifications(reservationCanceledConfirmationEnabled, reviewReminderEnabled, prMentionEnabled, enabled);
+        return new OptionalNotifications(
+                reservationCanceledConfirmationEnabled,
+                reviewReminderEnabled,
+                pullRequestMentionEnabled,
+                enabled
+        );
     }
 }

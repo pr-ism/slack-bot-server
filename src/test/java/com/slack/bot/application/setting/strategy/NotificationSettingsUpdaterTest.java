@@ -35,7 +35,7 @@ class NotificationSettingsUpdaterTest {
                 () -> assertThat(settings.getReservationConfirmed().getDeliverySpace()).isEqualTo(DeliverySpace.TRIGGER_CHANNEL),
                 () -> assertThat(settings.getOptionalNotifications().isReservationCanceledConfirmationEnabled()).isFalse(),
                 () -> assertThat(settings.getOptionalNotifications().isReviewReminderEnabled()).isFalse(),
-                () -> assertThat(settings.getOptionalNotifications().isPrMentionEnabled()).isFalse(),
+                () -> assertThat(settings.getOptionalNotifications().isPullRequestMentionEnabled()).isFalse(),
                 () -> assertThat(settings.getOptionalNotifications().isReviewCompletedEnabled()).isFalse()
         );
     }

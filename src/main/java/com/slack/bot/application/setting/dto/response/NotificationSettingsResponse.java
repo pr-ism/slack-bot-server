@@ -18,7 +18,7 @@ public record NotificationSettingsResponse(
                 settings.getReservationConfirmed().getDeliverySpace(),
                 settings.getOptionalNotifications().isReservationCanceledConfirmationEnabled(),
                 settings.getOptionalNotifications().isReviewReminderEnabled(),
-                settings.getOptionalNotifications().isPrMentionEnabled(),
+                settings.getOptionalNotifications().isPullRequestMentionEnabled(),
                 settings.getOptionalNotifications().isReviewCompletedEnabled()
         );
     }

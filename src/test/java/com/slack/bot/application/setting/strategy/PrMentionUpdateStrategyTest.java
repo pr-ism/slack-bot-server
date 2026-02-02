@@ -30,6 +30,6 @@ class PrMentionUpdateStrategyTest {
         strategy.apply(settings, request);
 
         // then
-        assertThat(settings.getOptionalNotifications().isPrMentionEnabled()).isFalse();
+        assertThat(settings.getOptionalNotifications().isPullRequestMentionEnabled()).isFalse();
     }
 }

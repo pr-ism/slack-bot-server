@@ -21,7 +21,7 @@ class OptionalNotificationsTest {
         assertAll(
                 () -> assertThat(actual.isReservationCanceledConfirmationEnabled()).isTrue(),
                 () -> assertThat(actual.isReviewReminderEnabled()).isTrue(),
-                () -> assertThat(actual.isPrMentionEnabled()).isTrue(),
+                () -> assertThat(actual.isPullRequestMentionEnabled()).isTrue(),
                 () -> assertThat(actual.isReviewCompletedEnabled()).isTrue()
         );
     }
@@ -38,7 +38,7 @@ class OptionalNotificationsTest {
         assertAll(
                 () -> assertThat(actual.isReservationCanceledConfirmationEnabled()).isFalse(),
                 () -> assertThat(actual.isReviewReminderEnabled()).isTrue(),
-                () -> assertThat(actual.isPrMentionEnabled()).isTrue(),
+                () -> assertThat(actual.isPullRequestMentionEnabled()).isTrue(),
                 () -> assertThat(actual.isReviewCompletedEnabled()).isTrue()
         );
     }
@@ -56,7 +56,7 @@ class OptionalNotificationsTest {
         assertAll(
                 () -> assertThat(actual.isReservationCanceledConfirmationEnabled()).isTrue(),
                 () -> assertThat(actual.isReviewReminderEnabled()).isTrue(),
-                () -> assertThat(actual.isPrMentionEnabled()).isTrue(),
+                () -> assertThat(actual.isPullRequestMentionEnabled()).isTrue(),
                 () -> assertThat(actual.isReviewCompletedEnabled()).isTrue()
         );
     }
@@ -73,7 +73,7 @@ class OptionalNotificationsTest {
         assertAll(
                 () -> assertThat(actual.isReservationCanceledConfirmationEnabled()).isTrue(),
                 () -> assertThat(actual.isReviewReminderEnabled()).isFalse(),
-                () -> assertThat(actual.isPrMentionEnabled()).isTrue(),
+                () -> assertThat(actual.isPullRequestMentionEnabled()).isTrue(),
                 () -> assertThat(actual.isReviewCompletedEnabled()).isTrue()
         );
     }
@@ -91,7 +91,7 @@ class OptionalNotificationsTest {
         assertAll(
                 () -> assertThat(actual.isReservationCanceledConfirmationEnabled()).isTrue(),
                 () -> assertThat(actual.isReviewReminderEnabled()).isTrue(),
-                () -> assertThat(actual.isPrMentionEnabled()).isTrue(),
+                () -> assertThat(actual.isPullRequestMentionEnabled()).isTrue(),
                 () -> assertThat(actual.isReviewCompletedEnabled()).isTrue()
         );
     }
@@ -108,7 +108,7 @@ class OptionalNotificationsTest {
         assertAll(
                 () -> assertThat(actual.isReservationCanceledConfirmationEnabled()).isTrue(),
                 () -> assertThat(actual.isReviewReminderEnabled()).isTrue(),
-                () -> assertThat(actual.isPrMentionEnabled()).isFalse(),
+                () -> assertThat(actual.isPullRequestMentionEnabled()).isFalse(),
                 () -> assertThat(actual.isReviewCompletedEnabled()).isTrue()
         );
     }
@@ -126,7 +126,7 @@ class OptionalNotificationsTest {
         assertAll(
                 () -> assertThat(actual.isReservationCanceledConfirmationEnabled()).isTrue(),
                 () -> assertThat(actual.isReviewReminderEnabled()).isTrue(),
-                () -> assertThat(actual.isPrMentionEnabled()).isTrue(),
+                () -> assertThat(actual.isPullRequestMentionEnabled()).isTrue(),
                 () -> assertThat(actual.isReviewCompletedEnabled()).isTrue()
         );
     }
@@ -143,7 +143,7 @@ class OptionalNotificationsTest {
         assertAll(
                 () -> assertThat(actual.isReservationCanceledConfirmationEnabled()).isTrue(),
                 () -> assertThat(actual.isReviewReminderEnabled()).isTrue(),
-                () -> assertThat(actual.isPrMentionEnabled()).isTrue(),
+                () -> assertThat(actual.isPullRequestMentionEnabled()).isTrue(),
                 () -> assertThat(actual.isReviewCompletedEnabled()).isFalse()
         );
     }
@@ -161,7 +161,7 @@ class OptionalNotificationsTest {
         assertAll(
                 () -> assertThat(actual.isReservationCanceledConfirmationEnabled()).isTrue(),
                 () -> assertThat(actual.isReviewReminderEnabled()).isTrue(),
-                () -> assertThat(actual.isPrMentionEnabled()).isTrue(),
+                () -> assertThat(actual.isPullRequestMentionEnabled()).isTrue(),
                 () -> assertThat(actual.isReviewCompletedEnabled()).isTrue()
         );
     }

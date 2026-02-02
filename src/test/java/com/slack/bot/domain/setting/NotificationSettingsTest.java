@@ -26,7 +26,7 @@ class NotificationSettingsTest {
                 () -> assertThat(actual.getReservationConfirmed().getDeliverySpace()).isEqualTo(DeliverySpace.DIRECT_MESSAGE),
                 () -> assertThat(actual.getOptionalNotifications().isReservationCanceledConfirmationEnabled()).isTrue(),
                 () -> assertThat(actual.getOptionalNotifications().isReviewReminderEnabled()).isTrue(),
-                () -> assertThat(actual.getOptionalNotifications().isPrMentionEnabled()).isTrue(),
+                () -> assertThat(actual.getOptionalNotifications().isPullRequestMentionEnabled()).isTrue(),
                 () -> assertThat(actual.getOptionalNotifications().isReviewCompletedEnabled()).isTrue()
         );
     }
@@ -151,7 +151,7 @@ class NotificationSettingsTest {
         settings.updatePrMention(false);
 
         // then
-        assertThat(settings.getOptionalNotifications().isPrMentionEnabled()).isFalse();
+        assertThat(settings.getOptionalNotifications().isPullRequestMentionEnabled()).isFalse();
     }
 
     @Test
@@ -165,7 +165,7 @@ class NotificationSettingsTest {
         settings.updatePrMention(true);
 
         // then
-        assertThat(settings.getOptionalNotifications().isPrMentionEnabled()).isTrue();
+        assertThat(settings.getOptionalNotifications().isPullRequestMentionEnabled()).isTrue();
     }
 
     @Test

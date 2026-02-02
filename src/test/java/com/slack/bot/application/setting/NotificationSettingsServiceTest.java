@@ -110,7 +110,7 @@ class NotificationSettingsServiceTest {
                 () -> assertThat(saved.getReservationConfirmed().getDeliverySpace()).isEqualTo(DeliverySpace.TRIGGER_CHANNEL),
                 () -> assertThat(saved.getOptionalNotifications().isReservationCanceledConfirmationEnabled()).isFalse(),
                 () -> assertThat(saved.getOptionalNotifications().isReviewReminderEnabled()).isTrue(),
-                () -> assertThat(saved.getOptionalNotifications().isPrMentionEnabled()).isFalse(),
+                () -> assertThat(saved.getOptionalNotifications().isPullRequestMentionEnabled()).isFalse(),
                 () -> assertThat(saved.getOptionalNotifications().isReviewCompletedEnabled()).isTrue()
         );
     }
