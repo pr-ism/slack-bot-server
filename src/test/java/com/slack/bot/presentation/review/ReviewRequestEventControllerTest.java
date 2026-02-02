@@ -1,12 +1,17 @@
 package com.slack.bot.presentation.review;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.willDoNothing;
+import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.post;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.slack.bot.application.review.ReviewEventBatch;
+import com.slack.bot.application.review.channel.exception.ReviewChannelResolveException;
+import com.slack.bot.application.review.client.exception.ReviewSlackApiException;
 import com.slack.bot.application.review.dto.request.ReviewRequestEventRequest;
 import com.slack.bot.presentation.CommonControllerSliceTestSupport;
 import java.util.List;
@@ -85,5 +90,65 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalidBody)
         ).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void 리뷰_채널을_찾을_수_없으면_예외_응답을_반환한다() throws Exception {
+        // given
+        ReviewRequestEventRequest request = new ReviewRequestEventRequest(
+                "test-api-key",
+                "my-repo",
+                "PR-1",
+                42,
+                "Fix bug",
+                "https://github.com/pr/1",
+                "author-gh",
+                List.of("reviewer-gh-1"),
+                List.of()
+        );
+
+        willThrow(new ReviewChannelResolveException("채널 정보가 없습니다."))
+                .given(reviewEventBatch)
+                .buffer(any(ReviewRequestEventRequest.class));
+
+        // when & then
+        mockMvc.perform(
+                        post("/events/review-request")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                )
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("R00"))
+                .andExpect(jsonPath("$.message").value("리뷰 채널 정보를 찾을 수 없습니다."));
+    }
+
+    @Test
+    void 슬랙_API_예외가_발생하면_서버_에러_응답을_반환한다() throws Exception {
+        // given
+        ReviewRequestEventRequest request = new ReviewRequestEventRequest(
+                "test-api-key",
+                "my-repo",
+                "PR-1",
+                42,
+                "Fix bug",
+                "https://github.com/pr/1",
+                "author-gh",
+                List.of("reviewer-gh-1"),
+                List.of()
+        );
+
+        willThrow(new ReviewSlackApiException("Slack API 요청 실패"))
+                .given(reviewEventBatch)
+                .buffer(any(ReviewRequestEventRequest.class));
+
+        // when & then
+        mockMvc.perform(
+                        post("/events/review-request")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                )
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.errorCode").value("R03"))
+                .andExpect(jsonPath("$.message").value("리뷰 알림 Slack API 요청 실패"));
     }
 }
