@@ -1,6 +1,5 @@
 package com.slack.bot.infrastructure.channel.persistence;
 
-import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.domain.channel.Channel;
 import com.slack.bot.domain.channel.repository.ChannelRepository;
 import java.util.Optional;
@@ -12,7 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ChannelRepositoryAdapter implements ChannelRepository {
 
-    private final JPAQueryFactory queryFactory;
     private final JpaChannelRepository jpaChannelRepository;
 
     @Override
