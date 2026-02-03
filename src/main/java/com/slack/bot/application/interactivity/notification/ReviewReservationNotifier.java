@@ -75,6 +75,9 @@ public class ReviewReservationNotifier {
         if (authorSlackId == null || authorSlackId.isBlank()) {
             return;
         }
+        if (reviewerId == null || reviewerId.isBlank()) {
+            return;
+        }
 
         String text = messageFormatter.buildStartNowText(authorSlackId, reviewerId, meta);
 
@@ -93,6 +96,9 @@ public class ReviewReservationNotifier {
             return;
         }
         if (authorSlackId == null || authorSlackId.isBlank()) {
+            return;
+        }
+        if (reviewerId == null || reviewerId.isBlank()) {
             return;
         }
 

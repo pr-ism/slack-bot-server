@@ -206,6 +206,40 @@ class ReviewReservationNotifierTest {
     }
 
     @Test
+    void reviewerId가_비어_있으면_리뷰_시작_알림을_전송하지_않는다() {
+        // given
+        ReviewScheduleMetaDto meta = createMeta();
+        String token = "xoxb-token";
+        String authorSlackId = "U-AUTHOR";
+
+        // when
+        reviewReservationNotifier.notifyStartNow(meta, null, token, authorSlackId);
+
+        // then
+        assertAll(
+                () -> verify(messageFormatter, never()).buildStartNowText(anyString(), anyString(), any()),
+                () -> verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString())
+        );
+    }
+
+    @Test
+    void reviewerId가_빈문자열이면_즉시_시작_알림을_전송하지_않는다() {
+        // given
+        ReviewScheduleMetaDto meta = createMeta();
+        String token = "xoxb-token";
+        String authorSlackId = "U-AUTHOR";
+
+        // when
+        reviewReservationNotifier.notifyStartNow(meta, "", token, authorSlackId);
+
+        // then
+        assertAll(
+                () -> verify(messageFormatter, never()).buildStartNowText(anyString(), anyString(), any()),
+                () -> verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString())
+        );
+    }
+
+    @Test
     void 예약_알림을_전송한다() {
         // given
         ReviewScheduleMetaDto meta = createMeta();
@@ -292,6 +326,42 @@ class ReviewReservationNotifierTest {
 
         // when
         reviewReservationNotifier.notifyScheduled(meta, reviewerId, scheduledAt, token, "");
+
+        // then
+        assertAll(
+                () -> verify(messageFormatter, never()).buildScheduledText(anyString(), anyString(), any(), any(), any()),
+                () -> verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString())
+        );
+    }
+
+    @Test
+    void reviewerId가_비어_있으면_리뷰_예약_알림을_전송하지_않는다() {
+        // given
+        ReviewScheduleMetaDto meta = createMeta();
+        Instant scheduledAt = FIXED_NOW.plusSeconds(3600);
+        String token = "xoxb-token";
+        String authorSlackId = "U-AUTHOR";
+
+        // when
+        reviewReservationNotifier.notifyScheduled(meta, null, scheduledAt, token, authorSlackId);
+
+        // then
+        assertAll(
+                () -> verify(messageFormatter, never()).buildScheduledText(anyString(), anyString(), any(), any(), any()),
+                () -> verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString())
+        );
+    }
+
+    @Test
+    void reviewerId가_빈문자열이면_예약_알림을_전송하지_않는다() {
+        // given
+        ReviewScheduleMetaDto meta = createMeta();
+        Instant scheduledAt = FIXED_NOW.plusSeconds(3600);
+        String token = "xoxb-token";
+        String authorSlackId = "U-AUTHOR";
+
+        // when
+        reviewReservationNotifier.notifyScheduled(meta, "", scheduledAt, token, authorSlackId);
 
         // then
         assertAll(
