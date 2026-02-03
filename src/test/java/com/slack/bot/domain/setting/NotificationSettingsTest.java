@@ -193,4 +193,30 @@ class NotificationSettingsTest {
         // then
         assertThat(settings.getOptionalNotifications().isReviewCompletedEnabled()).isTrue();
     }
+
+    @Test
+    void 리뷰_예약_완료_확인_메시지_전달_공간이_DIRECT_MESSAGE이면_DM이_활성화되어_있다() {
+        // given
+        NotificationSettings settings = NotificationSettings.defaults(1L);
+
+        // when
+        boolean actual = settings.isDirectMessageEnabled();
+
+        // then
+        assertThat(actual).isTrue();
+    }
+
+    @Test
+    void 리뷰_예약_완료_확인_메시지_전달_공간이_트리거_채널이면_DM이_비활성화되어_있다() {
+        // given
+        NotificationSettings settings = NotificationSettings.defaults(1L);
+
+        settings.changeReservationConfirmedSpace(DeliverySpace.TRIGGER_CHANNEL);
+
+        // when
+        boolean actual = settings.isDirectMessageEnabled();
+
+        // then
+        assertThat(actual).isFalse();
+    }
 }

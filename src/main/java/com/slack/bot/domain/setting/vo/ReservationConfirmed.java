@@ -30,4 +30,8 @@ public class ReservationConfirmed {
 
         return new ReservationConfirmed(newSpace);
     }
+
+    public boolean isDirectMessageEnabled() {
+        return this.deliverySpace.isDirectMessage();
+    }
 }

@@ -98,4 +98,8 @@ public class NotificationSettings extends BaseEntity {
     public void updateReviewCompleted(boolean enabled) {
         this.optionalNotifications = optionalNotifications.updateReviewCompleted(enabled);
     }
+
+    public boolean isDirectMessageEnabled() {
+        return this.reservationConfirmed.isDirectMessageEnabled();
+    }
 }
