@@ -101,6 +101,9 @@ public class ReviewReservationNotifier {
         if (reviewerId == null || reviewerId.isBlank()) {
             return;
         }
+        if (scheduledAt == null) {
+            return;
+        }
 
         ZonedDateTime now = ZonedDateTime.now(clock).truncatedTo(ChronoUnit.MINUTES);
         ZonedDateTime scheduledAtZoned = scheduledAt.atZone(clock.getZone()).truncatedTo(ChronoUnit.MINUTES);

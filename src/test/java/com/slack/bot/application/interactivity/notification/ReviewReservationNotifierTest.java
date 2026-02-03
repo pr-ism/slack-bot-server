@@ -370,6 +370,24 @@ class ReviewReservationNotifierTest {
         );
     }
 
+    @Test
+    void scheduledAt이_비어_있으면_예약_알림을_전송하지_않는다() {
+        // given
+        ReviewScheduleMetaDto meta = createMeta();
+        String reviewerId = "U-REVIEWER";
+        String token = "xoxb-token";
+        String authorSlackId = "U-AUTHOR";
+
+        // when
+        reviewReservationNotifier.notifyScheduled(meta, reviewerId, null, token, authorSlackId);
+
+        // then
+        assertAll(
+                () -> verify(messageFormatter, never()).buildScheduledText(anyString(), anyString(), any(), any(), any()),
+                () -> verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString())
+        );
+    }
+
     private ReviewReservation createReservation() {
         return ReviewReservation.builder()
                 .teamId("T1")
