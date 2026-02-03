@@ -49,4 +49,21 @@ public class ReviewReservationRepositoryAdapter implements ReviewReservationRepo
 
         return Optional.ofNullable(result);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsActive(String teamId, Long projectId, String reviewerSlackId) {
+        Integer result = queryFactory
+                .selectOne()
+                .from(reviewReservation)
+                .where(
+                        reviewReservation.teamId.eq(teamId),
+                        reviewReservation.projectId.eq(projectId),
+                        reviewReservation.reviewerSlackId.eq(reviewerSlackId),
+                        reviewReservation.status.eq(ReservationStatus.ACTIVE)
+                )
+                .fetchFirst();
+
+        return result != null;
+    }
 }

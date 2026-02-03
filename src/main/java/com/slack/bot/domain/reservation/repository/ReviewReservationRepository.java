@@ -10,4 +10,6 @@ public interface ReviewReservationRepository {
     Optional<ReviewReservation> findById(Long reservationId);
 
     Optional<ReviewReservation> findActive(String teamId, Long projectId, String reviewerSlackId);
+
+    boolean existsActive(String teamId, Long projectId, String reviewerSlackId);
 }
