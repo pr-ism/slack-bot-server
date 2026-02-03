@@ -41,7 +41,7 @@ class NotificationSettingsServiceTest {
 
         assertAll(
                 () -> assertThat(actual.projectMemberId()).isEqualTo(projectMemberId),
-                () -> assertThat(actual.reservationConfirmedSpace()).isEqualTo(DeliverySpace.DM),
+                () -> assertThat(actual.reservationConfirmedSpace()).isEqualTo(DeliverySpace.DIRECT_MESSAGE),
                 () -> assertThat(actual.reservationCanceledConfirmationEnabled()).isTrue(),
                 () -> assertThat(actual.reviewReminderEnabled()).isTrue(),
                 () -> assertThat(actual.prMentionEnabled()).isTrue(),
@@ -110,7 +110,7 @@ class NotificationSettingsServiceTest {
                 () -> assertThat(saved.getReservationConfirmed().getDeliverySpace()).isEqualTo(DeliverySpace.TRIGGER_CHANNEL),
                 () -> assertThat(saved.getOptionalNotifications().isReservationCanceledConfirmationEnabled()).isFalse(),
                 () -> assertThat(saved.getOptionalNotifications().isReviewReminderEnabled()).isTrue(),
-                () -> assertThat(saved.getOptionalNotifications().isPrMentionEnabled()).isFalse(),
+                () -> assertThat(saved.getOptionalNotifications().isPullRequestMentionEnabled()).isFalse(),
                 () -> assertThat(saved.getOptionalNotifications().isReviewCompletedEnabled()).isTrue()
         );
     }

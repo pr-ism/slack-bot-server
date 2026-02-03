@@ -1,6 +1,10 @@
 package com.slack.bot.domain.setting;
 
 public enum DeliverySpace {
-    DM,
-    TRIGGER_CHANNEL
+    DIRECT_MESSAGE,
+    TRIGGER_CHANNEL;
+
+    public boolean isDirectMessage() {
+        return this == DIRECT_MESSAGE;
+    }
 }

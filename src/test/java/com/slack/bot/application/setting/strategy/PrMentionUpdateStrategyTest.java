@@ -18,7 +18,7 @@ class PrMentionUpdateStrategyTest {
         // given
         NotificationSettings settings = NotificationSettings.defaults(1L);
         UpdateNotificationSettingsRequest request = new UpdateNotificationSettingsRequest(
-                DeliverySpace.DM,
+                DeliverySpace.DIRECT_MESSAGE,
                 true,
                 true,
                 false,
@@ -30,6 +30,6 @@ class PrMentionUpdateStrategyTest {
         strategy.apply(settings, request);
 
         // then
-        assertThat(settings.getOptionalNotifications().isPrMentionEnabled()).isFalse();
+        assertThat(settings.getOptionalNotifications().isPullRequestMentionEnabled()).isFalse();
     }
 }

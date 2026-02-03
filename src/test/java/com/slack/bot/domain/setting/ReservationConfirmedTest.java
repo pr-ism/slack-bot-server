@@ -18,7 +18,7 @@ class ReservationConfirmedTest {
         // when & then
         ReservationConfirmed reservationConfirmed = assertDoesNotThrow(ReservationConfirmed::defaults);
 
-        assertThat(reservationConfirmed.getDeliverySpace()).isEqualTo(DeliverySpace.DM);
+        assertThat(reservationConfirmed.getDeliverySpace()).isEqualTo(DeliverySpace.DIRECT_MESSAGE);
     }
 
     @Test
@@ -42,6 +42,31 @@ class ReservationConfirmedTest {
         assertThatThrownBy(() -> reservationConfirmed.changeSpace(null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("알림이 전달된 장소는 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void 리뷰_예약_완료_확인_메시지_전달_공간이_DM이면_DM이_활성화되어_있다() {
+        // given
+        ReservationConfirmed reservationConfirmed = ReservationConfirmed.defaults();
+
+        // when
+        boolean actual = reservationConfirmed.isDirectMessageEnabled();
+
+        // then
+        assertThat(actual).isTrue();
+    }
+
+    @Test
+    void 리뷰_예약_완료_확인_메시지_전달_공간이_트리거_채널이면_DM이_비활성화되어_있다() {
+        // given
+        ReservationConfirmed reservationConfirmed = ReservationConfirmed.defaults()
+                                                                        .changeSpace(DeliverySpace.TRIGGER_CHANNEL);
+
+        // when
+        boolean actual = reservationConfirmed.isDirectMessageEnabled();
+
+        // then
+        assertThat(actual).isFalse();
     }
 }
 

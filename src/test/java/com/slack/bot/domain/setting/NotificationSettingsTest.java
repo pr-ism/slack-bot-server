@@ -23,10 +23,10 @@ class NotificationSettingsTest {
         // then
         assertAll(
                 () -> assertThat(actual.getProjectMemberId()).isEqualTo(1L),
-                () -> assertThat(actual.getReservationConfirmed().getDeliverySpace()).isEqualTo(DeliverySpace.DM),
+                () -> assertThat(actual.getReservationConfirmed().getDeliverySpace()).isEqualTo(DeliverySpace.DIRECT_MESSAGE),
                 () -> assertThat(actual.getOptionalNotifications().isReservationCanceledConfirmationEnabled()).isTrue(),
                 () -> assertThat(actual.getOptionalNotifications().isReviewReminderEnabled()).isTrue(),
-                () -> assertThat(actual.getOptionalNotifications().isPrMentionEnabled()).isTrue(),
+                () -> assertThat(actual.getOptionalNotifications().isPullRequestMentionEnabled()).isTrue(),
                 () -> assertThat(actual.getOptionalNotifications().isReviewCompletedEnabled()).isTrue()
         );
     }
@@ -151,7 +151,7 @@ class NotificationSettingsTest {
         settings.updatePrMention(false);
 
         // then
-        assertThat(settings.getOptionalNotifications().isPrMentionEnabled()).isFalse();
+        assertThat(settings.getOptionalNotifications().isPullRequestMentionEnabled()).isFalse();
     }
 
     @Test
@@ -165,7 +165,7 @@ class NotificationSettingsTest {
         settings.updatePrMention(true);
 
         // then
-        assertThat(settings.getOptionalNotifications().isPrMentionEnabled()).isTrue();
+        assertThat(settings.getOptionalNotifications().isPullRequestMentionEnabled()).isTrue();
     }
 
     @Test
@@ -192,5 +192,31 @@ class NotificationSettingsTest {
 
         // then
         assertThat(settings.getOptionalNotifications().isReviewCompletedEnabled()).isTrue();
+    }
+
+    @Test
+    void 리뷰_예약_완료_확인_메시지_전달_공간이_DIRECT_MESSAGE이면_DM이_활성화되어_있다() {
+        // given
+        NotificationSettings settings = NotificationSettings.defaults(1L);
+
+        // when
+        boolean actual = settings.isDirectMessageEnabled();
+
+        // then
+        assertThat(actual).isTrue();
+    }
+
+    @Test
+    void 리뷰_예약_완료_확인_메시지_전달_공간이_트리거_채널이면_DM이_비활성화되어_있다() {
+        // given
+        NotificationSettings settings = NotificationSettings.defaults(1L);
+
+        settings.changeReservationConfirmedSpace(DeliverySpace.TRIGGER_CHANNEL);
+
+        // when
+        boolean actual = settings.isDirectMessageEnabled();
+
+        // then
+        assertThat(actual).isFalse();
     }
 }
