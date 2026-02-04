@@ -13,6 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
@@ -33,6 +34,7 @@ public class ReviewReservationCoordinator {
         return reviewReservationRepository.findById(reservationId);
     }
 
+    @Transactional
     public ReviewReservation create(ReservationCommandDto command) {
         if (reviewReservationRepository.existsActive(
                 command.teamId(),
@@ -59,6 +61,7 @@ public class ReviewReservationCoordinator {
         return savedReservation;
     }
 
+    @Transactional
     public ReviewReservation reschedule(ReservationCommandDto command) {
         ReviewReservation existing = requireReservation(command.reservationId());
 
@@ -88,7 +91,6 @@ public class ReviewReservationCoordinator {
 
         reviewReminderScheduler.cancelByReservationId(reservation.getId());
         reservation.markCancelled();
-        reviewReservationRepository.save(reservation);
     }
 
     private void validateSameKey(
