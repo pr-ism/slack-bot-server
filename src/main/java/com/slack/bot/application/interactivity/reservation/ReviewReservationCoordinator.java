@@ -6,9 +6,12 @@ import com.slack.bot.application.interactivity.reservation.dto.ReservationComman
 import com.slack.bot.application.interactivity.reservation.exception.ActiveReservationAlreadyExistsException;
 import com.slack.bot.application.interactivity.reservation.exception.ReservationKeyMismatchException;
 import com.slack.bot.application.interactivity.reservation.exception.ReservationNotFoundException;
+import com.slack.bot.application.interactivity.reservation.exception.ReservationScheduleInPastException;
 import com.slack.bot.domain.reservation.ReservationStatus;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.repository.ReviewReservationRepository;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ReviewReservationCoordinator {
 
+    private final Clock clock;
     private final ReviewReminderScheduler reviewReminderScheduler;
     private final ReviewReservationRepository reviewReservationRepository;
 
@@ -36,6 +40,7 @@ public class ReviewReservationCoordinator {
 
     @Transactional
     public ReviewReservation create(ReservationCommandDto command) {
+        validateScheduledAt(command.scheduledAt());
         return reviewReservationRepository.findActiveForUpdate(
                         command.teamId(),
                         command.projectId(),
@@ -52,12 +57,19 @@ public class ReviewReservationCoordinator {
         ReviewReservation existing = requireReservation(command.reservationId());
 
         validateSameKey(existing, command.teamId(), command.projectId(), command.reviewerSlackId());
+        validateScheduledAt(command.scheduledAt());
 
         return reviewReservationRepository.findActiveForUpdate(
                         command.teamId(),
                         command.projectId(),
                         command.reviewerSlackId()
                 )
+                .map(active -> {
+                    if (!active.getId().equals(existing.getId())) {
+                        throw new ActiveReservationAlreadyExistsException("이미 활성화된 리뷰 예약이 있습니다.");
+                    }
+                    return rescheduleInternal(active, command);
+                })
                 .orElseGet(() -> {
                     cancelInternal(existing);
                     return createInternal(command);
@@ -80,6 +92,17 @@ public class ReviewReservationCoordinator {
 
         reviewReminderScheduler.schedule(reminderScheduleCommand);
         return savedReservation;
+    }
+
+    private ReviewReservation rescheduleInternal(ReviewReservation reservation, ReservationCommandDto command) {
+        reservation.reschedule(command.scheduledAt());
+        reviewReservationRepository.save(reservation);
+
+        reviewReminderScheduler.cancelByReservationId(reservation.getId());
+        ReminderScheduleCommandDto reminderScheduleCommand = ReminderScheduleCommandDto.from(reservation, command);
+        reviewReminderScheduler.schedule(reminderScheduleCommand);
+
+        return reservation;
     }
 
     @Transactional
@@ -122,5 +145,11 @@ public class ReviewReservationCoordinator {
 
     private boolean safeNotEquals(Object left, Object right) {
         return !Objects.equals(left, right);
+    }
+
+    private void validateScheduledAt(Instant scheduledAt) {
+        if (scheduledAt.isBefore(Instant.now(clock))) {
+            throw new ReservationScheduleInPastException("리뷰 예약 시간은 현재보다 이후여야 합니다.");
+        }
     }
 }

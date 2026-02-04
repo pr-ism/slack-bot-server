@@ -9,8 +9,11 @@ import com.slack.bot.application.interactivity.reservation.dto.ReservationComman
 import com.slack.bot.application.interactivity.reservation.exception.ActiveReservationAlreadyExistsException;
 import com.slack.bot.application.interactivity.reservation.exception.ReservationKeyMismatchException;
 import com.slack.bot.application.interactivity.reservation.exception.ReservationNotFoundException;
+import com.slack.bot.application.interactivity.reservation.exception.ReservationScheduleInPastException;
 import com.slack.bot.domain.reservation.ReservationStatus;
+import com.slack.bot.domain.reservation.ReviewReminder;
 import com.slack.bot.domain.reservation.ReviewReservation;
+import com.slack.bot.domain.reservation.repository.ReviewReminderRepository;
 import com.slack.bot.domain.reservation.repository.ReviewReservationRepository;
 import com.slack.bot.domain.reservation.vo.ReservationPullRequest;
 import java.time.Instant;
@@ -31,6 +34,9 @@ class ReviewReservationCoordinatorTest {
     @Autowired
     ReviewReservationRepository reservationRepository;
 
+    @Autowired
+    ReviewReminderRepository reminderRepository;
+
     @Test
     void 활성_예약을_조회한다() {
         // given
@@ -41,6 +47,7 @@ class ReviewReservationCoordinatorTest {
                 .pullRequestUrl("https://github.com/org/repo/pull/1")
                 .build();
 
+        Instant scheduledAt = futureInstant(3600);
         ReservationCommandDto command = ReservationCommandDto.builder()
                 .teamId("T1")
                 .channelId("C1")
@@ -48,7 +55,7 @@ class ReviewReservationCoordinatorTest {
                 .reservationPullRequest(pullRequest)
                 .authorSlackId("U1")
                 .reviewerSlackId("U2")
-                .scheduledAt(Instant.now())
+                .scheduledAt(scheduledAt)
                 .build();
 
         ReviewReservation created = coordinator.create(command);
@@ -82,6 +89,7 @@ class ReviewReservationCoordinatorTest {
                 .pullRequestUrl("https://github.com/org/repo/pull/1")
                 .build();
 
+        Instant scheduledAt = futureInstant(3600);
         ReservationCommandDto command = ReservationCommandDto.builder()
                 .teamId("T1")
                 .channelId("C1")
@@ -89,7 +97,7 @@ class ReviewReservationCoordinatorTest {
                 .reservationPullRequest(pullRequest)
                 .authorSlackId("U1")
                 .reviewerSlackId("U2")
-                .scheduledAt(Instant.now())
+                .scheduledAt(scheduledAt)
                 .build();
 
         ReviewReservation created = coordinator.create(command);
@@ -130,7 +138,7 @@ class ReviewReservationCoordinatorTest {
                 .reservationPullRequest(pullRequest)
                 .authorSlackId("U789")
                 .reviewerSlackId("U012")
-                .scheduledAt(Instant.parse("2024-02-01T10:00:00Z"))
+                .scheduledAt(futureInstant(3600))
                 .build();
 
         // when
@@ -144,7 +152,7 @@ class ReviewReservationCoordinatorTest {
                 () -> assertThat(actual.getProjectId()).isEqualTo(10L),
                 () -> assertThat(actual.getAuthorSlackId()).isEqualTo("U789"),
                 () -> assertThat(actual.getReviewerSlackId()).isEqualTo("U012"),
-                () -> assertThat(actual.getScheduledAt()).isEqualTo(Instant.parse("2024-02-01T10:00:00Z")),
+                () -> assertThat(actual.getScheduledAt()).isAfter(Instant.now()),
                 () -> assertThat(actual.getStatus()).isEqualTo(ReservationStatus.ACTIVE)
         );
     }
@@ -166,7 +174,7 @@ class ReviewReservationCoordinatorTest {
                 .reservationPullRequest(pullRequest)
                 .authorSlackId("U1")
                 .reviewerSlackId("U2")
-                .scheduledAt(Instant.now())
+                .scheduledAt(futureInstant(3600))
                 .build();
 
         coordinator.create(firstCommand);
@@ -185,13 +193,39 @@ class ReviewReservationCoordinatorTest {
                 .reservationPullRequest(secondPullRequest)
                 .authorSlackId("U1")
                 .reviewerSlackId("U2")
-                .scheduledAt(Instant.now())
+                .scheduledAt(futureInstant(7200))
                 .build();
 
         // when & then
         assertThatThrownBy(() -> coordinator.create(secondCommand))
                 .isInstanceOf(ActiveReservationAlreadyExistsException.class)
                 .hasMessageContaining("이미 활성화된 리뷰 예약이 있습니다");
+    }
+
+    @Test
+    void 예약_시간이_현재보다_이전이면_생성에_실패한다() {
+        // given
+        ReservationPullRequest pullRequest = ReservationPullRequest.builder()
+                .pullRequestId(1L)
+                .pullRequestNumber(1)
+                .pullRequestTitle("Past")
+                .pullRequestUrl("https://github.com/org/repo/pull/1")
+                .build();
+
+        ReservationCommandDto command = ReservationCommandDto.builder()
+                .teamId("T1")
+                .channelId("C1")
+                .projectId(1L)
+                .reservationPullRequest(pullRequest)
+                .authorSlackId("U1")
+                .reviewerSlackId("U2")
+                .scheduledAt(pastInstant(60))
+                .build();
+
+        // when & then
+        assertThatThrownBy(() -> coordinator.create(command))
+                .isInstanceOf(ReservationScheduleInPastException.class)
+                .hasMessageContaining("리뷰 예약 시간은 현재보다 이후여야 합니다");
     }
 
     @Test
@@ -204,6 +238,7 @@ class ReviewReservationCoordinatorTest {
                 .pullRequestUrl("https://github.com/org/repo/pull/1")
                 .build();
 
+        Instant originalScheduledAt = futureInstant(3600);
         ReservationCommandDto originalCommand = ReservationCommandDto.builder()
                 .teamId("T1")
                 .channelId("C1")
@@ -211,7 +246,7 @@ class ReviewReservationCoordinatorTest {
                 .reservationPullRequest(pullRequest)
                 .authorSlackId("U1")
                 .reviewerSlackId("U2")
-                .scheduledAt(Instant.parse("2024-02-01T10:00:00Z"))
+                .scheduledAt(originalScheduledAt)
                 .build();
 
         ReviewReservation original = coordinator.create(originalCommand);
@@ -224,6 +259,7 @@ class ReviewReservationCoordinatorTest {
                 .pullRequestUrl("https://github.com/org/repo/pull/1")
                 .build();
 
+        Instant rescheduledAt = futureInstant(7200);
         ReservationCommandDto rescheduleCommand = ReservationCommandDto.builder()
                 .reservationId(original.getId())
                 .teamId("T1")
@@ -232,7 +268,7 @@ class ReviewReservationCoordinatorTest {
                 .reservationPullRequest(newPullRequest)
                 .authorSlackId("U1")
                 .reviewerSlackId("U2")
-                .scheduledAt(Instant.parse("2024-02-01T15:00:00Z"))
+                .scheduledAt(rescheduledAt)
                 .build();
 
         // when
@@ -241,18 +277,20 @@ class ReviewReservationCoordinatorTest {
         // then
         assertAll(
                 () -> assertThat(actual.getId()).isNotEqualTo(original.getId()),
-                () -> assertThat(actual.getScheduledAt()).isEqualTo(Instant.parse("2024-02-01T15:00:00Z")),
+                () -> assertThat(actual.getScheduledAt()).isEqualTo(rescheduledAt),
                 () -> assertThat(actual.getStatus()).isEqualTo(ReservationStatus.ACTIVE)
         );
 
         // 원래 예약은 취소됨
         Optional<ReviewReservation> originalReservation = reservationRepository.findById(original.getId());
-        assertThat(originalReservation).isPresent();
-        assertThat(originalReservation.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED);
+        assertAll(
+                () -> assertThat(originalReservation).isPresent(),
+                () -> assertThat(originalReservation.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED)
+        );
     }
 
     @Test
-    void 활성_예약이_있으면_기존_예약을_반환한다() {
+    void 활성_예약이_동일_ID면_일정과_리마인더가_갱신된다() {
         // given
         ReservationPullRequest pullRequest = ReservationPullRequest.builder()
                 .pullRequestId(1L)
@@ -261,6 +299,7 @@ class ReviewReservationCoordinatorTest {
                 .pullRequestUrl("https://github.com/org/repo/pull/1")
                 .build();
 
+        Instant originalScheduledAt = futureInstant(3600);
         ReservationCommandDto originalCommand = ReservationCommandDto.builder()
                 .teamId("T1")
                 .channelId("C1")
@@ -268,11 +307,12 @@ class ReviewReservationCoordinatorTest {
                 .reservationPullRequest(pullRequest)
                 .authorSlackId("U1")
                 .reviewerSlackId("U2")
-                .scheduledAt(Instant.parse("2024-02-01T10:00:00Z"))
+                .scheduledAt(originalScheduledAt)
                 .build();
 
         ReviewReservation original = coordinator.create(originalCommand);
 
+        Instant rescheduledAt = futureInstant(7200);
         ReservationCommandDto rescheduleCommand = ReservationCommandDto.builder()
                 .reservationId(original.getId())
                 .teamId("T1")
@@ -281,17 +321,80 @@ class ReviewReservationCoordinatorTest {
                 .reservationPullRequest(pullRequest)
                 .authorSlackId("U1")
                 .reviewerSlackId("U2")
-                .scheduledAt(Instant.parse("2024-02-01T15:00:00Z"))
+                .scheduledAt(rescheduledAt)
                 .build();
 
         // when
         ReviewReservation actual = coordinator.reschedule(rescheduleCommand);
 
         // then
+        Optional<ReviewReminder> reminder = reminderRepository.findByReservationId(original.getId());
         assertAll(
                 () -> assertThat(actual.getId()).isEqualTo(original.getId()),
-                () -> assertThat(actual.getScheduledAt()).isEqualTo(original.getScheduledAt()),
-                () -> assertThat(actual.getStatus()).isEqualTo(ReservationStatus.ACTIVE)
+                () -> assertThat(actual.getScheduledAt()).isEqualTo(rescheduledAt),
+                () -> assertThat(actual.getStatus()).isEqualTo(ReservationStatus.ACTIVE),
+                () -> assertThat(reminder).isPresent(),
+                () -> assertThat(reminder.get().getScheduledAt()).isEqualTo(rescheduledAt)
+        );
+    }
+
+    @Test
+    void 다른_ID의_활성_예약이_있으면_예외가_발생한다() {
+        // given
+        ReservationPullRequest pullRequest = ReservationPullRequest.builder()
+                .pullRequestId(1L)
+                .pullRequestNumber(1)
+                .pullRequestTitle("Original")
+                .pullRequestUrl("https://github.com/org/repo/pull/1")
+                .build();
+
+        Instant firstScheduledAt = futureInstant(3600);
+        ReservationCommandDto firstCommand = ReservationCommandDto.builder()
+                .teamId("T1")
+                .channelId("C1")
+                .projectId(1L)
+                .reservationPullRequest(pullRequest)
+                .authorSlackId("U1")
+                .reviewerSlackId("U2")
+                .scheduledAt(firstScheduledAt)
+                .build();
+
+        ReviewReservation first = coordinator.create(firstCommand);
+        coordinator.cancel(first.getId());
+
+        Instant secondScheduledAt = futureInstant(5400);
+        ReservationCommandDto secondCommand = ReservationCommandDto.builder()
+                .teamId("T1")
+                .channelId("C1")
+                .projectId(1L)
+                .reservationPullRequest(pullRequest)
+                .authorSlackId("U1")
+                .reviewerSlackId("U2")
+                .scheduledAt(secondScheduledAt)
+                .build();
+
+        ReviewReservation second = coordinator.create(secondCommand);
+
+        Instant rescheduledAt = futureInstant(7200);
+        ReservationCommandDto rescheduleCommand = ReservationCommandDto.builder()
+                .reservationId(first.getId())
+                .teamId("T1")
+                .channelId("C1")
+                .projectId(1L)
+                .reservationPullRequest(pullRequest)
+                .authorSlackId("U1")
+                .reviewerSlackId("U2")
+                .scheduledAt(rescheduledAt)
+                .build();
+
+        // when & then
+        Optional<ReviewReservation> activeReservation = reservationRepository.findById(second.getId());
+        assertAll(
+                () -> assertThatThrownBy(() -> coordinator.reschedule(rescheduleCommand))
+                        .isInstanceOf(ActiveReservationAlreadyExistsException.class)
+                        .hasMessageContaining("이미 활성화된 리뷰 예약이 있습니다"),
+                () -> assertThat(activeReservation).isPresent(),
+                () -> assertThat(activeReservation.get().getStatus()).isEqualTo(ReservationStatus.ACTIVE)
         );
     }
 
@@ -313,13 +416,53 @@ class ReviewReservationCoordinatorTest {
                 .reservationPullRequest(pullRequest)
                 .authorSlackId("U1")
                 .reviewerSlackId("U2")
-                .scheduledAt(Instant.now())
+                .scheduledAt(futureInstant(3600))
                 .build();
 
         // when & then
         assertThatThrownBy(() -> coordinator.reschedule(command))
                 .isInstanceOf(ReservationNotFoundException.class)
                 .hasMessageContaining("예약을 찾을 수 없습니다");
+    }
+
+    @Test
+    void 예약_시간이_현재보다_이전이면_재스케줄에_실패한다() {
+        // given
+        ReservationPullRequest pullRequest = ReservationPullRequest.builder()
+                .pullRequestId(1L)
+                .pullRequestNumber(1)
+                .pullRequestTitle("Original")
+                .pullRequestUrl("https://github.com/org/repo/pull/1")
+                .build();
+
+        Instant originalScheduledAt = futureInstant(3600);
+        ReservationCommandDto originalCommand = ReservationCommandDto.builder()
+                .teamId("T1")
+                .channelId("C1")
+                .projectId(1L)
+                .reservationPullRequest(pullRequest)
+                .authorSlackId("U1")
+                .reviewerSlackId("U2")
+                .scheduledAt(originalScheduledAt)
+                .build();
+
+        ReviewReservation original = coordinator.create(originalCommand);
+
+        ReservationCommandDto rescheduleCommand = ReservationCommandDto.builder()
+                .reservationId(original.getId())
+                .teamId("T1")
+                .channelId("C1")
+                .projectId(1L)
+                .reservationPullRequest(pullRequest)
+                .authorSlackId("U1")
+                .reviewerSlackId("U2")
+                .scheduledAt(pastInstant(60))
+                .build();
+
+        // when & then
+        assertThatThrownBy(() -> coordinator.reschedule(rescheduleCommand))
+                .isInstanceOf(ReservationScheduleInPastException.class)
+                .hasMessageContaining("리뷰 예약 시간은 현재보다 이후여야 합니다");
     }
 
     @Test
@@ -332,6 +475,7 @@ class ReviewReservationCoordinatorTest {
                 .pullRequestUrl("https://github.com/org/repo/pull/1")
                 .build();
 
+        Instant originalScheduledAt = futureInstant(3600);
         ReservationCommandDto originalCommand = ReservationCommandDto.builder()
                 .teamId("T1")
                 .channelId("C1")
@@ -339,7 +483,7 @@ class ReviewReservationCoordinatorTest {
                 .reservationPullRequest(pullRequest)
                 .authorSlackId("U1")
                 .reviewerSlackId("U2")
-                .scheduledAt(Instant.now())
+                .scheduledAt(originalScheduledAt)
                 .build();
 
         ReviewReservation original = coordinator.create(originalCommand);
@@ -352,7 +496,7 @@ class ReviewReservationCoordinatorTest {
                 .reservationPullRequest(pullRequest)
                 .authorSlackId("U1")
                 .reviewerSlackId("U2")
-                .scheduledAt(Instant.now())
+                .scheduledAt(futureInstant(7200))
                 .build();
 
         // when & then
@@ -378,7 +522,7 @@ class ReviewReservationCoordinatorTest {
                 .reservationPullRequest(pullRequest)
                 .authorSlackId("U1")
                 .reviewerSlackId("U2")
-                .scheduledAt(Instant.now())
+                .scheduledAt(futureInstant(3600))
                 .build();
 
         ReviewReservation created = coordinator.create(command);
@@ -419,7 +563,7 @@ class ReviewReservationCoordinatorTest {
                 .reservationPullRequest(pullRequest)
                 .authorSlackId("U1")
                 .reviewerSlackId("U2")
-                .scheduledAt(Instant.now())
+                .scheduledAt(futureInstant(3600))
                 .build();
 
         ReviewReservation created = coordinator.create(command);
@@ -433,5 +577,13 @@ class ReviewReservationCoordinatorTest {
                 () -> assertThat(actual).isPresent(),
                 () -> assertThat(actual.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED)
         );
+    }
+
+    private Instant futureInstant(long offsetSeconds) {
+        return Instant.now().plusSeconds(offsetSeconds);
+    }
+
+    private Instant pastInstant(long offsetSeconds) {
+        return Instant.now().minusSeconds(offsetSeconds);
     }
 }
