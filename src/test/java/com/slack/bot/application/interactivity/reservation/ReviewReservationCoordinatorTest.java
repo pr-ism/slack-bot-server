@@ -17,16 +17,21 @@ import com.slack.bot.domain.reservation.repository.ReviewReminderRepository;
 import com.slack.bot.domain.reservation.repository.ReviewReservationRepository;
 import com.slack.bot.domain.reservation.vo.ReservationPullRequest;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import java.time.Clock;
 
 @IntegrationTest
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class ReviewReservationCoordinatorTest {
+
+    @Autowired
+    Clock clock;
 
     @Autowired
     ReviewReservationCoordinator coordinator;
@@ -152,7 +157,7 @@ class ReviewReservationCoordinatorTest {
                 () -> assertThat(actual.getProjectId()).isEqualTo(10L),
                 () -> assertThat(actual.getAuthorSlackId()).isEqualTo("U789"),
                 () -> assertThat(actual.getReviewerSlackId()).isEqualTo("U012"),
-                () -> assertThat(actual.getScheduledAt()).isAfter(Instant.now()),
+                () -> assertThat(actual.getScheduledAt()).isAfter(clock.instant()),
                 () -> assertThat(actual.getStatus()).isEqualTo(ReservationStatus.ACTIVE)
         );
     }
@@ -580,10 +585,10 @@ class ReviewReservationCoordinatorTest {
     }
 
     private Instant futureInstant(long offsetSeconds) {
-        return Instant.now().plusSeconds(offsetSeconds);
+        return clock.instant().plusSeconds(offsetSeconds).truncatedTo(ChronoUnit.SECONDS);
     }
 
     private Instant pastInstant(long offsetSeconds) {
-        return Instant.now().minusSeconds(offsetSeconds);
+        return clock.instant().minusSeconds(offsetSeconds).truncatedTo(ChronoUnit.SECONDS);
     }
 }

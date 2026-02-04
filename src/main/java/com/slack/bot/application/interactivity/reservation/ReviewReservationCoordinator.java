@@ -148,7 +148,9 @@ public class ReviewReservationCoordinator {
     }
 
     private void validateScheduledAt(Instant scheduledAt) {
-        if (scheduledAt.isBefore(Instant.now(clock))) {
+        Instant now = Instant.now(clock);
+
+        if (!scheduledAt.isAfter(now)) {
             throw new ReservationScheduleInPastException("리뷰 예약 시간은 현재보다 이후여야 합니다.");
         }
     }
