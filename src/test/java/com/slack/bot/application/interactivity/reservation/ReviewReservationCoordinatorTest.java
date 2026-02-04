@@ -215,6 +215,7 @@ class ReviewReservationCoordinatorTest {
                 .build();
 
         ReviewReservation original = coordinator.create(originalCommand);
+        coordinator.cancel(original.getId());
 
         ReservationPullRequest newPullRequest = ReservationPullRequest.builder()
                 .pullRequestId(1L)
@@ -248,6 +249,50 @@ class ReviewReservationCoordinatorTest {
         Optional<ReviewReservation> originalReservation = reservationRepository.findById(original.getId());
         assertThat(originalReservation).isPresent();
         assertThat(originalReservation.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED);
+    }
+
+    @Test
+    void 활성_예약이_있으면_기존_예약을_반환한다() {
+        // given
+        ReservationPullRequest pullRequest = ReservationPullRequest.builder()
+                .pullRequestId(1L)
+                .pullRequestNumber(1)
+                .pullRequestTitle("Original")
+                .pullRequestUrl("https://github.com/org/repo/pull/1")
+                .build();
+
+        ReservationCommandDto originalCommand = ReservationCommandDto.builder()
+                .teamId("T1")
+                .channelId("C1")
+                .projectId(1L)
+                .reservationPullRequest(pullRequest)
+                .authorSlackId("U1")
+                .reviewerSlackId("U2")
+                .scheduledAt(Instant.parse("2024-02-01T10:00:00Z"))
+                .build();
+
+        ReviewReservation original = coordinator.create(originalCommand);
+
+        ReservationCommandDto rescheduleCommand = ReservationCommandDto.builder()
+                .reservationId(original.getId())
+                .teamId("T1")
+                .channelId("C1")
+                .projectId(1L)
+                .reservationPullRequest(pullRequest)
+                .authorSlackId("U1")
+                .reviewerSlackId("U2")
+                .scheduledAt(Instant.parse("2024-02-01T15:00:00Z"))
+                .build();
+
+        // when
+        ReviewReservation actual = coordinator.reschedule(rescheduleCommand);
+
+        // then
+        assertAll(
+                () -> assertThat(actual.getId()).isEqualTo(original.getId()),
+                () -> assertThat(actual.getScheduledAt()).isEqualTo(original.getScheduledAt()),
+                () -> assertThat(actual.getStatus()).isEqualTo(ReservationStatus.ACTIVE)
+        );
     }
 
     @Test

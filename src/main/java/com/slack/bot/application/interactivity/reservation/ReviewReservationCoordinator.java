@@ -44,6 +44,27 @@ public class ReviewReservationCoordinator {
             throw new ActiveReservationAlreadyExistsException("이미 활성화된 리뷰 예약이 있습니다.");
         }
 
+        return createInternal(command);
+    }
+
+    @Transactional
+    public ReviewReservation reschedule(ReservationCommandDto command) {
+        ReviewReservation existing = requireReservation(command.reservationId());
+
+        validateSameKey(existing, command.teamId(), command.projectId(), command.reviewerSlackId());
+
+        return reviewReservationRepository.findActive(
+                        command.teamId(),
+                        command.projectId(),
+                        command.reviewerSlackId()
+                )
+                .orElseGet(() -> {
+                    cancelInternal(existing);
+                    return createInternal(command);
+                });
+    }
+
+    private ReviewReservation createInternal(ReservationCommandDto command) {
         ReviewReservation reservation = ReviewReservation.builder()
                                                          .teamId(command.teamId())
                                                          .channelId(command.channelId())
@@ -59,15 +80,6 @@ public class ReviewReservationCoordinator {
 
         reviewReminderScheduler.schedule(reminderScheduleCommand);
         return savedReservation;
-    }
-
-    @Transactional
-    public ReviewReservation reschedule(ReservationCommandDto command) {
-        ReviewReservation existing = requireReservation(command.reservationId());
-
-        validateSameKey(existing, command.teamId(), command.projectId(), command.reviewerSlackId());
-        cancelInternal(existing);
-        return create(command);
     }
 
     public Optional<ReviewReservation> cancel(Long reservationId) {
@@ -91,6 +103,7 @@ public class ReviewReservationCoordinator {
 
         reviewReminderScheduler.cancelByReservationId(reservation.getId());
         reservation.markCancelled();
+        reviewReservationRepository.save(reservation);
     }
 
     private void validateSameKey(
