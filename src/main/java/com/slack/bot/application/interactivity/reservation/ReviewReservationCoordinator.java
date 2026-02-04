@@ -36,15 +36,15 @@ public class ReviewReservationCoordinator {
 
     @Transactional
     public ReviewReservation create(ReservationCommandDto command) {
-        if (reviewReservationRepository.existsActive(
-                command.teamId(),
-                command.projectId(),
-                command.reviewerSlackId()
-        )) {
-            throw new ActiveReservationAlreadyExistsException("이미 활성화된 리뷰 예약이 있습니다.");
-        }
-
-        return createInternal(command);
+        return reviewReservationRepository.findActiveForUpdate(
+                        command.teamId(),
+                        command.projectId(),
+                        command.reviewerSlackId()
+                )
+                .<ReviewReservation>map(existing -> {
+                    throw new ActiveReservationAlreadyExistsException("이미 활성화된 리뷰 예약이 있습니다.");
+                })
+                .orElseGet(() -> createInternal(command));
     }
 
     @Transactional
@@ -53,7 +53,7 @@ public class ReviewReservationCoordinator {
 
         validateSameKey(existing, command.teamId(), command.projectId(), command.reviewerSlackId());
 
-        return reviewReservationRepository.findActive(
+        return reviewReservationRepository.findActiveForUpdate(
                         command.teamId(),
                         command.projectId(),
                         command.reviewerSlackId()
@@ -82,6 +82,7 @@ public class ReviewReservationCoordinator {
         return savedReservation;
     }
 
+    @Transactional
     public Optional<ReviewReservation> cancel(Long reservationId) {
         return reviewReservationRepository.findById(reservationId)
                 .map(existing -> {
