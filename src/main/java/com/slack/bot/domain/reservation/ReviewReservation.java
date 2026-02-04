@@ -54,7 +54,7 @@ public class ReviewReservation extends BaseTimeEntity {
         validateReservationPullRequest(reservationPullRequest);
         validateAuthorSlackId(authorSlackId);
         validateReviewerSlackId(reviewerSlackId);
-        validateWhen(scheduledAt);
+        validateScheduledAt(scheduledAt);
         validateStatus(status);
 
         this.teamId = teamId;
@@ -73,6 +73,12 @@ public class ReviewReservation extends BaseTimeEntity {
 
     public void markCancelled() {
         status = ReservationStatus.CANCELLED;
+    }
+
+    public void reschedule(Instant scheduledAt) {
+        validateScheduledAt(scheduledAt);
+
+        this.scheduledAt = scheduledAt;
     }
 
     private void validateTeamId(String teamId) {
@@ -111,8 +117,8 @@ public class ReviewReservation extends BaseTimeEntity {
         }
     }
 
-    private void validateWhen(Instant when) {
-        if (when == null) {
+    private void validateScheduledAt(Instant scheduledAt) {
+        if (scheduledAt == null) {
             throw new IllegalArgumentException("리뷰 예약 시간은 비어 있을 수 없습니다.");
         }
     }

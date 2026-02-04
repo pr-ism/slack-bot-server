@@ -8,4 +8,6 @@ public interface ProjectRepository {
     Optional<Project> findByApiKey(String apiKey);
 
     Optional<Long> findIdByApiKey(String apiKey);
+
+    boolean existsById(Long projectId);
 }
