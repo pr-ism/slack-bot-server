@@ -21,6 +21,7 @@ class ProjectIdResolverTest {
     ProjectIdResolver resolver;
 
     @Test
+    @Sql("classpath:sql/fixtures/reservation/project_123.sql")
     void 유효한_프로젝트_ID가_제공되면_파싱된_값을_반환한다() {
         // when
         Long actual = resolver.resolve("123", "T1");
@@ -88,5 +89,13 @@ class ProjectIdResolverTest {
         assertThatThrownBy(() -> resolver.resolve("-1", "T1"))
                 .isInstanceOf(InvalidProjectIdException.class)
                 .hasMessageContaining("잘못된 project_id 값입니다: -1");
+    }
+
+    @Test
+    void 존재하지_않는_프로젝트_ID면_예외가_발생한다() {
+        // when & then
+        assertThatThrownBy(() -> resolver.resolve("9999", "T1"))
+                .isInstanceOf(InvalidProjectIdException.class)
+                .hasMessageContaining("잘못된 project_id 값입니다: 9999");
     }
 }

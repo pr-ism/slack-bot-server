@@ -33,4 +33,14 @@ public class ProjectRepositoryAdapter implements ProjectRepository {
 
         return Optional.ofNullable(result);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsById(Long projectId) {
+        Integer result = queryFactory.selectOne()
+                                     .from(project)
+                                     .where(project.id.eq(projectId))
+                                     .fetchFirst();
+        return result != null;
+    }
 }

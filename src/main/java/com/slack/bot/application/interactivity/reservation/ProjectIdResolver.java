@@ -36,6 +36,10 @@ public class ProjectIdResolver {
                 throw new InvalidProjectIdException(rawProjectId);
             }
 
+            if (!projectRepository.existsById(projectId)) {
+                throw new InvalidProjectIdException(rawProjectId);
+            }
+
             return projectId;
         } catch (NumberFormatException e) {
             throw new InvalidProjectIdException(rawProjectId, e);
