@@ -52,7 +52,7 @@ public class ReviewReservationRepositoryAdapter implements ReviewReservationRepo
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public Optional<ReviewReservation> findActiveForUpdate(
             String teamId,
             Long projectId,
