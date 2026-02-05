@@ -1,7 +1,7 @@
 package com.slack.bot.application.interactivity.view;
 
-import java.time.Instant;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
@@ -16,29 +16,29 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ReviewTimeValidator {
 
-    private static final Pattern HHMM_PATTERN = Pattern.compile("^\\d{2}:\\d{2}$");
+    private static final Pattern TIME_PATTERN = Pattern.compile("^\\d{2}:\\d{2}$");
     private final Clock clock;
 
-    public Map<String, String> validateCustomDateTime(String date, String hhmm) {
+    public Map<String, String> validateCustomDateTime(String dateString, String timeString) {
         Map<String, String> errors = new LinkedHashMap<>();
 
-        if (date == null || date.isBlank()) {
+        if (dateString == null || dateString.isBlank()) {
             errors.put("date_block", "날짜를 선택해주세요.");
             return errors;
         }
-        if (hhmm == null || hhmm.isBlank()) {
+        if (timeString == null || timeString.isBlank()) {
             errors.put("time_block", "시간을 입력해주세요. 예: 21:35");
             return errors;
         }
 
-        String normalized = normalizeHhMmOrNull(hhmm);
+        String normalizedTime = normalizeTimeOrNull(timeString);
 
-        if (normalized == null) {
+        if (normalizedTime == null) {
             errors.put("time_block", "시간은 00:00~23:59 범위의 HH:mm 형식이어야 합니다. 예: 21:35");
             return errors;
         }
 
-        Instant scheduledAt = parseScheduledAtOrNull(date, normalized);
+        Instant scheduledAt = parseScheduledAtOrNull(dateString, normalizedTime);
         if (scheduledAt == null) {
             errors.put("time_block", "날짜/시간 값이 올바르지 않습니다. 예: 21:35");
             return errors;
@@ -54,19 +54,19 @@ public class ReviewTimeValidator {
         return errors;
     }
 
-    public String normalizeHhMmOrNull(String input) {
+    public String normalizeTimeOrNull(String input) {
         if (input == null) {
             return null;
         }
 
-        String t = input.trim();
+        String trimmedTime = input.trim();
 
-        if (!HHMM_PATTERN.matcher(t).matches()) {
+        if (!TIME_PATTERN.matcher(trimmedTime).matches()) {
             return null;
         }
 
-        int hour = (t.charAt(0) - '0') * 10 + (t.charAt(1) - '0');
-        int minute = (t.charAt(3) - '0') * 10 + (t.charAt(4) - '0');
+        int hour = (trimmedTime.charAt(0) - '0') * 10 + (trimmedTime.charAt(1) - '0');
+        int minute = (trimmedTime.charAt(3) - '0') * 10 + (trimmedTime.charAt(4) - '0');
 
         if (hour < 0 || hour > 23) {
             return null;
@@ -75,24 +75,24 @@ public class ReviewTimeValidator {
             return null;
         }
 
-        return t;
+        return trimmedTime;
     }
 
-    public Instant parseScheduledAtInstant(String date, String hhmm) {
-        if (date == null || date.isBlank()) {
+    public Instant parseScheduledAtInstant(String dateString, String timeString) {
+        if (dateString == null || dateString.isBlank()) {
             throw new IllegalArgumentException("날짜 값이 필요합니다.");
         }
-        if (hhmm == null || hhmm.isBlank()) {
+        if (timeString == null || timeString.isBlank()) {
             throw new IllegalArgumentException("시간 값이 필요합니다.");
         }
 
-        String[] parts = hhmm.trim().split(":");
-        if (parts.length != 2) {
+        String[] timeParts = timeString.trim().split(":");
+        if (timeParts.length != 2) {
             throw new IllegalArgumentException("시간 형식은 HH:mm 이어야 합니다.");
         }
 
-        int hour = Integer.parseInt(parts[0]);
-        int minute = Integer.parseInt(parts[1]);
+        int hour = Integer.parseInt(timeParts[0]);
+        int minute = Integer.parseInt(timeParts[1]);
 
         if (hour < 0 || hour > 23) {
             throw new IllegalArgumentException("시간은 0~23 범위여야 합니다.");
@@ -101,15 +101,15 @@ public class ReviewTimeValidator {
             throw new IllegalArgumentException("분은 0~59 범위여야 합니다.");
         }
 
-        LocalDate ld = LocalDate.parse(date);
-        LocalDateTime localDateTime = ld.atTime(hour, minute);
+        LocalDate localDate = LocalDate.parse(dateString);
+        LocalDateTime localDateTime = localDate.atTime(hour, minute);
 
         return localDateTime.atZone(clock.getZone()).toInstant();
     }
 
-    private Instant parseScheduledAtOrNull(String date, String hhmm) {
+    private Instant parseScheduledAtOrNull(String dateString, String timeString) {
         try {
-            return parseScheduledAtInstant(date, hhmm);
+            return parseScheduledAtInstant(dateString, timeString);
         } catch (Exception e) {
             return null;
         }

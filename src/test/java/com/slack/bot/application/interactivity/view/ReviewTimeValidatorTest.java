@@ -68,10 +68,10 @@ class ReviewTimeValidatorTest {
     void normalizeHhMmOrNull은_공백을_제거하고_정상_형식만_반환한다() {
         // when & then
         assertAll(
-                () -> assertThat(validator.normalizeHhMmOrNull(" 09:05 ")).isEqualTo("09:05"),
-                () -> assertThat(validator.normalizeHhMmOrNull("9:05")).isNull(),
-                () -> assertThat(validator.normalizeHhMmOrNull("24:00")).isNull(),
-                () -> assertThat(validator.normalizeHhMmOrNull(null)).isNull()
+                () -> assertThat(validator.normalizeTimeOrNull(" 09:05 ")).isEqualTo("09:05"),
+                () -> assertThat(validator.normalizeTimeOrNull("9:05")).isNull(),
+                () -> assertThat(validator.normalizeTimeOrNull("24:00")).isNull(),
+                () -> assertThat(validator.normalizeTimeOrNull(null)).isNull()
         );
     }
 
