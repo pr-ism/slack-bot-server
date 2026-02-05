@@ -10,8 +10,7 @@ slack:
       help: |-
         👋 PRism 봇 사용법
 
-        - `/prism connect [GitHubID]`: 내 슬랙 계정과 깃허브 계정을 연결합니다.
-        - `/prism channels`: 채널별 API 키를 확인합니다.
+        - `/prism connect [github-id]`: 내 슬랙 계정과 깃허브 계정을 연결합니다.
         - `/prism my-page`: 내 전용 설정 링크를 받습니다.
         - `/prism help`: 이 도움말을 봅니다.
       unknown: "⚠️ 알 수 없는 명령어입니다. `/prism help`를 입력해보세요."
