@@ -86,10 +86,11 @@ public class ReviewTimeValidator {
             throw new IllegalArgumentException("시간 값이 필요합니다.");
         }
 
-        String[] timeParts = timeString.trim().split(":");
-        if (timeParts.length != 2) {
+        String normalizedTime = normalizeTimeOrNull(timeString);
+        if (normalizedTime == null) {
             throw new IllegalArgumentException("시간 형식은 HH:mm 이어야 합니다.");
         }
+        String[] timeParts = normalizedTime.split(":");
 
         int hour = Integer.parseInt(timeParts[0]);
         int minute = Integer.parseInt(timeParts[1]);
