@@ -26,6 +26,7 @@ public class ReviewTimeValidator {
             errors.put("date_block", "날짜를 선택해주세요.");
             return errors;
         }
+        String trimmedDate = dateString.trim();
         if (timeString == null || timeString.isBlank()) {
             errors.put("time_block", "시간을 입력해주세요. 예: 21:35");
             return errors;
@@ -38,7 +39,7 @@ public class ReviewTimeValidator {
             return errors;
         }
 
-        Instant scheduledAt = parseScheduledAtOrNull(dateString, normalizedTime);
+        Instant scheduledAt = parseScheduledAtOrNull(trimmedDate, normalizedTime);
         if (scheduledAt == null) {
             errors.put("time_block", "날짜/시간 값이 올바르지 않습니다. 예: 21:35");
             return errors;

@@ -29,6 +29,15 @@ class ReviewTimeValidatorTest {
     }
 
     @Test
+    void 날짜_공백을_제거해_정상_처리한다() {
+        // when
+        Map<String, String> errors = validator.validateCustomDateTime(" 2024-01-01 ", "09:00");
+
+        // then
+        assertThat(errors).isEmpty();
+    }
+
+    @Test
     void 과거_시간이면_에러를_반환한다() {
         // when
         Map<String, String> errors = validator.validateCustomDateTime("2024-01-01", "08:59");
