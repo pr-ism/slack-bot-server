@@ -41,7 +41,7 @@ class ReviewScheduleModalPublisherTest {
         assertAll(
                 () -> verify(viewFactory).customDatetimeModal(metaJson, initialDate),
                 () -> assertThat(response).isInstanceOf(SlackActionResponse.class),
-                () -> assertThat(((SlackActionResponse) response).response_action()).isEqualTo("push"),
+                () -> assertThat(((SlackActionResponse) response).responseAction()).isEqualTo("push"),
                 () -> assertThat(((SlackActionResponse) response).view()).isSameAs(modal)
         );
     }

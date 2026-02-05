@@ -1,12 +1,14 @@
 package com.slack.bot.application.interactivity.reply.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Collections;
 import java.util.Map;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record SlackActionResponse(
-        String response_action,
+        @JsonProperty("response_action")
+        String responseAction,
         Object view,
         Map<String, String> errors
 ) {
