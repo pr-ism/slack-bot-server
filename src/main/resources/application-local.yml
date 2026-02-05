@@ -47,6 +47,22 @@ slack:
       reviewer: |-
         리뷰 예약 시간이 되었습니다.
         PR: %s
+  review:
+    reservation:
+      time-options:
+        options:
+          - label: "5분 뒤"
+            value: "5"
+          - label: "10분 뒤"
+            value: "10"
+          - label: "15분 뒤"
+            value: "15"
+          - label: "30분 뒤"
+            value: "30"
+          - label: "45분 뒤"
+            value: "45"
+          - label: "1시간 뒤"
+            value: "60"
 
 review:
   notification:
