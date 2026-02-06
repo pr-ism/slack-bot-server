@@ -45,9 +45,7 @@ public class ReservationCommandWorkflow {
             return Optional.empty();
         }
 
-        publishCancelEvent(teamId, channelId, slackUserId, reservation);
-
-        return cancelReservationOrFallback(reservationId, reservation);
+        return cancelReservationOrFallback(teamId, channelId, slackUserId, reservationId, reservation);
     }
 
     public void handleChange(
@@ -94,11 +92,15 @@ public class ReservationCommandWorkflow {
     }
 
     private Optional<ReviewReservation> cancelReservationOrFallback(
+            String teamId,
+            String channelId,
+            String slackUserId,
             Long reservationId,
             ReviewReservation reservation
     ) {
         Optional<ReviewReservation> cancelled = reviewReservationCoordinator.cancel(reservationId);
         if (cancelled.isPresent()) {
+            publishCancelEvent(teamId, channelId, slackUserId, reservation);
             return cancelled;
         }
         return Optional.of(reservation);
