@@ -5,11 +5,6 @@ import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
 import com.slack.bot.application.command.AccessLinker;
 import com.slack.bot.application.command.MemberConnector;
 import com.slack.bot.application.command.ProjectMemberReader;
-import com.slack.bot.application.interactivity.block.BlockActionDispatcher;
-import com.slack.bot.application.interactivity.block.handler.CancelReviewReservationActionHandler;
-import com.slack.bot.application.interactivity.block.handler.ChangeReviewReservationActionHandler;
-import com.slack.bot.application.interactivity.block.handler.ClaimMappingActionHandler;
-import com.slack.bot.application.interactivity.block.handler.OpenReviewSchedulerActionHandler;
 import com.slack.bot.application.command.handler.CommandHandlerRegistry;
 import com.slack.bot.application.event.handler.SlackEventHandler;
 import com.slack.bot.application.event.handler.SlackEventHandlerRegistry;
@@ -104,21 +99,6 @@ public class AppConfig {
         handlerMap.put("member_joined_channel", memberJoinedHandler);
         handlerMap.put("app_uninstalled", appUninstalledHandler);
         return SlackEventHandlerRegistry.of(handlerMap);
-    }
-
-    @Bean
-    public BlockActionDispatcher blockActionDispatcher(
-            ClaimMappingActionHandler claimMappingActionHandler,
-            OpenReviewSchedulerActionHandler openReviewSchedulerActionHandler,
-            ChangeReviewReservationActionHandler changeReviewReservationActionHandler,
-            CancelReviewReservationActionHandler cancelReviewReservationActionHandler
-    ) {
-        return BlockActionDispatcher.create(
-                claimMappingActionHandler,
-                openReviewSchedulerActionHandler,
-                changeReviewReservationActionHandler,
-                cancelReviewReservationActionHandler
-        );
     }
 
     @Bean
