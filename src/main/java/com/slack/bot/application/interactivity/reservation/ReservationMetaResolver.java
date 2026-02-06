@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interactivity.dto.ReviewScheduleMetaDto;
+import com.slack.bot.application.interactivity.reservation.exception.ReservationMetaInvalidException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -16,20 +17,16 @@ public class ReservationMetaResolver {
     public ReviewScheduleMetaDto parseMeta(String metaJson) {
         JsonNode root = readRoot(metaJson);
 
-        String teamId = textOrNull(root, "team_id");
-        String channelId = textOrNull(root, "channel_id");
-        Long pullRequestId = longOrNull(root, "pull_request_id");
-        Integer pullRequestNumber = intOrNull(root, "pull_request_number");
-        String pullRequestTitle = textOrNull(root, "pull_request_title");
-        String pullRequestUrl = textOrNull(root, "pull_request_url");
-        String projectId = textOrNull(root, "project_id");
-        String authorGithubId = textOrNull(root, "author_github_id");
-        String authorSlackId = textOrNull(root, "author_slack_id");
-        String reservationId = textOrNull(root, "reservation_id");
-
-        if (pullRequestNumber == null) {
-            throw new IllegalArgumentException("pull_request_number는 비어 있을 수 없습니다.");
-        }
+        String teamId = textRequired(root, "team_id");
+        String channelId = textRequired(root, "channel_id");
+        Long pullRequestId = longRequired(root, "pull_request_id");
+        int pullRequestNumber = intRequired(root, "pull_request_number");
+        String pullRequestTitle = textRequired(root, "pull_request_title");
+        String pullRequestUrl = textRequired(root, "pull_request_url");
+        String projectId = textRequired(root, "project_id");
+        String authorGithubId = textRequired(root, "author_github_id");
+        String authorSlackId = textRequired(root, "author_slack_id");
+        String reservationId = textRequired(root, "reservation_id");
 
         return ReviewScheduleMetaDto.builder()
                 .teamId(teamId)
@@ -49,45 +46,45 @@ public class ReservationMetaResolver {
         try {
             return objectMapper.readTree(metaJson);
         } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("메타데이터 파싱 실패", e);
+            throw new ReservationMetaInvalidException("메타데이터 파싱 실패", e);
         }
     }
 
-    private String textOrNull(JsonNode node, String field) {
+    private String textRequired(JsonNode node, String field) {
         if (node == null) {
-            return null;
+            throw new ReservationMetaInvalidException(field + "는 비어 있을 수 없습니다.");
         }
 
         String value = node.path(field).asText(null);
 
-        if (value != null && !value.isBlank()) {
-            return value;
+        if (value == null || value.isBlank()) {
+            throw new ReservationMetaInvalidException(field + "는 비어 있을 수 없습니다.");
         }
-        return null;
+        return value;
     }
 
-    private Integer intOrNull(JsonNode node, String field) {
+    private int intRequired(JsonNode node, String field) {
         if (node == null) {
-            return null;
+            throw new ReservationMetaInvalidException(field + "는 비어 있을 수 없습니다.");
         }
 
         JsonNode valueNode = node.path(field);
 
         if (valueNode.isMissingNode() || valueNode.isNull()) {
-            return null;
+            throw new ReservationMetaInvalidException(field + "는 비어 있을 수 없습니다.");
         }
         return valueNode.asInt();
     }
 
-    private Long longOrNull(JsonNode node, String field) {
+    private Long longRequired(JsonNode node, String field) {
         if (node == null) {
-            return null;
+            throw new ReservationMetaInvalidException(field + "는 비어 있을 수 없습니다.");
         }
 
         JsonNode valueNode = node.path(field);
 
         if (valueNode.isMissingNode() || valueNode.isNull()) {
-            return null;
+            throw new ReservationMetaInvalidException(field + "는 비어 있을 수 없습니다.");
         }
         return valueNode.asLong();
     }
