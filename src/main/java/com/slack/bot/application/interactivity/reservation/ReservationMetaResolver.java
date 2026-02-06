@@ -73,6 +73,9 @@ public class ReservationMetaResolver {
         if (valueNode.isMissingNode() || valueNode.isNull()) {
             throw new ReservationMetaInvalidException(field + "는 비어 있을 수 없습니다.");
         }
+        if (!valueNode.isNumber()) {
+            throw new ReservationMetaInvalidException(field + "는 유효한 정수여야 합니다.");
+        }
         return valueNode.asInt();
     }
 
@@ -85,6 +88,9 @@ public class ReservationMetaResolver {
 
         if (valueNode.isMissingNode() || valueNode.isNull()) {
             throw new ReservationMetaInvalidException(field + "는 비어 있을 수 없습니다.");
+        }
+        if (!valueNode.isNumber()) {
+            throw new ReservationMetaInvalidException(field + "는 유효한 정수여야 합니다.");
         }
         return valueNode.asLong();
     }

@@ -119,6 +119,26 @@ class ReservationMetaResolverTest {
                 .hasMessage(field + "는 비어 있을 수 없습니다.");
     }
 
+    private static Stream<Arguments> nonNumericFieldMetas() {
+        return Stream.of(
+                Arguments.of("pull_request_id", (Consumer<ObjectNode>) node -> node.put("pull_request_id", "abc")),
+                Arguments.of("pull_request_number", (Consumer<ObjectNode>) node -> node.put("pull_request_number", "abc")),
+                Arguments.of("pull_request_number", (Consumer<ObjectNode>) node -> node.put("pull_request_number", "not-a-number"))
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonNumericFieldMetas")
+    void 숫자_필드가_숫자가_아니면_예외를_던진다(String field, Consumer<ObjectNode> mutator) {
+        // given
+        String metaJson = createMetaJson(mutator);
+
+        // when & then
+        assertThatThrownBy(() -> reservationMetaResolver.parseMeta(metaJson))
+                .isInstanceOf(ReservationMetaInvalidException.class)
+                .hasMessage(field + "는 유효한 정수여야 합니다.");
+    }
+
     @Test
     void 잘못된_메타는_예외를_던진다() {
         // given
