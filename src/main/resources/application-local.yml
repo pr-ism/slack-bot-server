@@ -46,6 +46,10 @@ slack:
       reviewer: |-
         리뷰 예약 시간이 되었습니다.
         PR: %s
+  interactivity:
+    claim-mapping:
+      messages:
+        success: "✅ 등록되었습니다! (Github: %s)"
   review:
     reservation:
       time-options:

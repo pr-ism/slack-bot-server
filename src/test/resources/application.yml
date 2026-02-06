@@ -29,6 +29,10 @@ slack:
           🔗 내 전용 설정 링크
           %s
           이 링크를 가진 사람만 접근할 수 있습니다.
+  interactivity:
+    claim-mapping:
+      messages:
+        success: "✅ 등록되었습니다! (Github: %s)"
 
 token:
   access-key: thisIsA32ByteAccessTokenKeyForHS
