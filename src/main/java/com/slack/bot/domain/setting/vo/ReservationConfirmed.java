@@ -2,6 +2,8 @@ package com.slack.bot.domain.setting.vo;
 
 import com.slack.bot.domain.setting.DeliverySpace;
 import jakarta.persistence.Embeddable;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -13,6 +15,7 @@ import lombok.NoArgsConstructor;
 @EqualsAndHashCode
 public class ReservationConfirmed {
 
+    @Enumerated(EnumType.STRING)
     private DeliverySpace deliverySpace;
 
     public static ReservationConfirmed defaults() {
