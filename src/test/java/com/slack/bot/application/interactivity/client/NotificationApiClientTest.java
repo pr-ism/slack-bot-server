@@ -48,7 +48,7 @@ class NotificationApiClientTest {
     }
 
     @Test
-    void 에페메랄_메시지를_성공적으로_전송한다() {
+    void 에페메랄_메시지를_전송한다() {
         // given
         String token = "xoxb-token";
         String channelId = "C123";
@@ -82,7 +82,7 @@ class NotificationApiClientTest {
     }
 
     @Test
-    void 에페메랄_메시지_전송_실패시_예외를_던진다() {
+    void 에페메랄_메시지_전송_실패_시_예외를_던진다() {
         // given
         String token = "xoxb-token";
         String channelId = "C123";
@@ -107,7 +107,7 @@ class NotificationApiClientTest {
     }
 
     @Test
-    void 에페메랄_블록_메시지를_성공적으로_전송한다() {
+    void 에페메랄_블록_메시지를_전송한다() {
         // given
         String token = "xoxb-token";
         String channelId = "C123";
@@ -160,7 +160,7 @@ class NotificationApiClientTest {
     }
 
     @Test
-    void 메시지를_성공적으로_전송한다() {
+    void 메시지를_전송한다() {
         // given
         String token = "xoxb-token";
         String channelId = "C123";
@@ -192,7 +192,7 @@ class NotificationApiClientTest {
     }
 
     @Test
-    void 메시지_전송_실패시_예외를_던진다() {
+    void 메시지_전송_실패_시_예외를_던진다() {
         // given
         String token = "xoxb-token";
         String channelId = "C123";
@@ -216,7 +216,7 @@ class NotificationApiClientTest {
     }
 
     @Test
-    void 블록_메시지를_성공적으로_전송한다() {
+    void 블록_메시지를_전송한다() {
         // given
         String token = "xoxb-token";
         String channelId = "C123";
@@ -267,7 +267,7 @@ class NotificationApiClientTest {
     }
 
     @Test
-    void DM_채널을_성공적으로_연다() {
+    void DM_채널을_연다() {
         // given
         String token = "xoxb-token";
         String userId = "U123";
@@ -349,7 +349,7 @@ class NotificationApiClientTest {
     }
 
     @Test
-    void DM_채널_ID가_빈문자열이면_예외를_던진다() {
+    void DM_채널_ID가_빈_문자열이면_예외를_던진다() {
         // given
         String token = "xoxb-token";
         String userId = "U123";
@@ -374,7 +374,41 @@ class NotificationApiClientTest {
     }
 
     @Test
-    void 응답이_null이면_예외를_던진다() {
+    void 모달을_연다() {
+        // given
+        String token = "xoxb-token";
+        String triggerId = "TRIGGER_ID";
+        java.util.Map<String, Object> view = java.util.Map.of("type", "modal");
+
+        String requestBody = """
+                {
+                  "trigger_id": "TRIGGER_ID",
+                  "view": {
+                    "type": "modal"
+                  }
+                }
+                """;
+        String responseBody = """
+                {
+                  "ok": true
+                }
+                """;
+
+        mockServer.expect(requestTo("https://slack.com/api/views.open"))
+                .andExpect(method(POST))
+                .andExpect(header("Authorization", "Bearer " + token))
+                .andExpect(content().json(requestBody))
+                .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
+
+        // when & then
+        assertAll(
+                () -> assertDoesNotThrow(() -> notificationApiClient.openModal(token, triggerId, view)),
+                () -> mockServer.verify()
+        );
+    }
+
+    @Test
+    void 응답이_비어_있으면_예외를_던진다() {
         // given
         String token = "xoxb-token";
         String channelId = "C123";

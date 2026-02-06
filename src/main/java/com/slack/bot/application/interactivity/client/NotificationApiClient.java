@@ -47,6 +47,13 @@ public class NotificationApiClient {
         ensureOk(response, "슬랙 봇 메시지 전송 실패: 블록 메시지 전송 실패");
     }
 
+    public void openModal(String token, String triggerId, Object view) {
+        Map<String, Object> body = buildOpenModalBody(triggerId, view);
+        JsonNode response = postForJson("views.open", token, body);
+
+        ensureOk(response, "슬랙 봇 메시지 전송 실패: 모달 열기 실패");
+    }
+
     public String openDirectMessageChannel(String token, String userId) {
         Map<String, Object> body = buildOpenConversationBody(userId);
         JsonNode response = postForJson("conversations.open", token, body);
@@ -168,6 +175,14 @@ public class NotificationApiClient {
         Map<String, Object> body = new HashMap<>();
 
         body.put("users", userId);
+        return body;
+    }
+
+    private Map<String, Object> buildOpenModalBody(String triggerId, Object view) {
+        Map<String, Object> body = new HashMap<>();
+
+        body.put("trigger_id", triggerId);
+        body.put("view", view);
         return body;
     }
 }
