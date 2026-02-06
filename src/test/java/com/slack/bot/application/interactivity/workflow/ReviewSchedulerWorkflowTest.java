@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -70,6 +71,64 @@ class ReviewSchedulerWorkflowTest {
     }
 
     @Test
+    void 예약_메타가_잘못되면_오류_알림을_보내고_빈_값을_반환한다() {
+        // given
+        JsonNode payload = payloadWithTriggerId("TRIGGER_1");
+        JsonNode action = actionWithMetaJson("{invalid-json");
+
+        // when
+        Optional<ReviewReservation> actual = reviewSchedulerWorkflow.handleOpenScheduler(
+                payload,
+                action,
+                "T1",
+                "C1",
+                "U1",
+                "xoxb-test-token"
+        );
+
+        // then
+        assertAll(
+                () -> verify(notificationApiClient).sendEphemeralMessage(
+                        "xoxb-test-token",
+                        "C1",
+                        "U1",
+                        InteractivityErrorType.INVALID_META.message()
+                ),
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
+                () -> assertThat(actual).isEmpty()
+        );
+    }
+
+    @Test
+    void 트리거_ID가_없으면_오류_알림을_보내고_빈_값을_반환한다() {
+        // given
+        JsonNode payload = objectMapper.createObjectNode();
+        JsonNode action = actionWithMetaJson(metaJsonWithProjectId("123"));
+
+        // when
+        Optional<ReviewReservation> actual = reviewSchedulerWorkflow.handleOpenScheduler(
+                payload,
+                action,
+                "T1",
+                "C1",
+                "U1",
+                "xoxb-test-token"
+        );
+
+        // then
+        assertAll(
+                () -> verify(notificationApiClient).sendEphemeralMessage(
+                        "xoxb-test-token",
+                        "C1",
+                        "U1",
+                        InteractivityErrorType.INVALID_META.message()
+                ),
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
+                () -> assertThat(actual).isEmpty()
+        );
+    }
+
+    @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/reservation/project_123.sql",
             "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
@@ -100,6 +159,41 @@ class ReviewSchedulerWorkflowTest {
                 () -> assertThat(actual.get().getId()).isEqualTo(100L),
                 () -> assertThat(eventCaptor.getValue().teamId()).isEqualTo("T1"),
                 () -> assertThat(eventCaptor.getValue().metaJson()).isEqualTo(metaJson)
+        );
+    }
+
+    @Test
+    @Sql("classpath:sql/fixtures/reservation/project_123.sql")
+    void 처리_중_오류가_발생하면_오류_알림을_보내고_빈_값을_반환한다() {
+        // given
+        String metaJson = metaJsonWithProjectId("123");
+        JsonNode payload = payloadWithTriggerId("TRIGGER_1");
+        JsonNode action = actionWithMetaJson(metaJson);
+
+        doThrow(new IllegalStateException("publish failed"))
+                .when(reviewInteractionEventPublisher)
+                .publish(any());
+
+        // when
+        Optional<ReviewReservation> actual = reviewSchedulerWorkflow.handleOpenScheduler(
+                payload,
+                action,
+                "T1",
+                "C1",
+                "U1",
+                "xoxb-test-token"
+        );
+
+        // then
+        assertAll(
+                () -> verify(notificationApiClient).sendEphemeralMessage(
+                        "xoxb-test-token",
+                        "C1",
+                        "U1",
+                        InteractivityErrorType.RESERVATION_LOAD_FAILURE.message()
+                ),
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
+                () -> assertThat(actual).isEmpty()
         );
     }
 

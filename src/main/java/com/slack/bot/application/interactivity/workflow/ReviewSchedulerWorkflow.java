@@ -68,12 +68,14 @@ public class ReviewSchedulerWorkflow {
         return reservationMetaResolver.parseMeta(metaJson);
     }
 
-    private SchedulerContextDto buildContext(JsonNode payload,
+    private SchedulerContextDto buildContext(
+            JsonNode payload,
             JsonNode action,
             String teamId,
             String channelId,
             String slackUserId,
-            String token) {
+            String token
+    ) {
         String metaJson = action.path("value")
                                 .asText(null);
 
@@ -83,7 +85,12 @@ public class ReviewSchedulerWorkflow {
         }
 
         String triggerId = payload.path("trigger_id")
-                                  .asText();
+                                  .asText(null);
+
+        if (triggerId == null || triggerId.isBlank()) {
+            errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.INVALID_META);
+            return null;
+        }
 
         return new SchedulerContextDto(
                 payload,
