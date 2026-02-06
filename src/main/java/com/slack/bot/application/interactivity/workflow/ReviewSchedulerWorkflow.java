@@ -10,6 +10,7 @@ import com.slack.bot.application.interactivity.reply.SlackActionErrorNotifier;
 import com.slack.bot.application.interactivity.reservation.ProjectIdResolver;
 import com.slack.bot.application.interactivity.reservation.ReservationMetaResolver;
 import com.slack.bot.application.interactivity.reservation.ReviewReservationCoordinator;
+import com.slack.bot.application.interactivity.reservation.exception.ReservationMetaInvalidException;
 import com.slack.bot.application.interactivity.view.factory.ReviewReservationTimeViewFactory;
 import com.slack.bot.application.interactivity.workflow.dto.SchedulerContextDto;
 import com.slack.bot.domain.reservation.ReviewReservation;
@@ -28,10 +29,6 @@ public class ReviewSchedulerWorkflow {
     private final ReservationMetaResolver reservationMetaResolver;
     private final ReviewReservationCoordinator reviewReservationCoordinator;
     private final ReviewInteractionEventPublisher reviewInteractionEventPublisher;
-
-    public ReviewScheduleMetaDto parseMeta(String metaJson) {
-        return reservationMetaResolver.parseMeta(metaJson);
-    }
 
     public Optional<ReviewReservation> handleOpenScheduler(
             JsonNode payload,
@@ -56,11 +53,19 @@ public class ReviewSchedulerWorkflow {
                         openReviewTimeModal(context);
                         return Optional.empty();
                     });
-        } catch (IllegalArgumentException | IllegalStateException e) {
+        } catch (ReservationMetaInvalidException e) {
+            errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.INVALID_META);
+
+            return Optional.empty();
+        } catch (IllegalStateException e) {
             errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.RESERVATION_LOAD_FAILURE);
 
             return Optional.empty();
         }
+    }
+
+    private ReviewScheduleMetaDto parseMeta(String metaJson) {
+        return reservationMetaResolver.parseMeta(metaJson);
     }
 
     private SchedulerContextDto buildContext(JsonNode payload,
