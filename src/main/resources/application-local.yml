@@ -10,8 +10,7 @@ slack:
       help: |-
         👋 PRism 봇 사용법
 
-        - `/prism connect [GitHubID]`: 내 슬랙 계정과 깃허브 계정을 연결합니다.
-        - `/prism channels`: 채널별 API 키를 확인합니다.
+        - `/prism connect [github-id]`: 내 슬랙 계정과 깃허브 계정을 연결합니다.
         - `/prism my-page`: 내 전용 설정 링크를 받습니다.
         - `/prism help`: 이 도움말을 봅니다.
       unknown: "⚠️ 알 수 없는 명령어입니다. `/prism help`를 입력해보세요."
@@ -47,6 +46,22 @@ slack:
       reviewer: |-
         리뷰 예약 시간이 되었습니다.
         PR: %s
+  review:
+    reservation:
+      time-options:
+        options:
+          - label: "5분 뒤"
+            value: "5"
+          - label: "10분 뒤"
+            value: "10"
+          - label: "15분 뒤"
+            value: "15"
+          - label: "30분 뒤"
+            value: "30"
+          - label: "45분 뒤"
+            value: "45"
+          - label: "1시간 뒤"
+            value: "60"
 
 review:
   notification:
