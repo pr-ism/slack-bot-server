@@ -408,6 +408,30 @@ class NotificationApiClientTest {
     }
 
     @Test
+    void 모달_열기_실패_시_예외를_던진다() {
+        // given
+        String token = "xoxb-token";
+        String triggerId = "TRIGGER_ID";
+        java.util.Map<String, Object> view = java.util.Map.of("type", "modal");
+
+        String responseBody = """
+                {
+                  "ok": false,
+                  "error": "invalid_trigger_id"
+                }
+                """;
+
+        mockServer.expect(requestTo("https://slack.com/api/views.open"))
+                .andExpect(method(POST))
+                .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
+
+        // when & then
+        assertThatThrownBy(() -> notificationApiClient.openModal(token, triggerId, view))
+                .isInstanceOf(SlackBotMessageDispatchException.class)
+                .hasMessageContaining("invalid_trigger_id");
+    }
+
+    @Test
     void 응답이_비어_있으면_예외를_던진다() {
         // given
         String token = "xoxb-token";
