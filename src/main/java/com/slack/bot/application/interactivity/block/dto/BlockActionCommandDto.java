@@ -13,4 +13,15 @@ public record BlockActionCommandDto(
         String slackUserId,
         String botToken
 ) {
+
+    @Override
+    public String toString() {
+        return "BlockActionCommandDto[" +
+                "actionId=" + actionId +
+                ", actionType=" + actionType +
+                ", teamId=" + teamId +
+                ", channelId=" + channelId +
+                ", slackUserId=" + slackUserId +
+                ", botToken=***]";
+    }
 }
