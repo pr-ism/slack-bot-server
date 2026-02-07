@@ -12,11 +12,11 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class CancelReviewReservationActionHandler implements BlockActionHandler {
 
-    private final ReservationCommandWorkflow reservationCommandUseCase;
+    private final ReservationCommandWorkflow reservationCommandWorkflow;
 
     @Override
     public BlockActionOutcomeDto handle(BlockActionCommandDto command) {
-        ReviewReservation cancelled = reservationCommandUseCase.handleCancel(
+        ReviewReservation cancelled = reservationCommandWorkflow.handleCancel(
                 command.action(),
                 command.teamId(),
                 command.channelId(),

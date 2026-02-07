@@ -12,11 +12,11 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class OpenReviewSchedulerActionHandler implements BlockActionHandler {
 
-    private final ReviewSchedulerWorkflow reviewSchedulerUseCase;
+    private final ReviewSchedulerWorkflow reviewSchedulerWorkflow;
 
     @Override
     public BlockActionOutcomeDto handle(BlockActionCommandDto command) {
-        ReviewReservation duplicate = reviewSchedulerUseCase.handleOpenScheduler(
+        ReviewReservation duplicate = reviewSchedulerWorkflow.handleOpenScheduler(
                 command.payload(),
                 command.action(),
                 command.teamId(),

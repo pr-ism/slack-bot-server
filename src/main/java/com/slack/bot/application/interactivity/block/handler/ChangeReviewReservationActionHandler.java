@@ -11,11 +11,11 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ChangeReviewReservationActionHandler implements BlockActionHandler {
 
-    private final ReservationCommandWorkflow reservationCommandUseCase;
+    private final ReservationCommandWorkflow reservationCommandWorkflow;
 
     @Override
     public BlockActionOutcomeDto handle(BlockActionCommandDto command) {
-        reservationCommandUseCase.handleChange(
+        reservationCommandWorkflow.handleChange(
                 command.payload(),
                 command.action(),
                 command.teamId(),
