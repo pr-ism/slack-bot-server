@@ -13,36 +13,8 @@ public class BlockActionDispatcher {
         this.handlerMap = handlerMap;
     }
 
-    public static BlockActionDispatcher create(
-            BlockActionHandler claimMappingActionHandler,
-            BlockActionHandler openReviewSchedulerActionHandler,
-            BlockActionHandler changeReviewReservationActionHandler,
-            BlockActionHandler cancelReviewReservationActionHandler
-    ) {
-        return new BlockActionDispatcher(
-                createHandlerMap(
-                        claimMappingActionHandler,
-                        openReviewSchedulerActionHandler,
-                        changeReviewReservationActionHandler,
-                        cancelReviewReservationActionHandler
-                )
-        );
-    }
-
-    private static Map<BlockActionType, BlockActionHandler> createHandlerMap(
-            BlockActionHandler claimMappingActionHandler,
-            BlockActionHandler openReviewSchedulerActionHandler,
-            BlockActionHandler changeReviewReservationActionHandler,
-            BlockActionHandler cancelReviewReservationActionHandler
-    ) {
-        EnumMap<BlockActionType, BlockActionHandler> map = new EnumMap<>(BlockActionType.class);
-
-        map.put(BlockActionType.CLAIM_PREFIX, claimMappingActionHandler);
-        map.put(BlockActionType.OPEN_REVIEW_SCHEDULER, openReviewSchedulerActionHandler);
-        map.put(BlockActionType.CHANGE_REVIEW_RESERVATION, changeReviewReservationActionHandler);
-        map.put(BlockActionType.CANCEL_REVIEW_RESERVATION, cancelReviewReservationActionHandler);
-
-        return map;
+    public static BlockActionDispatcher create(Map<BlockActionType, BlockActionHandler> handlerMap) {
+        return new BlockActionDispatcher(new EnumMap<>(handlerMap));
     }
 
     public BlockActionOutcomeDto dispatch(BlockActionCommandDto command) {
