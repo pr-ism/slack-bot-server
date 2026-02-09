@@ -13,8 +13,8 @@ public record SlackActionResponse(
         Map<String, String> errors
 ) {
 
-    public static Object empty() {
-        return Collections.emptyMap();
+    public static SlackActionResponse empty() {
+        return new SlackActionResponse(null, null, Collections.emptyMap());
     }
 
     public static SlackActionResponse push(Object view) {

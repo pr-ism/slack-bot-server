@@ -33,7 +33,7 @@ public class ReviewReservationWorkflow {
     private final ReviewReservationNotifier reservationNotifier;
     private final ReviewReservationCoordinator reviewReservationCoordinator;
 
-    public Object reserveReview(
+    public SlackActionResponse reserveReview(
             ReviewScheduleMetaDto meta,
             String reviewerId,
             String token,
@@ -48,7 +48,7 @@ public class ReviewReservationWorkflow {
         });
     }
 
-    private Object proceedReservation(ReservationContextDto context) {
+    private SlackActionResponse proceedReservation(ReservationContextDto context) {
         ReservationType strategy = ReservationType.resolve(context.reservationId());
         ReviewReservation reservation = strategy.persist(reviewReservationCoordinator, context);
 
@@ -109,11 +109,11 @@ public class ReviewReservationWorkflow {
         );
     }
 
-    private Object executeSafely(
+    private SlackActionResponse executeSafely(
             ReviewScheduleMetaDto meta,
             String token,
             String reviewerId,
-            Supplier<Object> action
+            Supplier<SlackActionResponse> action
     ) {
         try {
             return action.get();
