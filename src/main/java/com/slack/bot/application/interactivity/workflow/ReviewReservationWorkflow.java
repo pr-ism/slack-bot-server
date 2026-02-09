@@ -178,7 +178,14 @@ public class ReviewReservationWorkflow {
     private Long parseReservationId(String rawId) {
         return Optional.ofNullable(rawId)
                        .filter(value -> !value.isBlank())
-                       .map(Long::parseLong)
+                       .map(value -> {
+                           try {
+                               return Long.parseLong(value);
+                           } catch (NumberFormatException e) {
+                               log.warn("유효하지 않은 reservationId: {}", value);
+                               return null;
+                           }
+                       })
                        .orElse(null);
     }
 }

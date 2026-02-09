@@ -115,6 +115,26 @@ class ReviewReservationWorkflowTest {
     }
 
     @Test
+    @Sql("classpath:sql/fixtures/reservation/project_123.sql")
+    void reservation_ID가_숫자가_아니면_신규_예약으로_처리한다() {
+        // given
+        ReviewScheduleMetaDto meta = meta("123", "abc");
+        Instant scheduledAt = Instant.now().plusSeconds(3600);
+
+        // when
+        Object actual = reviewReservationWorkflow.reserveReview(meta, "U1", "xoxb-test-token", scheduledAt);
+
+        // then
+        Optional<ReviewReservation> saved = reviewReservationRepository.findActive("T1", 123L, "U1");
+
+        assertAll(
+                () -> assertThat(actual).isEqualTo(SlackActionResponse.clear()),
+                () -> assertThat(saved).isPresent(),
+                () -> assertThat(saved.get().getId()).isNotNull()
+        );
+    }
+
+    @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/reservation/project_123.sql",
             "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
@@ -180,16 +200,14 @@ class ReviewReservationWorkflowTest {
     }
 
     @Test
-    @Sql(scripts = {
-            "classpath:sql/fixtures/reservation/project_123.sql",
-            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
-    })
+    @Sql("classpath:sql/fixtures/reservation/project_123.sql")
     void 즉시_알림_분기를_통과한다() {
         // given
-        Instant mockedNow = Instant.parse("1999-01-01T00:00:00Z");
-        Instant scheduledAt = Instant.parse("1999-01-01T00:10:00Z");
-        ReviewScheduleMetaDto meta = meta("123", "100");
-        doReturn(mockedNow).when(clock).instant();
+        Instant nowForValidation = Instant.parse("2026-01-01T00:00:00Z");
+        Instant scheduledAt = Instant.parse("2026-01-01T00:00:10Z");
+        Instant nowForImmediate = Instant.parse("2026-01-01T00:00:20Z");
+        ReviewScheduleMetaDto meta = meta("123", null);
+        doReturn(nowForValidation, nowForImmediate).when(clock).instant();
 
         // when
         Object actual = reviewReservationWorkflow.reserveReview(meta, "U1", "xoxb-test-token", scheduledAt);
