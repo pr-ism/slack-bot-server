@@ -144,7 +144,7 @@ public class ReviewReservationWorkflow {
     }
 
     private boolean isImmediate(ReservationContextDto context) {
-        return !context.scheduledAt().isAfter(Instant.now());
+        return !context.scheduledAt().isAfter(Instant.now(clock));
     }
 
     private ReservationContextDto buildContext(
