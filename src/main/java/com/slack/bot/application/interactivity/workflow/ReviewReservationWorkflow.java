@@ -10,6 +10,7 @@ import com.slack.bot.application.interactivity.reservation.ProjectIdResolver;
 import com.slack.bot.application.interactivity.reservation.ReservationType;
 import com.slack.bot.application.interactivity.reservation.ReviewReservationCoordinator;
 import com.slack.bot.application.interactivity.reservation.dto.ReservationContextDto;
+import com.slack.bot.application.interactivity.reservation.exception.ActiveReservationAlreadyExistsException;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.vo.ReservationPullRequest;
 import java.time.Clock;
@@ -116,7 +117,7 @@ public class ReviewReservationWorkflow {
     ) {
         try {
             return action.get();
-        } catch (IllegalStateException e) {
+        } catch (ActiveReservationAlreadyExistsException e) {
             log.info("리뷰 예약 동시성 중복 발생");
 
             ReservationContextDto context = buildContext(meta, reviewerId, token, Instant.now(clock));

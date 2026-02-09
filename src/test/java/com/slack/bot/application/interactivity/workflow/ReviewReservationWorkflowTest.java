@@ -15,6 +15,7 @@ import com.slack.bot.application.interactivity.dto.ReviewScheduleMetaDto;
 import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
 import com.slack.bot.application.interactivity.reply.dto.response.SlackActionResponse;
 import com.slack.bot.application.interactivity.reservation.ReviewReservationCoordinator;
+import com.slack.bot.application.interactivity.reservation.exception.ActiveReservationAlreadyExistsException;
 import com.slack.bot.domain.reservation.ReservationStatus;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.vo.ReservationPullRequest;
@@ -141,7 +142,7 @@ class ReviewReservationWorkflowTest {
     void 예약_ID가_있으면_기존_예약을_변경한다() {
         // given
         ReviewScheduleMetaDto meta = meta("123", "100");
-        Instant scheduledAt = Instant.now().plusSeconds(7200);
+        Instant scheduledAt = Instant.parse("2099-01-01T10:00:00Z");
 
         // when
         Object actual = reviewReservationWorkflow.reserveReview(meta, "U1", "xoxb-test-token", scheduledAt);
@@ -181,7 +182,7 @@ class ReviewReservationWorkflowTest {
                                                                .status(ReservationStatus.ACTIVE)
                                                                .build();
 
-        doThrow(new IllegalStateException("concurrency"))
+        doThrow(new ActiveReservationAlreadyExistsException("concurrency"))
                 .doReturn(Optional.of(activeReservation))
                 .when(reviewReservationCoordinator)
                 .findActive(anyString(), anyLong(), anyString());
