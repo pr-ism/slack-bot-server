@@ -31,7 +31,7 @@ public enum BlockActionType {
     }
 
     public boolean matches(String actionId) {
-        if (isUnknown()) {
+        if (isUnknown() || actionId == null || actionId.isBlank()) {
             return false;
         }
         if (prefixMatch) {
