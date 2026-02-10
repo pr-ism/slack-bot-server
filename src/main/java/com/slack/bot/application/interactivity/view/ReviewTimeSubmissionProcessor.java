@@ -96,7 +96,7 @@ public class ReviewTimeSubmissionProcessor {
     private static Optional<Long> parseMinutes(String selected) {
         try {
             return Optional.of(Long.parseLong(selected));
-        } catch (Exception e) {
+        } catch (NumberFormatException e) {
             return Optional.empty();
         }
     }
