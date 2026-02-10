@@ -35,14 +35,13 @@ class ReviewScheduleModalPublisherTest {
         given(viewFactory.customDatetimeModal(metaJson, initialDate)).willReturn(modal);
 
         // when
-        Object response = publisher.pushCustomDatetimeModal(metaJson, initialDate);
+        SlackActionResponse response = publisher.pushCustomDatetimeModal(metaJson, initialDate);
 
         // then
         assertAll(
                 () -> verify(viewFactory).customDatetimeModal(metaJson, initialDate),
-                () -> assertThat(response).isInstanceOf(SlackActionResponse.class),
-                () -> assertThat(((SlackActionResponse) response).responseAction()).isEqualTo("push"),
-                () -> assertThat(((SlackActionResponse) response).view()).isSameAs(modal)
+                () -> assertThat(response.responseAction()).isEqualTo("push"),
+                () -> assertThat(response.view()).isSameAs(modal)
         );
     }
 }

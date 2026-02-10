@@ -33,7 +33,7 @@ class ReviewTimeSubmissionProcessorTest {
         ReviewScheduleMetaDto meta = meta("123");
 
         // when
-        Object actual = reviewTimeSubmissionProcessor.handleDefaultTimeSubmit(
+        SlackActionResponse actual = reviewTimeSubmissionProcessor.handleDefaultTimeSubmit(
                 payload,
                 metaJson("123"),
                 meta,
@@ -43,8 +43,7 @@ class ReviewTimeSubmissionProcessorTest {
 
         // then
         assertAll(
-                () -> assertThat(actual).isInstanceOf(SlackActionResponse.class),
-                () -> assertThat(((SlackActionResponse) actual).responseAction()).isEqualTo("push")
+                () -> assertThat(actual.responseAction()).isEqualTo("push")
         );
     }
 
@@ -55,7 +54,7 @@ class ReviewTimeSubmissionProcessorTest {
         ReviewScheduleMetaDto meta = meta("123");
 
         // when
-        Object actual = reviewTimeSubmissionProcessor.handleDefaultTimeSubmit(
+        SlackActionResponse actual = reviewTimeSubmissionProcessor.handleDefaultTimeSubmit(
                 payload,
                 metaJson("123"),
                 meta,
@@ -65,9 +64,8 @@ class ReviewTimeSubmissionProcessorTest {
 
         // then
         assertAll(
-                () -> assertThat(actual).isInstanceOf(SlackActionResponse.class),
-                () -> assertThat(((SlackActionResponse) actual).responseAction()).isEqualTo("errors"),
-                () -> assertThat(((SlackActionResponse) actual).errors()).containsKey("time_block")
+                () -> assertThat(actual.responseAction()).isEqualTo("errors"),
+                () -> assertThat(actual.errors()).containsKey("time_block")
         );
     }
 
@@ -79,7 +77,7 @@ class ReviewTimeSubmissionProcessorTest {
         ReviewScheduleMetaDto meta = meta("123");
 
         // when
-        Object actual = reviewTimeSubmissionProcessor.handleDefaultTimeSubmit(
+        SlackActionResponse actual = reviewTimeSubmissionProcessor.handleDefaultTimeSubmit(
                 payload,
                 metaJson("123"),
                 meta,
@@ -98,7 +96,7 @@ class ReviewTimeSubmissionProcessorTest {
         ReviewScheduleMetaDto meta = meta("123");
 
         // when
-        Object actual = reviewTimeSubmissionProcessor.handleCustomTimeSubmit(
+        SlackActionResponse actual = reviewTimeSubmissionProcessor.handleCustomTimeSubmit(
                 payload,
                 meta,
                 "U1",
@@ -107,9 +105,8 @@ class ReviewTimeSubmissionProcessorTest {
 
         // then
         assertAll(
-                () -> assertThat(actual).isInstanceOf(SlackActionResponse.class),
-                () -> assertThat(((SlackActionResponse) actual).responseAction()).isEqualTo("errors"),
-                () -> assertThat(((SlackActionResponse) actual).errors()).containsKey("time_block")
+                () -> assertThat(actual.responseAction()).isEqualTo("errors"),
+                () -> assertThat(actual.errors()).containsKey("time_block")
         );
     }
 

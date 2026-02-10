@@ -54,7 +54,7 @@ class ViewSubmissionRouterTest {
         JsonNode payload = payload("T1", "unknown", metaJson("123"), "");
 
         // when
-        Object actual = viewSubmissionRouter.handle(payload);
+        SlackActionResponse actual = viewSubmissionRouter.handle(payload);
 
         // then
         assertThat(actual).isEqualTo(SlackActionResponse.empty());
@@ -67,7 +67,7 @@ class ViewSubmissionRouterTest {
         JsonNode payload = payload("T1", ViewCallbackId.REVIEW_TIME_SUBMIT.value(), metaJson("123"), "");
 
         // when
-        Object actual = viewSubmissionRouter.handle(payload);
+        SlackActionResponse actual = viewSubmissionRouter.handle(payload);
 
         // then
         assertThat(actual).isEqualTo(SlackActionResponse.empty());

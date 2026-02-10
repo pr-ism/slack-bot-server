@@ -28,7 +28,7 @@ public class ReviewTimeSubmissionProcessor {
     private final ReviewReservationWorkflow reservationWorkflow;
     private final ReviewScheduleModalPublisher reviewScheduleModalPublisher;
 
-    public Object handleDefaultTimeSubmit(
+    public SlackActionResponse handleDefaultTimeSubmit(
             JsonNode payload,
             String metaJson,
             ReviewScheduleMetaDto meta,
@@ -46,7 +46,7 @@ public class ReviewTimeSubmissionProcessor {
         return dispatchSelection(selected, context);
     }
 
-    public Object handleCustomTimeSubmit(
+    public SlackActionResponse handleCustomTimeSubmit(
             JsonNode payload,
             ReviewScheduleMetaDto meta,
             String reviewerId,
@@ -66,7 +66,7 @@ public class ReviewTimeSubmissionProcessor {
         return reservationWorkflow.reserveReview(meta, reviewerId, token, scheduledAt);
     }
 
-    private Object dispatchSelection(String selected, SelectionContext context) {
+    private SlackActionResponse dispatchSelection(String selected, SelectionContext context) {
         if (OPTION_CUSTOM.equals(selected)) {
             String today = LocalDate.now(clock).toString();
 

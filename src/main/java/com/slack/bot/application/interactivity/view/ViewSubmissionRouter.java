@@ -20,7 +20,7 @@ public class ViewSubmissionRouter {
     private final ReservationMetaResolver reservationMetaResolver;
     private final ReviewTimeSubmissionProcessor reviewTimeSubmissionProcessor;
 
-    public Object handle(JsonNode payload) {
+    public SlackActionResponse handle(JsonNode payload) {
         ViewCallbackId callbackId = ViewCallbackId.from(readCallbackId(payload));
         String teamId = resolveTeamId(payload);
         validateTeamId(teamId);
