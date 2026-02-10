@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.dto.ReviewScheduleMetaDto;
 import com.slack.bot.application.interactivity.reply.dto.response.SlackActionResponse;
@@ -30,12 +31,12 @@ class ReviewTimeSubmissionProcessorTest {
     void 커스텀_시간_선택이면_커스텀_모달_push_응답을_반환한다() {
         // given
         JsonNode payload = defaultSubmitPayload("custom");
-        ReviewScheduleMetaDto meta = meta("123");
+        ReviewScheduleMetaDto meta = meta("123", null);
 
         // when
         SlackActionResponse actual = reviewTimeSubmissionProcessor.handleDefaultTimeSubmit(
                 payload,
-                metaJson("123"),
+                metaJson("123", null),
                 meta,
                 "U1",
                 "xoxb-test-token"
@@ -51,12 +52,12 @@ class ReviewTimeSubmissionProcessorTest {
     void 리뷰_시작_시간_값이_잘못되면_errors_응답을_반환한다() {
         // given
         JsonNode payload = defaultSubmitPayload("wrong-value");
-        ReviewScheduleMetaDto meta = meta("123");
+        ReviewScheduleMetaDto meta = meta("123", null);
 
         // when
         SlackActionResponse actual = reviewTimeSubmissionProcessor.handleDefaultTimeSubmit(
                 payload,
-                metaJson("123"),
+                metaJson("123", null),
                 meta,
                 "U1",
                 "xoxb-test-token"
@@ -74,12 +75,12 @@ class ReviewTimeSubmissionProcessorTest {
     void 분_옵션을_선택하면_예약_워크플로우를_수행한다() {
         // given
         JsonNode payload = defaultSubmitPayload("30");
-        ReviewScheduleMetaDto meta = meta("123");
+        ReviewScheduleMetaDto meta = meta("123", null);
 
         // when
         SlackActionResponse actual = reviewTimeSubmissionProcessor.handleDefaultTimeSubmit(
                 payload,
-                metaJson("123"),
+                metaJson("123", null),
                 meta,
                 "U1",
                 "xoxb-test-token"
@@ -93,7 +94,7 @@ class ReviewTimeSubmissionProcessorTest {
     void 커스텀_시간_입력이_잘못되면_errors_응답을_반환한다() {
         // given
         JsonNode payload = customSubmitPayload("2026-02-10", "99:10");
-        ReviewScheduleMetaDto meta = meta("123");
+        ReviewScheduleMetaDto meta = meta("123", null);
 
         // when
         SlackActionResponse actual = reviewTimeSubmissionProcessor.handleCustomTimeSubmit(
@@ -151,7 +152,7 @@ class ReviewTimeSubmissionProcessorTest {
         return payload;
     }
 
-    private ReviewScheduleMetaDto meta(String projectId) {
+    private ReviewScheduleMetaDto meta(String projectId, String reservationId) {
         return ReviewScheduleMetaDto.builder()
                                     .teamId("T1")
                                     .channelId("C1")
@@ -161,13 +162,13 @@ class ReviewTimeSubmissionProcessorTest {
                                     .pullRequestUrl("https://github.com/org/repo/pull/10")
                                     .authorGithubId("author-gh")
                                     .authorSlackId("U_AUTHOR")
-                                    .reservationId(null)
+                                    .reservationId(reservationId)
                                     .projectId(projectId)
                                     .build();
     }
 
-    private String metaJson(String projectId) {
-        return objectMapper.createObjectNode()
+    private String metaJson(String projectId, String reservationId) {
+        ObjectNode meta = objectMapper.createObjectNode()
                 .put("team_id", "T1")
                 .put("channel_id", "C1")
                 .put("pull_request_id", 10L)
@@ -176,7 +177,10 @@ class ReviewTimeSubmissionProcessorTest {
                 .put("pull_request_url", "https://github.com/org/repo/pull/10")
                 .put("project_id", projectId)
                 .put("author_github_id", "author-gh")
-                .put("author_slack_id", "U_AUTHOR")
-                .toString();
+                .put("author_slack_id", "U_AUTHOR");
+
+        meta.set("reservation_id", TextNode.valueOf(reservationId));
+
+        return meta.toString();
     }
 }
