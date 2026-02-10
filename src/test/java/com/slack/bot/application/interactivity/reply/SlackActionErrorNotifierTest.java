@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.Mockito.verify;
 
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
-import java.util.Collections;
+import com.slack.bot.application.interactivity.reply.dto.response.SlackActionResponse;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -44,7 +44,7 @@ class SlackActionErrorNotifierTest {
         SlackActionErrorNotifier notifier = new SlackActionErrorNotifier(notificationApiClient);
 
         // when
-        Object response = notifier.respond("xoxb", "C1", "U1", InteractivityErrorType.RESERVATION_NOT_FOUND);
+        SlackActionResponse response = notifier.respond("xoxb", "C1", "U1", InteractivityErrorType.RESERVATION_NOT_FOUND);
 
         // then
         assertAll(
@@ -54,7 +54,7 @@ class SlackActionErrorNotifierTest {
                         "U1",
                         InteractivityErrorType.RESERVATION_NOT_FOUND.message()
                 ),
-                () -> assertThat(response).isEqualTo(Collections.emptyMap())
+                () -> assertThat(response).isEqualTo(SlackActionResponse.empty())
         );
     }
 }

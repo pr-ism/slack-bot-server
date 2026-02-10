@@ -12,7 +12,7 @@ public class ReviewScheduleModalPublisher {
 
     private final ReviewReservationTimeViewFactory slackViews;
 
-    public Object pushCustomDatetimeModal(String metaJson, String initialDate) {
+    public SlackActionResponse pushCustomDatetimeModal(String metaJson, String initialDate) {
         View view = slackViews.customDatetimeModal(metaJson, initialDate);
 
         return SlackActionResponse.push(view);

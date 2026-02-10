@@ -2,7 +2,6 @@ package com.slack.bot.application.interactivity.reply.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.Collections;
 import java.util.Map;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -13,8 +12,8 @@ public record SlackActionResponse(
         Map<String, String> errors
 ) {
 
-    public static Object empty() {
-        return Collections.emptyMap();
+    public static SlackActionResponse empty() {
+        return new SlackActionResponse(null, null, null);
     }
 
     public static SlackActionResponse push(Object view) {
@@ -27,7 +26,7 @@ public record SlackActionResponse(
 
     public static SlackActionResponse errors(Map<String, String> errors) {
         if (errors == null) {
-            return new SlackActionResponse("errors", null, Collections.emptyMap());
+            return new SlackActionResponse("errors", null, null);
         }
 
         return new SlackActionResponse("errors", null, errors);

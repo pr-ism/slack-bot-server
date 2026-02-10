@@ -1,7 +1,5 @@
 package com.slack.bot.application.interactivity.block;
 
-import java.util.Arrays;
-
 public enum BlockActionType {
 
     CLAIM_PREFIX("claim_", true),
@@ -23,20 +21,66 @@ public enum BlockActionType {
             return UNKNOWN;
         }
 
-        return Arrays.stream(values())
-                     .filter(candidate -> candidate.matches(actionId))
-                     .findFirst()
-                     .orElse(UNKNOWN);
+        BlockActionType exactMatch = findExactMatch(actionId);
+
+        if (exactMatch != UNKNOWN) {
+            return exactMatch;
+        }
+
+        return findBestPrefixMatch(actionId);
     }
 
     public boolean matches(String actionId) {
-        if (isUnknown()) {
+        if (isUnknown() || actionId == null || actionId.isBlank()) {
             return false;
         }
         if (prefixMatch) {
             return actionId.startsWith(value);
         }
         return value.equals(actionId);
+    }
+
+    private boolean matchesExactly(String actionId) {
+        return !prefixMatch && !isUnknown() && value.equals(actionId);
+    }
+
+    private boolean isPrefixMatchType() {
+        return prefixMatch && !isUnknown();
+    }
+
+    private static BlockActionType findExactMatch(String actionId) {
+        for (BlockActionType candidate : values()) {
+            if (candidate.matchesExactly(actionId)) {
+                return candidate;
+            }
+        }
+        return UNKNOWN;
+    }
+
+    private static BlockActionType findBestPrefixMatch(String actionId) {
+        BlockActionType bestPrefixMatch = UNKNOWN;
+
+        for (BlockActionType candidate : values()) {
+            bestPrefixMatch = selectLongerPrefixMatch(bestPrefixMatch, candidate, actionId);
+        }
+
+        return bestPrefixMatch;
+    }
+
+    private static BlockActionType selectLongerPrefixMatch(
+            BlockActionType currentBest,
+            BlockActionType candidate,
+            String actionId
+    ) {
+        if (!candidate.isPrefixMatchType() || !candidate.matches(actionId)) {
+            return currentBest;
+        }
+
+        if (candidate.value.length() <= currentBest.value.length()) {
+            return currentBest;
+        }
+
+        return candidate;
     }
 
     public String value() {

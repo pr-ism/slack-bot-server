@@ -111,6 +111,24 @@ class BlockActionTypeTest {
     }
 
     @Test
+    void 액션_ID가_null이면_매칭되지_않는다() {
+        // when & then
+        assertAll(
+                () -> assertThat(BlockActionType.CLAIM_PREFIX.matches(null)).isFalse(),
+                () -> assertThat(BlockActionType.OPEN_REVIEW_SCHEDULER.matches(null)).isFalse()
+        );
+    }
+
+    @Test
+    void 액션_ID가_blank이면_매칭되지_않는다() {
+        // when & then
+        assertAll(
+                () -> assertThat(BlockActionType.CLAIM_PREFIX.matches(" ")).isFalse(),
+                () -> assertThat(BlockActionType.OPEN_REVIEW_SCHEDULER.matches("")).isFalse()
+        );
+    }
+
+    @Test
     void 리뷰_클레임_액션인지_확인할_수_있다() {
         // when & then
         assertAll(

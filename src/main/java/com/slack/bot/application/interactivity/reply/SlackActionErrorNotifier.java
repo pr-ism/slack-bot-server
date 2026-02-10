@@ -15,7 +15,7 @@ public class SlackActionErrorNotifier {
         notificationApiClient.sendEphemeralMessage(token, channelId, slackUserId, type.message());
     }
 
-    public Object respond(String token, String channelId, String slackUserId, InteractivityErrorType type) {
+    public SlackActionResponse respond(String token, String channelId, String slackUserId, InteractivityErrorType type) {
         notify(token, channelId, slackUserId, type);
 
         return SlackActionResponse.empty();
