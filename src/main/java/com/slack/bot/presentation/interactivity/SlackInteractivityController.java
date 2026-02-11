@@ -3,8 +3,8 @@ package com.slack.bot.presentation.interactivity;
 import com.slack.bot.application.interactivity.SlackInteractionServiceFacade;
 import com.slack.bot.application.interactivity.reply.dto.response.SlackActionResponse;
 import com.slack.bot.global.security.SlackSignatureVerifier;
-import com.slack.bot.infrastructure.auth.jwt.exception.InvalidTokenException;
 import com.slack.bot.presentation.interactivity.dto.request.SlackInteractivityHttpRequest;
+import com.slack.bot.presentation.interactivity.exception.SlackSignatureVerificationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -25,7 +25,7 @@ public class SlackInteractivityController {
         validateRequest(request);
 
         if (!isAuthorized(request)) {
-            throw new InvalidTokenException("슬랙 요청 시그니처 검증에 실패했습니다.");
+            throw new SlackSignatureVerificationException("슬랙 요청 시그니처 검증에 실패했습니다.");
         }
 
         SlackActionResponse response = slackInteractionServiceFacade.handle(request.payloadJson());

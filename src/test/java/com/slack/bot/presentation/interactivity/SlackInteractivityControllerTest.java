@@ -83,7 +83,7 @@ class SlackInteractivityControllerTest extends CommonControllerSliceTestSupport 
                                                              .content(requestBody)
                                              )
                                              .andExpect(status().isUnauthorized())
-                                             .andExpect(jsonPath("$.errorCode").value("A00"))
+                                             .andExpect(jsonPath("$.errorCode").value("I00"))
                                              .andExpect(jsonPath("$.message").value("슬랙 요청 시그니처 검증에 실패했습니다."));
 
         시그니처_검증_실패_문서화(resultActions);

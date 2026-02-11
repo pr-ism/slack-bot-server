@@ -17,12 +17,14 @@ import com.slack.bot.global.exception.dto.response.OauthErrorCode;
 import com.slack.bot.global.exception.dto.response.DefaultErrorCode;
 import com.slack.bot.global.exception.dto.response.ErrorCode;
 import com.slack.bot.global.exception.dto.response.ExceptionResponse;
+import com.slack.bot.global.exception.dto.response.InteractivityErrorCode;
 import com.slack.bot.global.exception.dto.response.ReviewErrorCode;
 import com.slack.bot.global.exception.dto.response.SettingErrorCode;
 import com.slack.bot.infrastructure.auth.jwt.exception.InvalidTokenException;
 import com.slack.bot.infrastructure.link.persistence.exception.AccessLinkDuplicateKeyException;
 import com.slack.bot.infrastructure.link.persistence.exception.AccessLinkSequenceStateException;
 import com.slack.bot.infrastructure.setting.exception.NotificationSettingsCreationConflictException;
+import com.slack.bot.presentation.interactivity.exception.SlackSignatureVerificationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.StringUtils;
 import org.springframework.http.HttpHeaders;
@@ -85,6 +87,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.info("InvalidTokenException : {}", ex.getMessage());
 
         return createResponseEntity(AuthErrorCode.INVALID_TOKEN, ex.getMessage());
+    }
+
+    @ExceptionHandler(SlackSignatureVerificationException.class)
+    public ResponseEntity<Object> handleSlackSignatureVerificationException(SlackSignatureVerificationException ex) {
+        log.info("SlackSignatureVerificationException : {}", ex.getMessage());
+
+        return createResponseEntity(InteractivityErrorCode.SLACK_SIGNATURE_VERIFICATION_FAILED, ex.getMessage());
     }
 
     @ExceptionHandler(EmptyAccessTokenException.class)
