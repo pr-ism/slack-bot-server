@@ -39,6 +39,15 @@ class BlockActionTypeTest {
     }
 
     @Test
+    void 리뷰_바로_시작_액션을_인식한다() {
+        // when
+        BlockActionType actual = BlockActionType.from("start_review");
+
+        // then
+        assertThat(actual).isEqualTo(BlockActionType.START_REVIEW);
+    }
+
+    @Test
     void 리뷰_예약_변경_액션을_인식한다() {
         // when
         BlockActionType actual = BlockActionType.from("change_review_reservation");
@@ -156,6 +165,15 @@ class BlockActionTypeTest {
     }
 
     @Test
+    void 리뷰_바로_시작_액션인지_확인할_수_있다() {
+        // when & then
+        assertAll(
+                () -> assertThat(BlockActionType.START_REVIEW.isStartReview()).isTrue(),
+                () -> assertThat(BlockActionType.CLAIM_PREFIX.isStartReview()).isFalse()
+        );
+    }
+
+    @Test
     void 리뷰_예약_변경_액션인지_확인할_수_있다() {
         // when & then
         assertAll(
@@ -179,6 +197,7 @@ class BlockActionTypeTest {
         assertAll(
                 () -> assertThat(BlockActionType.CLAIM_PREFIX.value()).isEqualTo("claim_"),
                 () -> assertThat(BlockActionType.OPEN_REVIEW_SCHEDULER.value()).isEqualTo("open_review_scheduler"),
+                () -> assertThat(BlockActionType.START_REVIEW.value()).isEqualTo("start_review"),
                 () -> assertThat(BlockActionType.CANCEL_REVIEW_RESERVATION.value()).isEqualTo("cancel_review_reservation"),
                 () -> assertThat(BlockActionType.CHANGE_REVIEW_RESERVATION.value()).isEqualTo("change_review_reservation"),
                 () -> assertThat(BlockActionType.UNKNOWN.value()).isEmpty()

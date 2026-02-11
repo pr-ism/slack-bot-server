@@ -6,6 +6,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
@@ -62,6 +63,46 @@ class ClaimMappingWorkflowTest {
                         eq("xoxb-test-token"),
                         eq("D1"),
                         argThat(message -> message.contains("new-github-id"))
+                )
+        );
+    }
+
+    @Test
+    @Sql(scripts = {
+            "classpath:sql/fixtures/notification/workspace_t1.sql",
+            "classpath:sql/fixtures/notification/project_member_t1.sql",
+            "classpath:sql/fixtures/notification/notification_settings_t1_u1_dm_enabled.sql"
+    })
+    void 이미_등록된_깃허브_ID를_다시_클레임하면_이미_등록됨_메시지를_보낸다() {
+        // given
+        given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U1")).willReturn("D1");
+
+        // when
+        claimMappingWorkflow.handle("T1", "U1", "user1-gh", "xoxb-test-token", "C1");
+
+        // then
+        Optional<ProjectMember> actual = projectMemberRepository.findBySlackUser("T1", "U1");
+
+        assertAll(
+                () -> assertThat(actual).isPresent(),
+                () -> assertThat(actual.get().getGithubId().getValue()).isEqualTo("user1-gh"),
+                () -> verify(notificationApiClient).sendEphemeralMessage(
+                        eq("xoxb-test-token"),
+                        eq("C1"),
+                        eq("U1"),
+                        argThat(message -> message.contains("이미 GitHub ID가 등록"))
+                ),
+                () -> verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1"),
+                () -> verify(notificationApiClient).sendMessage(
+                        eq("xoxb-test-token"),
+                        eq("D1"),
+                        argThat(message -> message.contains("이미 GitHub ID가 등록"))
+                ),
+                () -> verify(notificationApiClient, never()).sendEphemeralMessage(
+                        eq("xoxb-test-token"),
+                        eq("C1"),
+                        eq("U1"),
+                        argThat(message -> message.contains("✅ 등록되었습니다"))
                 )
         );
     }

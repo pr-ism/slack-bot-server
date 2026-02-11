@@ -8,8 +8,10 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 public class SlackSignatureVerifier {
 
@@ -26,18 +28,33 @@ public class SlackSignatureVerifier {
         try {
             ts = Long.parseLong(timestamp);
         } catch (NumberFormatException e) {
+            log.warn("슬랙 시그니처 검증 실패: timestamp 파싱 실패. timestamp={}", timestamp);
             return false;
         }
         long now = System.currentTimeMillis() / 1_000L;
 
         if (Math.abs(now - ts) > MAX_TIMESTAMP_DRIFT_SECONDS) {
+            log.warn("슬랙 시그니처 검증 실패: timestamp 허용 오차 초과. now={}, request={}, drift={}", now, ts, Math.abs(now - ts));
             return false;
         }
 
         String base = "v0:" + timestamp + ":" + rawBody;
         String computed = "v0=" + hmacSha256(base, signingSecret);
+        boolean verified = constantTimeEquals(computed, signature);
 
-        return constantTimeEquals(computed, signature);
+        if (!verified) {
+            log.warn("슬랙 시그니처 검증 실패: 서명 불일치. requestSignaturePrefix={}", signaturePrefix(signature));
+        }
+
+        return verified;
+    }
+
+    private String signaturePrefix(String signature) {
+        if (signature == null || signature.isBlank()) {
+            return "empty";
+        }
+        int endIndex = Math.min(signature.length(), 12);
+        return signature.substring(0, endIndex);
     }
 
     private String hmacSha256(String data, String secret) {

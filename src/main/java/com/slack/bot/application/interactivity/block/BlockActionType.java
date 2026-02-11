@@ -4,6 +4,7 @@ public enum BlockActionType {
 
     CLAIM_PREFIX("claim_", true),
     OPEN_REVIEW_SCHEDULER("open_review_scheduler", false),
+    START_REVIEW("start_review", false),
     CANCEL_REVIEW_RESERVATION("cancel_review_reservation", false),
     CHANGE_REVIEW_RESERVATION("change_review_reservation", false),
     UNKNOWN("", false);
@@ -97,6 +98,10 @@ public enum BlockActionType {
 
     public boolean isCancelReviewReservation() {
         return this == CANCEL_REVIEW_RESERVATION;
+    }
+
+    public boolean isStartReview() {
+        return this == START_REVIEW;
     }
 
     public boolean isChangeReviewReservation() {

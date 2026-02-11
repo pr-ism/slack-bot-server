@@ -23,6 +23,13 @@ public class SlackInteractionServiceFacade {
         try {
             JsonNode payload = objectMapper.readTree(payloadJson);
             String type = resolveInteractionType(payload);
+            log.info(
+                    "슬랙 인터랙션 처리 시작. type={}, actionId={}, teamId={}, userId={}",
+                    type,
+                    payload.path("actions").path(0).path("action_id").asText(""),
+                    payload.path("team").path("id").asText(""),
+                    payload.path("user").path("id").asText("")
+            );
 
             if ("view_submission".equals(type)) {
                 return viewSubmissionRouter.handle(payload);

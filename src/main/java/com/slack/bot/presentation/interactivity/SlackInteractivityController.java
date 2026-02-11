@@ -6,12 +6,14 @@ import com.slack.bot.global.security.SlackSignatureVerifier;
 import com.slack.bot.presentation.interactivity.dto.request.SlackInteractivityHttpRequest;
 import com.slack.bot.presentation.interactivity.exception.SlackSignatureVerificationException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Slf4j
 @RestController
 @RequestMapping("/slack/interactive")
 @RequiredArgsConstructor
@@ -22,9 +24,20 @@ public class SlackInteractivityController {
 
     @PostMapping(consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public ResponseEntity<SlackActionResponse> handleInteractivity(SlackInteractivityHttpRequest request) {
+        log.info(
+                "슬랙 인터랙션 요청 수신. timestamp={}, signaturePresent={}, rawBodyLength={}",
+                request.timestamp(),
+                request.signature() != null && !request.signature().isBlank(),
+                request.rawBody() == null ? 0 : request.rawBody().length()
+        );
         validateRequest(request);
 
         if (!isAuthorized(request)) {
+            log.warn(
+                    "슬랙 인터랙션 시그니처 검증 실패. timestamp={}, rawBodyLength={}",
+                    request.timestamp(),
+                    request.rawBody() == null ? 0 : request.rawBody().length()
+            );
             throw new SlackSignatureVerificationException("슬랙 요청 시그니처 검증에 실패했습니다.");
         }
 

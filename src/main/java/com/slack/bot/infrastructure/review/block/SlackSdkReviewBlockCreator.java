@@ -125,12 +125,17 @@ public class SlackSdkReviewBlockCreator implements ReviewBlockCreator {
                                       .value(actionMetaJson)
                                       .build());
         }
-        elements.add(ButtonElement.builder()
+        ButtonElement.ButtonElementBuilder startReviewButtonBuilder = ButtonElement.builder()
                 .text(PlainTextObject.builder().text("리뷰 바로 시작").build())
                 .style("primary")
                 .actionId(START_REVIEW_ACTION_ID)
-                .url(report.pullRequestUrl())
-                .build());
+                .url(report.pullRequestUrl());
+
+        if (actionMetaJson != null && !actionMetaJson.isBlank()) {
+            startReviewButtonBuilder.value(actionMetaJson);
+        }
+        elements.add(startReviewButtonBuilder.build());
+
         return ActionsBlock.builder()
                            .elements(elements)
                            .build();

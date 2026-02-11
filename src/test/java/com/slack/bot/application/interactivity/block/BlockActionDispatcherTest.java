@@ -174,6 +174,29 @@ class BlockActionDispatcherTest {
     }
 
     @Test
+    void 리뷰_바로_시작_액션이면_추가_작업없이_빈_결과를_반환한다() {
+        // given
+        BlockActionCommandDto command = command(
+                objectMapper.createObjectNode(),
+                objectMapper.createObjectNode(),
+                BlockActionType.START_REVIEW.value(),
+                BlockActionType.START_REVIEW,
+                "U1"
+        );
+
+        // when
+        BlockActionOutcomeDto actual = blockActionDispatcher.dispatch(command);
+
+        // then
+        assertAll(
+                () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
+                () -> verify(reviewInteractionEventPublisher, never()).publish(any()),
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
+                () -> verify(notificationApiClient, never()).sendEphemeralMessage(any(), any(), any(), any())
+        );
+    }
+
+    @Test
     void 알수없는_액션_타입이면_아무것도_수행하지_않고_빈_결과를_반환한다() {
         // given
         BlockActionCommandDto command = command(
