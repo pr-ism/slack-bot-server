@@ -912,7 +912,7 @@ Content-Type: application/json;charset=UTF-8
 
 {
   "projectMemberId" : 1,
-  "reservationConfirmedSpace" : "DM",
+  "reservationConfirmedSpace" : "DIRECT_MESSAGE",
   "reservationCanceledConfirmationEnabled" : true,
   "reviewReminderEnabled" : true,
   "prMentionEnabled" : true,
@@ -1286,10 +1286,92 @@ X-API-Key: test-api-key
 </div>
 </div>
 </div>
+<div class="sect1">
+<h2 id="Interactivity-API"><a class="link" href="#Interactivity-API">Interactivity API</a></h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="handle"><a class="link" href="#handle">슬랙 인터렉션 핸들링</a></h3>
+<div class="sect3">
+<h4 id="handle_http_request"><a class="link" href="#handle_http_request">HTTP request</a></h4>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight nowrap"><code class="language-http" data-lang="http">POST /slack/interactive?payload=%7B%22type%22%3A%22block_actions%22%7D%0A HTTP/1.1
+Content-Type: application/x-www-form-urlencoded;charset=UTF-8
+X-Slack-Request-Timestamp: 1700000000
+X-Slack-Signature: v0=signature
+
+payload=%7B%22type%22%3A%22block_actions%22%7D%0A</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="handle_request_headers"><a class="link" href="#handle_request_headers">Request headers</a></h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">이름</th>
+<th class="tableblock halign-left valign-top">필수여부</th>
+<th class="tableblock halign-left valign-top">설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>X-Slack-Request-Timestamp</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">슬랙 요청 시각(Unix epoch seconds)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>X-Slack-Signature</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">슬랙 시그니처(v0=&#8230;&#8203;)</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="handle_form_parameters"><a class="link" href="#handle_form_parameters">Form parameters</a></h4>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Parameter</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>payload</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">URL 인코딩된 슬랙 인터랙티브 payload JSON</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="handle_http_response"><a class="link" href="#handle_http_response">HTTP response</a></h4>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight nowrap"><code class="language-http" data-lang="http">HTTP/1.1 200 OK
+Content-Type: application/json;charset=UTF-8
+
+{ }</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-02-02 19:22:59 +0900
+Last updated 2026-02-11 18:48:27 +0900
 </div>
 </div>
 </body>

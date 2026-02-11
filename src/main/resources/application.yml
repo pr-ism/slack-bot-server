@@ -3,3 +3,6 @@ spring:
     name: bot
   profiles:
     active: local
+
+slack:
+  signing-secret: ${SLACK_SIGNING_SECRET:signing-secret}

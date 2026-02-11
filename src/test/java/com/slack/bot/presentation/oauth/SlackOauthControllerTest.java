@@ -202,7 +202,7 @@ class SlackOauthControllerTest extends CommonControllerSliceTestSupport {
                )
                .andExpect(status().isBadRequest())
                .andExpect(jsonPath("$.errorCode").value("D01"))
-               .andExpect(jsonPath("$.message").value("유효하지 않은 입력"));
+               .andExpect(jsonPath("$.message").value("슬랙 봇의 team ID는 비어 있을 수 없습니다."));
     }
 
     @Test
