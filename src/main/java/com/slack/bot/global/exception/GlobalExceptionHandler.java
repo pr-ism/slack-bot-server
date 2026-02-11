@@ -24,6 +24,7 @@ import com.slack.bot.infrastructure.link.persistence.exception.AccessLinkDuplica
 import com.slack.bot.infrastructure.link.persistence.exception.AccessLinkSequenceStateException;
 import com.slack.bot.infrastructure.setting.exception.NotificationSettingsCreationConflictException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.StringUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -48,7 +49,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<Object> handleIllegalArgumentException(IllegalArgumentException ex) {
         log.info("IllegalArgumentException : {}", ex.getMessage());
 
-        return createResponseEntity(DefaultErrorCode.INVALID_INPUT);
+        return createResponseEntity(DefaultErrorCode.INVALID_INPUT, ex.getMessage());
     }
 
     @ExceptionHandler(SlackOauthEmptyResponseException.class)
@@ -83,7 +84,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<Object> handleInvalidTokenException(InvalidTokenException ex) {
         log.info("InvalidTokenException : {}", ex.getMessage());
 
-        return createResponseEntity(AuthErrorCode.INVALID_TOKEN);
+        return createResponseEntity(AuthErrorCode.INVALID_TOKEN, ex.getMessage());
     }
 
     @ExceptionHandler(EmptyAccessTokenException.class)
@@ -179,6 +180,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private ResponseEntity<Object> createResponseEntity(ErrorCode errorCode) {
         ExceptionResponse response = ExceptionResponse.from(errorCode);
+
+        return ResponseEntity.status(errorCode.getHttpStatus())
+                             .body(response);
+    }
+
+    private ResponseEntity<Object> createResponseEntity(ErrorCode errorCode, String message) {
+        String resolvedMessage = errorCode.getMessage();
+
+        if (StringUtils.hasText(message)) {
+            resolvedMessage = message;
+        }
+
+        ExceptionResponse response = new ExceptionResponse(errorCode.getErrorCode(), resolvedMessage);
 
         return ResponseEntity.status(errorCode.getHttpStatus())
                              .body(response);

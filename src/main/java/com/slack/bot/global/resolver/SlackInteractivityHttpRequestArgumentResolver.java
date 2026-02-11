@@ -32,7 +32,7 @@ public class SlackInteractivityHttpRequestArgumentResolver implements HandlerMet
         if (request == null) {
             throw new IllegalStateException("요청 객체를 찾을 수 없습니다.");
         }
-        
+
         return parse(request);
     }
 
