@@ -22,12 +22,14 @@ public class ReviewActionMetaBuilder {
     public String build(String teamId, String channelId, String apiKey, ReviewAssignmentRequest report) {
         Long projectId = projectRepository.findIdByApiKey(apiKey)
                                           .orElseThrow(() -> new ProjectNotFoundException(apiKey));
+        Long pullRequestId = resolvePullRequestId(report);
 
         ObjectNode meta = objectMapper.createObjectNode();
 
         meta.put("team_id", teamId);
         meta.put("channel_id", channelId);
         meta.put("project_id", projectId);
+        meta.put("pull_request_id", pullRequestId);
         meta.put("pull_request_url", report.pullRequestUrl());
         meta.put("pull_request_title", report.pullRequestTitle());
         meta.put("repo", report.repositoryName());
@@ -45,6 +47,14 @@ public class ReviewActionMetaBuilder {
             return objectMapper.writeValueAsString(meta);
         } catch (JsonProcessingException e) {
             throw new ReviewActionMetaException("리뷰 스케줄러 메타데이터 직렬화 실패", e);
+        }
+    }
+
+    private Long resolvePullRequestId(ReviewAssignmentRequest report) {
+        try {
+            return Long.parseLong(report.pullRequestId());
+        } catch (NumberFormatException e) {
+            return Long.valueOf(report.pullRequestNumber());
         }
     }
 }

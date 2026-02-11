@@ -55,6 +55,7 @@ class ReviewActionMetaBuilderTest {
                 () -> assertThat(node.get("team_id").asText()).isEqualTo("T1"),
                 () -> assertThat(node.get("channel_id").asText()).isEqualTo("C1"),
                 () -> assertThat(node.get("project_id").asLong()).isEqualTo(1L),
+                () -> assertThat(node.get("pull_request_id").asLong()).isEqualTo(42L),
                 () -> assertThat(node.get("pull_request_url").asText()).isEqualTo("https://github.com/pr/1"),
                 () -> assertThat(node.get("repo").asText()).isEqualTo("my-repo"),
                 () -> assertThat(node.get("author_github_id").asText()).isEqualTo("author-gh"),

@@ -76,9 +76,7 @@ class ReservationMetaResolverTest {
                 Arguments.of("pull_request_number", (Consumer<ObjectNode>) node -> node.remove("pull_request_number")),
                 Arguments.of("pull_request_title", (Consumer<ObjectNode>) node -> node.remove("pull_request_title")),
                 Arguments.of("pull_request_url", (Consumer<ObjectNode>) node -> node.remove("pull_request_url")),
-                Arguments.of("author_github_id", (Consumer<ObjectNode>) node -> node.remove("author_github_id")),
-                Arguments.of("author_slack_id", (Consumer<ObjectNode>) node -> node.remove("author_slack_id")),
-                Arguments.of("reservation_id", (Consumer<ObjectNode>) node -> node.remove("reservation_id"))
+                Arguments.of("author_github_id", (Consumer<ObjectNode>) node -> node.remove("author_github_id"))
         );
     }
 
@@ -101,9 +99,7 @@ class ReservationMetaResolverTest {
                 Arguments.of("project_id", (Consumer<ObjectNode>) node -> node.put("project_id", " ")),
                 Arguments.of("pull_request_title", (Consumer<ObjectNode>) node -> node.put("pull_request_title", " ")),
                 Arguments.of("pull_request_url", (Consumer<ObjectNode>) node -> node.put("pull_request_url", " ")),
-                Arguments.of("author_github_id", (Consumer<ObjectNode>) node -> node.put("author_github_id", " ")),
-                Arguments.of("author_slack_id", (Consumer<ObjectNode>) node -> node.put("author_slack_id", " ")),
-                Arguments.of("reservation_id", (Consumer<ObjectNode>) node -> node.put("reservation_id", " "))
+                Arguments.of("author_github_id", (Consumer<ObjectNode>) node -> node.put("author_github_id", " "))
         );
     }
 
@@ -148,6 +144,42 @@ class ReservationMetaResolverTest {
         assertThatThrownBy(() -> reservationMetaResolver.parseMeta(invalidMeta))
                 .isInstanceOf(ReservationMetaInvalidException.class)
                 .hasMessage("메타데이터 파싱 실패");
+    }
+
+    @Test
+    void author_slack_ID와_reservation_ID는_없어도_파싱할_수_있다() {
+        // given
+        String metaJson = createMetaJson(node -> {
+            node.remove("author_slack_id");
+            node.remove("reservation_id");
+        });
+
+        // when
+        ReviewScheduleMetaDto actual = reservationMetaResolver.parseMeta(metaJson);
+
+        // then
+        assertAll(
+                () -> assertThat(actual.authorSlackId()).isNull(),
+                () -> assertThat(actual.reservationId()).isNull()
+        );
+    }
+
+    @Test
+    void author_slack_ID와_reservation_ID가_공백이면_null로_파싱한다() {
+        // given
+        String metaJson = createMetaJson(node -> {
+            node.put("author_slack_id", " ");
+            node.put("reservation_id", " ");
+        });
+
+        // when
+        ReviewScheduleMetaDto actual = reservationMetaResolver.parseMeta(metaJson);
+
+        // then
+        assertAll(
+                () -> assertThat(actual.authorSlackId()).isNull(),
+                () -> assertThat(actual.reservationId()).isNull()
+        );
     }
 
     private String createMetaJson(Consumer<ObjectNode> mutator) {

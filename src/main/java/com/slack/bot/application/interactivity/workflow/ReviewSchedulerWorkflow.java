@@ -16,8 +16,10 @@ import com.slack.bot.application.interactivity.workflow.dto.SchedulerContextDto;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ReviewSchedulerWorkflow {
@@ -54,6 +56,7 @@ public class ReviewSchedulerWorkflow {
                         return Optional.empty();
                     });
         } catch (ReservationMetaInvalidException e) {
+            log.warn("리뷰 예약 메타 파싱 실패: {}", e.getMessage());
             errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.INVALID_META);
 
             return Optional.empty();
