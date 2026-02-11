@@ -3,7 +3,9 @@ package com.slack.bot.global.security;
 import com.slack.bot.global.config.properties.SlackProperties;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.stereotype.Component;
@@ -41,8 +43,7 @@ public class SlackSignatureVerifier {
     private String hmacSha256(String data, String secret) {
         Mac mac = createHmacSha256Mac(secret);
         byte[] digest = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
-
-        return toHexString(digest);
+        return HexFormat.of().formatHex(digest);
     }
 
     private Mac createHmacSha256Mac(String secret) {
@@ -56,27 +57,13 @@ public class SlackSignatureVerifier {
         }
     }
 
-    private String toHexString(byte[] digest) {
-        StringBuilder hexStringBuilder = new StringBuilder();
-
-        for (byte b : digest) {
-            hexStringBuilder.append(String.format("%02x", b));
-        }
-
-        return hexStringBuilder.toString();
-    }
-
     private boolean constantTimeEquals(String a, String b) {
-        if (a == null || b == null || a.length() != b.length()) {
+        if (a == null || b == null) {
             return false;
         }
-
-        int differenceAccumulator = 0;
-
-        for (int i = 0; i < a.length(); i++) {
-            differenceAccumulator |= a.charAt(i) ^ b.charAt(i);
-        }
-
-        return differenceAccumulator == 0;
+        return MessageDigest.isEqual(
+                a.getBytes(StandardCharsets.UTF_8),
+                b.getBytes(StandardCharsets.UTF_8)
+        );
     }
 }
