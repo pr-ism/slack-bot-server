@@ -12,6 +12,8 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.slack.api.model.view.Views;
 import com.slack.bot.application.interactivity.client.exception.SlackBotMessageDispatchException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -44,7 +46,7 @@ class NotificationApiClientTest {
 
         RestClient slackClient = restClientBuilder.build();
 
-        notificationApiClient = new NotificationApiClient(slackClient);
+        notificationApiClient = new NotificationApiClient(slackClient, new ObjectMapper());
     }
 
     @Test
@@ -429,6 +431,49 @@ class NotificationApiClientTest {
         assertThatThrownBy(() -> notificationApiClient.openModal(token, triggerId, view))
                 .isInstanceOf(SlackBotMessageDispatchException.class)
                 .hasMessageContaining("invalid_trigger_id");
+    }
+
+    @Test
+    void 슬랙_View_객체로_모달을_열때_snake_case로_직렬화한다() {
+        // given
+        String token = "xoxb-token";
+        String triggerId = "TRIGGER_ID";
+        Object view = Views.view(v -> v
+                .type("modal")
+                .callbackId("review_time_submit")
+                .privateMetadata("{\"team_id\":\"T1\"}")
+                .title(Views.viewTitle(t -> t.type("plain_text").text("리뷰 시간 설정")))
+                .submit(Views.viewSubmit(s -> s.type("plain_text").text("확인")))
+                .close(Views.viewClose(c -> c.type("plain_text").text("취소")))
+        );
+
+        String requestBody = """
+                {
+                  "trigger_id": "TRIGGER_ID",
+                  "view": {
+                    "type": "modal",
+                    "callback_id": "review_time_submit",
+                    "private_metadata": "{\\"team_id\\":\\"T1\\"}"
+                  }
+                }
+                """;
+        String responseBody = """
+                {
+                  "ok": true
+                }
+                """;
+
+        mockServer.expect(requestTo("https://slack.com/api/views.open"))
+                .andExpect(method(POST))
+                .andExpect(header("Authorization", "Bearer " + token))
+                .andExpect(content().json(requestBody, false))
+                .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
+
+        // when & then
+        assertAll(
+                () -> assertDoesNotThrow(() -> notificationApiClient.openModal(token, triggerId, view)),
+                () -> mockServer.verify()
+        );
     }
 
     @Test
