@@ -20,7 +20,12 @@ public class SlackSignatureVerifier {
     }
 
     public boolean verify(String timestamp, String signature, String rawBody) {
-        long ts = Long.parseLong(timestamp);
+        long ts;
+        try {
+            ts = Long.parseLong(timestamp);
+        } catch (NumberFormatException e) {
+            return false;
+        }
         long now = System.currentTimeMillis() / 1_000L;
 
         if (Math.abs(now - ts) > MAX_TIMESTAMP_DRIFT_SECONDS) {
