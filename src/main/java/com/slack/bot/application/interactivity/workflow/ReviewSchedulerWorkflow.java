@@ -120,6 +120,13 @@ public class ReviewSchedulerWorkflow {
     }
 
     private void openReviewTimeModal(SchedulerContextDto context) {
+        log.info(
+                "리뷰 예약 모달 오픈 시도. teamId={}, userId={}, triggerIdPrefix={}, metaLength={}",
+                context.teamId(),
+                context.slackUserId(),
+                abbreviate(context.triggerId()),
+                context.metaJson() == null ? 0 : context.metaJson().length()
+        );
         Object view = slackViews.reviewTimeSubmitModal(context.metaJson());
 
         slackApiClient.openModal(context.token(), context.triggerId(), view);
@@ -134,5 +141,13 @@ public class ReviewSchedulerWorkflow {
         );
 
         reviewInteractionEventPublisher.publish(event);
+    }
+
+    private String abbreviate(String value) {
+        if (value == null || value.isBlank()) {
+            return "empty";
+        }
+        int endIndex = Math.min(value.length(), 12);
+        return value.substring(0, endIndex);
     }
 }

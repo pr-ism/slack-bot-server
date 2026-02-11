@@ -91,8 +91,28 @@ public class NotificationApiClient {
         }
         if (!response.path("ok").asBoolean(false)) {
             String error = response.path("error").asText("알 수 없는 오류");
-            throw new SlackBotMessageDispatchException(failureMessage + " - " + error);
+            String details = resolveResponseDetails(response);
+            if (details.isBlank()) {
+                throw new SlackBotMessageDispatchException(failureMessage + " - " + error);
+            }
+            throw new SlackBotMessageDispatchException(failureMessage + " - " + error + " - " + details);
         }
+    }
+
+    private String resolveResponseDetails(JsonNode response) {
+        JsonNode messages = response.path("response_metadata").path("messages");
+        if (!messages.isArray() || messages.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder details = new StringBuilder("messages=");
+        for (int i = 0; i < messages.size(); i++) {
+            if (i > 0) {
+                details.append(", ");
+            }
+            details.append(messages.get(i).asText(""));
+        }
+        return details.toString();
     }
 
     private RestClient.ResponseSpec.ErrorHandler slackApiErrorHandler(String apiName) {

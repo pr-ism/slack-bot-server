@@ -182,6 +182,8 @@ class ReservationMetaResolverTest {
         );
     }
 
+
+
     private String createMetaJson(Consumer<ObjectNode> mutator) {
         ObjectNode node = objectMapper.createObjectNode();
 
