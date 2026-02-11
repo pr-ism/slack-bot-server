@@ -7,6 +7,7 @@ import com.slack.bot.context.ControllerMockInjectionSupport;
 import com.slack.bot.context.ResetMockTestExecutionListener;
 import com.slack.bot.docs.RestDocsConfiguration;
 import com.slack.bot.global.resolver.ProjectMemberIdArgumentResolver;
+import com.slack.bot.global.resolver.SlackInteractivityHttpRequestArgumentResolver;
 import com.slack.bot.global.exception.GlobalExceptionHandler;
 import com.slack.bot.global.resolver.SlackCommandRequestArgumentResolver;
 import java.util.List;
@@ -60,10 +61,16 @@ public abstract class CommonControllerSliceTestSupport {
         StandaloneMockMvcBuilder standaloneMockMvcBuilder = MockMvcBuilders.standaloneSetup(findRestControllers());
         ProjectMemberIdArgumentResolver projectMemberIdArgumentResolver = new ProjectMemberIdArgumentResolver();
         SlackCommandRequestArgumentResolver slackCommandRequestArgumentResolver = new SlackCommandRequestArgumentResolver();
+        SlackInteractivityHttpRequestArgumentResolver slackInteractivityHttpRequestArgumentResolver =
+                new SlackInteractivityHttpRequestArgumentResolver();
 
         this.mockMvc = new FixedStandaloneMockMvcBuilder(standaloneMockMvcBuilder)
                 .configureMessageConverters()
-                .configureArgumentResolvers(projectMemberIdArgumentResolver, slackCommandRequestArgumentResolver)
+                .configureArgumentResolvers(
+                        projectMemberIdArgumentResolver,
+                        slackCommandRequestArgumentResolver,
+                        slackInteractivityHttpRequestArgumentResolver
+                )
                 .configureInterceptors()
                 .configureControllerAdvice()
                 .configureRestDocs()
