@@ -24,6 +24,7 @@ public class SlackInteractivityController {
 
     @PostMapping(consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public ResponseEntity<SlackActionResponse> handleInteractivity(SlackInteractivityHttpRequest request) {
+        System.out.println("request = " + request);
         log.warn(
                 "[INTERACTIVITY-INCOMING] /slack/interactive called. ts={}, sigPresent={}, bodyLen={}",
                 request.timestamp(),
