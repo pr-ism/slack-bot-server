@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.api.model.view.View;
 import com.slack.api.model.view.Views;
 import com.slack.bot.application.interactivity.reply.dto.response.SlackActionResponse;
@@ -27,7 +29,7 @@ class ReviewScheduleModalPublisherTest {
     @Test
     void 커스텀_시간_모달을_push_응답으로_반환한다() {
         // given
-        ReviewScheduleModalPublisher publisher = new ReviewScheduleModalPublisher(viewFactory);
+        ReviewScheduleModalPublisher publisher = new ReviewScheduleModalPublisher(viewFactory, new ObjectMapper());
         String metaJson = "{\"teamId\":\"T1\"}";
         String initialDate = "2024-01-01";
         View modal = Views.view(v -> v.type("modal").callbackId("cb"));
@@ -41,7 +43,8 @@ class ReviewScheduleModalPublisherTest {
         assertAll(
                 () -> verify(viewFactory).customDatetimeModal(metaJson, initialDate),
                 () -> assertThat(response.responseAction()).isEqualTo("push"),
-                () -> assertThat(response.view()).isSameAs(modal)
+                () -> assertThat(response.view()).isInstanceOf(JsonNode.class),
+                () -> assertThat(((JsonNode) response.view()).path("callback_id").asText()).isEqualTo("cb")
         );
     }
 }
