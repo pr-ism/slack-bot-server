@@ -135,10 +135,11 @@ public class ReviewReservationWorkflow {
     }
 
     private Optional<ReviewReservation> findActiveReservation(ReservationContextDto context) {
-        return reviewReservationCoordinator.findActive(
+        return reviewReservationCoordinator.findActiveByPullRequest(
                 context.meta().teamId(),
                 context.projectId(),
-                context.reviewerId()
+                context.reviewerId(),
+                context.reservationPullRequest().getPullRequestId()
         );
     }
 

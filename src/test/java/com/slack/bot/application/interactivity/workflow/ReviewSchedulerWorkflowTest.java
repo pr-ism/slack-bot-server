@@ -232,6 +232,38 @@ class ReviewSchedulerWorkflowTest {
     }
 
     @Test
+    @Sql(scripts = {
+            "classpath:sql/fixtures/reservation/project_123.sql",
+            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
+    })
+    void 같은_리뷰어의_다른_PR이면_중복으로_보지_않고_모달을_연다() {
+        // given
+        String metaJson = metaJsonWithProjectIdAndPullRequest("123", 11L, 11);
+        JsonNode payload = payloadWithTriggerId("TRIGGER_1");
+        JsonNode action = actionWithMetaJson(metaJson);
+
+        // when
+        Optional<ReviewReservation> actual = reviewSchedulerWorkflow.handleOpenScheduler(
+                payload,
+                action,
+                "T1",
+                "C1",
+                "U1",
+                "xoxb-test-token"
+        );
+
+        // then
+        assertAll(
+                () -> assertThat(actual).isEmpty(),
+                () -> verify(notificationApiClient).openModal(
+                        eq("xoxb-test-token"),
+                        eq("TRIGGER_1"),
+                        any()
+                )
+        );
+    }
+
+    @Test
     void 리뷰이가_리뷰_예약을_누르면_예약_불가_알림을_보내고_모달을_열지_않는다() {
         // given
         JsonNode payload = payloadWithTriggerId("TRIGGER_1");
@@ -284,13 +316,17 @@ class ReviewSchedulerWorkflowTest {
     }
 
     private String metaJsonWithProjectId(String projectId) {
+        return metaJsonWithProjectIdAndPullRequest(projectId, 10L, 10);
+    }
+
+    private String metaJsonWithProjectIdAndPullRequest(String projectId, Long pullRequestId, int pullRequestNumber) {
         return objectMapper.createObjectNode()
                 .put("team_id", "T1")
                 .put("channel_id", "C1")
-                .put("pull_request_id", 10L)
-                .put("pull_request_number", 10)
-                .put("pull_request_title", "PR 제목")
-                .put("pull_request_url", "https://github.com/org/repo/pull/10")
+                .put("pull_request_id", pullRequestId)
+                .put("pull_request_number", pullRequestNumber)
+                .put("pull_request_title", "PR 제목 " + pullRequestNumber)
+                .put("pull_request_url", "https://github.com/org/repo/pull/" + pullRequestNumber)
                 .put("project_id", projectId)
                 .put("author_github_id", "author-gh")
                 .put("author_slack_id", "U_AUTHOR")

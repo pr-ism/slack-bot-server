@@ -34,6 +34,20 @@ public class ReviewReservationCoordinator {
         return reviewReservationRepository.findActive(teamId, projectId, reviewerSlackId);
     }
 
+    public Optional<ReviewReservation> findActiveByPullRequest(
+            String teamId,
+            Long projectId,
+            String reviewerSlackId,
+            Long pullRequestId
+    ) {
+        return reviewReservationRepository.findActiveByPullRequest(
+                teamId,
+                projectId,
+                reviewerSlackId,
+                pullRequestId
+        );
+    }
+
     public Optional<ReviewReservation> findById(Long reservationId) {
         return reviewReservationRepository.findById(reservationId);
     }
@@ -41,10 +55,11 @@ public class ReviewReservationCoordinator {
     @Transactional
     public ReviewReservation create(ReservationCommandDto command) {
         validateScheduledAt(command.scheduledAt());
-        return reviewReservationRepository.findActiveForUpdate(
+        return reviewReservationRepository.findActiveByPullRequestForUpdate(
                         command.teamId(),
                         command.projectId(),
-                        command.reviewerSlackId()
+                        command.reviewerSlackId(),
+                        command.reservationPullRequest().getPullRequestId()
                 )
                 .<ReviewReservation>map(existing -> {
                     throw new ActiveReservationAlreadyExistsException("이미 활성화된 리뷰 예약이 있습니다.");
@@ -59,10 +74,11 @@ public class ReviewReservationCoordinator {
         validateSameKey(existing, command.teamId(), command.projectId(), command.reviewerSlackId());
         validateScheduledAt(command.scheduledAt());
 
-        return reviewReservationRepository.findActiveForUpdate(
+        return reviewReservationRepository.findActiveByPullRequestForUpdate(
                         command.teamId(),
                         command.projectId(),
-                        command.reviewerSlackId()
+                        command.reviewerSlackId(),
+                        command.reservationPullRequest().getPullRequestId()
                 )
                 .map(active -> {
                     if (!active.getId().equals(existing.getId())) {

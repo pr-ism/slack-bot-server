@@ -185,10 +185,10 @@ class ReviewReservationCoordinatorTest {
         coordinator.create(firstCommand);
 
         ReservationPullRequest secondPullRequest = ReservationPullRequest.builder()
-                .pullRequestId(2L)
-                .pullRequestNumber(2)
+                .pullRequestId(1L)
+                .pullRequestNumber(1)
                 .pullRequestTitle("Second")
-                .pullRequestUrl("https://github.com/org/repo/pull/2")
+                .pullRequestUrl("https://github.com/org/repo/pull/1")
                 .build();
 
         ReservationCommandDto secondCommand = ReservationCommandDto.builder()
@@ -205,6 +205,57 @@ class ReviewReservationCoordinatorTest {
         assertThatThrownBy(() -> coordinator.create(secondCommand))
                 .isInstanceOf(ActiveReservationAlreadyExistsException.class)
                 .hasMessageContaining("이미 활성화된 리뷰 예약이 있습니다");
+    }
+
+    @Test
+    void 다른_PR이면_활성_예약이_있어도_새_예약을_생성한다() {
+        // given
+        ReservationPullRequest firstPullRequest = ReservationPullRequest.builder()
+                .pullRequestId(1L)
+                .pullRequestNumber(1)
+                .pullRequestTitle("First")
+                .pullRequestUrl("https://github.com/org/repo/pull/1")
+                .build();
+
+        ReservationCommandDto firstCommand = ReservationCommandDto.builder()
+                .teamId("T1")
+                .channelId("C1")
+                .projectId(1L)
+                .reservationPullRequest(firstPullRequest)
+                .authorSlackId("U1")
+                .reviewerSlackId("U2")
+                .scheduledAt(futureInstant(3600))
+                .build();
+
+        ReviewReservation first = coordinator.create(firstCommand);
+
+        ReservationPullRequest secondPullRequest = ReservationPullRequest.builder()
+                .pullRequestId(2L)
+                .pullRequestNumber(2)
+                .pullRequestTitle("Second")
+                .pullRequestUrl("https://github.com/org/repo/pull/2")
+                .build();
+
+        ReservationCommandDto secondCommand = ReservationCommandDto.builder()
+                .teamId("T1")
+                .channelId("C1")
+                .projectId(1L)
+                .reservationPullRequest(secondPullRequest)
+                .authorSlackId("U1")
+                .reviewerSlackId("U2")
+                .scheduledAt(futureInstant(7200))
+                .build();
+
+        // when
+        ReviewReservation second = coordinator.create(secondCommand);
+
+        // then
+        assertAll(
+                () -> assertThat(first.getId()).isNotEqualTo(second.getId()),
+                () -> assertThat(first.getStatus()).isEqualTo(ReservationStatus.ACTIVE),
+                () -> assertThat(second.getStatus()).isEqualTo(ReservationStatus.ACTIVE),
+                () -> assertThat(second.getReservationPullRequest().getPullRequestId()).isEqualTo(2L)
+        );
     }
 
     @Test

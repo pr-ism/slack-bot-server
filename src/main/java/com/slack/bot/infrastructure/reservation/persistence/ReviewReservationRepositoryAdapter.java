@@ -88,4 +88,49 @@ public class ReviewReservationRepositoryAdapter implements ReviewReservationRepo
 
         return result != null;
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ReviewReservation> findActiveByPullRequest(
+            String teamId,
+            Long projectId,
+            String reviewerSlackId,
+            Long pullRequestId
+    ) {
+        ReviewReservation result = queryFactory
+                .selectFrom(reviewReservation)
+                .where(
+                        reviewReservation.teamId.eq(teamId),
+                        reviewReservation.projectId.eq(projectId),
+                        reviewReservation.reviewerSlackId.eq(reviewerSlackId),
+                        reviewReservation.reservationPullRequest.pullRequestId.eq(pullRequestId),
+                        reviewReservation.status.eq(ReservationStatus.ACTIVE)
+                )
+                .fetchOne();
+
+        return Optional.ofNullable(result);
+    }
+
+    @Override
+    @Transactional
+    public Optional<ReviewReservation> findActiveByPullRequestForUpdate(
+            String teamId,
+            Long projectId,
+            String reviewerSlackId,
+            Long pullRequestId
+    ) {
+        ReviewReservation result = queryFactory
+                .selectFrom(reviewReservation)
+                .where(
+                        reviewReservation.teamId.eq(teamId),
+                        reviewReservation.projectId.eq(projectId),
+                        reviewReservation.reviewerSlackId.eq(reviewerSlackId),
+                        reviewReservation.reservationPullRequest.pullRequestId.eq(pullRequestId),
+                        reviewReservation.status.eq(ReservationStatus.ACTIVE)
+                )
+                .setLockMode(LockModeType.PESSIMISTIC_WRITE)
+                .fetchOne();
+
+        return Optional.ofNullable(result);
+    }
 }

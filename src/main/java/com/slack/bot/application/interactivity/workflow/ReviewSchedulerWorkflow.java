@@ -134,10 +134,11 @@ public class ReviewSchedulerWorkflow {
             SchedulerContextDto context,
             Long projectId
     ) {
-        return reviewReservationCoordinator.findActive(
+        return reviewReservationCoordinator.findActiveByPullRequest(
                 meta.teamId(),
                 projectId,
-                context.slackUserId()
+                context.slackUserId(),
+                meta.pullRequestId()
         );
     }
 

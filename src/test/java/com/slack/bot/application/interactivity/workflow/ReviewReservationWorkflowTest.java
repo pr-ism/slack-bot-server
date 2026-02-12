@@ -185,7 +185,7 @@ class ReviewReservationWorkflowTest {
         doThrow(new ActiveReservationAlreadyExistsException("concurrency"))
                 .doReturn(Optional.of(activeReservation))
                 .when(reviewReservationCoordinator)
-                .findActive(anyString(), anyLong(), anyString());
+                .findActiveByPullRequest(anyString(), anyLong(), anyString(), anyLong());
 
         // when
         Object actual = reviewReservationWorkflow.reserveReview(
