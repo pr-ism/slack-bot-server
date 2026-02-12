@@ -11,10 +11,12 @@ import com.slack.bot.application.interactivity.reservation.ReservationType;
 import com.slack.bot.application.interactivity.reservation.ReviewReservationCoordinator;
 import com.slack.bot.application.interactivity.reservation.dto.ReservationContextDto;
 import com.slack.bot.application.interactivity.reservation.exception.ActiveReservationAlreadyExistsException;
+import com.slack.bot.application.interactivity.reservation.exception.ReservationScheduleInPastException;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.vo.ReservationPullRequest;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,8 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class ReviewReservationWorkflow {
+
+    private static final String TIME_BLOCK_ID = "time_block";
 
     private final Clock clock;
     private final AuthorResolver authorResolver;
@@ -115,6 +119,10 @@ public class ReviewReservationWorkflow {
     ) {
         try {
             return action.get();
+        } catch (ReservationScheduleInPastException e) {
+            log.info("리뷰 예약 시간 유효성 실패: {}", e.getMessage());
+
+            return SlackActionResponse.errors(Map.of(TIME_BLOCK_ID, e.getMessage()));
         } catch (ActiveReservationAlreadyExistsException e) {
             log.info("리뷰 예약 동시성 중복 발생");
 

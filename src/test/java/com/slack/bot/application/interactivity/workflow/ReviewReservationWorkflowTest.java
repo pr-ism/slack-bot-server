@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.ArgumentMatchers.eq;
@@ -16,6 +17,7 @@ import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
 import com.slack.bot.application.interactivity.reply.dto.response.SlackActionResponse;
 import com.slack.bot.application.interactivity.reservation.ReviewReservationCoordinator;
 import com.slack.bot.application.interactivity.reservation.exception.ActiveReservationAlreadyExistsException;
+import com.slack.bot.application.interactivity.reservation.exception.ReservationScheduleInPastException;
 import com.slack.bot.domain.reservation.ReservationStatus;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.vo.ReservationPullRequest;
@@ -214,6 +216,31 @@ class ReviewReservationWorkflowTest {
 
         // then
         assertThat(actual).isEqualTo(SlackActionResponse.clear());
+    }
+
+    @Test
+    @Sql("classpath:sql/fixtures/reservation/project_123.sql")
+    void 예약_시간이_과거로_판정되면_모달_에러로_메시지를_반환한다() {
+        // given
+        ReviewScheduleMetaDto meta = meta("123", null);
+        Instant scheduledAt = Instant.now(clock).plusSeconds(3600);
+        doThrow(new ReservationScheduleInPastException("리뷰 예약 시간은 현재보다 이후여야 합니다."))
+                .when(reviewReservationCoordinator)
+                .create(any());
+
+        // when
+        SlackActionResponse actual = reviewReservationWorkflow.reserveReview(
+                meta,
+                "U1",
+                "xoxb-test-token",
+                scheduledAt
+        );
+
+        // then
+        assertAll(
+                () -> assertThat(actual.responseAction()).isEqualTo("errors"),
+                () -> assertThat(actual.errors()).containsEntry("time_block", "리뷰 예약 시간은 현재보다 이후여야 합니다.")
+        );
     }
 
     private ReviewScheduleMetaDto meta(String projectId, String reservationId) {

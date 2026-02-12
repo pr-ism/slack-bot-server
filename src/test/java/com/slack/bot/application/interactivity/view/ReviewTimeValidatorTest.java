@@ -22,7 +22,7 @@ class ReviewTimeValidatorTest {
     @Test
     void 정상_시간이면_에러가_없다() {
         // when
-        Map<String, String> errors = validator.validateCustomDateTime("2024-01-01", "09:00");
+        Map<String, String> errors = validator.validateCustomDateTime("2024-01-01", "09:01");
 
         // then
         assertThat(errors).isEmpty();
@@ -31,7 +31,7 @@ class ReviewTimeValidatorTest {
     @Test
     void 날짜_공백을_제거해_정상_처리한다() {
         // when
-        Map<String, String> errors = validator.validateCustomDateTime(" 2024-01-01 ", "09:00");
+        Map<String, String> errors = validator.validateCustomDateTime(" 2024-01-01 ", "09:01");
 
         // then
         assertThat(errors).isEmpty();
@@ -41,6 +41,15 @@ class ReviewTimeValidatorTest {
     void 과거_시간이면_에러를_반환한다() {
         // when
         Map<String, String> errors = validator.validateCustomDateTime("2024-01-01", "08:59");
+
+        // then
+        assertThat(errors).containsEntry("time_block", "과거 시간은 선택할 수 없습니다. 현재 이후 시간으로 입력해주세요.");
+    }
+
+    @Test
+    void 현재와_같은_분이면_에러를_반환한다() {
+        // when
+        Map<String, String> errors = validator.validateCustomDateTime("2024-01-01", "09:00");
 
         // then
         assertThat(errors).containsEntry("time_block", "과거 시간은 선택할 수 없습니다. 현재 이후 시간으로 입력해주세요.");

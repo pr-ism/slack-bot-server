@@ -48,7 +48,7 @@ public class ReviewTimeValidator {
         ZonedDateTime nowMinute = ZonedDateTime.now(clock).truncatedTo(ChronoUnit.MINUTES);
         ZonedDateTime scheduledAtMinute = scheduledAt.atZone(clock.getZone()).truncatedTo(ChronoUnit.MINUTES);
 
-        if (scheduledAtMinute.isBefore(nowMinute)) {
+        if (!scheduledAtMinute.isAfter(nowMinute)) {
             errors.put("time_block", "과거 시간은 선택할 수 없습니다. 현재 이후 시간으로 입력해주세요.");
         }
 
