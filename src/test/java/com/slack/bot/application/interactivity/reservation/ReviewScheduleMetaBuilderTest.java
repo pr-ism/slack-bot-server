@@ -14,6 +14,8 @@ import com.slack.bot.domain.member.vo.GithubId;
 import com.slack.bot.domain.reservation.ReservationStatus;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.vo.ReservationPullRequest;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -165,5 +167,86 @@ class ReviewScheduleMetaBuilderTest {
         assertThatThrownBy(() -> metaBuilder.buildForChange(reservation))
                 .isInstanceOf(ReviewScheduleMetaException.class)
                 .hasMessageContaining("author_github_id를 찾을 수 없습니다.");
+    }
+
+    @Test
+    void author는_존재하지만_GitHub_ID가_null이면_메타데이터_생성에_실패한다() {
+        // given
+        ReservationPullRequest pullRequest = ReservationPullRequest.builder()
+                                                                   .pullRequestId(1L)
+                                                                   .pullRequestNumber(1)
+                                                                   .pullRequestTitle("Title")
+                                                                   .pullRequestUrl("https://example.com")
+                                                                   .build();
+        ReviewReservation reservation = ReviewReservation.builder()
+                                                         .teamId("T1")
+                                                         .channelId("C1")
+                                                         .projectId(1L)
+                                                         .reservationPullRequest(pullRequest)
+                                                         .authorSlackId("U1")
+                                                         .reviewerSlackId("U2")
+                                                         .scheduledAt(Instant.now())
+                                                         .status(ReservationStatus.ACTIVE)
+                                                         .build();
+        ProjectMember author = ProjectMember.builder()
+                                            .teamId("T1")
+                                            .slackUserId("U1")
+                                            .displayName("author")
+                                            .build();
+        given(projectMemberRepository.findBySlackUser("T1", "U1"))
+                .willReturn(Optional.of(author));
+
+        // when & then
+        assertThatThrownBy(() -> metaBuilder.buildForChange(reservation))
+                .isInstanceOf(ReviewScheduleMetaException.class)
+                .hasMessageContaining("author_github_id를 찾을 수 없습니다.");
+    }
+
+    @Test
+    void author는_존재하지만_GitHub_ID가_공백이면_메타데이터_생성에_실패한다() {
+        // given
+        ReservationPullRequest pullRequest = ReservationPullRequest.builder()
+                                                                   .pullRequestId(1L)
+                                                                   .pullRequestNumber(1)
+                                                                   .pullRequestTitle("Title")
+                                                                   .pullRequestUrl("https://example.com")
+                                                                   .build();
+        ReviewReservation reservation = ReviewReservation.builder()
+                                                         .teamId("T1")
+                                                         .channelId("C1")
+                                                         .projectId(1L)
+                                                         .reservationPullRequest(pullRequest)
+                                                         .authorSlackId("U1")
+                                                         .reviewerSlackId("U2")
+                                                         .scheduledAt(Instant.now())
+                                                         .status(ReservationStatus.ACTIVE)
+                                                         .build();
+        ProjectMember author = ProjectMember.builder()
+                                            .teamId("T1")
+                                            .slackUserId("U1")
+                                            .displayName("author")
+                                            .build();
+        setGithubId(author, " ");
+        given(projectMemberRepository.findBySlackUser("T1", "U1"))
+                .willReturn(Optional.of(author));
+
+        // when & then
+        assertThatThrownBy(() -> metaBuilder.buildForChange(reservation))
+                .isInstanceOf(ReviewScheduleMetaException.class)
+                .hasMessageContaining("author_github_id를 찾을 수 없습니다.");
+    }
+
+    private void setGithubId(ProjectMember member, String value) {
+        try {
+            Constructor<GithubId> constructor = GithubId.class.getDeclaredConstructor(String.class);
+            constructor.setAccessible(true);
+            GithubId githubId = constructor.newInstance(value);
+
+            Field field = ProjectMember.class.getDeclaredField("githubId");
+            field.setAccessible(true);
+            field.set(member, githubId);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("테스트 GitHub ID 설정 실패", e);
+        }
     }
 }
