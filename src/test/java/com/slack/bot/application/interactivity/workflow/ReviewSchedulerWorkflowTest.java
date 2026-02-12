@@ -231,6 +231,48 @@ class ReviewSchedulerWorkflowTest {
         );
     }
 
+    @Test
+    void 리뷰이가_리뷰_예약을_누르면_예약_불가_알림을_보내고_모달을_열지_않는다() {
+        // given
+        JsonNode payload = payloadWithTriggerId("TRIGGER_1");
+        String metaJson = objectMapper.createObjectNode()
+                .put("team_id", "T1")
+                .put("channel_id", "C1")
+                .put("pull_request_id", 10L)
+                .put("pull_request_number", 10)
+                .put("pull_request_title", "PR 제목")
+                .put("pull_request_url", "https://github.com/org/repo/pull/10")
+                .put("project_id", "123")
+                .put("author_github_id", "author-gh")
+                .put("author_slack_id", "U1")
+                .put("reservation_id", "R1")
+                .toString();
+        JsonNode action = actionWithMetaJson(metaJson);
+
+        // when
+        Optional<ReviewReservation> actual = reviewSchedulerWorkflow.handleOpenScheduler(
+                payload,
+                action,
+                "T1",
+                "C1",
+                "U1",
+                "xoxb-test-token"
+        );
+
+        // then
+        assertAll(
+                () -> assertThat(actual).isEmpty(),
+                () -> verify(notificationApiClient).sendEphemeralMessage(
+                        "xoxb-test-token",
+                        "C1",
+                        "U1",
+                        InteractivityErrorType.REVIEWEE_CANNOT_RESERVE.message()
+                ),
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
+                () -> verify(reviewInteractionEventPublisher, never()).publish(any())
+        );
+    }
+
     private JsonNode payloadWithTriggerId(String triggerId) {
         return objectMapper.createObjectNode()
                 .put("trigger_id", triggerId);

@@ -7,6 +7,7 @@ import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventP
 import com.slack.bot.application.interactivity.publisher.ReviewReservationRequestEvent;
 import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
 import com.slack.bot.application.interactivity.reply.SlackActionErrorNotifier;
+import com.slack.bot.application.interactivity.reservation.AuthorResolver;
 import com.slack.bot.application.interactivity.reservation.ProjectIdResolver;
 import com.slack.bot.application.interactivity.reservation.ReservationMetaResolver;
 import com.slack.bot.application.interactivity.reservation.ReviewReservationCoordinator;
@@ -24,6 +25,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ReviewSchedulerWorkflow {
 
+    private final AuthorResolver authorResolver;
     private final ProjectIdResolver projectIdResolver;
     private final NotificationApiClient slackApiClient;
     private final SlackActionErrorNotifier errorNotifier;
@@ -48,6 +50,12 @@ public class ReviewSchedulerWorkflow {
 
         try {
             ReviewScheduleMetaDto meta = parseMeta(context.metaJson());
+
+            if (isRevieweeRequester(meta, context.slackUserId())) {
+                errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.REVIEWEE_CANNOT_RESERVE);
+                return Optional.empty();
+            }
+
             Long projectId = projectIdResolver.resolve(meta.projectId(), context.teamId());
 
             publishReservationRequest(context);
@@ -69,6 +77,20 @@ public class ReviewSchedulerWorkflow {
 
     private ReviewScheduleMetaDto parseMeta(String metaJson) {
         return reservationMetaResolver.parseMeta(metaJson);
+    }
+
+    private boolean isRevieweeRequester(ReviewScheduleMetaDto meta, String requesterSlackUserId) {
+        if (meta == null || requesterSlackUserId == null || requesterSlackUserId.isBlank()) {
+            return false;
+        }
+
+        String authorSlackId = authorResolver.resolveAuthorSlackId(meta);
+
+        if (authorSlackId == null || authorSlackId.isBlank()) {
+            return false;
+        }
+
+        return requesterSlackUserId.equals(authorSlackId);
     }
 
     private SchedulerContextDto buildContext(
