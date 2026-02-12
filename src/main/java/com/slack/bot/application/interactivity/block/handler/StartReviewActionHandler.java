@@ -4,6 +4,7 @@ import com.slack.bot.application.interactivity.block.BlockActionHandler;
 import com.slack.bot.application.interactivity.block.dto.BlockActionCommandDto;
 import com.slack.bot.application.interactivity.block.dto.BlockActionOutcomeDto;
 import com.slack.bot.application.interactivity.dto.ReviewScheduleMetaDto;
+import com.slack.bot.application.interactivity.notification.NotificationDispatcher;
 import com.slack.bot.application.interactivity.notification.ReviewReservationNotifier;
 import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
 import com.slack.bot.application.interactivity.reply.SlackActionErrorNotifier;
@@ -19,9 +20,12 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class StartReviewActionHandler implements BlockActionHandler {
 
+    private static final String START_REVIEW_ACK_MESSAGE = "리뷰 시작 알림을 전송했습니다.";
+
     private final AuthorResolver authorResolver;
     private final ReservationMetaResolver reservationMetaResolver;
     private final ReviewReservationNotifier reviewReservationNotifier;
+    private final NotificationDispatcher notificationDispatcher;
     private final SlackActionErrorNotifier errorNotifier;
 
     @Override
@@ -49,6 +53,12 @@ public class StartReviewActionHandler implements BlockActionHandler {
                     meta,
                     command.slackUserId(),
                     command.botToken()
+            );
+            notificationDispatcher.sendEphemeral(
+                    command.botToken(),
+                    command.channelId(),
+                    command.slackUserId(),
+                    START_REVIEW_ACK_MESSAGE
             );
         } catch (ReservationMetaInvalidException e) {
             log.warn("리뷰 바로 시작 메타 파싱 실패", e);

@@ -53,6 +53,12 @@ class StartReviewActionHandlerTest {
         // then
         assertAll(
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
+                () -> verify(notificationApiClient).sendEphemeralMessage(
+                        eq("xoxb-test-token"),
+                        eq("C1"),
+                        eq("U2"),
+                        eq("리뷰 시작 알림을 전송했습니다.")
+                ),
                 () -> verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1"),
                 () -> verify(notificationApiClient).sendMessage(
                         eq("xoxb-test-token"),
