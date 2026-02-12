@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.slack.bot.application.IntegrationTest;
@@ -16,6 +18,7 @@ import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
 import com.slack.bot.application.interactivity.reply.dto.response.SlackActionResponse;
 import com.slack.bot.application.interactivity.reservation.ReviewReservationCoordinator;
 import com.slack.bot.application.interactivity.reservation.exception.ActiveReservationAlreadyExistsException;
+import com.slack.bot.application.interactivity.reservation.exception.ReservationScheduleInPastException;
 import com.slack.bot.domain.reservation.ReservationStatus;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.vo.ReservationPullRequest;
@@ -50,7 +53,7 @@ class ReviewReservationWorkflowTest {
     ReviewReservationCoordinator reviewReservationCoordinator;
 
     @Test
-    @Sql("classpath:sql/fixtures/reservation/project_123.sql")
+    @Sql("classpath:sql/fixtures/interactivity/project_123.sql")
     void 신규_예약을_생성하면_clear_응답을_반환한다() {
         // given
         ReviewScheduleMetaDto meta = meta("123", null);
@@ -72,7 +75,7 @@ class ReviewReservationWorkflowTest {
 
     @Test
     @Sql(scripts = {
-            "classpath:sql/fixtures/reservation/project_123.sql",
+            "classpath:sql/fixtures/interactivity/project_123.sql",
             "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
     })
     void 중복된_신규_예약이면_빈_응답을_반환한다() {
@@ -115,7 +118,7 @@ class ReviewReservationWorkflowTest {
     }
 
     @Test
-    @Sql("classpath:sql/fixtures/reservation/project_123.sql")
+    @Sql("classpath:sql/fixtures/interactivity/project_123.sql")
     void reservation_ID가_숫자가_아니면_신규_예약으로_처리한다() {
         // given
         ReviewScheduleMetaDto meta = meta("123", "abc");
@@ -136,7 +139,7 @@ class ReviewReservationWorkflowTest {
 
     @Test
     @Sql(scripts = {
-            "classpath:sql/fixtures/reservation/project_123.sql",
+            "classpath:sql/fixtures/interactivity/project_123.sql",
             "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
     })
     void 예약_ID가_있으면_기존_예약을_변경한다() {
@@ -153,13 +156,15 @@ class ReviewReservationWorkflowTest {
         assertAll(
                 () -> assertThat(actual).isEqualTo(SlackActionResponse.clear()),
                 () -> assertThat(changed).isPresent(),
-                () -> assertThat(changed.get().getScheduledAt()).isEqualTo(scheduledAt)
+                () -> assertThat(changed.get().getScheduledAt()).isEqualTo(scheduledAt),
+                () -> verify(notificationApiClient, never()).sendEphemeralMessage(any(), any(), any(), any()),
+                () -> verify(notificationApiClient, never()).sendEphemeralBlockMessage(any(), any(), any(), any(), any())
         );
     }
 
     @Test
     @Sql(scripts = {
-            "classpath:sql/fixtures/reservation/project_123.sql",
+            "classpath:sql/fixtures/interactivity/project_123.sql",
             "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
     })
     void 동시성_중복_예외가_발생하면_활성_예약을_조회해_중복_안내를_수행한다() {
@@ -185,7 +190,7 @@ class ReviewReservationWorkflowTest {
         doThrow(new ActiveReservationAlreadyExistsException("concurrency"))
                 .doReturn(Optional.of(activeReservation))
                 .when(reviewReservationCoordinator)
-                .findActive(anyString(), anyLong(), anyString());
+                .findActive(anyString(), anyLong(), anyString(), anyLong());
 
         // when
         Object actual = reviewReservationWorkflow.reserveReview(
@@ -200,7 +205,7 @@ class ReviewReservationWorkflowTest {
     }
 
     @Test
-    @Sql("classpath:sql/fixtures/reservation/project_123.sql")
+    @Sql("classpath:sql/fixtures/interactivity/project_123.sql")
     void 즉시_알림_분기를_통과한다() {
         // given
         Instant nowForValidation = Instant.parse("2026-01-01T00:00:00Z");
@@ -214,6 +219,31 @@ class ReviewReservationWorkflowTest {
 
         // then
         assertThat(actual).isEqualTo(SlackActionResponse.clear());
+    }
+
+    @Test
+    @Sql("classpath:sql/fixtures/interactivity/project_123.sql")
+    void 예약_시간이_과거로_판정되면_모달_에러로_메시지를_반환한다() {
+        // given
+        ReviewScheduleMetaDto meta = meta("123", null);
+        Instant scheduledAt = Instant.now(clock).plusSeconds(3600);
+        doThrow(new ReservationScheduleInPastException("리뷰 예약 시간은 현재보다 이후여야 합니다."))
+                .when(reviewReservationCoordinator)
+                .create(any());
+
+        // when
+        SlackActionResponse actual = reviewReservationWorkflow.reserveReview(
+                meta,
+                "U1",
+                "xoxb-test-token",
+                scheduledAt
+        );
+
+        // then
+        assertAll(
+                () -> assertThat(actual.responseAction()).isEqualTo("errors"),
+                () -> assertThat(actual.errors()).containsEntry("time_block", "리뷰 예약 시간은 현재보다 이후여야 합니다.")
+        );
     }
 
     private ReviewScheduleMetaDto meta(String projectId, String reservationId) {
