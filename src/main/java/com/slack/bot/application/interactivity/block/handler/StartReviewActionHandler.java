@@ -9,6 +9,7 @@ import com.slack.bot.application.interactivity.notification.ReviewReservationNot
 import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
 import com.slack.bot.application.interactivity.reply.SlackActionErrorNotifier;
 import com.slack.bot.application.interactivity.reservation.AuthorResolver;
+import com.slack.bot.application.interactivity.reservation.ReviewReservationCoordinator;
 import com.slack.bot.application.interactivity.reservation.ReservationMetaResolver;
 import com.slack.bot.application.interactivity.reservation.exception.ReservationMetaInvalidException;
 import java.time.Clock;
@@ -32,6 +33,7 @@ public class StartReviewActionHandler implements BlockActionHandler {
     private final Clock clock;
     private final AuthorResolver authorResolver;
     private final ReservationMetaResolver reservationMetaResolver;
+    private final ReviewReservationCoordinator reviewReservationCoordinator;
     private final ReviewReservationNotifier reviewReservationNotifier;
     private final NotificationDispatcher notificationDispatcher;
     private final SlackActionErrorNotifier errorNotifier;
@@ -73,6 +75,7 @@ public class StartReviewActionHandler implements BlockActionHandler {
                     command.slackUserId(),
                     command.botToken()
             );
+            cancelActiveReservation(meta, command.slackUserId());
             markStarted(dedupKey);
             notificationDispatcher.sendEphemeral(
                     command.botToken(),
@@ -127,5 +130,32 @@ public class StartReviewActionHandler implements BlockActionHandler {
 
     private void markStarted(String key) {
         startedReviewMarks.put(key, Instant.now(clock));
+    }
+
+    private void cancelActiveReservation(ReviewScheduleMetaDto meta, String reviewerSlackUserId) {
+        Long projectId = parseProjectId(meta.projectId());
+
+        if (projectId == null) {
+            return;
+        }
+
+        reviewReservationCoordinator.findActiveByPullRequest(
+                meta.teamId(),
+                projectId,
+                reviewerSlackUserId,
+                meta.pullRequestId()
+        ).ifPresent(reservation -> reviewReservationCoordinator.cancel(reservation.getId()));
+    }
+
+    private Long parseProjectId(String rawProjectId) {
+        if (rawProjectId == null || rawProjectId.isBlank()) {
+            return null;
+        }
+
+        try {
+            return Long.parseLong(rawProjectId);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

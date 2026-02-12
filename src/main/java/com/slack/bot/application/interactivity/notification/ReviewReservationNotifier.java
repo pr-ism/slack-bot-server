@@ -155,6 +155,7 @@ public class ReviewReservationNotifier {
         String text = messageFormatter.buildStartNowText(authorSlackId, reviewerId, meta);
 
         notificationDispatcher.sendDirectMessageBySettingOrDefault(meta.teamId(), token, authorSlackId, text);
+        notificationDispatcher.sendDirectMessageBySettingOrDefault(meta.teamId(), token, reviewerId, text);
     }
 
     public void notifyScheduled(

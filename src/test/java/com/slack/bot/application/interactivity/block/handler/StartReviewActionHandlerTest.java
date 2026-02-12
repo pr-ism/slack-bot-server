@@ -17,6 +17,9 @@ import com.slack.bot.application.interactivity.block.BlockActionType;
 import com.slack.bot.application.interactivity.block.dto.BlockActionCommandDto;
 import com.slack.bot.application.interactivity.block.dto.BlockActionOutcomeDto;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
+import com.slack.bot.domain.reservation.ReservationStatus;
+import com.slack.bot.domain.reservation.repository.ReviewReservationRepository;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -37,6 +40,9 @@ class StartReviewActionHandlerTest {
     @Autowired
     NotificationApiClient notificationApiClient;
 
+    @Autowired
+    ReviewReservationRepository reviewReservationRepository;
+
     @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
@@ -46,6 +52,7 @@ class StartReviewActionHandlerTest {
     void 리뷰_바로_시작_액션이면_리뷰이_DM_설정이_켜져있을때_즉시_DM을_보낸다() {
         // given
         given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U1")).willReturn("D_AUTHOR");
+        given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U2")).willReturn("D_REVIEWER");
         BlockActionCommandDto command = commandWithMeta(metaJson(), "U2");
 
         // when
@@ -66,7 +73,12 @@ class StartReviewActionHandlerTest {
                         eq("D_AUTHOR"),
                         argThat(message -> message.contains("<@U1>") && message.contains("<@U2>"))
                 ),
-                () -> verify(notificationApiClient, never()).openDirectMessageChannel("xoxb-test-token", "U2")
+                () -> verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U2"),
+                () -> verify(notificationApiClient).sendMessage(
+                        eq("xoxb-test-token"),
+                        eq("D_REVIEWER"),
+                        argThat(message -> message.contains("<@U1>") && message.contains("<@U2>"))
+                )
         );
     }
 
@@ -210,6 +222,54 @@ class StartReviewActionHandlerTest {
         );
     }
 
+    @Test
+    @Sql(scripts = {
+            "classpath:sql/fixtures/notification/workspace_t1.sql",
+            "classpath:sql/fixtures/notification/project_member_t1.sql",
+            "classpath:sql/fixtures/notification/notification_settings_t1_u1_dm_enabled.sql"
+    })
+    void 리뷰어_DM_설정이_켜져있으면_리뷰어에게도_지금_시작_알림_DM을_보낸다() {
+        // given
+        given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U2")).willReturn("D_REVIEWEE");
+        given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U1")).willReturn("D_REVIEWER");
+        BlockActionCommandDto command = commandWithMeta(metaJsonWithAuthorAndPullRequest("U2", 11L, 11), "U1");
+
+        // when
+        BlockActionOutcomeDto actual = startReviewActionHandler.handle(command);
+
+        // then
+        assertAll(
+                () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
+                () -> verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U2"),
+                () -> verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1"),
+                () -> verify(notificationApiClient, times(2)).sendMessage(
+                        eq("xoxb-test-token"),
+                        any(),
+                        argThat(message -> message.contains("<@U2>") && message.contains("<@U1>"))
+                )
+        );
+    }
+
+    @Test
+    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    void 리뷰_바로_시작을_누르면_해당_활성_예약을_즉시_종료한다() {
+        // given
+        given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U_AUTHOR")).willReturn("D_AUTHOR");
+        BlockActionCommandDto command = commandWithMeta(metaJsonWithAuthor("U_AUTHOR"), "U1");
+
+        // when
+        BlockActionOutcomeDto actual = startReviewActionHandler.handle(command);
+
+        // then
+        Optional<com.slack.bot.domain.reservation.ReviewReservation> reservation = reviewReservationRepository.findById(100L);
+
+        assertAll(
+                () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
+                () -> assertThat(reservation).isPresent(),
+                () -> assertThat(reservation.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED)
+        );
+    }
+
     private BlockActionCommandDto commandWithMeta(String metaJson, String reviewerSlackId) {
         JsonNode action = objectMapper.createObjectNode().put("value", metaJson);
 
@@ -230,13 +290,17 @@ class StartReviewActionHandlerTest {
     }
 
     private String metaJsonWithAuthor(String authorSlackId) {
+        return metaJsonWithAuthorAndPullRequest(authorSlackId, 10L, 10);
+    }
+
+    private String metaJsonWithAuthorAndPullRequest(String authorSlackId, Long pullRequestId, int pullRequestNumber) {
         return objectMapper.createObjectNode()
                 .put("team_id", "T1")
                 .put("channel_id", "C1")
-                .put("pull_request_id", 10L)
-                .put("pull_request_number", 10)
-                .put("pull_request_title", "PR 제목")
-                .put("pull_request_url", "https://github.com/org/repo/pull/10")
+                .put("pull_request_id", pullRequestId)
+                .put("pull_request_number", pullRequestNumber)
+                .put("pull_request_title", "PR 제목 " + pullRequestNumber)
+                .put("pull_request_url", "https://github.com/org/repo/pull/" + pullRequestNumber)
                 .put("project_id", "123")
                 .put("author_github_id", "author-gh")
                 .put("author_slack_id", authorSlackId)
