@@ -26,13 +26,12 @@ class BlockActionInteractionService {
         BlockActionOutcomeDto outcome = resultContext.outcome();
 
         if (outcome.hasDuplicateReservation()) {
-            reservationNotifier.sendReservationBlockToDmAndEphemeral(
+            reservationNotifier.sendDuplicateReservationNoticeToDmAndEphemeral(
                     context.botToken(),
                     context.teamId(),
                     context.channelId(),
                     context.slackUserId(),
-                    outcome.duplicateReservation(),
-                    "이미 이 PR 리뷰를 예약했습니다."
+                    outcome.duplicateReservation()
             );
         }
         if (outcome.hasCancelledReservation()) {

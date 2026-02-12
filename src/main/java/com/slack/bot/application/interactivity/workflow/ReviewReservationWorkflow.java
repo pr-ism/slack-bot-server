@@ -99,13 +99,12 @@ public class ReviewReservationWorkflow {
     }
 
     private void notifyDuplicate(ReservationContextDto context, ReviewReservation reservation) {
-        reservationNotifier.sendReservationBlockToDmAndEphemeral(
+        reservationNotifier.sendDuplicateReservationNoticeToDmAndEphemeral(
                 context.token(),
                 context.meta().teamId(),
                 context.meta().channelId(),
                 context.reviewerId(),
-                reservation,
-                "이미 이 PR 리뷰를 예약했습니다."
+                reservation
         );
     }
 

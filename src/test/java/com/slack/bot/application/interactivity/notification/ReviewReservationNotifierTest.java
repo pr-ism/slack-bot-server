@@ -134,6 +134,98 @@ class ReviewReservationNotifierTest {
     }
 
     @Test
+    void 중복_예약이_아직_시작_전이면_일반_중복_문구로_DM과_에페메랄을_전송한다() {
+        // given
+        String token = "xoxb-token";
+        String teamId = "T1";
+        String channelId = "C1";
+        String slackUserId = "U1";
+        ReviewReservation reservation = createReservation(FIXED_NOW.plusSeconds(3600));
+
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode blocks = mapper.createArrayNode();
+        String fallbackText = "fallback";
+        ReviewReservationMessageDto message = ReviewReservationMessageDto.ofBlocks(blocks, fallbackText);
+
+        given(reservationBlockCreator.create(
+                reservation,
+                "이미 이 PR 리뷰를 예약했습니다.",
+                ReviewReservationBlockType.RESERVATION
+        )).willReturn(message);
+
+        // when
+        reviewReservationNotifier.sendDuplicateReservationNoticeToDmAndEphemeral(
+                token,
+                teamId,
+                channelId,
+                slackUserId,
+                reservation
+        );
+
+        // then
+        assertAll(
+                () -> verify(reservationBlockCreator).create(
+                        reservation,
+                        "이미 이 PR 리뷰를 예약했습니다.",
+                        ReviewReservationBlockType.RESERVATION
+                ),
+                () -> verify(notificationDispatcher).sendBlockToDmAndEphemeral(
+                        token,
+                        channelId,
+                        slackUserId,
+                        blocks,
+                        fallbackText
+                )
+        );
+    }
+
+    @Test
+    void 중복_예약이_이미_시작_시각_이후면_시작됨_문구로_DM과_에페메랄을_전송한다() {
+        // given
+        String token = "xoxb-token";
+        String teamId = "T1";
+        String channelId = "C1";
+        String slackUserId = "U1";
+        ReviewReservation reservation = createReservation(FIXED_NOW.minusSeconds(60));
+
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode blocks = mapper.createArrayNode();
+        String fallbackText = "fallback";
+        ReviewReservationMessageDto message = ReviewReservationMessageDto.ofBlocks(blocks, fallbackText);
+
+        given(reservationBlockCreator.create(
+                reservation,
+                "이미 리뷰 시작 시간이 되어 새로 예약할 수 없습니다.",
+                ReviewReservationBlockType.RESERVATION
+        )).willReturn(message);
+
+        // when
+        reviewReservationNotifier.sendDuplicateReservationNoticeToDmAndEphemeral(
+                token,
+                teamId,
+                channelId,
+                slackUserId,
+                reservation
+        );
+
+        // then
+        assertAll(
+                () -> verify(reservationBlockCreator).create(
+                        reservation,
+                        "이미 리뷰 시작 시간이 되어 새로 예약할 수 없습니다.",
+                        ReviewReservationBlockType.RESERVATION
+                ),
+                () -> verify(notificationDispatcher).sendBlockToDmAndEphemeral(
+                        token,
+                        channelId,
+                        slackUserId,
+                        blocks,
+                        fallbackText
+                )
+        );
+    }
+
+    @Test
     void 리뷰_예약_취소_메시지를_전송한다() {
         // given
         String token = "xoxb-token";
@@ -433,6 +525,10 @@ class ReviewReservationNotifierTest {
     }
 
     private ReviewReservation createReservation() {
+        return createReservation(FIXED_NOW.plusSeconds(3600));
+    }
+
+    private ReviewReservation createReservation(Instant scheduledAt) {
         return ReviewReservation.builder()
                 .teamId("T1")
                 .channelId("C1")
@@ -442,10 +538,10 @@ class ReviewReservationNotifierTest {
                         .pullRequestNumber(1)
                         .pullRequestTitle("Fix bug")
                         .pullRequestUrl("https://github.com/org/repo/pull/1")
-                        .build())
+                .build())
                 .authorSlackId("U-AUTHOR")
                 .reviewerSlackId("U-REVIEWER")
-                .scheduledAt(FIXED_NOW.plusSeconds(3600))
+                .scheduledAt(scheduledAt)
                 .status(ReservationStatus.ACTIVE)
                 .build();
     }

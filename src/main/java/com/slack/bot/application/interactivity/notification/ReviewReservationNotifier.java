@@ -18,6 +18,9 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ReviewReservationNotifier {
 
+    private static final String DUPLICATE_RESERVATION_MESSAGE = "이미 이 PR 리뷰를 예약했습니다.";
+    private static final String ALREADY_STARTED_RESERVATION_MESSAGE = "이미 리뷰 시작 시간이 되어 새로 예약할 수 없습니다.";
+
     private final Clock clock;
     private final NotificationDispatcher notificationDispatcher;
     private final ReviewReservationBlockCreator reservationBlockCreator;
@@ -67,6 +70,23 @@ public class ReviewReservationNotifier {
                 slackUserId,
                 message.blocks(),
                 message.fallbackText()
+        );
+    }
+
+    public void sendDuplicateReservationNoticeToDmAndEphemeral(
+            String token,
+            String teamId,
+            String channelId,
+            String slackUserId,
+            ReviewReservation reservation
+    ) {
+        sendReservationBlockToDmAndEphemeral(
+                token,
+                teamId,
+                channelId,
+                slackUserId,
+                reservation,
+                resolveDuplicateReservationMessage(reservation)
         );
     }
 
@@ -153,5 +173,17 @@ public class ReviewReservationNotifier {
 
         notificationDispatcher.sendDirectMessageIfEnabled(meta.teamId(), token, authorSlackId, text);
         notificationDispatcher.sendDirectMessageIfEnabled(meta.teamId(), token, reviewerId, text);
+    }
+
+    private String resolveDuplicateReservationMessage(ReviewReservation reservation) {
+        if (reservation == null || reservation.getScheduledAt() == null) {
+            return DUPLICATE_RESERVATION_MESSAGE;
+        }
+
+        if (!reservation.getScheduledAt().isAfter(Instant.now(clock))) {
+            return ALREADY_STARTED_RESERVATION_MESSAGE;
+        }
+
+        return DUPLICATE_RESERVATION_MESSAGE;
     }
 }
