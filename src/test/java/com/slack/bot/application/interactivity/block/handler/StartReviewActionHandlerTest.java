@@ -150,6 +150,66 @@ class StartReviewActionHandlerTest {
         );
     }
 
+    @Test
+    @Sql(scripts = {
+            "classpath:sql/fixtures/notification/workspace_t1.sql",
+            "classpath:sql/fixtures/notification/project_member_t1.sql",
+            "classpath:sql/fixtures/notification/notification_settings_t1_u2_dm_disabled.sql"
+    })
+    void 리뷰이가_DM_비활성_설정이면_리뷰_바로_시작시_리뷰이에게_DM을_보내지_않는다() {
+        // given
+        given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U2")).willReturn("D_REVIEWEE");
+        BlockActionCommandDto command = commandWithMeta(metaJsonWithAuthor("U2"), "U8");
+
+        // when
+        BlockActionOutcomeDto actual = startReviewActionHandler.handle(command);
+
+        // then
+        assertAll(
+                () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
+                () -> verify(notificationApiClient, never()).openDirectMessageChannel("xoxb-test-token", "U2"),
+                () -> verify(notificationApiClient, never()).sendMessage(
+                        eq("xoxb-test-token"),
+                        eq("D_REVIEWEE"),
+                        any()
+                ),
+                () -> verify(notificationApiClient).sendEphemeralMessage(
+                        eq("xoxb-test-token"),
+                        eq("C1"),
+                        eq("U8"),
+                        eq("리뷰 시작 알림을 전송했습니다.")
+                )
+        );
+    }
+
+    @Test
+    @Sql("classpath:sql/fixtures/notification/workspace_t1.sql")
+    void 리뷰이_DM_설정이_없으면_기본값으로_리뷰_바로_시작시_리뷰이에게_DM을_보낸다() {
+        // given
+        given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U3")).willReturn("D_REVIEWEE");
+        BlockActionCommandDto command = commandWithMeta(metaJsonWithAuthor("U3"), "U7");
+
+        // when
+        BlockActionOutcomeDto actual = startReviewActionHandler.handle(command);
+
+        // then
+        assertAll(
+                () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
+                () -> verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U3"),
+                () -> verify(notificationApiClient).sendMessage(
+                        eq("xoxb-test-token"),
+                        eq("D_REVIEWEE"),
+                        argThat(message -> message.contains("<@U3>") && message.contains("<@U7>"))
+                ),
+                () -> verify(notificationApiClient).sendEphemeralMessage(
+                        eq("xoxb-test-token"),
+                        eq("C1"),
+                        eq("U7"),
+                        eq("리뷰 시작 알림을 전송했습니다.")
+                )
+        );
+    }
+
     private BlockActionCommandDto commandWithMeta(String metaJson, String reviewerSlackId) {
         JsonNode action = objectMapper.createObjectNode().put("value", metaJson);
 
@@ -166,6 +226,10 @@ class StartReviewActionHandlerTest {
     }
 
     private String metaJson() {
+        return metaJsonWithAuthor("U1");
+    }
+
+    private String metaJsonWithAuthor(String authorSlackId) {
         return objectMapper.createObjectNode()
                 .put("team_id", "T1")
                 .put("channel_id", "C1")
@@ -175,7 +239,7 @@ class StartReviewActionHandlerTest {
                 .put("pull_request_url", "https://github.com/org/repo/pull/10")
                 .put("project_id", "123")
                 .put("author_github_id", "author-gh")
-                .put("author_slack_id", "U1")
+                .put("author_slack_id", authorSlackId)
                 .put("reservation_id", "R1")
                 .toString();
     }
