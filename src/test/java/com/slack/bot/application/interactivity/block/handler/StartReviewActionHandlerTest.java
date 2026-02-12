@@ -88,6 +88,28 @@ class StartReviewActionHandlerTest {
         );
     }
 
+    @Test
+    void 리뷰이가_리뷰_바로_시작을_누르면_예약_불가_알림을_보내고_DM을_보내지_않는다() {
+        // given
+        BlockActionCommandDto command = commandWithMeta(metaJson(), "U1");
+
+        // when
+        BlockActionOutcomeDto actual = startReviewActionHandler.handle(command);
+
+        // then
+        assertAll(
+                () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
+                () -> verify(notificationApiClient).sendEphemeralMessage(
+                        eq("xoxb-test-token"),
+                        eq("C1"),
+                        eq("U1"),
+                        eq("리뷰이는 해당 PR에 대한 리뷰를 할 수 없습니다.")
+                ),
+                () -> verify(notificationApiClient, never()).openDirectMessageChannel(any(), any()),
+                () -> verify(notificationApiClient, never()).sendMessage(any(), any(), any())
+        );
+    }
+
     private BlockActionCommandDto commandWithMeta(String metaJson, String reviewerSlackId) {
         JsonNode action = objectMapper.createObjectNode().put("value", metaJson);
 

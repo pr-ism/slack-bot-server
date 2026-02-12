@@ -5,6 +5,9 @@ import com.slack.bot.application.interactivity.block.dto.BlockActionCommandDto;
 import com.slack.bot.application.interactivity.block.dto.BlockActionOutcomeDto;
 import com.slack.bot.application.interactivity.dto.ReviewScheduleMetaDto;
 import com.slack.bot.application.interactivity.notification.ReviewReservationNotifier;
+import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
+import com.slack.bot.application.interactivity.reply.SlackActionErrorNotifier;
+import com.slack.bot.application.interactivity.reservation.AuthorResolver;
 import com.slack.bot.application.interactivity.reservation.ReservationMetaResolver;
 import com.slack.bot.application.interactivity.reservation.exception.ReservationMetaInvalidException;
 import lombok.RequiredArgsConstructor;
@@ -16,8 +19,10 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class StartReviewActionHandler implements BlockActionHandler {
 
+    private final AuthorResolver authorResolver;
     private final ReservationMetaResolver reservationMetaResolver;
     private final ReviewReservationNotifier reviewReservationNotifier;
+    private final SlackActionErrorNotifier errorNotifier;
 
     @Override
     public BlockActionOutcomeDto handle(BlockActionCommandDto command) {
@@ -30,6 +35,16 @@ public class StartReviewActionHandler implements BlockActionHandler {
         try {
             ReviewScheduleMetaDto meta = reservationMetaResolver.parseMeta(metaJson);
 
+            if (isRevieweeRequester(meta, command.slackUserId())) {
+                errorNotifier.notify(
+                        command.botToken(),
+                        command.channelId(),
+                        command.slackUserId(),
+                        InteractivityErrorType.REVIEWEE_CANNOT_RESERVE
+                );
+                return BlockActionOutcomeDto.empty();
+            }
+
             reviewReservationNotifier.notifyStartNowToReviewee(
                     meta,
                     command.slackUserId(),
@@ -40,5 +55,19 @@ public class StartReviewActionHandler implements BlockActionHandler {
         }
 
         return BlockActionOutcomeDto.empty();
+    }
+
+    private boolean isRevieweeRequester(ReviewScheduleMetaDto meta, String requesterSlackUserId) {
+        if (meta == null || requesterSlackUserId == null || requesterSlackUserId.isBlank()) {
+            return false;
+        }
+
+        String authorSlackId = authorResolver.resolveAuthorSlackId(meta);
+
+        if (authorSlackId == null || authorSlackId.isBlank()) {
+            return false;
+        }
+
+        return requesterSlackUserId.equals(authorSlackId);
     }
 }
