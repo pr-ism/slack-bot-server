@@ -62,6 +62,43 @@ class OptionalNotificationsTest {
     }
 
     @Test
+    void 선택_알림_설정에서_예약_채널_에페메랄_메시지를_비활성화한다() {
+        // given
+        OptionalNotifications optional = OptionalNotifications.defaults();
+
+        // when
+        OptionalNotifications actual = optional.updateReservationChannelEphemeral(false);
+
+        // then
+        assertAll(
+                () -> assertThat(actual.isReservationCanceledConfirmationEnabled()).isTrue(),
+                () -> assertThat(actual.isReservationChannelEphemeralEnabled()).isFalse(),
+                () -> assertThat(actual.isReviewReminderEnabled()).isTrue(),
+                () -> assertThat(actual.isPullRequestMentionEnabled()).isTrue(),
+                () -> assertThat(actual.isReviewCompletedEnabled()).isTrue()
+        );
+    }
+
+    @Test
+    void 선택_알림_설정에서_예약_채널_에페메랄_메시지를_다시_활성화한다() {
+        // given
+        OptionalNotifications optional = OptionalNotifications.defaults()
+                                                              .updateReservationChannelEphemeral(false);
+
+        // when
+        OptionalNotifications actual = optional.updateReservationChannelEphemeral(true);
+
+        // then
+        assertAll(
+                () -> assertThat(actual.isReservationCanceledConfirmationEnabled()).isTrue(),
+                () -> assertThat(actual.isReservationChannelEphemeralEnabled()).isTrue(),
+                () -> assertThat(actual.isReviewReminderEnabled()).isTrue(),
+                () -> assertThat(actual.isPullRequestMentionEnabled()).isTrue(),
+                () -> assertThat(actual.isReviewCompletedEnabled()).isTrue()
+        );
+    }
+
+    @Test
     void 선택_알림_설정에서_리뷰_리마인드_메시지를_비활성화한다() {
         // given
         OptionalNotifications optional = OptionalNotifications.defaults();
