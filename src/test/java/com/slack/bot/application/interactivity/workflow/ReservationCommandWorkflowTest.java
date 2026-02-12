@@ -232,7 +232,10 @@ class ReservationCommandWorkflowTest {
     }
 
     @Test
-    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    @Sql(scripts = {
+            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql",
+            "classpath:sql/fixtures/interactivity/project_member_t1_u_author.sql"
+    })
     void 리뷰_예약_변경_요청은_모달을_열고_변경_이벤트를_발행한다() {
         // given
         JsonNode payload = objectMapper.createObjectNode()

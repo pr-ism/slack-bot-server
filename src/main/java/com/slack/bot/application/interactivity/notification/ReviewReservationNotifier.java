@@ -76,6 +76,26 @@ public class ReviewReservationNotifier {
         );
     }
 
+    public void sendReservationBlockToDirectMessageOnly(
+            String token,
+            String slackUserId,
+            ReviewReservation reservation,
+            String headerText
+    ) {
+        ReviewReservationMessageDto message = reservationBlockCreator.create(
+                reservation,
+                headerText,
+                ReviewReservationBlockType.RESERVATION
+        );
+
+        notificationDispatcher.sendReservationBlockToDirectMessageOnly(
+                token,
+                slackUserId,
+                message.blocks(),
+                message.fallbackText()
+        );
+    }
+
     public void sendDuplicateReservationNoticeToDmAndEphemeral(
             String token,
             String channelId,

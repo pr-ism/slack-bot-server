@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.slack.bot.application.IntegrationTest;
@@ -155,7 +156,9 @@ class ReviewReservationWorkflowTest {
         assertAll(
                 () -> assertThat(actual).isEqualTo(SlackActionResponse.clear()),
                 () -> assertThat(changed).isPresent(),
-                () -> assertThat(changed.get().getScheduledAt()).isEqualTo(scheduledAt)
+                () -> assertThat(changed.get().getScheduledAt()).isEqualTo(scheduledAt),
+                () -> verify(notificationApiClient, never()).sendEphemeralMessage(any(), any(), any(), any()),
+                () -> verify(notificationApiClient, never()).sendEphemeralBlockMessage(any(), any(), any(), any(), any())
         );
     }
 

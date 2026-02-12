@@ -72,10 +72,20 @@ public class ReviewReservationWorkflow {
     private void notifySuccess(ReservationType strategy, ReservationContextDto context, ReviewReservation reservation) {
         notifyTiming(context);
 
-        reservationNotifier.sendReservationBlockToDmAndEphemeral(
+        if (strategy.isNew()) {
+            reservationNotifier.sendReservationBlockToDmAndEphemeral(
+                    context.token(),
+                    context.meta().teamId(),
+                    context.meta().channelId(),
+                    context.reviewerId(),
+                    reservation,
+                    strategy.successMessage()
+            );
+            return;
+        }
+
+        reservationNotifier.sendReservationBlockToDirectMessageOnly(
                 context.token(),
-                context.meta().teamId(),
-                context.meta().channelId(),
                 context.reviewerId(),
                 reservation,
                 strategy.successMessage()

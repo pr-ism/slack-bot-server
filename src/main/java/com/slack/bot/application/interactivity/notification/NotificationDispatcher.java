@@ -75,6 +75,15 @@ public class NotificationDispatcher {
         }
     }
 
+    public void sendReservationBlockToDirectMessageOnly(
+            String token,
+            String userId,
+            Object blocks,
+            String fallback
+    ) {
+        sendBlockToDirectMessageOnly(token, userId, blocks, fallback);
+    }
+
     public void sendBlock(
             String teamId,
             String token,

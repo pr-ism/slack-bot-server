@@ -25,7 +25,7 @@ public class ReservationMetaResolver {
         String pullRequestUrl = textRequired(root, "pull_request_url");
         String projectId = textRequired(root, "project_id");
         String authorGithubId = textRequired(root, "author_github_id");
-        String authorSlackId = textOptional(root, "author_slack_id");
+        String authorSlackId = textRequired(root, "author_slack_id");
         String reservationId = textOptional(root, "reservation_id");
 
         return ReviewScheduleMetaDto.builder()

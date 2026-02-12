@@ -195,9 +195,10 @@ public class ReservationCommandWorkflow {
             String token,
             ReviewReservation reservation
     ) {
-        String metaJson = reviewScheduleMetaBuilder.buildForChange(reservation);
-
-        if (metaJson == null) {
+        final String metaJson;
+        try {
+            metaJson = reviewScheduleMetaBuilder.buildForChange(reservation);
+        } catch (RuntimeException e) {
             errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.RESERVATION_LOAD_FAILURE);
             return;
         }
