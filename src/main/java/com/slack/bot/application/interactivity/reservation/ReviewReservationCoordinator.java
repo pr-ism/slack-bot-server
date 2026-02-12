@@ -76,6 +76,20 @@ public class ReviewReservationCoordinator {
                 });
     }
 
+    public Optional<ReviewReservation> findActive(
+            String teamId,
+            Long projectId,
+            String reviewerSlackId,
+            Long pullRequestId
+    ) {
+        return reviewReservationRepository.findActive(
+                teamId,
+                projectId,
+                reviewerSlackId,
+                pullRequestId
+        );
+    }
+
     private ReviewReservation createInternal(ReservationCommandDto command) {
         ReviewReservation reservation = ReviewReservation.builder()
                                                          .teamId(command.teamId())

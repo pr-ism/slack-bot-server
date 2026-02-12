@@ -112,4 +112,24 @@ public class ReviewReservationNotifier {
         notificationDispatcher.sendDirectMessageIfEnabled(meta.teamId(), token, authorSlackId, text);
         notificationDispatcher.sendDirectMessageIfEnabled(meta.teamId(), token, reviewerId, text);
     }
+
+    public void notifyStartNowToReviewee(ReviewScheduleMetaDto meta, String reviewerId, String token) {
+        if (meta == null) {
+            return;
+        }
+        if (reviewerId == null || reviewerId.isBlank()) {
+            return;
+        }
+
+        String authorSlackId = meta.authorSlackId();
+
+        if (authorSlackId == null || authorSlackId.isBlank()) {
+            return;
+        }
+
+        String text = messageFormatter.buildStartNowText(authorSlackId, reviewerId, meta);
+
+        notificationDispatcher.sendDirectMessageBySettingOrDefault(meta.teamId(), token, authorSlackId, text);
+        notificationDispatcher.sendDirectMessageBySettingOrDefault(meta.teamId(), token, reviewerId, text);
+    }
 }

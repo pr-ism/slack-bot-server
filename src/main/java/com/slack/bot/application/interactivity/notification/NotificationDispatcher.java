@@ -71,6 +71,23 @@ public class NotificationDispatcher {
                );
     }
 
+    public void sendDirectMessageBySettingOrDefault(
+            String teamId,
+            String token,
+            String userId,
+            String text
+    ) {
+        notificationSettingsRepository.findBySlackUser(teamId, userId)
+                                      .ifPresentOrElse(
+                                              settings -> {
+                                                  if (settings.isDirectMessageEnabled()) {
+                                                      sendDmText(token, userId, text);
+                                                  }
+                                              },
+                                              () -> sendDmText(token, userId, text)
+                                      );
+    }
+
     private void sendDmText(String token, String userId, String text) {
         String dmChannelId = notificationApiClient.openDirectMessageChannel(token, userId);
 

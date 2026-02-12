@@ -74,6 +74,28 @@ public class ReviewReservationRepositoryAdapter implements ReviewReservationRepo
 
     @Override
     @Transactional(readOnly = true)
+    public Optional<ReviewReservation> findActive(
+            String teamId,
+            Long projectId,
+            String reviewerSlackId,
+            Long pullRequestId
+    ) {
+        ReviewReservation result = queryFactory
+                .selectFrom(reviewReservation)
+                .where(
+                        reviewReservation.teamId.eq(teamId),
+                        reviewReservation.projectId.eq(projectId),
+                        reviewReservation.reviewerSlackId.eq(reviewerSlackId),
+                        reviewReservation.reservationPullRequest.pullRequestId.eq(pullRequestId),
+                        reviewReservation.status.eq(ReservationStatus.ACTIVE)
+                )
+                .fetchOne();
+
+        return Optional.ofNullable(result);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public boolean existsActive(String teamId, Long projectId, String reviewerSlackId) {
         Integer result = queryFactory
                 .selectOne()
