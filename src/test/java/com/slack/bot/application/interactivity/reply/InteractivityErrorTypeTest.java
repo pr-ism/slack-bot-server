@@ -21,6 +21,7 @@ class InteractivityErrorTypeTest {
                 Arguments.of(InteractivityErrorType.RESERVATION_NOT_FOUND, "예약 정보를 찾을 수 없습니다. 새로 예약해 주세요."),
                 Arguments.of(InteractivityErrorType.RESERVATION_ALREADY_CANCELLED, "이미 취소된 예약입니다."),
                 Arguments.of(InteractivityErrorType.RESERVATION_CHANGE_NOT_ALLOWED_CANCELLED, "이미 취소한 예약이므로 리뷰 예약 시간을 변경할 수 없습니다."),
+                Arguments.of(InteractivityErrorType.RESERVATION_ALREADY_STARTED, "이미 리뷰가 시작되어 예약을 취소하거나 변경할 수 없습니다."),
                 Arguments.of(InteractivityErrorType.NOT_OWNER_CANCEL, "본인의 예약만 취소할 수 있습니다."),
                 Arguments.of(InteractivityErrorType.NOT_OWNER_CHANGE, "본인의 예약만 변경할 수 있습니다."),
                 Arguments.of(InteractivityErrorType.RESERVATION_FAILURE, "리뷰 예약을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.")

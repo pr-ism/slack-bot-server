@@ -90,6 +90,50 @@ class ReviewReservationNotifierTest {
     }
 
     @Test
+    void 리뷰_예약_블록을_DM과_에페메랄로_동시에_전송한다() {
+        // given
+        String token = "xoxb-token";
+        String teamId = "T1";
+        String channelId = "C1";
+        String slackUserId = "U1";
+        String headerText = "이미 이 PR 리뷰를 예약했습니다.";
+        ReviewReservation reservation = createReservation();
+
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode blocks = mapper.createArrayNode();
+        String fallbackText = "이미 예약된 리뷰입니다";
+        ReviewReservationMessageDto message = ReviewReservationMessageDto.ofBlocks(blocks, fallbackText);
+
+        given(reservationBlockCreator.create(
+                reservation,
+                headerText,
+                ReviewReservationBlockType.RESERVATION
+        )).willReturn(message);
+
+        // when
+        reviewReservationNotifier.sendReservationBlockToDmAndEphemeral(
+                token,
+                teamId,
+                channelId,
+                slackUserId,
+                reservation,
+                headerText
+        );
+
+        // then
+        assertAll(
+                () -> verify(reservationBlockCreator).create(reservation, headerText, ReviewReservationBlockType.RESERVATION),
+                () -> verify(notificationDispatcher).sendBlockToDmAndEphemeral(
+                        token,
+                        channelId,
+                        slackUserId,
+                        blocks,
+                        fallbackText
+                )
+        );
+    }
+
+    @Test
     void 리뷰_예약_취소_메시지를_전송한다() {
         // given
         String token = "xoxb-token";

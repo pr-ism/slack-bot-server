@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.doThrow;
 
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.domain.setting.DeliverySpace;
@@ -190,6 +191,48 @@ class NotificationDispatcherTest {
 
         // then
         verify(notificationApiClient).sendEphemeralBlockMessage(token, channelId, userId, blocks, fallback);
+    }
+
+    @Test
+    void DM과_에페메랄_블록_메시지를_동시에_전송한다() {
+        // given
+        String token = "xoxb-test-token";
+        String channelId = "C1";
+        String userId = "U1";
+        List<String> blocks = List.of("block1", "block2");
+        String fallback = "fallback text";
+
+        given(notificationApiClient.openDirectMessageChannel(token, userId))
+                .willReturn("DM-CHANNEL-ID");
+
+        // when
+        notificationDispatcher.sendBlockToDmAndEphemeral(token, channelId, userId, blocks, fallback);
+
+        // then
+        verify(notificationApiClient).sendEphemeralBlockMessage(token, channelId, userId, blocks, fallback);
+        verify(notificationApiClient).openDirectMessageChannel(token, userId);
+        verify(notificationApiClient).sendBlockMessage(token, "DM-CHANNEL-ID", blocks, fallback);
+    }
+
+    @Test
+    void DM_전송이_실패해도_에페메랄_블록_메시지는_전송한다() {
+        // given
+        String token = "xoxb-test-token";
+        String channelId = "C1";
+        String userId = "U1";
+        List<String> blocks = List.of("block1", "block2");
+        String fallback = "fallback text";
+
+        doThrow(new RuntimeException("dm-fail"))
+                .when(notificationApiClient).openDirectMessageChannel(token, userId);
+
+        // when
+        notificationDispatcher.sendBlockToDmAndEphemeral(token, channelId, userId, blocks, fallback);
+
+        // then
+        verify(notificationApiClient).sendEphemeralBlockMessage(token, channelId, userId, blocks, fallback);
+        verify(notificationApiClient).openDirectMessageChannel(token, userId);
+        verify(notificationApiClient, never()).sendBlockMessage(anyString(), anyString(), any(), anyString());
     }
 
     @Test

@@ -99,7 +99,7 @@ public class ReviewReservationWorkflow {
     }
 
     private void notifyDuplicate(ReservationContextDto context, ReviewReservation reservation) {
-        reservationNotifier.sendReservationBlock(
+        reservationNotifier.sendReservationBlockToDmAndEphemeral(
                 context.token(),
                 context.meta().teamId(),
                 context.meta().channelId(),

@@ -68,7 +68,7 @@ class ReviewReminderDispatcherTest {
         Clock clock = Clock.fixed(FIXED_NOW, ZoneOffset.UTC);
         ReviewReminderMessageProperties messageProperties = new ReviewReminderMessageProperties(
                 "리뷰어 %s %s",
-                "PR: %s (%s)"
+                "PR: %s"
         );
 
         dispatcher = new ReviewReminderDispatcher(
@@ -155,7 +155,7 @@ class ReviewReminderDispatcherTest {
 
         // then
         String expectedAuthorMessage = "리뷰어 <@U-REVIEWER> <https://github.com/org/repo/pull/1|Great PR>";
-        String expectedReviewerMessage = "PR: Great PR (https://github.com/org/repo/pull/1)";
+        String expectedReviewerMessage = "PR: <https://github.com/org/repo/pull/1|Great PR>";
 
         ArgumentCaptor<ReviewReminder> savedReminderCaptor = ArgumentCaptor.forClass(ReviewReminder.class);
         assertAll(
@@ -191,7 +191,7 @@ class ReviewReminderDispatcherTest {
                 () -> verify(reviewReminderSlackDirectMessageClient).send(
                         TOKEN,
                         REVIEWER_ID,
-                        "PR: Great PR (https://github.com/org/repo/pull/1)"
+                        "PR: <https://github.com/org/repo/pull/1|Great PR>"
                 )
         );
     }
@@ -375,7 +375,7 @@ class ReviewReminderDispatcherTest {
         dispatcher.send(reminder);
 
         // then
-        verify(reviewReminderSlackDirectMessageClient).send(TOKEN, REVIEWER_ID, "PR:  (https://github.com/org/repo/pull/1)");
+        verify(reviewReminderSlackDirectMessageClient).send(TOKEN, REVIEWER_ID, "PR: https://github.com/org/repo/pull/1");
     }
 
     @Test

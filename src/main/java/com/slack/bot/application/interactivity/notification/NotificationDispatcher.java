@@ -3,8 +3,10 @@ package com.slack.bot.application.interactivity.notification;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.domain.setting.repository.NotificationSettingsRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class NotificationDispatcher {
@@ -18,6 +20,22 @@ public class NotificationDispatcher {
 
     public void sendEphemeralBlocks(String token, String channelId, String userId, Object blocks, String fallback) {
         notificationApiClient.sendEphemeralBlockMessage(token, channelId, userId, blocks, fallback);
+    }
+
+    public void sendBlockToDmAndEphemeral(
+            String token,
+            String channelId,
+            String userId,
+            Object blocks,
+            String fallback
+    ) {
+        sendEphemeralBlocks(token, channelId, userId, blocks, fallback);
+
+        try {
+            sendDirectMessageBlocks(token, userId, blocks, fallback);
+        } catch (RuntimeException e) {
+            log.warn("DM 블록 메시지 전송 실패. userId={}", userId, e);
+        }
     }
 
     public void sendBlock(

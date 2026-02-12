@@ -11,6 +11,8 @@ import com.slack.bot.application.interactivity.reservation.ReviewReservationCoor
 import com.slack.bot.application.interactivity.reservation.ReviewScheduleMetaBuilder;
 import com.slack.bot.application.interactivity.view.factory.ReviewReservationTimeViewFactory;
 import com.slack.bot.domain.reservation.ReviewReservation;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -23,6 +25,7 @@ public class ReservationCommandWorkflow {
     private final SlackActionErrorNotifier errorNotifier;
     private final ReviewReservationTimeViewFactory slackViews;
     private final ReviewScheduleMetaBuilder reviewScheduleMetaBuilder;
+    private final Clock clock;
     private final ReviewReservationCoordinator reviewReservationCoordinator;
     private final ReviewInteractionEventPublisher reviewInteractionEventPublisher;
 
@@ -147,6 +150,10 @@ public class ReservationCommandWorkflow {
             errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.RESERVATION_ALREADY_CANCELLED);
             return false;
         }
+        if (isReviewAlreadyStarted(reservation)) {
+            errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.RESERVATION_ALREADY_STARTED);
+            return false;
+        }
 
         return isOwnerOrNotify(reservation, token, channelId, slackUserId, InteractivityErrorType.NOT_OWNER_CANCEL);
     }
@@ -169,8 +176,16 @@ public class ReservationCommandWorkflow {
             );
             return false;
         }
+        if (isReviewAlreadyStarted(reservation)) {
+            errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.RESERVATION_ALREADY_STARTED);
+            return false;
+        }
 
         return isOwnerOrNotify(reservation, token, channelId, slackUserId, InteractivityErrorType.NOT_OWNER_CHANGE);
+    }
+
+    private boolean isReviewAlreadyStarted(ReviewReservation reservation) {
+        return !reservation.getScheduledAt().isAfter(Instant.now(clock));
     }
 
     private void openChangeModal(

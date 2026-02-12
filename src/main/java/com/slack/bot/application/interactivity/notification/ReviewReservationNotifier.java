@@ -47,6 +47,29 @@ public class ReviewReservationNotifier {
         );
     }
 
+    public void sendReservationBlockToDmAndEphemeral(
+            String token,
+            String teamId,
+            String channelId,
+            String slackUserId,
+            ReviewReservation reservation,
+            String headerText
+    ) {
+        ReviewReservationMessageDto message = reservationBlockCreator.create(
+                reservation,
+                headerText,
+                ReviewReservationBlockType.RESERVATION
+        );
+
+        notificationDispatcher.sendBlockToDmAndEphemeral(
+                token,
+                channelId,
+                slackUserId,
+                message.blocks(),
+                message.fallbackText()
+        );
+    }
+
     public void sendCancellationMessage(
             String token,
             String channelId,

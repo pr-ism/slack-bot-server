@@ -77,17 +77,17 @@ class BlockActionDispatcherTest {
         assertAll(
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
                 () -> assertThat(mapped).isPresent(),
-                () -> assertThat(mapped.get().getGithubId().getValue()).isEqualTo("new-github-id"),
+                () -> assertThat(mapped.get().getGithubId().getValue()).isEqualTo("user1-gh"),
                 () -> verify(notificationApiClient).sendEphemeralMessage(
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U1"),
-                        argThat(message -> message.contains("new-github-id"))
+                        argThat(message -> message.contains("이미 GitHub ID가 등록") && message.contains("user1-gh"))
                 ),
                 () -> verify(notificationApiClient).sendMessage(
                         eq("xoxb-test-token"),
                         eq("D1"),
-                        argThat(message -> message.contains("new-github-id"))
+                        argThat(message -> message.contains("이미 GitHub ID가 등록") && message.contains("user1-gh"))
                 )
         );
     }

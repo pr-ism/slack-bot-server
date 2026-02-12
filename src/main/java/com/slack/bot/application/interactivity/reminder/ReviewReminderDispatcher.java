@@ -118,8 +118,7 @@ public class ReviewReminderDispatcher {
     private String buildReviewerMessage(ReviewReminder reviewReminder) {
         return messageProperties.reviewer()
                                 .formatted(
-                                        reviewReminder.getPullRequest().getPullRequestTitle(),
-                                        reviewReminder.getPullRequest().getPullRequestUrl()
+                                        formatPullRequestLink(reviewReminder)
                                 );
     }
 

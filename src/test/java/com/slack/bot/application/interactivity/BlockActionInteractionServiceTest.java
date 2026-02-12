@@ -63,6 +63,13 @@ class BlockActionInteractionServiceTest {
                         any(),
                         any()
                 ),
+                () -> verify(notificationApiClient).sendEphemeralBlockMessage(
+                        eq("xoxb-test-token"),
+                        eq("C1"),
+                        eq("U1"),
+                        any(),
+                        any()
+                ),
                 () -> assertThat(reviewReservationRepository.findById(100L))
                         .isPresent()
                         .get()

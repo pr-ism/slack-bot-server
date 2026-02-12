@@ -26,7 +26,7 @@ class BlockActionInteractionService {
         BlockActionOutcomeDto outcome = resultContext.outcome();
 
         if (outcome.hasDuplicateReservation()) {
-            reservationNotifier.sendReservationBlock(
+            reservationNotifier.sendReservationBlockToDmAndEphemeral(
                     context.botToken(),
                     context.teamId(),
                     context.channelId(),
