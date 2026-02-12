@@ -2,6 +2,7 @@ package com.slack.bot.infrastructure.interactivity.block;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import com.slack.api.model.block.Blocks;
 import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.block.composition.BlockCompositions;
@@ -22,6 +23,8 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class SlackSdkReviewReservationBlockCreator implements ReviewReservationBlockCreator {
+
+    private static final Gson SNAKE_CASE_GSON = GsonFactory.createSnakeCase();
 
     private final Clock clock;
     private final ObjectMapper objectMapper;
@@ -133,8 +136,7 @@ public class SlackSdkReviewReservationBlockCreator implements ReviewReservationB
     }
 
     private JsonNode toJsonNode(Object value) {
-        String json = GsonFactory.createSnakeCase()
-                                 .toJson(value);
+        String json = SNAKE_CASE_GSON.toJson(value);
 
         try {
             return objectMapper.readTree(json);

@@ -13,6 +13,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.slack.api.model.view.Views;
 import com.slack.bot.application.interactivity.client.exception.SlackBotMessageDispatchException;
 import java.io.IOException;
@@ -534,6 +535,75 @@ class NotificationApiClientTest {
                 () -> assertDoesNotThrow(() -> notificationApiClient.openModal(token, triggerId, view)),
                 () -> mockServer.verify()
         );
+    }
+
+    @Test
+    void JsonNode_View_객체로_모달을_열때_그대로_전달한다() throws Exception {
+        // given
+        String token = "xoxb-token";
+        String triggerId = "TRIGGER_ID";
+        ObjectMapper mapper = new ObjectMapper();
+        Object view = mapper.readTree("""
+                {
+                  "type": "modal",
+                  "callback_id": "review_time_submit"
+                }
+                """);
+
+        String requestBody = """
+                {
+                  "trigger_id": "TRIGGER_ID",
+                  "view": {
+                    "type": "modal",
+                    "callback_id": "review_time_submit"
+                  }
+                }
+                """;
+        String responseBody = """
+                {
+                  "ok": true
+                }
+                """;
+
+        mockServer.expect(requestTo("https://slack.com/api/views.open"))
+                  .andExpect(method(POST))
+                  .andExpect(header("Authorization", "Bearer " + token))
+                  .andExpect(content().json(requestBody, JsonCompareMode.LENIENT))
+                  .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
+
+        // when & then
+        assertAll(
+                () -> assertDoesNotThrow(() -> notificationApiClient.openModal(token, triggerId, view)),
+                () -> mockServer.verify()
+        );
+    }
+
+    @Test
+    void 모달_view_직렬화_실패시_원인_예외를_포함해_던진다() {
+        // given
+        String token = "xoxb-token";
+        String triggerId = "TRIGGER_ID";
+        Object view = Views.view(v -> v
+                .type("modal")
+                .callbackId("review_time_submit")
+        );
+        ObjectMapper failingObjectMapper = new ObjectMapper() {
+            @Override
+            public com.fasterxml.jackson.databind.JsonNode readTree(String content) throws JsonProcessingException {
+                throw new JsonProcessingException("readTree failed") {
+                };
+            }
+        };
+        NotificationApiClient failingClient = new NotificationApiClient(
+                RestClient.builder().baseUrl("https://slack.com/api/").build(),
+                failingObjectMapper
+        );
+
+        // when & then
+        assertThatThrownBy(() -> failingClient.openModal(token, triggerId, view))
+                .isInstanceOf(SlackBotMessageDispatchException.class)
+                .hasMessageContaining("모달 view 직렬화 실패")
+                .hasCauseInstanceOf(JsonProcessingException.class);
     }
 
     @Test

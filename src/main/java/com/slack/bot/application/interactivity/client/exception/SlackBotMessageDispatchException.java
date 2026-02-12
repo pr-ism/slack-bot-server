@@ -5,4 +5,8 @@ public class SlackBotMessageDispatchException extends RuntimeException {
     public SlackBotMessageDispatchException(String message) {
         super(message);
     }
+
+    public SlackBotMessageDispatchException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

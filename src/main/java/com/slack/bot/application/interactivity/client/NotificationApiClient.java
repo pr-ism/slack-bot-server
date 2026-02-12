@@ -2,6 +2,7 @@ package com.slack.bot.application.interactivity.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import com.slack.api.util.json.GsonFactory;
 import com.slack.bot.application.interactivity.client.exception.SlackBotMessageDispatchException;
 import java.io.IOException;
@@ -18,6 +19,7 @@ import org.springframework.web.client.RestClient;
 public class NotificationApiClient {
 
     private static final int ERROR_BODY_MAX_LENGTH = 500;
+    private static final Gson SNAKE_CASE_GSON = GsonFactory.createSnakeCase();
 
     private final RestClient slackClient;
     private final ObjectMapper objectMapper;
@@ -215,13 +217,12 @@ public class NotificationApiClient {
             return view;
         }
 
-        String snakeCaseJson = GsonFactory.createSnakeCase()
-                                          .toJson(view);
+        String snakeCaseJson = SNAKE_CASE_GSON.toJson(view);
 
         try {
             return objectMapper.readTree(snakeCaseJson);
         } catch (IOException e) {
-            throw new SlackBotMessageDispatchException("슬랙 봇 메시지 전송 실패: 모달 view 직렬화 실패");
+            throw new SlackBotMessageDispatchException("슬랙 봇 메시지 전송 실패: 모달 view 직렬화 실패", e);
         }
     }
 }
