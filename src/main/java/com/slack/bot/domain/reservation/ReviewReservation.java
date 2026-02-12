@@ -8,6 +8,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -79,6 +80,10 @@ public class ReviewReservation extends BaseTimeEntity {
         validateScheduledAt(scheduledAt);
 
         this.scheduledAt = scheduledAt;
+    }
+
+    public boolean isNotEqualTo(ReviewReservation other) {
+        return !Objects.equals(getId(), other.getId());
     }
 
     private void validateTeamId(String teamId) {

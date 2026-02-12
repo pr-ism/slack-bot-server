@@ -11,14 +11,10 @@ public interface ReviewReservationRepository {
 
     Optional<ReviewReservation> findActive(String teamId, Long projectId, String reviewerSlackId);
 
-    Optional<ReviewReservation> findActiveForUpdate(String teamId, Long projectId, String reviewerSlackId);
-
     Optional<ReviewReservation> findActive(
             String teamId,
             Long projectId,
             String reviewerSlackId,
             Long pullRequestId
     );
-
-    boolean existsActive(String teamId, Long projectId, String reviewerSlackId);
 }
