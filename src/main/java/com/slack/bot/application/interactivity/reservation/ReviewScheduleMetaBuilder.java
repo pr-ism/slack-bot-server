@@ -47,7 +47,7 @@ public class ReviewScheduleMetaBuilder {
 
         return projectMemberRepository.findBySlackUser(teamId, authorSlackId)
                                       .map(ProjectMember::getGithubId)
-                                      .map(githubId -> githubId == null ? null : githubId.getValue())
+                                      .map(githubId -> githubId.getValue())
                                       .filter(value -> value != null && !value.isBlank())
                                       .orElseThrow(() -> new ReviewScheduleMetaException(
                                               "리뷰 스케줄러 메타데이터 생성 실패: author_github_id를 찾을 수 없습니다.",
