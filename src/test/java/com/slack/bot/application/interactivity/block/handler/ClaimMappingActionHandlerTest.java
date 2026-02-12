@@ -48,7 +48,7 @@ class ClaimMappingActionHandlerTest {
             "classpath:sql/fixtures/notification/project_member_t1.sql",
             "classpath:sql/fixtures/notification/notification_settings_t1_u1_dm_enabled.sql"
     })
-    void 깃허브_ID_클레임_액션이면_멤버_연동을_갱신하고_에페메랄과_DM을_보낸다() {
+    void 이미_매핑된_사용자_DM_활성_상태면_기존_매핑값으로_이미_등록_안내를_에페메랄과_DM으로_보낸다() {
         // given
         given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U1")).willReturn("D1");
         BlockActionCommandDto command = claimCommandWithGithubId("new-github-id", "U1");
@@ -63,18 +63,18 @@ class ClaimMappingActionHandlerTest {
                 () -> assertThat(actual.duplicateReservation()).isNull(),
                 () -> assertThat(actual.cancelledReservation()).isNull(),
                 () -> assertThat(mapped).isPresent(),
-                () -> assertThat(mapped.get().getGithubId().getValue()).isEqualTo("new-github-id"),
+                () -> assertThat(mapped.get().getGithubId().getValue()).isEqualTo("user1-gh"),
                 () -> verify(notificationApiClient).sendEphemeralMessage(
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U1"),
-                        argThat(message -> message.contains("new-github-id"))
+                        argThat(message -> message.contains("이미 GitHub ID가 등록") && message.contains("user1-gh"))
                 ),
                 () -> verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1"),
                 () -> verify(notificationApiClient).sendMessage(
                         eq("xoxb-test-token"),
                         eq("D1"),
-                        argThat(message -> message.contains("new-github-id"))
+                        argThat(message -> message.contains("이미 GitHub ID가 등록") && message.contains("user1-gh"))
                 )
         );
     }
@@ -85,7 +85,7 @@ class ClaimMappingActionHandlerTest {
             "classpath:sql/fixtures/notification/project_member_t1.sql",
             "classpath:sql/fixtures/notification/notification_settings_t1_u2_dm_disabled.sql"
     })
-    void DM_알림이_비활성화된_사용자의_클레임_매핑은_에페메랄만_보내고_DM은_생략한다() {
+    void 이미_매핑된_사용자의_클레임_요청은_기존_매핑값으로_이미_등록_안내를_보낸다() {
         // given
         BlockActionCommandDto command = claimCommandWithGithubId("updated-u2-github", "U2");
 
@@ -98,12 +98,12 @@ class ClaimMappingActionHandlerTest {
         assertAll(
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
                 () -> assertThat(mapped).isPresent(),
-                () -> assertThat(mapped.get().getGithubId().getValue()).isEqualTo("updated-u2-github"),
+                () -> assertThat(mapped.get().getGithubId().getValue()).isEqualTo("user2-gh"),
                 () -> verify(notificationApiClient).sendEphemeralMessage(
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U2"),
-                        argThat(message -> message.contains("updated-u2-github"))
+                        argThat(message -> message.contains("이미 GitHub ID가 등록") && message.contains("user2-gh"))
                 ),
                 () -> verify(notificationApiClient, never()).openDirectMessageChannel(any(), any()),
                 () -> verify(notificationApiClient, never()).sendMessage(any(), any(), any())

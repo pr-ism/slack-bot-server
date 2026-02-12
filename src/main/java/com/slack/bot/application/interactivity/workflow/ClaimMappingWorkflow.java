@@ -19,8 +19,10 @@ public class ClaimMappingWorkflow {
     private final ClaimMappingMessageProperties messages;
 
     public void handle(String teamId, String slackUserId, String githubId, String token, String channelId) {
-        if (isAlreadyConnected(teamId, slackUserId, githubId)) {
-            String alreadyConnectedMessage = ALREADY_CONNECTED_MESSAGE_TEMPLATE.formatted(githubId);
+        String mappedGithubId = findMappedGithubId(teamId, slackUserId);
+
+        if (mappedGithubId != null) {
+            String alreadyConnectedMessage = ALREADY_CONNECTED_MESSAGE_TEMPLATE.formatted(mappedGithubId);
 
             notificationDispatcher.sendEphemeral(token, channelId, slackUserId, alreadyConnectedMessage);
             notificationDispatcher.sendDirectMessageIfEnabled(teamId, token, slackUserId, alreadyConnectedMessage);
@@ -35,10 +37,11 @@ public class ClaimMappingWorkflow {
         notificationDispatcher.sendDirectMessageIfEnabled(teamId, token, slackUserId, successMessage);
     }
 
-    private boolean isAlreadyConnected(String teamId, String slackUserId, String githubId) {
+    private String findMappedGithubId(String teamId, String slackUserId) {
         return projectMemberReader.read(teamId, slackUserId)
                                   .map(projectMember -> projectMember.getGithubId())
-                                  .map(registeredGithubId -> registeredGithubId != null && githubId.equals(registeredGithubId.getValue()))
-                                  .orElse(false);
+                                  .map(registeredGithubId -> registeredGithubId == null ? null : registeredGithubId.getValue())
+                                  .filter(registeredGithubId -> !registeredGithubId.isBlank())
+                                  .orElse(null);
     }
 }
