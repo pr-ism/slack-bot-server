@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -113,6 +114,39 @@ class StartReviewActionHandlerTest {
                 ),
                 () -> verify(notificationApiClient, never()).openDirectMessageChannel(any(), any()),
                 () -> verify(notificationApiClient, never()).sendMessage(any(), any(), any())
+        );
+    }
+
+    @Test
+    @Sql(scripts = {
+            "classpath:sql/fixtures/notification/workspace_t1.sql",
+            "classpath:sql/fixtures/notification/project_member_t1.sql",
+            "classpath:sql/fixtures/notification/notification_settings_t1_u1_dm_enabled.sql"
+    })
+    void 같은_리뷰어가_같은_PR에서_리뷰_바로_시작을_다시_누르면_이미_시작_안내를_보낸다() {
+        // given
+        given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U1")).willReturn("D_AUTHOR");
+        BlockActionCommandDto command = commandWithMeta(metaJson(), "U9");
+
+        // when
+        startReviewActionHandler.handle(command);
+        BlockActionOutcomeDto second = startReviewActionHandler.handle(command);
+
+        // then
+        assertAll(
+                () -> assertThat(second).isEqualTo(BlockActionOutcomeDto.empty()),
+                () -> verify(notificationApiClient, times(1)).openDirectMessageChannel("xoxb-test-token", "U1"),
+                () -> verify(notificationApiClient, times(1)).sendMessage(
+                        eq("xoxb-test-token"),
+                        eq("D_AUTHOR"),
+                        argThat(message -> message.contains("<@U1>") && message.contains("<@U9>"))
+                ),
+                () -> verify(notificationApiClient).sendEphemeralMessage(
+                        eq("xoxb-test-token"),
+                        eq("C1"),
+                        eq("U9"),
+                        eq("이미 해당 PR에 대한 리뷰를 시작했습니다.")
+                )
         );
     }
 
