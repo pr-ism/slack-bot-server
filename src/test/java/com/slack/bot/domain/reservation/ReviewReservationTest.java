@@ -298,6 +298,18 @@ class ReviewReservationTest {
         assertThat(actual).isFalse();
     }
 
+    @Test
+    void 비교_대상이_null이면_isNotEqualTo는_true를_반환한다() {
+        // given
+        ReviewReservation first = createReservation();
+
+        // when
+        boolean actual = first.isNotEqualTo(null);
+
+        // then
+        assertThat(actual).isTrue();
+    }
+
     private ReviewReservation createReservation() {
         return ReviewReservation.builder()
                 .teamId("T1")

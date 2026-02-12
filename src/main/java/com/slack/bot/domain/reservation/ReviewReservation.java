@@ -83,6 +83,10 @@ public class ReviewReservation extends BaseTimeEntity {
     }
 
     public boolean isNotEqualTo(ReviewReservation other) {
+        if (other == null) {
+            return true;
+        }
+
         return !Objects.equals(getId(), other.getId());
     }
 
