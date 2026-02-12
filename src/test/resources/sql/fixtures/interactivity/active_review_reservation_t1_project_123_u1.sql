@@ -29,3 +29,21 @@ INSERT INTO review_reservations (
     '2099-01-01 00:00:00',
     'ACTIVE'
 );
+
+INSERT INTO project_members (
+    id,
+    team_id,
+    slack_user_id,
+    display_name,
+    github_id,
+    created_at,
+    updated_at
+) VALUES (
+    900,
+    'T1',
+    'U_AUTHOR',
+    '작성자',
+    'author-gh',
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+);

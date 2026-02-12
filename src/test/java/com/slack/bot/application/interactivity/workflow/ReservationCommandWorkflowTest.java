@@ -18,6 +18,7 @@ import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
 import com.slack.bot.domain.reservation.ReservationStatus;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.repository.ReviewReservationRepository;
+import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -177,6 +178,68 @@ class ReservationCommandWorkflowTest {
 
     @Test
     @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    void 이미_취소된_예약은_취소할_수_없다는_알림을_보낸다() {
+        // given
+        JsonNode action = actionWithReservationId("100");
+        ReviewReservation reservation = reviewReservationRepository.findById(100L).orElseThrow();
+        reservation.markCancelled();
+        reviewReservationRepository.save(reservation);
+
+        // when
+        Optional<ReviewReservation> actual = reservationCommandWorkflow.handleCancel(
+                action,
+                "T1",
+                "C1",
+                "U1",
+                "xoxb-test-token"
+        );
+
+        // then
+        assertAll(
+                () -> assertThat(actual).isEmpty(),
+                () -> verify(notificationApiClient).sendEphemeralMessage(
+                        eq("xoxb-test-token"),
+                        eq("C1"),
+                        eq("U1"),
+                        eq(InteractivityErrorType.RESERVATION_ALREADY_CANCELLED.message())
+                ),
+                () -> verify(reviewInteractionEventPublisher, never()).publish(any())
+        );
+    }
+
+    @Test
+    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    void 이미_시작된_예약은_취소할_수_없다는_알림을_보낸다() {
+        // given
+        JsonNode action = actionWithReservationId("100");
+        ReviewReservation reservation = reviewReservationRepository.findById(100L).orElseThrow();
+        reservation.reschedule(Instant.parse("2020-01-01T00:00:00Z"));
+        reviewReservationRepository.save(reservation);
+
+        // when
+        Optional<ReviewReservation> actual = reservationCommandWorkflow.handleCancel(
+                action,
+                "T1",
+                "C1",
+                "U1",
+                "xoxb-test-token"
+        );
+
+        // then
+        assertAll(
+                () -> assertThat(actual).isEmpty(),
+                () -> verify(notificationApiClient).sendEphemeralMessage(
+                        eq("xoxb-test-token"),
+                        eq("C1"),
+                        eq("U1"),
+                        eq(InteractivityErrorType.RESERVATION_ALREADY_STARTED.message())
+                ),
+                () -> verify(reviewInteractionEventPublisher, never()).publish(any())
+        );
+    }
+
+    @Test
+    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
     void 리뷰_예약_변경_요청은_모달을_열고_변경_이벤트를_발행한다() {
         // given
         JsonNode payload = objectMapper.createObjectNode()
@@ -233,6 +296,74 @@ class ReservationCommandWorkflowTest {
                         eq("U2"),
                         eq(InteractivityErrorType.NOT_OWNER_CHANGE.message())
                 ),
+                () -> verify(reviewInteractionEventPublisher, never()).publish(any())
+        );
+    }
+
+    @Test
+    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    void 이미_취소된_예약은_변경할_수_없다는_알림을_보낸다() {
+        // given
+        JsonNode payload = objectMapper.createObjectNode()
+                                       .put("trigger_id", "TRIGGER_1");
+        JsonNode action = actionWithReservationId("100");
+        ReviewReservation reservation = reviewReservationRepository.findById(100L).orElseThrow();
+        reservation.markCancelled();
+        reviewReservationRepository.save(reservation);
+
+        // when
+        reservationCommandWorkflow.handleChange(
+                payload,
+                action,
+                "T1",
+                "C1",
+                "U1",
+                "xoxb-test-token"
+        );
+
+        // then
+        assertAll(
+                () -> verify(notificationApiClient).sendEphemeralMessage(
+                        eq("xoxb-test-token"),
+                        eq("C1"),
+                        eq("U1"),
+                        eq(InteractivityErrorType.RESERVATION_CHANGE_NOT_ALLOWED_CANCELLED.message())
+                ),
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
+                () -> verify(reviewInteractionEventPublisher, never()).publish(any())
+        );
+    }
+
+    @Test
+    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    void 이미_시작된_예약은_변경할_수_없다는_알림을_보낸다() {
+        // given
+        JsonNode payload = objectMapper.createObjectNode()
+                                       .put("trigger_id", "TRIGGER_1");
+        JsonNode action = actionWithReservationId("100");
+        ReviewReservation reservation = reviewReservationRepository.findById(100L).orElseThrow();
+        reservation.reschedule(Instant.parse("2020-01-01T00:00:00Z"));
+        reviewReservationRepository.save(reservation);
+
+        // when
+        reservationCommandWorkflow.handleChange(
+                payload,
+                action,
+                "T1",
+                "C1",
+                "U1",
+                "xoxb-test-token"
+        );
+
+        // then
+        assertAll(
+                () -> verify(notificationApiClient).sendEphemeralMessage(
+                        eq("xoxb-test-token"),
+                        eq("C1"),
+                        eq("U1"),
+                        eq(InteractivityErrorType.RESERVATION_ALREADY_STARTED.message())
+                ),
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
                 () -> verify(reviewInteractionEventPublisher, never()).publish(any())
         );
     }
