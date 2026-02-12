@@ -79,7 +79,7 @@ class NotificationDispatcherTest {
         NotificationSettings settings = NotificationSettings.create(
                 2L,
                 reservationConfirmed,
-                OptionalNotifications.defaults()
+                OptionalNotifications.defaults().updateReservationChannelEphemeral(false)
         );
 
         given(notificationSettingsRepository.findBySlackUser("T1", userId))
@@ -233,6 +233,75 @@ class NotificationDispatcherTest {
         verify(notificationApiClient).sendEphemeralBlockMessage(token, channelId, userId, blocks, fallback);
         verify(notificationApiClient).openDirectMessageChannel(token, userId);
         verify(notificationApiClient, never()).sendBlockMessage(anyString(), anyString(), any(), anyString());
+    }
+
+    @Test
+    void 예약_알림은_설정이_없으면_DM과_에페메랄을_모두_전송한다() {
+        // given
+        String token = "xoxb-test-token";
+        String teamId = "T1";
+        String channelId = "C1";
+        String userId = "U1";
+        List<String> blocks = List.of("block1", "block2");
+        String fallback = "fallback text";
+
+        given(notificationSettingsRepository.findBySlackUser(teamId, userId))
+                .willReturn(Optional.empty());
+        given(notificationApiClient.openDirectMessageChannel(token, userId))
+                .willReturn("DM-CHANNEL-ID");
+
+        // when
+        notificationDispatcher.sendReservationBlockBySettingOrDefault(
+                token,
+                teamId,
+                channelId,
+                userId,
+                blocks,
+                fallback
+        );
+
+        // then
+        verify(notificationApiClient).sendEphemeralBlockMessage(token, channelId, userId, blocks, fallback);
+        verify(notificationApiClient).openDirectMessageChannel(token, userId);
+        verify(notificationApiClient).sendBlockMessage(token, "DM-CHANNEL-ID", blocks, fallback);
+    }
+
+    @Test
+    void 예약_알림은_채널_에페메랄이_비활성이면_DM만_전송한다() {
+        // given
+        String token = "xoxb-test-token";
+        String teamId = "T1";
+        String channelId = "C1";
+        String userId = "U2";
+        List<String> blocks = List.of("block1", "block2");
+        String fallback = "fallback text";
+        ReservationConfirmed reservationConfirmed = ReservationConfirmed.defaults()
+                .changeSpace(DeliverySpace.TRIGGER_CHANNEL);
+        NotificationSettings settings = NotificationSettings.create(
+                2L,
+                reservationConfirmed,
+                OptionalNotifications.defaults().updateReservationChannelEphemeral(false)
+        );
+
+        given(notificationSettingsRepository.findBySlackUser(teamId, userId))
+                .willReturn(Optional.of(settings));
+        given(notificationApiClient.openDirectMessageChannel(token, userId))
+                .willReturn("DM-CHANNEL-ID");
+
+        // when
+        notificationDispatcher.sendReservationBlockBySettingOrDefault(
+                token,
+                teamId,
+                channelId,
+                userId,
+                blocks,
+                fallback
+        );
+
+        // then
+        verify(notificationApiClient, never()).sendEphemeralBlockMessage(anyString(), anyString(), anyString(), any(), anyString());
+        verify(notificationApiClient).openDirectMessageChannel(token, userId);
+        verify(notificationApiClient).sendBlockMessage(token, "DM-CHANNEL-ID", blocks, fallback);
     }
 
     @Test

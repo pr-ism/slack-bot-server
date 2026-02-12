@@ -25,6 +25,7 @@ class NotificationSettingsTest {
                 () -> assertThat(actual.getProjectMemberId()).isEqualTo(1L),
                 () -> assertThat(actual.getReservationConfirmed().getDeliverySpace()).isEqualTo(DeliverySpace.DIRECT_MESSAGE),
                 () -> assertThat(actual.getOptionalNotifications().isReservationCanceledConfirmationEnabled()).isTrue(),
+                () -> assertThat(actual.getOptionalNotifications().isReservationChannelEphemeralEnabled()).isTrue(),
                 () -> assertThat(actual.getOptionalNotifications().isReviewReminderEnabled()).isTrue(),
                 () -> assertThat(actual.getOptionalNotifications().isPullRequestMentionEnabled()).isTrue(),
                 () -> assertThat(actual.getOptionalNotifications().isReviewCompletedEnabled()).isTrue()
@@ -114,6 +115,32 @@ class NotificationSettingsTest {
 
         // then
         assertThat(settings.getOptionalNotifications().isReservationCanceledConfirmationEnabled()).isTrue();
+    }
+
+    @Test
+    void 알림_설정에서_리뷰_예약_채널_에페메랄_안내를_비활성화한다() {
+        // given
+        NotificationSettings settings = NotificationSettings.defaults(1L);
+
+        // when
+        settings.updateReservationChannelEphemeral(false);
+
+        // then
+        assertThat(settings.getOptionalNotifications().isReservationChannelEphemeralEnabled()).isFalse();
+    }
+
+    @Test
+    void 알림_설정에서_리뷰_예약_채널_에페메랄_안내를_다시_활성화한다() {
+        // given
+        NotificationSettings settings = NotificationSettings.defaults(1L);
+
+        settings.updateReservationChannelEphemeral(false);
+
+        // when
+        settings.updateReservationChannelEphemeral(true);
+
+        // then
+        assertThat(settings.getOptionalNotifications().isReservationChannelEphemeralEnabled()).isTrue();
     }
 
     @Test
@@ -218,5 +245,17 @@ class NotificationSettingsTest {
 
         // then
         assertThat(actual).isFalse();
+    }
+
+    @Test
+    void 리뷰_예약_채널_에페메랄_설정_기본값은_활성화다() {
+        // given
+        NotificationSettings settings = NotificationSettings.defaults(1L);
+
+        // when
+        boolean actual = settings.isReservationChannelEphemeralEnabled();
+
+        // then
+        assertThat(actual).isTrue();
     }
 }

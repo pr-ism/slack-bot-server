@@ -64,8 +64,9 @@ public class ReviewReservationNotifier {
                 ReviewReservationBlockType.RESERVATION
         );
 
-        notificationDispatcher.sendBlockToDmAndEphemeral(
+        notificationDispatcher.sendReservationBlockBySettingOrDefault(
                 token,
+                teamId,
                 channelId,
                 slackUserId,
                 message.blocks(),

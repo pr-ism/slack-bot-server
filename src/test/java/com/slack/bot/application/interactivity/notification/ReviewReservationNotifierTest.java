@@ -123,8 +123,9 @@ class ReviewReservationNotifierTest {
         // then
         assertAll(
                 () -> verify(reservationBlockCreator).create(reservation, headerText, ReviewReservationBlockType.RESERVATION),
-                () -> verify(notificationDispatcher).sendBlockToDmAndEphemeral(
+                () -> verify(notificationDispatcher).sendReservationBlockBySettingOrDefault(
                         token,
+                        teamId,
                         channelId,
                         slackUserId,
                         blocks,

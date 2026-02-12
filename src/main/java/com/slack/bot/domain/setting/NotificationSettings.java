@@ -87,6 +87,10 @@ public class NotificationSettings extends BaseEntity {
         this.optionalNotifications = optionalNotifications.updateReservationCanceledConfirmation(enabled);
     }
 
+    public void updateReservationChannelEphemeral(boolean enabled) {
+        this.optionalNotifications = optionalNotifications.updateReservationChannelEphemeral(enabled);
+    }
+
     public void updateReviewReminder(boolean enabled) {
         this.optionalNotifications = optionalNotifications.updateReviewReminder(enabled);
     }
@@ -101,5 +105,9 @@ public class NotificationSettings extends BaseEntity {
 
     public boolean isDirectMessageEnabled() {
         return this.reservationConfirmed.isDirectMessageEnabled();
+    }
+
+    public boolean isReservationChannelEphemeralEnabled() {
+        return this.optionalNotifications.isReservationChannelEphemeralEnabled();
     }
 }

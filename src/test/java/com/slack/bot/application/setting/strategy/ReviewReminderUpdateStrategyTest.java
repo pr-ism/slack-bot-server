@@ -20,6 +20,7 @@ class ReviewReminderUpdateStrategyTest {
         UpdateNotificationSettingsRequest request = new UpdateNotificationSettingsRequest(
                 DeliverySpace.DIRECT_MESSAGE,
                 true,
+                true,
                 false,
                 true,
                 true

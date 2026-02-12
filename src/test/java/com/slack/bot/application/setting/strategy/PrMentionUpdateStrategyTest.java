@@ -21,6 +21,7 @@ class PrMentionUpdateStrategyTest {
                 DeliverySpace.DIRECT_MESSAGE,
                 true,
                 true,
+                true,
                 false,
                 true
         );

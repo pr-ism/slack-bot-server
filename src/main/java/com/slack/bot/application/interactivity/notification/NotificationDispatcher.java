@@ -38,6 +38,29 @@ public class NotificationDispatcher {
         }
     }
 
+    public void sendReservationBlockBySettingOrDefault(
+            String token,
+            String teamId,
+            String channelId,
+            String userId,
+            Object blocks,
+            String fallback
+    ) {
+        boolean sendChannelEphemeral = notificationSettingsRepository.findBySlackUser(teamId, userId)
+                .map(settings -> settings.isReservationChannelEphemeralEnabled())
+                .orElse(true);
+
+        if (sendChannelEphemeral) {
+            sendEphemeralBlocks(token, channelId, userId, blocks, fallback);
+        }
+
+        try {
+            sendDirectMessageBlocks(token, userId, blocks, fallback);
+        } catch (RuntimeException e) {
+            log.warn("DM 블록 메시지 전송 실패. userId={}", userId, e);
+        }
+    }
+
     public void sendBlockToDirectMessageOnly(
             String token,
             String userId,

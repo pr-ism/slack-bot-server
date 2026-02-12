@@ -41,6 +41,7 @@ class NotificationSettingsControllerTest extends CommonControllerSliceTestSuppor
                 true,
                 true,
                 true,
+                true,
                 true
         );
 
@@ -56,6 +57,7 @@ class NotificationSettingsControllerTest extends CommonControllerSliceTestSuppor
                                              .andExpect(jsonPath("$.projectMemberId").value(projectMemberId))
                                              .andExpect(jsonPath("$.reservationConfirmedSpace").value("DIRECT_MESSAGE"))
                                              .andExpect(jsonPath("$.reservationCanceledConfirmationEnabled").value(true))
+                                             .andExpect(jsonPath("$.reservationChannelEphemeralEnabled").value(true))
                                              .andExpect(jsonPath("$.reviewReminderEnabled").value(true))
                                              .andExpect(jsonPath("$.prMentionEnabled").value(true))
                                              .andExpect(jsonPath("$.reviewCompletedEnabled").value(true));
@@ -73,6 +75,7 @@ class NotificationSettingsControllerTest extends CommonControllerSliceTestSuppor
                                 fieldWithPath("projectMemberId").type(JsonFieldType.NUMBER).description("프로젝트 멤버 ID"),
                                 fieldWithPath("reservationConfirmedSpace").type(JsonFieldType.STRING).description("리뷰 예약 완료 알림 전달 공간"),
                                 fieldWithPath("reservationCanceledConfirmationEnabled").type(JsonFieldType.BOOLEAN).description("리뷰 예약 취소 확인 알림 활성화 여부"),
+                                fieldWithPath("reservationChannelEphemeralEnabled").type(JsonFieldType.BOOLEAN).description("리뷰 예약 안내 채널 에페메랄 알림 활성화 여부"),
                                 fieldWithPath("reviewReminderEnabled").type(JsonFieldType.BOOLEAN).description("리뷰 리마인드 알림 활성화 여부"),
                                 fieldWithPath("prMentionEnabled").type(JsonFieldType.BOOLEAN).description("PR 멘션 알림 활성화 여부"),
                                 fieldWithPath("reviewCompletedEnabled").type(JsonFieldType.BOOLEAN).description("리뷰 완료 알림 활성화 여부")
@@ -88,6 +91,7 @@ class NotificationSettingsControllerTest extends CommonControllerSliceTestSuppor
         UpdateNotificationSettingsRequest request = new UpdateNotificationSettingsRequest(
                 DeliverySpace.TRIGGER_CHANNEL,
                 false,
+                false,
                 true,
                 false,
                 true
@@ -95,6 +99,7 @@ class NotificationSettingsControllerTest extends CommonControllerSliceTestSuppor
         NotificationSettingsResponse response = new NotificationSettingsResponse(
                 projectMemberId,
                 DeliverySpace.TRIGGER_CHANNEL,
+                false,
                 false,
                 true,
                 false,
@@ -115,6 +120,7 @@ class NotificationSettingsControllerTest extends CommonControllerSliceTestSuppor
                                              .andExpect(jsonPath("$.projectMemberId").value(projectMemberId))
                                              .andExpect(jsonPath("$.reservationConfirmedSpace").value("TRIGGER_CHANNEL"))
                                              .andExpect(jsonPath("$.reservationCanceledConfirmationEnabled").value(false))
+                                             .andExpect(jsonPath("$.reservationChannelEphemeralEnabled").value(false))
                                              .andExpect(jsonPath("$.reviewReminderEnabled").value(true))
                                              .andExpect(jsonPath("$.prMentionEnabled").value(false))
                                              .andExpect(jsonPath("$.reviewCompletedEnabled").value(true));
@@ -131,6 +137,7 @@ class NotificationSettingsControllerTest extends CommonControllerSliceTestSuppor
                         requestFields(
                                 fieldWithPath("reservationConfirmedSpace").type(JsonFieldType.STRING).description("리뷰 예약 완료 알림 전달 공간"),
                                 fieldWithPath("reservationCanceledConfirmationEnabled").type(JsonFieldType.BOOLEAN).description("리뷰 예약 취소 확인 알림 활성화 여부"),
+                                fieldWithPath("reservationChannelEphemeralEnabled").type(JsonFieldType.BOOLEAN).description("리뷰 예약 안내 채널 에페메랄 알림 활성화 여부"),
                                 fieldWithPath("reviewReminderEnabled").type(JsonFieldType.BOOLEAN).description("리뷰 리마인드 알림 활성화 여부"),
                                 fieldWithPath("prMentionEnabled").type(JsonFieldType.BOOLEAN).description("PR 멘션 알림 활성화 여부"),
                                 fieldWithPath("reviewCompletedEnabled").type(JsonFieldType.BOOLEAN).description("리뷰 완료 알림 활성화 여부")
@@ -139,6 +146,7 @@ class NotificationSettingsControllerTest extends CommonControllerSliceTestSuppor
                                 fieldWithPath("projectMemberId").type(JsonFieldType.NUMBER).description("프로젝트 멤버 ID"),
                                 fieldWithPath("reservationConfirmedSpace").type(JsonFieldType.STRING).description("리뷰 예약 완료 알림 전달 공간"),
                                 fieldWithPath("reservationCanceledConfirmationEnabled").type(JsonFieldType.BOOLEAN).description("리뷰 예약 취소 확인 알림 활성화 여부"),
+                                fieldWithPath("reservationChannelEphemeralEnabled").type(JsonFieldType.BOOLEAN).description("리뷰 예약 안내 채널 에페메랄 알림 활성화 여부"),
                                 fieldWithPath("reviewReminderEnabled").type(JsonFieldType.BOOLEAN).description("리뷰 리마인드 알림 활성화 여부"),
                                 fieldWithPath("prMentionEnabled").type(JsonFieldType.BOOLEAN).description("PR 멘션 알림 활성화 여부"),
                                 fieldWithPath("reviewCompletedEnabled").type(JsonFieldType.BOOLEAN).description("리뷰 완료 알림 활성화 여부")

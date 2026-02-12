@@ -72,7 +72,7 @@ public class ReviewReservationWorkflow {
     private void notifySuccess(ReservationType strategy, ReservationContextDto context, ReviewReservation reservation) {
         notifyTiming(context);
 
-        reservationNotifier.sendReservationBlock(
+        reservationNotifier.sendReservationBlockToDmAndEphemeral(
                 context.token(),
                 context.meta().teamId(),
                 context.meta().channelId(),

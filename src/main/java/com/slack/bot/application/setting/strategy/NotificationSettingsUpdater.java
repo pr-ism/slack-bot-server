@@ -18,6 +18,7 @@ public class NotificationSettingsUpdater {
         return List.of(
                 new ReservationConfirmedSpaceUpdateStrategy(),
                 new ReservationCanceledConfirmationUpdateStrategy(),
+                new ReservationChannelEphemeralUpdateStrategy(),
                 new ReviewReminderUpdateStrategy(),
                 new PrMentionUpdateStrategy(),
                 new ReviewCompletedUpdateStrategy()

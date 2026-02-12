@@ -22,6 +22,7 @@ class ReservationCanceledConfirmationUpdateStrategyTest {
                 false,
                 true,
                 true,
+                true,
                 true
         );
         ReservationCanceledConfirmationUpdateStrategy strategy = new ReservationCanceledConfirmationUpdateStrategy();
