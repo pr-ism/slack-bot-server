@@ -85,6 +85,30 @@ class ChangeReviewReservationActionHandlerTest {
         );
     }
 
+    @Test
+    @Sql("classpath:sql/fixtures/interactivity/cancelled_review_reservation_t1_project_123_u1.sql")
+    void 이미_취소한_예약_변경_요청이면_변경_불가_알림을_보내고_모달을_열지_않는다() {
+        // given
+        BlockActionCommandDto command = commandWithReservationId("100", "U1", "TRIGGER_1");
+
+        // when
+        BlockActionOutcomeDto actual = changeReviewReservationActionHandler.handle(command);
+
+        // then
+        assertAll(
+                () -> assertThat(actual.duplicateReservation()).isNull(),
+                () -> assertThat(actual.cancelledReservation()).isNull(),
+                () -> verify(notificationApiClient).sendEphemeralMessage(
+                        eq("xoxb-test-token"),
+                        eq("C1"),
+                        eq("U1"),
+                        eq(InteractivityErrorType.RESERVATION_CHANGE_NOT_ALLOWED_CANCELLED.message())
+                ),
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
+                () -> verify(reviewInteractionEventPublisher, never()).publish(any())
+        );
+    }
+
     private BlockActionCommandDto commandWithReservationId(String reservationId, String slackUserId, String triggerId) {
         JsonNode payload = objectMapper.createObjectNode()
                                        .put("trigger_id", triggerId);

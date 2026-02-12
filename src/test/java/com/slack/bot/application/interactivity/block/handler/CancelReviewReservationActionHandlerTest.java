@@ -114,6 +114,29 @@ class CancelReviewReservationActionHandlerTest {
         );
     }
 
+    @Test
+    @Sql("classpath:sql/fixtures/interactivity/cancelled_review_reservation_t1_project_123_u1.sql")
+    void 이미_취소된_예약_취소_요청이면_이미_취소됨_알림을_보내고_빈_응답을_반환한다() {
+        // given
+        BlockActionCommandDto command = commandWithReservationId("100", "U1");
+
+        // when
+        BlockActionOutcomeDto actual = cancelReviewReservationActionHandler.handle(command);
+
+        // then
+        assertAll(
+                () -> assertThat(actual.duplicateReservation()).isNull(),
+                () -> assertThat(actual.cancelledReservation()).isNull(),
+                () -> verify(notificationApiClient).sendEphemeralMessage(
+                        eq("xoxb-test-token"),
+                        eq("C1"),
+                        eq("U1"),
+                        eq(InteractivityErrorType.RESERVATION_ALREADY_CANCELLED.message())
+                ),
+                () -> verify(reviewInteractionEventPublisher, never()).publish(any())
+        );
+    }
+
     private BlockActionCommandDto commandWithReservationId(String reservationId, String slackUserId) {
         JsonNode action = objectMapper.createObjectNode()
                 .put("value", reservationId);

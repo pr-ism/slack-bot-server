@@ -176,6 +176,34 @@ class ReservationCommandWorkflowTest {
     }
 
     @Test
+    @Sql("classpath:sql/fixtures/interactivity/cancelled_review_reservation_t1_project_123_u1.sql")
+    void 이미_취소된_예약을_다시_취소하면_이미_취소됨_알림을_보낸다() {
+        // given
+        JsonNode action = actionWithReservationId("100");
+
+        // when
+        Optional<ReviewReservation> actual = reservationCommandWorkflow.handleCancel(
+                action,
+                "T1",
+                "C1",
+                "U1",
+                "xoxb-test-token"
+        );
+
+        // then
+        assertAll(
+                () -> assertThat(actual).isEmpty(),
+                () -> verify(notificationApiClient).sendEphemeralMessage(
+                        eq("xoxb-test-token"),
+                        eq("C1"),
+                        eq("U1"),
+                        eq(InteractivityErrorType.RESERVATION_ALREADY_CANCELLED.message())
+                ),
+                () -> verify(reviewInteractionEventPublisher, never()).publish(any())
+        );
+    }
+
+    @Test
     @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
     void 리뷰_예약_변경_요청은_모달을_열고_변경_이벤트를_발행한다() {
         // given
@@ -233,6 +261,37 @@ class ReservationCommandWorkflowTest {
                         eq("U2"),
                         eq(InteractivityErrorType.NOT_OWNER_CHANGE.message())
                 ),
+                () -> verify(reviewInteractionEventPublisher, never()).publish(any())
+        );
+    }
+
+    @Test
+    @Sql("classpath:sql/fixtures/interactivity/cancelled_review_reservation_t1_project_123_u1.sql")
+    void 이미_취소한_예약은_변경_불가_알림을_보내고_모달을_열지_않는다() {
+        // given
+        JsonNode payload = objectMapper.createObjectNode()
+                .put("trigger_id", "TRIGGER_1");
+        JsonNode action = actionWithReservationId("100");
+
+        // when
+        reservationCommandWorkflow.handleChange(
+                payload,
+                action,
+                "T1",
+                "C1",
+                "U1",
+                "xoxb-test-token"
+        );
+
+        // then
+        assertAll(
+                () -> verify(notificationApiClient).sendEphemeralMessage(
+                        eq("xoxb-test-token"),
+                        eq("C1"),
+                        eq("U1"),
+                        eq(InteractivityErrorType.RESERVATION_CHANGE_NOT_ALLOWED_CANCELLED.message())
+                ),
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
                 () -> verify(reviewInteractionEventPublisher, never()).publish(any())
         );
     }

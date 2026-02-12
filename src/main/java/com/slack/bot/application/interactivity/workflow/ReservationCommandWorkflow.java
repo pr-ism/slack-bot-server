@@ -143,6 +143,10 @@ public class ReservationCommandWorkflow {
         if (reservation == null) {
             return false;
         }
+        if (!reservation.isActive()) {
+            errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.RESERVATION_ALREADY_CANCELLED);
+            return false;
+        }
 
         return isOwnerOrNotify(reservation, token, channelId, slackUserId, InteractivityErrorType.NOT_OWNER_CANCEL);
     }
@@ -154,6 +158,15 @@ public class ReservationCommandWorkflow {
             String slackUserId
     ) {
         if (reservation == null) {
+            return false;
+        }
+        if (!reservation.isActive()) {
+            errorNotifier.notify(
+                    token,
+                    channelId,
+                    slackUserId,
+                    InteractivityErrorType.RESERVATION_CHANGE_NOT_ALLOWED_CANCELLED
+            );
             return false;
         }
 
