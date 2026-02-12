@@ -101,7 +101,6 @@ public class ReviewReservationWorkflow {
     private void notifyDuplicate(ReservationContextDto context, ReviewReservation reservation) {
         reservationNotifier.sendDuplicateReservationNoticeToDmAndEphemeral(
                 context.token(),
-                context.meta().teamId(),
                 context.meta().channelId(),
                 context.reviewerId(),
                 reservation

@@ -28,7 +28,6 @@ class BlockActionInteractionService {
         if (outcome.hasDuplicateReservation()) {
             reservationNotifier.sendDuplicateReservationNoticeToDmAndEphemeral(
                     context.botToken(),
-                    context.teamId(),
                     context.channelId(),
                     context.slackUserId(),
                     outcome.duplicateReservation()

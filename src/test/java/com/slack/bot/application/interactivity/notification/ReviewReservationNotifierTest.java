@@ -137,7 +137,6 @@ class ReviewReservationNotifierTest {
     void 중복_예약이_아직_시작_전이면_일반_중복_문구로_DM과_에페메랄을_전송한다() {
         // given
         String token = "xoxb-token";
-        String teamId = "T1";
         String channelId = "C1";
         String slackUserId = "U1";
         ReviewReservation reservation = createReservation(FIXED_NOW.plusSeconds(3600));
@@ -156,7 +155,6 @@ class ReviewReservationNotifierTest {
         // when
         reviewReservationNotifier.sendDuplicateReservationNoticeToDmAndEphemeral(
                 token,
-                teamId,
                 channelId,
                 slackUserId,
                 reservation
@@ -169,9 +167,14 @@ class ReviewReservationNotifierTest {
                         "이미 이 PR 리뷰를 예약했습니다.",
                         ReviewReservationBlockType.RESERVATION
                 ),
-                () -> verify(notificationDispatcher).sendBlockToDmAndEphemeral(
+                () -> verify(notificationDispatcher).sendEphemeral(
                         token,
                         channelId,
+                        slackUserId,
+                        "이미 이 PR 리뷰를 예약했습니다."
+                ),
+                () -> verify(notificationDispatcher).sendBlockToDirectMessageOnly(
+                        token,
                         slackUserId,
                         blocks,
                         fallbackText
@@ -183,7 +186,6 @@ class ReviewReservationNotifierTest {
     void 중복_예약이_이미_시작_시각_이후면_시작됨_문구로_DM과_에페메랄을_전송한다() {
         // given
         String token = "xoxb-token";
-        String teamId = "T1";
         String channelId = "C1";
         String slackUserId = "U1";
         ReviewReservation reservation = createReservation(FIXED_NOW.minusSeconds(60));
@@ -202,7 +204,6 @@ class ReviewReservationNotifierTest {
         // when
         reviewReservationNotifier.sendDuplicateReservationNoticeToDmAndEphemeral(
                 token,
-                teamId,
                 channelId,
                 slackUserId,
                 reservation
@@ -215,9 +216,14 @@ class ReviewReservationNotifierTest {
                         "이미 리뷰 시작 시간이 되어 새로 예약할 수 없습니다.",
                         ReviewReservationBlockType.RESERVATION
                 ),
-                () -> verify(notificationDispatcher).sendBlockToDmAndEphemeral(
+                () -> verify(notificationDispatcher).sendEphemeral(
                         token,
                         channelId,
+                        slackUserId,
+                        "이미 리뷰 시작 시간이 되어 새로 예약할 수 없습니다."
+                ),
+                () -> verify(notificationDispatcher).sendBlockToDirectMessageOnly(
+                        token,
                         slackUserId,
                         blocks,
                         fallbackText

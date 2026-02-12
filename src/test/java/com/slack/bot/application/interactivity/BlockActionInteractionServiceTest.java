@@ -63,12 +63,11 @@ class BlockActionInteractionServiceTest {
                         any(),
                         any()
                 ),
-                () -> verify(notificationApiClient).sendEphemeralBlockMessage(
+                () -> verify(notificationApiClient).sendEphemeralMessage(
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U1"),
-                        any(),
-                        any()
+                        eq("이미 이 PR 리뷰를 예약했습니다.")
                 ),
                 () -> assertThat(reviewReservationRepository.findById(100L))
                         .isPresent()

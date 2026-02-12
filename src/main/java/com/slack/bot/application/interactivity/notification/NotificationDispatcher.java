@@ -38,6 +38,19 @@ public class NotificationDispatcher {
         }
     }
 
+    public void sendBlockToDirectMessageOnly(
+            String token,
+            String userId,
+            Object blocks,
+            String fallback
+    ) {
+        try {
+            sendDirectMessageBlocks(token, userId, blocks, fallback);
+        } catch (RuntimeException e) {
+            log.warn("DM 블록 메시지 전송 실패. userId={}", userId, e);
+        }
+    }
+
     public void sendBlock(
             String teamId,
             String token,

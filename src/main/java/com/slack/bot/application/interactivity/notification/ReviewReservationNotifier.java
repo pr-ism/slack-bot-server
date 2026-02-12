@@ -75,18 +75,28 @@ public class ReviewReservationNotifier {
 
     public void sendDuplicateReservationNoticeToDmAndEphemeral(
             String token,
-            String teamId,
             String channelId,
             String slackUserId,
             ReviewReservation reservation
     ) {
-        sendReservationBlockToDmAndEphemeral(
+        String duplicateMessage = resolveDuplicateReservationMessage(reservation);
+        ReviewReservationMessageDto message = reservationBlockCreator.create(
+                reservation,
+                duplicateMessage,
+                ReviewReservationBlockType.RESERVATION
+        );
+
+        notificationDispatcher.sendEphemeral(
                 token,
-                teamId,
                 channelId,
                 slackUserId,
-                reservation,
-                resolveDuplicateReservationMessage(reservation)
+                duplicateMessage
+        );
+        notificationDispatcher.sendBlockToDirectMessageOnly(
+                token,
+                slackUserId,
+                message.blocks(),
+                message.fallbackText()
         );
     }
 
