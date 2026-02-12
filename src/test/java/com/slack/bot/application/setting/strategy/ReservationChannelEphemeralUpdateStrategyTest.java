@@ -11,26 +11,26 @@ import org.junit.jupiter.api.Test;
 
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
-class ReviewCompletedUpdateStrategyTest {
+class ReservationChannelEphemeralUpdateStrategyTest {
 
     @Test
-    void 리뷰_완료_알림을_변경한다() {
+    void 예약_채널_에페메랄_알림을_변경한다() {
         // given
         NotificationSettings settings = NotificationSettings.defaults(1L);
         UpdateNotificationSettingsRequest request = new UpdateNotificationSettingsRequest(
                 DeliverySpace.DIRECT_MESSAGE,
                 true,
+                false,
                 true,
                 true,
-                true,
-                false
+                true
         );
-        ReviewCompletedUpdateStrategy strategy = new ReviewCompletedUpdateStrategy();
+        ReservationChannelEphemeralUpdateStrategy strategy = new ReservationChannelEphemeralUpdateStrategy();
 
         // when
         strategy.apply(settings, request);
 
         // then
-        assertThat(settings.getOptionalNotifications().isReviewCompletedEnabled()).isFalse();
+        assertThat(settings.getOptionalNotifications().isReservationChannelEphemeralEnabled()).isFalse();
     }
 }

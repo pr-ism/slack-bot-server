@@ -22,6 +22,7 @@ class ReservationConfirmedSpaceUpdateStrategyTest {
                 true,
                 true,
                 true,
+                true,
                 true
         );
         ReservationConfirmedSpaceUpdateStrategy strategy = new ReservationConfirmedSpaceUpdateStrategy();

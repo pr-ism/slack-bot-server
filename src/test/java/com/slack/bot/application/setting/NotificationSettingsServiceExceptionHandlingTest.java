@@ -44,6 +44,7 @@ class NotificationSettingsServiceExceptionHandlingTest {
         UpdateNotificationSettingsRequest request = new UpdateNotificationSettingsRequest(
                 DeliverySpace.TRIGGER_CHANNEL,
                 false,
+                false,
                 true,
                 false,
                 true
@@ -60,6 +61,7 @@ class NotificationSettingsServiceExceptionHandlingTest {
                 () -> assertThat(actual.projectMemberId()).isEqualTo(projectMemberId),
                 () -> assertThat(actual.reservationConfirmedSpace()).isEqualTo(DeliverySpace.TRIGGER_CHANNEL),
                 () -> assertThat(actual.reservationCanceledConfirmationEnabled()).isFalse(),
+                () -> assertThat(actual.reservationChannelEphemeralEnabled()).isTrue(),
                 () -> assertThat(actual.reviewReminderEnabled()).isTrue(),
                 () -> assertThat(actual.prMentionEnabled()).isFalse(),
                 () -> assertThat(actual.reviewCompletedEnabled()).isTrue(),
@@ -74,6 +76,7 @@ class NotificationSettingsServiceExceptionHandlingTest {
         Long projectMemberId = 2L;
         UpdateNotificationSettingsRequest request = new UpdateNotificationSettingsRequest(
                 DeliverySpace.TRIGGER_CHANNEL,
+                false,
                 false,
                 true,
                 false,
@@ -122,5 +125,4 @@ class NotificationSettingsServiceExceptionHandlingTest {
             }
         }
     }
-
 }
