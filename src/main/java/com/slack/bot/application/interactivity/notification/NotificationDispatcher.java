@@ -44,14 +44,15 @@ public class NotificationDispatcher {
             String channelId,
             String userId,
             Object blocks,
-            String fallback
+            String fallback,
+            String ephemeralText
     ) {
         boolean sendChannelEphemeral = notificationSettingsRepository.findBySlackUser(teamId, userId)
                 .map(settings -> settings.isReservationChannelEphemeralEnabled())
                 .orElse(true);
 
         if (sendChannelEphemeral) {
-            sendEphemeralBlocks(token, channelId, userId, blocks, fallback);
+            sendEphemeral(token, channelId, userId, ephemeralText);
         }
 
         try {

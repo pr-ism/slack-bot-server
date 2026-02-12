@@ -63,6 +63,7 @@ public class ReviewReservationNotifier {
                 headerText,
                 ReviewReservationBlockType.RESERVATION
         );
+        String ephemeralText = buildReservationEphemeralText(reservation, headerText);
 
         notificationDispatcher.sendReservationBlockBySettingOrDefault(
                 token,
@@ -70,7 +71,8 @@ public class ReviewReservationNotifier {
                 channelId,
                 slackUserId,
                 message.blocks(),
-                message.fallbackText()
+                message.fallbackText(),
+                ephemeralText
         );
     }
 
@@ -197,5 +199,23 @@ public class ReviewReservationNotifier {
         }
 
         return DUPLICATE_RESERVATION_MESSAGE;
+    }
+
+    private String buildReservationEphemeralText(ReviewReservation reservation, String headerText) {
+        String title = reservation.getReservationPullRequest().getPullRequestTitle();
+        String prLine = (title != null && !title.isBlank())
+                ? title
+                : "PR #" + reservation.getReservationPullRequest().getPullRequestNumber();
+        ZonedDateTime when = reservation.getScheduledAt().atZone(clock.getZone());
+        String scheduledAtText = String.format(
+                "%d년 %d월 %d일 %02d시 %02d분",
+                when.getYear(),
+                when.getMonthValue(),
+                when.getDayOfMonth(),
+                when.getHour(),
+                when.getMinute()
+        );
+
+        return headerText + "\n" + prLine + "\n리뷰 시작 시간: " + scheduledAtText;
     }
 }

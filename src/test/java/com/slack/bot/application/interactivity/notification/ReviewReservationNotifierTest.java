@@ -3,6 +3,7 @@ package com.slack.bot.application.interactivity.notification;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -124,12 +125,16 @@ class ReviewReservationNotifierTest {
         assertAll(
                 () -> verify(reservationBlockCreator).create(reservation, headerText, ReviewReservationBlockType.RESERVATION),
                 () -> verify(notificationDispatcher).sendReservationBlockBySettingOrDefault(
-                        token,
-                        teamId,
-                        channelId,
-                        slackUserId,
-                        blocks,
-                        fallbackText
+                        eq(token),
+                        eq(teamId),
+                        eq(channelId),
+                        eq(slackUserId),
+                        eq(blocks),
+                        eq(fallbackText),
+                        argThat(text -> text.contains("이미 이 PR 리뷰를 예약했습니다.")
+                                && text.contains("Fix bug")
+                                && text.contains("리뷰 시작 시간:")
+                                && !text.contains("취소/변경은 아래 버튼으로만 가능합니다."))
                 )
         );
     }

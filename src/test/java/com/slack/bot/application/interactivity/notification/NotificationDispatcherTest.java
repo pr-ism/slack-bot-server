@@ -257,11 +257,17 @@ class NotificationDispatcherTest {
                 channelId,
                 userId,
                 blocks,
-                fallback
+                fallback,
+                "리뷰 예약이 완료되었습니다.\nCreate qewr\n리뷰 시작 시간: 2026년 2월 12일 16시 51분"
         );
 
         // then
-        verify(notificationApiClient).sendEphemeralBlockMessage(token, channelId, userId, blocks, fallback);
+        verify(notificationApiClient).sendEphemeralMessage(
+                token,
+                channelId,
+                userId,
+                "리뷰 예약이 완료되었습니다.\nCreate qewr\n리뷰 시작 시간: 2026년 2월 12일 16시 51분"
+        );
         verify(notificationApiClient).openDirectMessageChannel(token, userId);
         verify(notificationApiClient).sendBlockMessage(token, "DM-CHANNEL-ID", blocks, fallback);
     }
@@ -295,7 +301,8 @@ class NotificationDispatcherTest {
                 channelId,
                 userId,
                 blocks,
-                fallback
+                fallback,
+                "리뷰 예약이 완료되었습니다.\nCreate qewr\n리뷰 시작 시간: 2026년 2월 12일 16시 51분"
         );
 
         // then
