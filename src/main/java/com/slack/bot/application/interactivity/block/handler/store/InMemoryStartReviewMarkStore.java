@@ -16,6 +16,11 @@ public class InMemoryStartReviewMarkStore implements StartReviewMarkStore {
     }
 
     @Override
+    public Instant putIfAbsent(String key, Instant markedAt) {
+        return marks.putIfAbsent(key, markedAt);
+    }
+
+    @Override
     public void put(String key, Instant markedAt) {
         marks.put(key, markedAt);
     }
@@ -23,5 +28,10 @@ public class InMemoryStartReviewMarkStore implements StartReviewMarkStore {
     @Override
     public void remove(String key) {
         marks.remove(key);
+    }
+
+    @Override
+    public boolean remove(String key, Instant markedAt) {
+        return marks.remove(key, markedAt);
     }
 }

@@ -62,7 +62,7 @@ public class StartReviewActionHandler implements BlockActionHandler {
         }
 
         String duplicatePreventionKey = createDuplicatePreventionKey(meta, command.slackUserId());
-        if (isAlreadyStarted(duplicatePreventionKey)) {
+        if (!tryMarkStarted(duplicatePreventionKey)) {
             notificationDispatcher.sendEphemeral(
                     command.botToken(),
                     command.channelId(),
@@ -72,13 +72,18 @@ public class StartReviewActionHandler implements BlockActionHandler {
             return BlockActionOutcomeDto.empty();
         }
 
+        try {
+            cancelActiveReservation(meta, command.slackUserId());
+        } catch (RuntimeException e) {
+            rollbackStartedMark(duplicatePreventionKey);
+            throw e;
+        }
+
         reviewReservationNotifier.notifyStartNowToParticipants(
                 meta,
                 command.slackUserId(),
                 command.botToken()
         );
-        cancelActiveReservation(meta, command.slackUserId());
-        markStarted(duplicatePreventionKey);
         notificationDispatcher.sendEphemeral(
                 command.botToken(),
                 command.channelId(),
@@ -121,23 +126,30 @@ public class StartReviewActionHandler implements BlockActionHandler {
         return teamId + ":" + projectId + ":" + pullRequestId + ":" + reviewerId;
     }
 
-    private boolean isAlreadyStarted(String key) {
-        Instant markedAt = startReviewMarkStore.get(key);
-        if (markedAt == null) {
-            return false;
-        }
-
+    private boolean tryMarkStarted(String key) {
         Instant now = Instant.now(clock);
-        if (markedAt.plus(START_REVIEW_MARK_TTL).isBefore(now)) {
-            startReviewMarkStore.remove(key);
+        Instant existing = startReviewMarkStore.putIfAbsent(key, now);
+        if (existing == null) {
+            return true;
+        }
+
+        if (!isExpired(existing, now)) {
             return false;
         }
 
-        return true;
+        if (!startReviewMarkStore.remove(key, existing)) {
+            return false;
+        }
+
+        return startReviewMarkStore.putIfAbsent(key, now) == null;
     }
 
-    private void markStarted(String key) {
-        startReviewMarkStore.put(key, Instant.now(clock));
+    private boolean isExpired(Instant markedAt, Instant now) {
+        return markedAt.plus(START_REVIEW_MARK_TTL).isBefore(now);
+    }
+
+    private void rollbackStartedMark(String key) {
+        startReviewMarkStore.remove(key);
     }
 
     private void cancelActiveReservation(ReviewScheduleMetaDto meta, String reviewerSlackUserId) {
