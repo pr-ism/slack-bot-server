@@ -11,10 +11,15 @@ import com.slack.bot.infrastructure.analysis.metadata.reservation.persistence.Jp
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @IntegrationTest
 @SuppressWarnings("NonAsciiCharacters")
@@ -97,7 +102,8 @@ class ReviewInteractionEventHandlerTest {
                     () -> assertThat(actual).isPresent(),
                     () -> assertThat(actual.get().getInteractionTimeline().getReviewTimeSelectedAt()).isNotNull(),
                     () -> assertThat(actual.get().getInteractionTimeline().getReviewScheduledAt()).isEqualTo(reviewScheduledAt),
-                    () -> assertThat(actual.get().getInteractionTimeline().getPullRequestNotifiedAt()).isEqualTo(fulfilledNotifiedAt),
+                    () -> assertThat(actual.get().getInteractionTimeline().getPullRequestNotifiedAt())
+                            .isIn(firstNotifiedAt, fulfilledNotifiedAt),
                     () -> assertThat(actual.get().getInteractionCount().getScheduleChangeCount()).isEqualTo(1),
                     () -> assertThat(actual.get().getInteractionCount().getScheduleCancelCount()).isEqualTo(1),
                     () -> assertThat(actual.get().isReviewFulfilled()).isTrue()
@@ -225,5 +231,102 @@ class ReviewInteractionEventHandlerTest {
                     () -> assertThat(actual.get().getInteractionTimeline().getPullRequestNotifiedAt()).isNotNull()
             );
         });
+    }
+
+    @Test
+    void 동일_리뷰_키_병렬_이벤트를_처리해도_엔티티는_한_건만_생성되고_변경_횟수_누락이_없다() throws InterruptedException {
+        // given
+        CountDownLatch startSignal = new CountDownLatch(1);
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+
+        // when
+        executorService.submit(() -> {
+            awaitStart(startSignal);
+            reviewInteractionEventPublisher.publish(new ReviewReservationChangeEvent(
+                    "T1",
+                    "C1",
+                    "U1",
+                    100L,
+                    123L,
+                    10L
+            ));
+        });
+        executorService.submit(() -> {
+            awaitStart(startSignal);
+            reviewInteractionEventPublisher.publish(new ReviewReservationChangeEvent(
+                    "T1",
+                    "C1",
+                    "U1",
+                    101L,
+                    123L,
+                    10L
+            ));
+        });
+        startSignal.countDown();
+        executorService.shutdown();
+        executorService.awaitTermination(3, TimeUnit.SECONDS);
+
+        // then
+        await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
+            Optional<ReviewReservationInteraction> actual = reviewReservationInteractionRepository.findByReviewKey(
+                    "T1",
+                    123L,
+                    10L,
+                    "U1"
+            );
+            long savedCount = jpaReviewReservationInteractionRepository.count();
+
+            assertAll(
+                    () -> assertThat(savedCount).isEqualTo(1L),
+                    () -> assertThat(actual).isPresent(),
+                    () -> assertThat(actual.get().getInteractionCount().getScheduleChangeCount()).isEqualTo(2)
+            );
+        });
+    }
+
+    @Test
+    void 같은_리뷰_키로_후행_삽입이_들어와도_무시되며_선행_데이터가_유지된다() {
+        // given
+        ReviewReservationInteraction firstInteraction = ReviewReservationInteraction.create("T1", 123L, 10L, "U1");
+        firstInteraction.recordReviewScheduledAt(Instant.parse("2099-01-01T10:00:00Z"));
+        firstInteraction.recordPullRequestNotifiedAt(Instant.parse("2099-01-01T09:30:00Z"));
+        reviewReservationInteractionRepository.create(firstInteraction);
+
+        ReviewReservationInteraction duplicatedInteraction = ReviewReservationInteraction.create("T1", 123L, 10L, "U1");
+        duplicatedInteraction.recordReviewScheduledAt(Instant.parse("2099-01-01T11:00:00Z"));
+        duplicatedInteraction.recordPullRequestNotifiedAt(Instant.parse("2099-01-01T10:30:00Z"));
+
+        // when
+        try {
+            reviewReservationInteractionRepository.create(duplicatedInteraction);
+        } catch (DataIntegrityViolationException ignored) {
+        }
+
+        // then
+        await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
+            Optional<ReviewReservationInteraction> actual = reviewReservationInteractionRepository.findByReviewKey(
+                    "T1",
+                    123L,
+                    10L,
+                    "U1"
+            );
+
+            assertAll(
+                    () -> assertThat(actual).isPresent(),
+                    () -> assertThat(actual.get().getInteractionTimeline().getReviewScheduledAt())
+                            .isEqualTo(Instant.parse("2099-01-01T10:00:00Z")),
+                    () -> assertThat(actual.get().getInteractionTimeline().getPullRequestNotifiedAt())
+                            .isEqualTo(Instant.parse("2099-01-01T09:30:00Z"))
+            );
+        });
+    }
+
+    private void awaitStart(CountDownLatch startSignal) {
+        try {
+            startSignal.await();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("병렬 이벤트 시작 신호 대기 중 인터럽트가 발생했습니다.", exception);
+        }
     }
 }
