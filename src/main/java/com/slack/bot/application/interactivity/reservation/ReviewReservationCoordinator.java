@@ -82,6 +82,24 @@ public class ReviewReservationCoordinator {
         );
     }
 
+    @Transactional
+    public Optional<ReviewReservation> cancelActive(
+            String teamId,
+            Long projectId,
+            String reviewerSlackId,
+            Long pullRequestId
+    ) {
+        return reviewReservationRepository.findActive(
+                teamId,
+                projectId,
+                reviewerSlackId,
+                pullRequestId
+        ).map(existing -> {
+            cancelInternal(existing);
+            return existing;
+        });
+    }
+
     private ReviewReservation createInternal(ReservationCommandDto command) {
         ReviewReservation reservation = ReviewReservation.builder()
                                                          .teamId(command.teamId())

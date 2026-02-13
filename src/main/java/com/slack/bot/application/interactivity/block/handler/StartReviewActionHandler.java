@@ -159,12 +159,12 @@ public class StartReviewActionHandler implements BlockActionHandler {
             return;
         }
 
-        reviewReservationCoordinator.findActive(
+        reviewReservationCoordinator.cancelActive(
                 meta.teamId(),
                 projectId,
                 reviewerSlackUserId,
                 meta.pullRequestId()
-        ).ifPresent(reservation -> reviewReservationCoordinator.cancel(reservation.getId()));
+        );
     }
 
     private Long parseProjectId(String rawProjectId) {
