@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Repository
@@ -20,7 +21,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
     private final EntityManager entityManager;
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ReviewReservationInteraction create(ReviewReservationInteraction interaction) {
         entityManager.persist(interaction);
         entityManager.flush();
