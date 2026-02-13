@@ -1,8 +1,8 @@
-package com.slack.bot.domain.reservation;
+package com.slack.bot.domain.analysis.metadata.reservation;
 
 import com.slack.bot.domain.common.BaseTimeEntity;
-import com.slack.bot.domain.reservation.vo.ReviewReservationInteractionCount;
-import com.slack.bot.domain.reservation.vo.ReviewReservationInteractionTimeline;
+import com.slack.bot.domain.analysis.metadata.reservation.vo.ReviewReservationInteractionCount;
+import com.slack.bot.domain.analysis.metadata.reservation.vo.ReviewReservationInteractionTimeline;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;

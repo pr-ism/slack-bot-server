@@ -5,9 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.awaitility.Awaitility.await;
 
 import com.slack.bot.application.IntegrationTest;
-import com.slack.bot.domain.reservation.ReviewReservationInteraction;
-import com.slack.bot.domain.reservation.repository.ReviewReservationInteractionRepository;
-import com.slack.bot.infrastructure.reservation.persistence.JpaReviewReservationInteractionRepository;
+import com.slack.bot.domain.analysis.metadata.reservation.ReviewReservationInteraction;
+import com.slack.bot.domain.analysis.metadata.reservation.repository.ReviewReservationInteractionRepository;
+import com.slack.bot.infrastructure.analysis.metadata.reservation.persistence.JpaReviewReservationInteractionRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;

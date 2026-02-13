@@ -1,10 +1,10 @@
-package com.slack.bot.infrastructure.reservation.persistence;
+package com.slack.bot.infrastructure.analysis.metadata.reservation.persistence;
 
-import static com.slack.bot.domain.reservation.QReviewReservationInteraction.reviewReservationInteraction;
+import static com.slack.bot.domain.analysis.metadata.reservation.QReviewReservationInteraction.reviewReservationInteraction;
 
 import com.querydsl.jpa.impl.JPAQueryFactory;
-import com.slack.bot.domain.reservation.ReviewReservationInteraction;
-import com.slack.bot.domain.reservation.repository.ReviewReservationInteractionRepository;
+import com.slack.bot.domain.analysis.metadata.reservation.ReviewReservationInteraction;
+import com.slack.bot.domain.analysis.metadata.reservation.repository.ReviewReservationInteractionRepository;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;

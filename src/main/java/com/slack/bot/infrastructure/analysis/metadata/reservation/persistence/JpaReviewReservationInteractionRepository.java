@@ -1,6 +1,6 @@
-package com.slack.bot.infrastructure.reservation.persistence;
+package com.slack.bot.infrastructure.analysis.metadata.reservation.persistence;
 
-import com.slack.bot.domain.reservation.ReviewReservationInteraction;
+import com.slack.bot.domain.analysis.metadata.reservation.ReviewReservationInteraction;
 import org.springframework.data.repository.ListCrudRepository;
 
 public interface JpaReviewReservationInteractionRepository extends ListCrudRepository<ReviewReservationInteraction, Long> {

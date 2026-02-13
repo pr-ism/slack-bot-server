@@ -1,7 +1,7 @@
 package com.slack.bot.application.interactivity.publisher;
 
-import com.slack.bot.domain.reservation.ReviewReservationInteraction;
-import com.slack.bot.domain.reservation.repository.ReviewReservationInteractionRepository;
+import com.slack.bot.domain.analysis.metadata.reservation.ReviewReservationInteraction;
+import com.slack.bot.domain.analysis.metadata.reservation.repository.ReviewReservationInteractionRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.function.Consumer;

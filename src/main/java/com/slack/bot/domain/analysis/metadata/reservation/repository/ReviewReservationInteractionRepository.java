@@ -1,6 +1,6 @@
-package com.slack.bot.domain.reservation.repository;
+package com.slack.bot.domain.analysis.metadata.reservation.repository;
 
-import com.slack.bot.domain.reservation.ReviewReservationInteraction;
+import com.slack.bot.domain.analysis.metadata.reservation.ReviewReservationInteraction;
 import java.util.Optional;
 
 public interface ReviewReservationInteractionRepository {

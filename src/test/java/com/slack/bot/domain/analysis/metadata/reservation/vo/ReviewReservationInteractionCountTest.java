@@ -1,4 +1,4 @@
-package com.slack.bot.domain.reservation.vo;
+package com.slack.bot.domain.analysis.metadata.reservation.vo;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

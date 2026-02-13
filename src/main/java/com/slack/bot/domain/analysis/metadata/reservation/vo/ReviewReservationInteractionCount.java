@@ -1,4 +1,4 @@
-package com.slack.bot.domain.reservation.vo;
+package com.slack.bot.domain.analysis.metadata.reservation.vo;
 
 import jakarta.persistence.Embeddable;
 import lombok.AccessLevel;
