@@ -1,6 +1,9 @@
 package com.slack.bot.application.interactivity.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
+import com.slack.api.util.json.GsonFactory;
 import com.slack.bot.application.interactivity.client.exception.SlackBotMessageDispatchException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -16,8 +19,10 @@ import org.springframework.web.client.RestClient;
 public class NotificationApiClient {
 
     private static final int ERROR_BODY_MAX_LENGTH = 500;
+    private static final Gson SNAKE_CASE_GSON = GsonFactory.createSnakeCase();
 
     private final RestClient slackClient;
+    private final ObjectMapper objectMapper;
 
     public void sendEphemeralMessage(String token, String channelId, String targetUserId, String text) {
         Map<String, String> body = buildEphemeralTextBody(channelId, targetUserId, text);
@@ -48,7 +53,7 @@ public class NotificationApiClient {
     }
 
     public void openModal(String token, String triggerId, Object view) {
-        Map<String, Object> body = buildOpenModalBody(triggerId, view);
+        Map<String, Object> body = buildOpenModalBody(triggerId, normalizeView(view));
         JsonNode response = postForJson("views.open", token, body);
 
         ensureOk(response, "슬랙 봇 메시지 전송 실패: 모달 열기 실패");
@@ -60,7 +65,8 @@ public class NotificationApiClient {
 
         ensureOk(response, "슬랙 봇 메시지 전송 실패: 직접 메시지 채널 열기 실패");
 
-        JsonNode channelId = response.path("channel").path("id");
+        JsonNode channelId = response.path("channel")
+                                     .path("id");
 
         validateChannelId(channelId);
         return channelId.asText();
@@ -91,8 +97,28 @@ public class NotificationApiClient {
         }
         if (!response.path("ok").asBoolean(false)) {
             String error = response.path("error").asText("알 수 없는 오류");
-            throw new SlackBotMessageDispatchException(failureMessage + " - " + error);
+            String details = resolveResponseDetails(response);
+            if (details.isBlank()) {
+                throw new SlackBotMessageDispatchException(failureMessage + " - " + error);
+            }
+            throw new SlackBotMessageDispatchException(failureMessage + " - " + error + " - " + details);
         }
+    }
+
+    private String resolveResponseDetails(JsonNode response) {
+        JsonNode messages = response.path("response_metadata").path("messages");
+        if (!messages.isArray() || messages.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder details = new StringBuilder("messages=");
+        for (int i = 0; i < messages.size(); i++) {
+            if (i > 0) {
+                details.append(", ");
+            }
+            details.append(messages.get(i).asText(""));
+        }
+        return details.toString();
     }
 
     private RestClient.ResponseSpec.ErrorHandler slackApiErrorHandler(String apiName) {
@@ -105,7 +131,7 @@ public class NotificationApiClient {
                     .append(responseError.getStatusCode().value());
             if (!responseBody.isBlank()) {
                 messageBuilder.append(", 응답본문=")
-                        .append(truncateBody(responseBody));
+                              .append(truncateBody(responseBody));
             }
             throw new SlackBotMessageDispatchException(messageBuilder.toString());
         };
@@ -184,5 +210,19 @@ public class NotificationApiClient {
         body.put("trigger_id", triggerId);
         body.put("view", view);
         return body;
+    }
+
+    private Object normalizeView(Object view) {
+        if (view == null || view instanceof JsonNode || view instanceof Map<?, ?>) {
+            return view;
+        }
+
+        String snakeCaseJson = SNAKE_CASE_GSON.toJson(view);
+
+        try {
+            return objectMapper.readTree(snakeCaseJson);
+        } catch (IOException e) {
+            throw new SlackBotMessageDispatchException("슬랙 봇 메시지 전송 실패: 모달 view 직렬화 실패", e);
+        }
     }
 }

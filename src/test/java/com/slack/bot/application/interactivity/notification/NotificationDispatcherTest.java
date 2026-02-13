@@ -3,6 +3,7 @@ package com.slack.bot.application.interactivity.notification;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -267,5 +268,152 @@ class NotificationDispatcherTest {
 
         // then
         verify(notificationApiClient).sendEphemeralMessage(token, channelId, userId, text);
+    }
+
+    @Test
+    void 블록을_에페메랄과_DM으로_함께_전송한다() {
+        // given
+        String token = "xoxb-test-token";
+        String channelId = "C1";
+        String userId = "U1";
+        List<String> blocks = List.of("block1", "block2");
+        String fallback = "fallback text";
+
+        given(notificationApiClient.openDirectMessageChannel(token, userId))
+                .willReturn("DM-CHANNEL-ID");
+
+        // when
+        notificationDispatcher.sendBlockToDmAndEphemeral(token, channelId, userId, blocks, fallback);
+
+        // then
+        verify(notificationApiClient).sendEphemeralBlockMessage(token, channelId, userId, blocks, fallback);
+        verify(notificationApiClient).sendBlockMessage(token, "DM-CHANNEL-ID", blocks, fallback);
+    }
+
+    @Test
+    void DM_블록_전송_중_예외가_발생해도_에페메랄은_전송한다() {
+        // given
+        String token = "xoxb-test-token";
+        String channelId = "C1";
+        String userId = "U1";
+        List<String> blocks = List.of("block1", "block2");
+        String fallback = "fallback text";
+
+        doThrow(new RuntimeException("dm open failed"))
+                .when(notificationApiClient)
+                .openDirectMessageChannel(token, userId);
+
+        // when
+        notificationDispatcher.sendBlockToDmAndEphemeral(token, channelId, userId, blocks, fallback);
+
+        // then
+        verify(notificationApiClient).sendEphemeralBlockMessage(token, channelId, userId, blocks, fallback);
+        verify(notificationApiClient).openDirectMessageChannel(token, userId);
+    }
+
+    @Test
+    void 블록을_DM으로만_전송한다() {
+        // given
+        String token = "xoxb-test-token";
+        String userId = "U1";
+        List<String> blocks = List.of("block1", "block2");
+        String fallback = "fallback text";
+
+        given(notificationApiClient.openDirectMessageChannel(token, userId))
+                .willReturn("DM-CHANNEL-ID");
+
+        // when
+        notificationDispatcher.sendBlockToDirectMessageOnly(token, userId, blocks, fallback);
+
+        // then
+        verify(notificationApiClient).openDirectMessageChannel(token, userId);
+        verify(notificationApiClient).sendBlockMessage(token, "DM-CHANNEL-ID", blocks, fallback);
+    }
+
+    @Test
+    void DM으로만_블록_전송_중_예외가_발생해도_예외를_전파하지_않는다() {
+        // given
+        String token = "xoxb-test-token";
+        String userId = "U1";
+        List<String> blocks = List.of("block1", "block2");
+        String fallback = "fallback text";
+
+        doThrow(new RuntimeException("dm open failed"))
+                .when(notificationApiClient)
+                .openDirectMessageChannel(token, userId);
+
+        // when
+        notificationDispatcher.sendBlockToDirectMessageOnly(token, userId, blocks, fallback);
+
+        // then
+        verify(notificationApiClient).openDirectMessageChannel(token, userId);
+        verify(notificationApiClient, never()).sendBlockMessage(anyString(), anyString(), any(), anyString());
+    }
+
+    @Test
+    void 예약_채널_에페메랄_설정이_켜져_있으면_에페메랄과_DM을_전송한다() {
+        // given
+        String token = "xoxb-test-token";
+        String teamId = "T1";
+        String channelId = "C1";
+        String userId = "U1";
+        List<String> blocks = List.of("block1", "block2");
+        String fallback = "fallback text";
+        String ephemeralText = "예약 완료";
+        NotificationSettings settings = NotificationSettings.defaults(1L);
+
+        given(notificationSettingsRepository.findBySlackUser(teamId, userId))
+                .willReturn(Optional.of(settings));
+        given(notificationApiClient.openDirectMessageChannel(token, userId))
+                .willReturn("DM-CHANNEL-ID");
+
+        // when
+        notificationDispatcher.sendReservationBlockBySettingOrDefault(
+                token,
+                teamId,
+                channelId,
+                userId,
+                blocks,
+                fallback,
+                ephemeralText
+        );
+
+        // then
+        verify(notificationApiClient).sendEphemeralMessage(token, channelId, userId, ephemeralText);
+        verify(notificationApiClient).sendBlockMessage(token, "DM-CHANNEL-ID", blocks, fallback);
+    }
+
+    @Test
+    void 예약_채널_에페메랄_설정이_꺼져_있으면_DM만_전송한다() {
+        // given
+        String token = "xoxb-test-token";
+        String teamId = "T1";
+        String channelId = "C1";
+        String userId = "U1";
+        List<String> blocks = List.of("block1", "block2");
+        String fallback = "fallback text";
+        String ephemeralText = "예약 완료";
+        NotificationSettings settings = NotificationSettings.defaults(1L);
+        settings.updateReservationChannelEphemeral(false);
+
+        given(notificationSettingsRepository.findBySlackUser(teamId, userId))
+                .willReturn(Optional.of(settings));
+        given(notificationApiClient.openDirectMessageChannel(token, userId))
+                .willReturn("DM-CHANNEL-ID");
+
+        // when
+        notificationDispatcher.sendReservationBlockBySettingOrDefault(
+                token,
+                teamId,
+                channelId,
+                userId,
+                blocks,
+                fallback,
+                ephemeralText
+        );
+
+        // then
+        verify(notificationApiClient, never()).sendEphemeralMessage(anyString(), anyString(), anyString(), anyString());
+        verify(notificationApiClient).sendBlockMessage(token, "DM-CHANNEL-ID", blocks, fallback);
     }
 }

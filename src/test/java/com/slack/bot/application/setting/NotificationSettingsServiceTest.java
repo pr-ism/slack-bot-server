@@ -43,6 +43,7 @@ class NotificationSettingsServiceTest {
                 () -> assertThat(actual.projectMemberId()).isEqualTo(projectMemberId),
                 () -> assertThat(actual.reservationConfirmedSpace()).isEqualTo(DeliverySpace.DIRECT_MESSAGE),
                 () -> assertThat(actual.reservationCanceledConfirmationEnabled()).isTrue(),
+                () -> assertThat(actual.reservationChannelEphemeralEnabled()).isTrue(),
                 () -> assertThat(actual.reviewReminderEnabled()).isTrue(),
                 () -> assertThat(actual.prMentionEnabled()).isTrue(),
                 () -> assertThat(actual.reviewCompletedEnabled()).isTrue(),
@@ -72,6 +73,7 @@ class NotificationSettingsServiceTest {
                 () -> assertThat(actual.projectMemberId()).isEqualTo(projectMemberId),
                 () -> assertThat(actual.reservationConfirmedSpace()).isEqualTo(DeliverySpace.TRIGGER_CHANNEL),
                 () -> assertThat(actual.reservationCanceledConfirmationEnabled()).isFalse(),
+                () -> assertThat(actual.reservationChannelEphemeralEnabled()).isTrue(),
                 () -> assertThat(actual.reviewReminderEnabled()).isFalse(),
                 () -> assertThat(actual.prMentionEnabled()).isFalse(),
                 () -> assertThat(actual.reviewCompletedEnabled()).isFalse(),
@@ -89,6 +91,7 @@ class NotificationSettingsServiceTest {
         UpdateNotificationSettingsRequest request = new UpdateNotificationSettingsRequest(
                 DeliverySpace.TRIGGER_CHANNEL,
                 false,
+                false,
                 true,
                 false,
                 true
@@ -104,11 +107,13 @@ class NotificationSettingsServiceTest {
         assertAll(
                 () -> assertThat(actual.reservationConfirmedSpace()).isEqualTo(DeliverySpace.TRIGGER_CHANNEL),
                 () -> assertThat(actual.reservationCanceledConfirmationEnabled()).isFalse(),
+                () -> assertThat(actual.reservationChannelEphemeralEnabled()).isTrue(),
                 () -> assertThat(actual.reviewReminderEnabled()).isTrue(),
                 () -> assertThat(actual.prMentionEnabled()).isFalse(),
                 () -> assertThat(actual.reviewCompletedEnabled()).isTrue(),
                 () -> assertThat(saved.getReservationConfirmed().getDeliverySpace()).isEqualTo(DeliverySpace.TRIGGER_CHANNEL),
                 () -> assertThat(saved.getOptionalNotifications().isReservationCanceledConfirmationEnabled()).isFalse(),
+                () -> assertThat(saved.getOptionalNotifications().isReservationChannelEphemeralEnabled()).isTrue(),
                 () -> assertThat(saved.getOptionalNotifications().isReviewReminderEnabled()).isTrue(),
                 () -> assertThat(saved.getOptionalNotifications().isPullRequestMentionEnabled()).isFalse(),
                 () -> assertThat(saved.getOptionalNotifications().isReviewCompletedEnabled()).isTrue()

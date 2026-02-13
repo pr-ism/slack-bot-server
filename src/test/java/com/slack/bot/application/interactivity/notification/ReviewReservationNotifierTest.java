@@ -18,6 +18,7 @@ import com.slack.bot.application.interactivity.dto.ReviewScheduleMetaDto;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.ReservationStatus;
 import com.slack.bot.domain.reservation.vo.ReservationPullRequest;
+import java.lang.reflect.Field;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -388,20 +389,223 @@ class ReviewReservationNotifierTest {
         );
     }
 
+    @Test
+    void 예약_블록을_DM과_에페메랄_설정에_따라_전송한다() {
+        // given
+        String token = "xoxb-token";
+        String teamId = "T1";
+        String channelId = "C1";
+        String slackUserId = "U1";
+        String headerText = "리뷰 예약 완료";
+        ReviewReservation reservation = createReservationWith("Fix bug", 1, FIXED_NOW.plusSeconds(3600));
+
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode blocks = mapper.createArrayNode();
+        String fallbackText = "fallback";
+        ReviewReservationMessageDto message = ReviewReservationMessageDto.ofBlocks(blocks, fallbackText);
+
+        given(reservationBlockCreator.create(
+                reservation,
+                headerText,
+                ReviewReservationBlockType.RESERVATION
+        )).willReturn(message);
+
+        // when
+        reviewReservationNotifier.sendReservationBlockToDmAndEphemeral(
+                token,
+                teamId,
+                channelId,
+                slackUserId,
+                reservation,
+                headerText
+        );
+
+        // then
+        assertAll(
+                () -> verify(reservationBlockCreator).create(reservation, headerText, ReviewReservationBlockType.RESERVATION),
+                () -> verify(notificationDispatcher).sendReservationBlockBySettingOrDefault(
+                        eq(token),
+                        eq(teamId),
+                        eq(channelId),
+                        eq(slackUserId),
+                        eq(blocks),
+                        eq(fallbackText),
+                        eq("리뷰 예약 완료\nFix bug\n리뷰 시작 시간: 2024년 1월 1일 11시 00분")
+                )
+        );
+    }
+
+    @Test
+    void 예약_블록을_DM으로만_전송한다() {
+        // given
+        String token = "xoxb-token";
+        String slackUserId = "U1";
+        String headerText = "리뷰 예약 완료";
+        ReviewReservation reservation = createReservation();
+
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode blocks = mapper.createArrayNode();
+        String fallbackText = "fallback";
+        ReviewReservationMessageDto message = ReviewReservationMessageDto.ofBlocks(blocks, fallbackText);
+
+        given(reservationBlockCreator.create(
+                reservation,
+                headerText,
+                ReviewReservationBlockType.RESERVATION
+        )).willReturn(message);
+
+        // when
+        reviewReservationNotifier.sendReservationBlockToDirectMessageOnly(token, slackUserId, reservation, headerText);
+
+        // then
+        assertAll(
+                () -> verify(reservationBlockCreator).create(reservation, headerText, ReviewReservationBlockType.RESERVATION),
+                () -> verify(notificationDispatcher).sendBlockToDirectMessageOnly(token, slackUserId, blocks, fallbackText)
+        );
+    }
+
+    @Test
+    void 중복_예약_안내를_DM과_에페메랄로_전송한다() {
+        // given
+        String token = "xoxb-token";
+        String channelId = "C1";
+        String slackUserId = "U1";
+        ReviewReservation reservation = createReservationWith("Fix bug", 1, FIXED_NOW.plusSeconds(3600));
+
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode blocks = mapper.createArrayNode();
+        String fallbackText = "fallback";
+        ReviewReservationMessageDto message = ReviewReservationMessageDto.ofBlocks(blocks, fallbackText);
+
+        given(reservationBlockCreator.create(
+                reservation,
+                "이미 이 PR 리뷰를 예약했습니다.",
+                ReviewReservationBlockType.RESERVATION
+        )).willReturn(message);
+
+        // when
+        reviewReservationNotifier.sendDuplicateReservationNoticeToDmAndEphemeral(
+                token,
+                channelId,
+                slackUserId,
+                reservation
+        );
+
+        // then
+        assertAll(
+                () -> verify(notificationDispatcher).sendEphemeral(
+                        token,
+                        channelId,
+                        slackUserId,
+                        "이미 이 PR 리뷰를 예약했습니다."
+                ),
+                () -> verify(notificationDispatcher).sendBlockToDirectMessageOnly(
+                        token,
+                        slackUserId,
+                        blocks,
+                        fallbackText
+                )
+        );
+    }
+
+    @Test
+    void 예약_시간이_지났으면_중복_안내에_이미_시작된_문구를_사용한다() {
+        // given
+        String token = "xoxb-token";
+        String channelId = "C1";
+        String slackUserId = "U1";
+        ReviewReservation reservation = createReservationWith("Fix bug", 1, FIXED_NOW.minusSeconds(60));
+
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode blocks = mapper.createArrayNode();
+        String fallbackText = "fallback";
+        ReviewReservationMessageDto message = ReviewReservationMessageDto.ofBlocks(blocks, fallbackText);
+
+        given(reservationBlockCreator.create(
+                reservation,
+                "이미 리뷰 시작 시간이 되어 새로 예약할 수 없습니다.",
+                ReviewReservationBlockType.RESERVATION
+        )).willReturn(message);
+
+        // when
+        reviewReservationNotifier.sendDuplicateReservationNoticeToDmAndEphemeral(
+                token,
+                channelId,
+                slackUserId,
+                reservation
+        );
+
+        // then
+        verify(notificationDispatcher).sendEphemeral(
+                token,
+                channelId,
+                slackUserId,
+                "이미 리뷰 시작 시간이 되어 새로 예약할 수 없습니다."
+        );
+    }
+
+    @Test
+    void PR_제목이_비어_있으면_PR_번호로_예약_안내_문구를_구성한다() {
+        // given
+        String token = "xoxb-token";
+        String teamId = "T1";
+        String channelId = "C1";
+        String slackUserId = "U1";
+        String headerText = "리뷰 예약 완료";
+        ReviewReservation reservation = createReservationWith("Valid title", 42, FIXED_NOW.plusSeconds(3600));
+        setPullRequestTitle(reservation, " ");
+
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode blocks = mapper.createArrayNode();
+        String fallbackText = "fallback";
+        ReviewReservationMessageDto message = ReviewReservationMessageDto.ofBlocks(blocks, fallbackText);
+
+        given(reservationBlockCreator.create(
+                reservation,
+                headerText,
+                ReviewReservationBlockType.RESERVATION
+        )).willReturn(message);
+
+        // when
+        reviewReservationNotifier.sendReservationBlockToDmAndEphemeral(
+                token,
+                teamId,
+                channelId,
+                slackUserId,
+                reservation,
+                headerText
+        );
+
+        // then
+        verify(notificationDispatcher).sendReservationBlockBySettingOrDefault(
+                eq(token),
+                eq(teamId),
+                eq(channelId),
+                eq(slackUserId),
+                eq(blocks),
+                eq(fallbackText),
+                eq("리뷰 예약 완료\nPR #42\n리뷰 시작 시간: 2024년 1월 1일 11시 00분")
+        );
+    }
+
     private ReviewReservation createReservation() {
+        return createReservationWith("Fix bug", 1, FIXED_NOW.plusSeconds(3600));
+    }
+
+    private ReviewReservation createReservationWith(String title, int pullRequestNumber, Instant scheduledAt) {
         return ReviewReservation.builder()
                 .teamId("T1")
                 .channelId("C1")
                 .projectId(1L)
                 .reservationPullRequest(ReservationPullRequest.builder()
                         .pullRequestId(1L)
-                        .pullRequestNumber(1)
-                        .pullRequestTitle("Fix bug")
+                        .pullRequestNumber(pullRequestNumber)
+                        .pullRequestTitle(title)
                         .pullRequestUrl("https://github.com/org/repo/pull/1")
                         .build())
                 .authorSlackId("U-AUTHOR")
                 .reviewerSlackId("U-REVIEWER")
-                .scheduledAt(FIXED_NOW.plusSeconds(3600))
+                .scheduledAt(scheduledAt)
                 .status(ReservationStatus.ACTIVE)
                 .build();
     }
@@ -419,5 +623,15 @@ class ReviewReservationNotifierTest {
                                     .reservationId("100")
                                     .projectId("1")
                                     .build();
+    }
+
+    private void setPullRequestTitle(ReviewReservation reservation, String pullRequestTitle) {
+        try {
+            Field titleField = ReservationPullRequest.class.getDeclaredField("pullRequestTitle");
+            titleField.setAccessible(true);
+            titleField.set(reservation.getReservationPullRequest(), pullRequestTitle);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("테스트 PR 제목 설정 실패", e);
+        }
     }
 }

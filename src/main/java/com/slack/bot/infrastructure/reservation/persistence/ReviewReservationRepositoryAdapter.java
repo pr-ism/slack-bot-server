@@ -8,7 +8,6 @@ import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.repository.ReviewReservationRepository;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import jakarta.persistence.LockModeType;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,11 +51,12 @@ public class ReviewReservationRepositoryAdapter implements ReviewReservationRepo
     }
 
     @Override
-    @Transactional
-    public Optional<ReviewReservation> findActiveForUpdate(
+    @Transactional(readOnly = true)
+    public Optional<ReviewReservation> findActive(
             String teamId,
             Long projectId,
-            String reviewerSlackId
+            String reviewerSlackId,
+            Long pullRequestId
     ) {
         ReviewReservation result = queryFactory
                 .selectFrom(reviewReservation)
@@ -64,28 +64,11 @@ public class ReviewReservationRepositoryAdapter implements ReviewReservationRepo
                         reviewReservation.teamId.eq(teamId),
                         reviewReservation.projectId.eq(projectId),
                         reviewReservation.reviewerSlackId.eq(reviewerSlackId),
+                        reviewReservation.reservationPullRequest.pullRequestId.eq(pullRequestId),
                         reviewReservation.status.eq(ReservationStatus.ACTIVE)
                 )
-                .setLockMode(LockModeType.PESSIMISTIC_WRITE)
                 .fetchOne();
 
         return Optional.ofNullable(result);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public boolean existsActive(String teamId, Long projectId, String reviewerSlackId) {
-        Integer result = queryFactory
-                .selectOne()
-                .from(reviewReservation)
-                .where(
-                        reviewReservation.teamId.eq(teamId),
-                        reviewReservation.projectId.eq(projectId),
-                        reviewReservation.reviewerSlackId.eq(reviewerSlackId),
-                        reviewReservation.status.eq(ReservationStatus.ACTIVE)
-                )
-                .fetchFirst();
-
-        return result != null;
     }
 }

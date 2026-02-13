@@ -117,6 +117,37 @@ class NotificationSettingsTest {
     }
 
     @Test
+    void 알림_설정에서_예약_채널_에페메랄_메시지를_비활성화한다() {
+        // given
+        NotificationSettings settings = NotificationSettings.defaults(1L);
+
+        // when
+        settings.updateReservationChannelEphemeral(false);
+
+        // then
+        assertAll(
+                () -> assertThat(settings.getOptionalNotifications().isReservationChannelEphemeralEnabled()).isFalse(),
+                () -> assertThat(settings.isReservationChannelEphemeralEnabled()).isFalse()
+        );
+    }
+
+    @Test
+    void 알림_설정에서_예약_채널_에페메랄_메시지를_다시_활성화한다() {
+        // given
+        NotificationSettings settings = NotificationSettings.defaults(1L);
+        settings.updateReservationChannelEphemeral(false);
+
+        // when
+        settings.updateReservationChannelEphemeral(true);
+
+        // then
+        assertAll(
+                () -> assertThat(settings.getOptionalNotifications().isReservationChannelEphemeralEnabled()).isTrue(),
+                () -> assertThat(settings.isReservationChannelEphemeralEnabled()).isTrue()
+        );
+    }
+
+    @Test
     void 알림_설정에서_리뷰_리마인드_메시지를_비활성화한다() {
         // given
         NotificationSettings settings = NotificationSettings.defaults(1L);

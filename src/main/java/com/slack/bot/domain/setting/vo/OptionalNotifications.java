@@ -13,21 +13,24 @@ import lombok.NoArgsConstructor;
 public class OptionalNotifications {
 
     private boolean reservationCanceledConfirmationEnabled;
+    private boolean reservationChannelEphemeralEnabled;
     private boolean reviewReminderEnabled;
     private boolean pullRequestMentionEnabled;
     private boolean reviewCompletedEnabled;
 
     public static OptionalNotifications defaults() {
-        return new OptionalNotifications(true, true, true, true);
+        return new OptionalNotifications(true, true, true, true, true);
     }
 
     private OptionalNotifications(
             boolean reservationCanceledConfirmationEnabled,
+            boolean reservationChannelEphemeralEnabled,
             boolean reviewReminderEnabled,
             boolean pullRequestMentionEnabled,
             boolean reviewCompletedEnabled
     ) {
         this.reservationCanceledConfirmationEnabled = reservationCanceledConfirmationEnabled;
+        this.reservationChannelEphemeralEnabled = reservationChannelEphemeralEnabled;
         this.reviewReminderEnabled = reviewReminderEnabled;
         this.pullRequestMentionEnabled = pullRequestMentionEnabled;
         this.reviewCompletedEnabled = reviewCompletedEnabled;
@@ -35,6 +38,17 @@ public class OptionalNotifications {
 
     public OptionalNotifications updateReservationCanceledConfirmation(boolean enabled) {
         return new OptionalNotifications(
+                enabled,
+                reservationChannelEphemeralEnabled,
+                reviewReminderEnabled,
+                pullRequestMentionEnabled,
+                reviewCompletedEnabled
+        );
+    }
+
+    public OptionalNotifications updateReservationChannelEphemeral(boolean enabled) {
+        return new OptionalNotifications(
+                reservationCanceledConfirmationEnabled,
                 enabled,
                 reviewReminderEnabled,
                 pullRequestMentionEnabled,
@@ -45,6 +59,7 @@ public class OptionalNotifications {
     public OptionalNotifications updateReviewReminder(boolean enabled) {
         return new OptionalNotifications(
                 reservationCanceledConfirmationEnabled,
+                reservationChannelEphemeralEnabled,
                 enabled,
                 pullRequestMentionEnabled,
                 reviewCompletedEnabled
@@ -54,6 +69,7 @@ public class OptionalNotifications {
     public OptionalNotifications updatePrMention(boolean enabled) {
         return new OptionalNotifications(
                 reservationCanceledConfirmationEnabled,
+                reservationChannelEphemeralEnabled,
                 reviewReminderEnabled,
                 enabled,
                 reviewCompletedEnabled
@@ -63,6 +79,7 @@ public class OptionalNotifications {
     public OptionalNotifications updateReviewCompleted(boolean enabled) {
         return new OptionalNotifications(
                 reservationCanceledConfirmationEnabled,
+                reservationChannelEphemeralEnabled,
                 reviewReminderEnabled,
                 pullRequestMentionEnabled,
                 enabled

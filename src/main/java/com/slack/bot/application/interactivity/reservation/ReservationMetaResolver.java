@@ -26,20 +26,20 @@ public class ReservationMetaResolver {
         String projectId = textRequired(root, "project_id");
         String authorGithubId = textRequired(root, "author_github_id");
         String authorSlackId = textRequired(root, "author_slack_id");
-        String reservationId = textRequired(root, "reservation_id");
+        String reservationId = textOptional(root, "reservation_id");
 
         return ReviewScheduleMetaDto.builder()
-                .teamId(teamId)
-                .channelId(channelId)
-                .pullRequestId(pullRequestId)
-                .pullRequestNumber(pullRequestNumber)
-                .pullRequestTitle(pullRequestTitle)
-                .pullRequestUrl(pullRequestUrl)
-                .authorGithubId(authorGithubId)
-                .authorSlackId(authorSlackId)
-                .reservationId(reservationId)
-                .projectId(projectId)
-                .build();
+                                    .teamId(teamId)
+                                    .channelId(channelId)
+                                    .pullRequestId(pullRequestId)
+                                    .pullRequestNumber(pullRequestNumber)
+                                    .pullRequestTitle(pullRequestTitle)
+                                    .pullRequestUrl(pullRequestUrl)
+                                    .authorGithubId(authorGithubId)
+                                    .authorSlackId(authorSlackId)
+                                    .reservationId(reservationId)
+                                    .projectId(projectId)
+                                    .build();
     }
 
     private JsonNode readRoot(String metaJson) {
@@ -59,6 +59,19 @@ public class ReservationMetaResolver {
 
         if (value == null || value.isBlank()) {
             throw new ReservationMetaInvalidException(field + "는 비어 있을 수 없습니다.");
+        }
+        return value;
+    }
+
+    private String textOptional(JsonNode node, String field) {
+        if (node == null) {
+            return null;
+        }
+
+        String value = node.path(field).asText(null);
+
+        if (value == null || value.isBlank()) {
+            return null;
         }
         return value;
     }

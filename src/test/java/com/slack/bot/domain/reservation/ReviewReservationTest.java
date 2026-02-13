@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
+import com.slack.bot.domain.common.BaseEntity;
 import com.slack.bot.domain.reservation.vo.ReservationPullRequest;
+import java.lang.reflect.Field;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -249,6 +251,86 @@ class ReviewReservationTest {
                 () -> assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.CANCELLED),
                 () -> assertThat(reservation.isActive()).isFalse()
         );
+    }
+
+    @Test
+    void ID가_다르면_isNotEqualTo는_true를_반환한다() {
+        // given
+        ReviewReservation first = createReservation();
+        setId(first, 1L);
+
+        ReviewReservation second = createReservation();
+        setId(second, 2L);
+
+        // when
+        boolean actual = first.isNotEqualTo(second);
+
+        // then
+        assertThat(actual).isTrue();
+    }
+
+    @Test
+    void ID가_같으면_isNotEqualTo는_false를_반환한다() {
+        // given
+        ReviewReservation first = createReservation();
+        setId(first, 1L);
+
+        ReviewReservation second = createReservation();
+        setId(second, 1L);
+
+        // when
+        boolean actual = first.isNotEqualTo(second);
+
+        // then
+        assertThat(actual).isFalse();
+    }
+
+    @Test
+    void ID가_둘_다_null이면_isNotEqualTo는_false를_반환한다() {
+        // given
+        ReviewReservation first = createReservation();
+        ReviewReservation second = createReservation();
+
+        // when
+        boolean actual = first.isNotEqualTo(second);
+
+        // then
+        assertThat(actual).isFalse();
+    }
+
+    @Test
+    void 비교_대상이_null이면_isNotEqualTo는_true를_반환한다() {
+        // given
+        ReviewReservation first = createReservation();
+
+        // when
+        boolean actual = first.isNotEqualTo(null);
+
+        // then
+        assertThat(actual).isTrue();
+    }
+
+    private ReviewReservation createReservation() {
+        return ReviewReservation.builder()
+                .teamId("T1")
+                .channelId("C1")
+                .projectId(1L)
+                .reservationPullRequest(createValidPullRequest())
+                .authorSlackId("U1")
+                .reviewerSlackId("U2")
+                .scheduledAt(Instant.now())
+                .status(ReservationStatus.ACTIVE)
+                .build();
+    }
+
+    private void setId(ReviewReservation reservation, Long id) {
+        try {
+            Field idField = BaseEntity.class.getDeclaredField("id");
+            idField.setAccessible(true);
+            idField.set(reservation, id);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("테스트 ID 설정 실패", e);
+        }
     }
 
     private ReservationPullRequest createValidPullRequest() {

@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS notification_settings (
     project_member_id BIGINT NOT NULL UNIQUE,
     delivery_space VARCHAR(255) NOT NULL,
     reservation_canceled_confirmation_enabled BOOLEAN NOT NULL,
+    reservation_channel_ephemeral_enabled BOOLEAN NOT NULL DEFAULT TRUE,
     review_reminder_enabled BOOLEAN NOT NULL,
     pull_request_mention_enabled BOOLEAN NOT NULL,
     review_completed_enabled BOOLEAN NOT NULL

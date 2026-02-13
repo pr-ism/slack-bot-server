@@ -9,6 +9,7 @@ public record UpdateNotificationSettingsRequest(
         DeliverySpace reservationConfirmedSpace,
 
         boolean reservationCanceledConfirmationEnabled,
+        boolean reservationChannelEphemeralEnabled,
         boolean reviewReminderEnabled,
         boolean prMentionEnabled,
         boolean reviewCompletedEnabled

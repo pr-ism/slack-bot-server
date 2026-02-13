@@ -2,6 +2,7 @@ package com.slack.bot.infrastructure.review.block;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import com.slack.api.model.Attachment;
 import com.slack.api.model.block.ActionsBlock;
 import com.slack.api.model.block.LayoutBlock;
@@ -30,6 +31,7 @@ public class SlackSdkReviewBlockCreator implements ReviewBlockCreator {
     private static final String START_REVIEW_ACTION_ID = "start_review";
     private static final String CLAIM_ACTION_PREFIX = "claim_github_id_";
     private static final String ATTACHMENT_COLOR = "#6366F1";
+    private static final Gson SNAKE_CASE_GSON = GsonFactory.createSnakeCase();
 
     private final ObjectMapper objectMapper;
     private final ReviewParticipantFormatter mentionFormatter;
@@ -159,7 +161,7 @@ public class SlackSdkReviewBlockCreator implements ReviewBlockCreator {
     }
 
     private JsonNode toJsonNode(Object value) {
-        String json = GsonFactory.createSnakeCase().toJson(value);
+        String json = SNAKE_CASE_GSON.toJson(value);
 
         try {
             return objectMapper.readTree(json);

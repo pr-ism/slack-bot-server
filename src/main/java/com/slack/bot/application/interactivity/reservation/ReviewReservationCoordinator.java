@@ -41,11 +41,7 @@ public class ReviewReservationCoordinator {
     @Transactional
     public ReviewReservation create(ReservationCommandDto command) {
         validateScheduledAt(command.scheduledAt());
-        return reviewReservationRepository.findActiveForUpdate(
-                        command.teamId(),
-                        command.projectId(),
-                        command.reviewerSlackId()
-                )
+        return reviewReservationRepository.findActive(command.teamId(), command.projectId(), command.reviewerSlackId())
                 .<ReviewReservation>map(existing -> {
                     throw new ActiveReservationAlreadyExistsException("이미 활성화된 리뷰 예약이 있습니다.");
                 })
@@ -59,13 +55,9 @@ public class ReviewReservationCoordinator {
         validateSameKey(existing, command.teamId(), command.projectId(), command.reviewerSlackId());
         validateScheduledAt(command.scheduledAt());
 
-        return reviewReservationRepository.findActiveForUpdate(
-                        command.teamId(),
-                        command.projectId(),
-                        command.reviewerSlackId()
-                )
+        return reviewReservationRepository.findActive(command.teamId(), command.projectId(), command.reviewerSlackId())
                 .map(active -> {
-                    if (!active.getId().equals(existing.getId())) {
+                    if (active.isNotEqualTo(existing)) {
                         throw new ActiveReservationAlreadyExistsException("이미 활성화된 리뷰 예약이 있습니다.");
                     }
                     return rescheduleInternal(active, command);
@@ -74,6 +66,38 @@ public class ReviewReservationCoordinator {
                     cancelInternal(existing);
                     return createInternal(command);
                 });
+    }
+
+    public Optional<ReviewReservation> findActive(
+            String teamId,
+            Long projectId,
+            String reviewerSlackId,
+            Long pullRequestId
+    ) {
+        return reviewReservationRepository.findActive(
+                teamId,
+                projectId,
+                reviewerSlackId,
+                pullRequestId
+        );
+    }
+
+    @Transactional
+    public Optional<ReviewReservation> cancelActive(
+            String teamId,
+            Long projectId,
+            String reviewerSlackId,
+            Long pullRequestId
+    ) {
+        return reviewReservationRepository.findActive(
+                teamId,
+                projectId,
+                reviewerSlackId,
+                pullRequestId
+        ).map(existing -> {
+            cancelInternal(existing);
+            return existing;
+        });
     }
 
     private ReviewReservation createInternal(ReservationCommandDto command) {

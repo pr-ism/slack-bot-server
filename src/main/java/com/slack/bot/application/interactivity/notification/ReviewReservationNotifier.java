@@ -18,6 +18,9 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ReviewReservationNotifier {
 
+    private static final String DUPLICATE_RESERVATION_MESSAGE = "이미 이 PR 리뷰를 예약했습니다.";
+    private static final String ALREADY_STARTED_RESERVATION_MESSAGE = "이미 리뷰 시작 시간이 되어 새로 예약할 수 없습니다.";
+
     private final Clock clock;
     private final NotificationDispatcher notificationDispatcher;
     private final ReviewReservationBlockCreator reservationBlockCreator;
@@ -41,6 +44,79 @@ public class ReviewReservationNotifier {
                 teamId,
                 token,
                 channelId,
+                slackUserId,
+                message.blocks(),
+                message.fallbackText()
+        );
+    }
+
+    public void sendReservationBlockToDmAndEphemeral(
+            String token,
+            String teamId,
+            String channelId,
+            String slackUserId,
+            ReviewReservation reservation,
+            String headerText
+    ) {
+        ReviewReservationMessageDto message = reservationBlockCreator.create(
+                reservation,
+                headerText,
+                ReviewReservationBlockType.RESERVATION
+        );
+        String ephemeralText = buildReservationEphemeralText(reservation, headerText);
+
+        notificationDispatcher.sendReservationBlockBySettingOrDefault(
+                token,
+                teamId,
+                channelId,
+                slackUserId,
+                message.blocks(),
+                message.fallbackText(),
+                ephemeralText
+        );
+    }
+
+    public void sendReservationBlockToDirectMessageOnly(
+            String token,
+            String slackUserId,
+            ReviewReservation reservation,
+            String headerText
+    ) {
+        ReviewReservationMessageDto message = reservationBlockCreator.create(
+                reservation,
+                headerText,
+                ReviewReservationBlockType.RESERVATION
+        );
+
+        notificationDispatcher.sendBlockToDirectMessageOnly(
+                token,
+                slackUserId,
+                message.blocks(),
+                message.fallbackText()
+        );
+    }
+
+    public void sendDuplicateReservationNoticeToDmAndEphemeral(
+            String token,
+            String channelId,
+            String slackUserId,
+            ReviewReservation reservation
+    ) {
+        String duplicateMessage = resolveDuplicateReservationMessage(reservation);
+        ReviewReservationMessageDto message = reservationBlockCreator.create(
+                reservation,
+                duplicateMessage,
+                ReviewReservationBlockType.RESERVATION
+        );
+
+        notificationDispatcher.sendEphemeral(
+                token,
+                channelId,
+                slackUserId,
+                duplicateMessage
+        );
+        notificationDispatcher.sendBlockToDirectMessageOnly(
+                token,
                 slackUserId,
                 message.blocks(),
                 message.fallbackText()
@@ -85,6 +161,26 @@ public class ReviewReservationNotifier {
         notificationDispatcher.sendDirectMessageIfEnabled(meta.teamId(), token, reviewerId, text);
     }
 
+    public void notifyStartNowToParticipants(ReviewScheduleMetaDto meta, String reviewerId, String token) {
+        if (meta == null) {
+            return;
+        }
+        if (reviewerId == null || reviewerId.isBlank()) {
+            return;
+        }
+
+        String authorSlackId = meta.authorSlackId();
+
+        if (authorSlackId == null || authorSlackId.isBlank()) {
+            return;
+        }
+
+        String text = messageFormatter.buildStartNowText(authorSlackId, reviewerId, meta);
+
+        notificationDispatcher.sendDirectMessageBySettingOrDefault(meta.teamId(), token, authorSlackId, text);
+        notificationDispatcher.sendDirectMessageBySettingOrDefault(meta.teamId(), token, reviewerId, text);
+    }
+
     public void notifyScheduled(
             ReviewScheduleMetaDto meta,
             String reviewerId,
@@ -111,5 +207,35 @@ public class ReviewReservationNotifier {
 
         notificationDispatcher.sendDirectMessageIfEnabled(meta.teamId(), token, authorSlackId, text);
         notificationDispatcher.sendDirectMessageIfEnabled(meta.teamId(), token, reviewerId, text);
+    }
+
+    private String resolveDuplicateReservationMessage(ReviewReservation reservation) {
+        if (reservation == null || reservation.getScheduledAt() == null) {
+            return DUPLICATE_RESERVATION_MESSAGE;
+        }
+
+        if (!reservation.getScheduledAt().isAfter(Instant.now(clock))) {
+            return ALREADY_STARTED_RESERVATION_MESSAGE;
+        }
+
+        return DUPLICATE_RESERVATION_MESSAGE;
+    }
+
+    private String buildReservationEphemeralText(ReviewReservation reservation, String headerText) {
+        String title = reservation.getReservationPullRequest().getPullRequestTitle();
+        String prLine = (title != null && !title.isBlank())
+                ? title
+                : "PR #" + reservation.getReservationPullRequest().getPullRequestNumber();
+        ZonedDateTime when = reservation.getScheduledAt().atZone(clock.getZone());
+        String scheduledAtText = String.format(
+                "%d년 %d월 %d일 %02d시 %02d분",
+                when.getYear(),
+                when.getMonthValue(),
+                when.getDayOfMonth(),
+                when.getHour(),
+                when.getMinute()
+        );
+
+        return headerText + "\n" + prLine + "\n리뷰 시작 시간: " + scheduledAtText;
     }
 }

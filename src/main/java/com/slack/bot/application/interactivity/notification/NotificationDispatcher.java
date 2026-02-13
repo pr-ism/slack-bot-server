@@ -3,8 +3,10 @@ package com.slack.bot.application.interactivity.notification;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.domain.setting.repository.NotificationSettingsRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class NotificationDispatcher {
@@ -20,6 +22,59 @@ public class NotificationDispatcher {
         notificationApiClient.sendEphemeralBlockMessage(token, channelId, userId, blocks, fallback);
     }
 
+    public void sendBlockToDmAndEphemeral(
+            String token,
+            String channelId,
+            String userId,
+            Object blocks,
+            String fallback
+    ) {
+        sendEphemeralBlocks(token, channelId, userId, blocks, fallback);
+
+        try {
+            sendDirectMessageBlocks(token, userId, blocks, fallback);
+        } catch (RuntimeException e) {
+            log.warn("DM 블록 메시지 전송 실패. userId={}", userId, e);
+        }
+    }
+
+    public void sendReservationBlockBySettingOrDefault(
+            String token,
+            String teamId,
+            String channelId,
+            String userId,
+            Object blocks,
+            String fallback,
+            String ephemeralText
+    ) {
+        boolean sendChannelEphemeral = notificationSettingsRepository.findBySlackUser(teamId, userId)
+                                                     .map(settings -> settings.isReservationChannelEphemeralEnabled())
+                                                     .orElse(true);
+
+        if (sendChannelEphemeral) {
+            sendEphemeral(token, channelId, userId, ephemeralText);
+        }
+
+        try {
+            sendDirectMessageBlocks(token, userId, blocks, fallback);
+        } catch (RuntimeException e) {
+            log.warn("DM 블록 메시지 전송 실패. userId={}", userId, e);
+        }
+    }
+
+    public void sendBlockToDirectMessageOnly(
+            String token,
+            String userId,
+            Object blocks,
+            String fallback
+    ) {
+        try {
+            sendDirectMessageBlocks(token, userId, blocks, fallback);
+        } catch (RuntimeException e) {
+            log.warn("DM 블록 메시지 전송 실패. userId={}", userId, e);
+        }
+    }
+
     public void sendBlock(
             String teamId,
             String token,
@@ -29,16 +84,16 @@ public class NotificationDispatcher {
             String fallback
     ) {
         notificationSettingsRepository.findBySlackUser(teamId, userId)
-                .ifPresentOrElse(
-                        settings -> {
-                            if (settings.isDirectMessageEnabled()) {
-                                sendEphemeralBlocks(token, channelId, userId, blocks, fallback);
-                                return;
-                            }
-                            sendDirectMessageBlocks(token, userId, blocks, fallback);
-                        },
-                        () -> sendDirectMessageBlocks(token, userId, blocks, fallback)
-                );
+                                      .ifPresentOrElse(
+                                              settings -> {
+                                                  if (settings.isDirectMessageEnabled()) {
+                                                      sendEphemeralBlocks(token, channelId, userId, blocks, fallback);
+                                                      return;
+                                                  }
+                                                  sendDirectMessageBlocks(token, userId, blocks, fallback);
+                                              },
+                                              () -> sendDirectMessageBlocks(token, userId, blocks, fallback)
+                                      );
     }
 
     public void sendText(String teamId,
@@ -61,14 +116,31 @@ public class NotificationDispatcher {
     }
 
     public void sendDirectMessageIfEnabled(String teamId, String token, String userId, String text) {
-       notificationSettingsRepository.findBySlackUser(teamId, userId)
-               .ifPresent(
-                       settings -> {
-                           if (settings.isDirectMessageEnabled()) {
-                               sendDmText(token, userId, text);
-                           }
-                       }
-               );
+        notificationSettingsRepository.findBySlackUser(teamId, userId)
+                                      .ifPresent(
+                                              settings -> {
+                                                  if (settings.isDirectMessageEnabled()) {
+                                                      sendDmText(token, userId, text);
+                                                  }
+                                              }
+                                      );
+    }
+
+    public void sendDirectMessageBySettingOrDefault(
+            String teamId,
+            String token,
+            String userId,
+            String text
+    ) {
+        notificationSettingsRepository.findBySlackUser(teamId, userId)
+                                      .ifPresentOrElse(
+                                              settings -> {
+                                                  if (settings.isDirectMessageEnabled()) {
+                                                      sendDmText(token, userId, text);
+                                                  }
+                                              },
+                                              () -> sendDmText(token, userId, text)
+                                      );
     }
 
     private void sendDmText(String token, String userId, String text) {

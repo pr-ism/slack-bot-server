@@ -11,6 +11,8 @@ import com.slack.bot.application.interactivity.reservation.ReviewReservationCoor
 import com.slack.bot.application.interactivity.reservation.ReviewScheduleMetaBuilder;
 import com.slack.bot.application.interactivity.view.factory.ReviewReservationTimeViewFactory;
 import com.slack.bot.domain.reservation.ReviewReservation;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -23,6 +25,7 @@ public class ReservationCommandWorkflow {
     private final SlackActionErrorNotifier errorNotifier;
     private final ReviewReservationTimeViewFactory slackViews;
     private final ReviewScheduleMetaBuilder reviewScheduleMetaBuilder;
+    private final Clock clock;
     private final ReviewReservationCoordinator reviewReservationCoordinator;
     private final ReviewInteractionEventPublisher reviewInteractionEventPublisher;
 
@@ -113,10 +116,10 @@ public class ReservationCommandWorkflow {
             String slackUserId
     ) {
         return reviewReservationCoordinator.findById(reservationId)
-                .orElseGet(() -> {
-                    errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.RESERVATION_NOT_FOUND);
-                    return null;
-                });
+                                           .orElseGet(() -> {
+                                               errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.RESERVATION_NOT_FOUND);
+                                               return null;
+                                           });
     }
 
     private boolean isOwnerOrNotify(
@@ -143,6 +146,14 @@ public class ReservationCommandWorkflow {
         if (reservation == null) {
             return false;
         }
+        if (!reservation.isActive()) {
+            errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.RESERVATION_ALREADY_CANCELLED);
+            return false;
+        }
+        if (isReviewAlreadyStarted(reservation)) {
+            errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.RESERVATION_ALREADY_STARTED);
+            return false;
+        }
 
         return isOwnerOrNotify(reservation, token, channelId, slackUserId, InteractivityErrorType.NOT_OWNER_CANCEL);
     }
@@ -156,8 +167,25 @@ public class ReservationCommandWorkflow {
         if (reservation == null) {
             return false;
         }
+        if (!reservation.isActive()) {
+            errorNotifier.notify(
+                    token,
+                    channelId,
+                    slackUserId,
+                    InteractivityErrorType.RESERVATION_CHANGE_NOT_ALLOWED_CANCELLED
+            );
+            return false;
+        }
+        if (isReviewAlreadyStarted(reservation)) {
+            errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.RESERVATION_ALREADY_STARTED);
+            return false;
+        }
 
         return isOwnerOrNotify(reservation, token, channelId, slackUserId, InteractivityErrorType.NOT_OWNER_CHANGE);
+    }
+
+    private boolean isReviewAlreadyStarted(ReviewReservation reservation) {
+        return !reservation.getScheduledAt().isAfter(Instant.now(clock));
     }
 
     private void openChangeModal(
@@ -167,9 +195,10 @@ public class ReservationCommandWorkflow {
             String token,
             ReviewReservation reservation
     ) {
-        String metaJson = reviewScheduleMetaBuilder.buildForChange(reservation);
-
-        if (metaJson == null) {
+        final String metaJson;
+        try {
+            metaJson = reviewScheduleMetaBuilder.buildForChange(reservation);
+        } catch (RuntimeException e) {
             errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.RESERVATION_LOAD_FAILURE);
             return;
         }

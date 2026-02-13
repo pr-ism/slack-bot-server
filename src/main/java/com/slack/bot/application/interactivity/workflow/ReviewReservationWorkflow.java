@@ -11,10 +11,12 @@ import com.slack.bot.application.interactivity.reservation.ReservationType;
 import com.slack.bot.application.interactivity.reservation.ReviewReservationCoordinator;
 import com.slack.bot.application.interactivity.reservation.dto.ReservationContextDto;
 import com.slack.bot.application.interactivity.reservation.exception.ActiveReservationAlreadyExistsException;
+import com.slack.bot.application.interactivity.reservation.exception.ReservationScheduleInPastException;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.vo.ReservationPullRequest;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,8 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class ReviewReservationWorkflow {
+
+    private static final String TIME_BLOCK_ID = "time_block";
 
     private final Clock clock;
     private final AuthorResolver authorResolver;
@@ -68,10 +72,20 @@ public class ReviewReservationWorkflow {
     private void notifySuccess(ReservationType strategy, ReservationContextDto context, ReviewReservation reservation) {
         notifyTiming(context);
 
-        reservationNotifier.sendReservationBlock(
+        if (strategy.isNew()) {
+            reservationNotifier.sendReservationBlockToDmAndEphemeral(
+                    context.token(),
+                    context.meta().teamId(),
+                    context.meta().channelId(),
+                    context.reviewerId(),
+                    reservation,
+                    strategy.successMessage()
+            );
+            return;
+        }
+
+        reservationNotifier.sendReservationBlockToDirectMessageOnly(
                 context.token(),
-                context.meta().teamId(),
-                context.meta().channelId(),
                 context.reviewerId(),
                 reservation,
                 strategy.successMessage()
@@ -99,13 +113,11 @@ public class ReviewReservationWorkflow {
     }
 
     private void notifyDuplicate(ReservationContextDto context, ReviewReservation reservation) {
-        reservationNotifier.sendReservationBlock(
+        reservationNotifier.sendDuplicateReservationNoticeToDmAndEphemeral(
                 context.token(),
-                context.meta().teamId(),
                 context.meta().channelId(),
                 context.reviewerId(),
-                reservation,
-                "이미 이 PR 리뷰를 예약했습니다."
+                reservation
         );
     }
 
@@ -117,6 +129,10 @@ public class ReviewReservationWorkflow {
     ) {
         try {
             return action.get();
+        } catch (ReservationScheduleInPastException e) {
+            log.info("리뷰 예약 시간 유효성 실패: {}", e.getMessage());
+
+            return SlackActionResponse.errors(Map.of(TIME_BLOCK_ID, e.getMessage()));
         } catch (ActiveReservationAlreadyExistsException e) {
             log.info("리뷰 예약 동시성 중복 발생");
 
@@ -140,7 +156,8 @@ public class ReviewReservationWorkflow {
         return reviewReservationCoordinator.findActive(
                 context.meta().teamId(),
                 context.projectId(),
-                context.reviewerId()
+                context.reviewerId(),
+                context.reservationPullRequest().getPullRequestId()
         );
     }
 
@@ -157,11 +174,11 @@ public class ReviewReservationWorkflow {
         Long reservationId = parseReservationId(meta.reservationId());
         boolean isReschedule = reservationId != null;
         ReservationPullRequest reservationPullRequest = ReservationPullRequest.builder()
-                                                             .pullRequestId(meta.pullRequestId())
-                                                             .pullRequestNumber(meta.pullRequestNumber())
-                                                             .pullRequestTitle(meta.pullRequestTitle())
-                                                             .pullRequestUrl(meta.pullRequestUrl())
-                                                             .build();
+                                                                          .pullRequestId(meta.pullRequestId())
+                                                                          .pullRequestNumber(meta.pullRequestNumber())
+                                                                          .pullRequestTitle(meta.pullRequestTitle())
+                                                                          .pullRequestUrl(meta.pullRequestUrl())
+                                                                          .build();
 
         return ReservationContextDto.builder()
                                     .meta(meta)
