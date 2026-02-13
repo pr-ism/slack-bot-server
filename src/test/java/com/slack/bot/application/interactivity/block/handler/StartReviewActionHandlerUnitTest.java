@@ -14,6 +14,7 @@ import com.slack.bot.application.interactivity.block.handler.store.StartReviewMa
 import com.slack.bot.application.interactivity.dto.ReviewScheduleMetaDto;
 import com.slack.bot.application.interactivity.notification.NotificationDispatcher;
 import com.slack.bot.application.interactivity.notification.ReviewReservationNotifier;
+import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventPublisher;
 import com.slack.bot.application.interactivity.reply.SlackActionErrorNotifier;
 import com.slack.bot.application.interactivity.reservation.AuthorResolver;
 import com.slack.bot.application.interactivity.reservation.ReservationMetaResolver;
@@ -54,6 +55,9 @@ class StartReviewActionHandlerUnitTest {
     @Mock
     ReviewReservationCoordinator reviewReservationCoordinator;
 
+    @Mock
+    ReviewInteractionEventPublisher reviewInteractionEventPublisher;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
@@ -69,7 +73,8 @@ class StartReviewActionHandlerUnitTest {
                 reservationMetaResolver,
                 errorNotifier,
                 reviewReservationNotifier,
-                reviewReservationCoordinator
+                reviewReservationCoordinator,
+                reviewInteractionEventPublisher
         );
 
         ReviewScheduleMetaDto meta = ReviewScheduleMetaDto.builder()

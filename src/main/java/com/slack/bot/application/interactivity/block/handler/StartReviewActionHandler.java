@@ -8,6 +8,8 @@ import com.slack.bot.application.interactivity.client.exception.SlackBotMessageD
 import com.slack.bot.application.interactivity.dto.ReviewScheduleMetaDto;
 import com.slack.bot.application.interactivity.notification.NotificationDispatcher;
 import com.slack.bot.application.interactivity.notification.ReviewReservationNotifier;
+import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventPublisher;
+import com.slack.bot.application.interactivity.publisher.ReviewReservationFulfilledEvent;
 import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
 import com.slack.bot.application.interactivity.reply.SlackActionErrorNotifier;
 import com.slack.bot.application.interactivity.reservation.AuthorResolver;
@@ -38,6 +40,7 @@ public class StartReviewActionHandler implements BlockActionHandler {
     private final SlackActionErrorNotifier errorNotifier;
     private final ReviewReservationNotifier reviewReservationNotifier;
     private final ReviewReservationCoordinator reviewReservationCoordinator;
+    private final ReviewInteractionEventPublisher reviewInteractionEventPublisher;
 
     @Override
     public BlockActionOutcomeDto handle(BlockActionCommandDto command) {
@@ -92,6 +95,7 @@ public class StartReviewActionHandler implements BlockActionHandler {
                     command.slackUserId(),
                     START_REVIEW_ACK_MESSAGE
             );
+            publishReviewFulfilledEvent(meta, command.slackUserId());
         } catch (SlackBotMessageDispatchException e) {
             log.warn("리뷰 시작 알림 전송 실패", e);
         } catch (RuntimeException e) {
@@ -184,5 +188,34 @@ public class StartReviewActionHandler implements BlockActionHandler {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    private void publishReviewFulfilledEvent(ReviewScheduleMetaDto meta, String reviewerSlackUserId) {
+        if (meta == null) {
+            return;
+        }
+
+        Long projectId = parseProjectId(meta.projectId());
+        if (projectId == null) {
+            return;
+        }
+        if (meta.teamId() == null || meta.teamId().isBlank()) {
+            return;
+        }
+        if (reviewerSlackUserId == null || reviewerSlackUserId.isBlank()) {
+            return;
+        }
+        if (meta.pullRequestId() == null) {
+            return;
+        }
+
+        ReviewReservationFulfilledEvent event = new ReviewReservationFulfilledEvent(
+                meta.teamId(),
+                projectId,
+                reviewerSlackUserId,
+                meta.pullRequestId(),
+                Instant.now(clock)
+        );
+        reviewInteractionEventPublisher.publish(event);
     }
 }

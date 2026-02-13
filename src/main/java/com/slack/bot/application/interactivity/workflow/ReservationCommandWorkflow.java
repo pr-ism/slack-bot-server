@@ -117,7 +117,12 @@ public class ReservationCommandWorkflow {
     ) {
         return reviewReservationCoordinator.findById(reservationId)
                                            .orElseGet(() -> {
-                                               errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.RESERVATION_NOT_FOUND);
+                                               errorNotifier.notify(
+                                                       token,
+                                                       channelId,
+                                                       slackUserId,
+                                                       InteractivityErrorType.RESERVATION_NOT_FOUND
+                                               );
                                                return null;
                                            });
     }
@@ -220,7 +225,9 @@ public class ReservationCommandWorkflow {
                 teamId,
                 channelId,
                 slackUserId,
-                reservation.getId()
+                reservation.getId(),
+                reservation.getProjectId(),
+                reservation.getReservationPullRequest().getPullRequestId()
         );
 
         reviewInteractionEventPublisher.publish(event);
@@ -236,7 +243,9 @@ public class ReservationCommandWorkflow {
                 teamId,
                 channelId,
                 slackUserId,
-                reservation.getId()
+                reservation.getId(),
+                reservation.getProjectId(),
+                reservation.getReservationPullRequest().getPullRequestId()
         );
 
         reviewInteractionEventPublisher.publish(event);
