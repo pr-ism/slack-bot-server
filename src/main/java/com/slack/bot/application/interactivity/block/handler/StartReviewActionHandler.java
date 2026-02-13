@@ -72,7 +72,7 @@ public class StartReviewActionHandler implements BlockActionHandler {
             return BlockActionOutcomeDto.empty();
         }
 
-        reviewReservationNotifier.notifyStartNowToReviewee(
+        reviewReservationNotifier.notifyStartNowToParticipants(
                 meta,
                 command.slackUserId(),
                 command.botToken()

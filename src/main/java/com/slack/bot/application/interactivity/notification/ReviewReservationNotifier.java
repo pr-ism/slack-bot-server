@@ -161,7 +161,7 @@ public class ReviewReservationNotifier {
         notificationDispatcher.sendDirectMessageIfEnabled(meta.teamId(), token, reviewerId, text);
     }
 
-    public void notifyStartNowToReviewee(ReviewScheduleMetaDto meta, String reviewerId, String token) {
+    public void notifyStartNowToParticipants(ReviewScheduleMetaDto meta, String reviewerId, String token) {
         if (meta == null) {
             return;
         }
