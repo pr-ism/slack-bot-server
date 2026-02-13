@@ -116,7 +116,13 @@ CREATE TABLE IF NOT EXISTS review_reservation_interactions (
     pull_request_notified_at TIMESTAMP(6),
     schedule_cancel_count INT NOT NULL,
     schedule_change_count INT NOT NULL,
-    review_fulfilled BOOLEAN NOT NULL
+    review_fulfilled BOOLEAN NOT NULL,
+    CONSTRAINT uk_review_reservation_interactions_review_key UNIQUE (
+        team_id,
+        project_id,
+        pull_request_id,
+        reviewer_slack_id
+    )
 );
 
 CREATE TABLE IF NOT EXISTS review_reminders (
