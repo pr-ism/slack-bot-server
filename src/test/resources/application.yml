@@ -52,6 +52,11 @@ app:
       max-pool-size: 8
       thread-name-prefix: slack-events-
       queue-capacity: 50
+    review-interaction:
+      core-pool-size: 1
+      max-pool-size: 1
+      thread-name-prefix: review-interaction-
+      queue-capacity: 500
 
 review:
   notification:

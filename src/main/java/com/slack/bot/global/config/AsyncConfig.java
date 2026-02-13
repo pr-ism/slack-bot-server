@@ -1,5 +1,6 @@
 package com.slack.bot.global.config;
 
+import com.slack.bot.global.config.properties.ReviewInteractionAsyncProperties;
 import com.slack.bot.global.config.properties.SlackEventAsyncProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,10 +17,14 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 @EnableAsync
 @Configuration
 @RequiredArgsConstructor
-@EnableConfigurationProperties(SlackEventAsyncProperties.class)
+@EnableConfigurationProperties({
+        SlackEventAsyncProperties.class,
+        ReviewInteractionAsyncProperties.class
+})
 public class AsyncConfig implements AsyncConfigurer {
 
     private final SlackEventAsyncProperties slackEventAsyncProperties;
+    private final ReviewInteractionAsyncProperties reviewInteractionAsyncProperties;
 
     @Bean(name = "slackEventExecutor")
     public TaskExecutor slackEventExecutor() {
@@ -29,6 +34,18 @@ public class AsyncConfig implements AsyncConfigurer {
         executor.setMaxPoolSize(slackEventAsyncProperties.maxPoolSize());
         executor.setThreadNamePrefix(slackEventAsyncProperties.threadNamePrefix());
         executor.setQueueCapacity(slackEventAsyncProperties.queueCapacity());
+        executor.initialize();
+        return executor;
+    }
+
+    @Bean(name = "reviewInteractionExecutor")
+    public TaskExecutor reviewInteractionExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+
+        executor.setCorePoolSize(reviewInteractionAsyncProperties.corePoolSize());
+        executor.setMaxPoolSize(reviewInteractionAsyncProperties.maxPoolSize());
+        executor.setThreadNamePrefix(reviewInteractionAsyncProperties.threadNamePrefix());
+        executor.setQueueCapacity(reviewInteractionAsyncProperties.queueCapacity());
         executor.initialize();
         return executor;
     }
