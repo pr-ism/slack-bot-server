@@ -4,6 +4,7 @@ import com.slack.bot.application.interactivity.block.BlockActionHandler;
 import com.slack.bot.application.interactivity.block.dto.BlockActionCommandDto;
 import com.slack.bot.application.interactivity.block.dto.BlockActionOutcomeDto;
 import com.slack.bot.application.interactivity.block.handler.store.StartReviewMarkStore;
+import com.slack.bot.application.interactivity.client.exception.SlackBotMessageDispatchException;
 import com.slack.bot.application.interactivity.dto.ReviewScheduleMetaDto;
 import com.slack.bot.application.interactivity.notification.NotificationDispatcher;
 import com.slack.bot.application.interactivity.notification.ReviewReservationNotifier;
@@ -79,17 +80,23 @@ public class StartReviewActionHandler implements BlockActionHandler {
             throw e;
         }
 
-        reviewReservationNotifier.notifyStartNowToParticipants(
-                meta,
-                command.slackUserId(),
-                command.botToken()
-        );
-        notificationDispatcher.sendEphemeral(
-                command.botToken(),
-                command.channelId(),
-                command.slackUserId(),
-                START_REVIEW_ACK_MESSAGE
-        );
+        try {
+            reviewReservationNotifier.notifyStartNowToParticipants(
+                    meta,
+                    command.slackUserId(),
+                    command.botToken()
+            );
+            notificationDispatcher.sendEphemeral(
+                    command.botToken(),
+                    command.channelId(),
+                    command.slackUserId(),
+                    START_REVIEW_ACK_MESSAGE
+            );
+        } catch (SlackBotMessageDispatchException e) {
+            log.warn("리뷰 시작 알림 전송 실패", e);
+        } catch (RuntimeException e) {
+            log.error("예상치 못한 리뷰 시작 알림 전송 실패", e);
+        }
 
         return BlockActionOutcomeDto.empty();
     }
