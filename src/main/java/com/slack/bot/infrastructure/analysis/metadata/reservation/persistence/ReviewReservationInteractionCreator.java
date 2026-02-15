@@ -2,21 +2,17 @@ package com.slack.bot.infrastructure.analysis.metadata.reservation.persistence;
 
 import com.slack.bot.domain.analysis.metadata.reservation.ReviewReservationInteraction;
 import jakarta.persistence.EntityManager;
-import org.springframework.data.jpa.repository.support.SimpleJpaRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Repository
+@RequiredArgsConstructor
 public class ReviewReservationInteractionCreator {
 
     private final EntityManager entityManager;
-    private final SimpleJpaRepository<ReviewReservationInteraction, Long> repository;
-
-    public ReviewReservationInteractionCreator(EntityManager entityManager) {
-        this.entityManager = entityManager;
-        this.repository = new SimpleJpaRepository<>(ReviewReservationInteraction.class, entityManager);
-    }
+    private final JpaReviewReservationInteractionRepository repository;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ReviewReservationInteraction create(ReviewReservationInteraction interaction) {

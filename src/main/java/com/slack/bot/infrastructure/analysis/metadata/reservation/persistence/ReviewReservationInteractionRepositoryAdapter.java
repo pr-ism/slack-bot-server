@@ -22,11 +22,6 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
     private final MysqlDuplicateKeyDetector mysqlDuplicateKeyDetector;
 
     @Override
-    public ReviewReservationInteraction create(ReviewReservationInteraction interaction) {
-        return reviewReservationInteractionCreator.create(interaction);
-    }
-
-    @Override
     @Transactional(readOnly = true)
     public Optional<ReviewReservationInteraction> findByReviewKey(
             String teamId,
@@ -61,14 +56,27 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
         }
 
         ReviewReservationInteraction interaction = ReviewReservationInteraction.create(
-                teamId, projectId, pullRequestId, reviewerSlackId
+                teamId,
+                projectId,
+                pullRequestId,
+                reviewerSlackId
         );
         interaction.recordReviewTimeSelectedAt(reviewTimeSelectedAt);
 
-        tryCreateOrOnDuplicate(
-                interaction,
-                () -> updateReviewTimeSelectedAt(teamId, projectId, pullRequestId, reviewerSlackId, reviewTimeSelectedAt)
-        );
+        try {
+            reviewReservationInteractionCreator.create(interaction);
+        } catch (DataIntegrityViolationException exception) {
+            if (mysqlDuplicateKeyDetector.isNotDuplicateKey(exception)) {
+                throw exception;
+            }
+            updateReviewTimeSelectedAt(
+                    teamId,
+                    projectId,
+                    pullRequestId,
+                    reviewerSlackId,
+                    reviewTimeSelectedAt
+            );
+        }
     }
 
     @Override
@@ -84,14 +92,26 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
         }
 
         ReviewReservationInteraction interaction = ReviewReservationInteraction.create(
-                teamId, projectId, pullRequestId, reviewerSlackId
+                teamId,
+                projectId,
+                pullRequestId,
+                reviewerSlackId
         );
         interaction.increaseScheduleChangeCount();
 
-        tryCreateOrOnDuplicate(
-                interaction,
-                () -> increaseScheduleChangeCount(teamId, projectId, pullRequestId, reviewerSlackId)
-        );
+        try {
+            reviewReservationInteractionCreator.create(interaction);
+        } catch (DataIntegrityViolationException exception) {
+            if (mysqlDuplicateKeyDetector.isNotDuplicateKey(exception)) {
+                throw exception;
+            }
+            increaseScheduleChangeCount(
+                    teamId,
+                    projectId,
+                    pullRequestId,
+                    reviewerSlackId
+            );
+        }
     }
 
     @Override
@@ -107,14 +127,26 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
         }
 
         ReviewReservationInteraction interaction = ReviewReservationInteraction.create(
-                teamId, projectId, pullRequestId, reviewerSlackId
+                teamId,
+                projectId,
+                pullRequestId,
+                reviewerSlackId
         );
         interaction.increaseScheduleCancelCount();
 
-        tryCreateOrOnDuplicate(
-                interaction,
-                () -> increaseScheduleCancelCount(teamId, projectId, pullRequestId, reviewerSlackId)
-        );
+        try {
+            reviewReservationInteractionCreator.create(interaction);
+        } catch (DataIntegrityViolationException exception) {
+            if (mysqlDuplicateKeyDetector.isNotDuplicateKey(exception)) {
+                throw exception;
+            }
+            increaseScheduleCancelCount(
+                    teamId,
+                    projectId,
+                    pullRequestId,
+                    reviewerSlackId
+            );
+        }
     }
 
     @Override
@@ -128,23 +160,40 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
             Instant pullRequestNotifiedAt
     ) {
         if (updateReviewScheduledAtAndPullRequestNotifiedAt(
-                teamId, projectId, pullRequestId, reviewerSlackId, reviewScheduledAt, pullRequestNotifiedAt
+                teamId,
+                projectId,
+                pullRequestId,
+                reviewerSlackId,
+                reviewScheduledAt,
+                pullRequestNotifiedAt
         )) {
             return;
         }
 
         ReviewReservationInteraction interaction = ReviewReservationInteraction.create(
-                teamId, projectId, pullRequestId, reviewerSlackId
+                teamId,
+                projectId,
+                pullRequestId,
+                reviewerSlackId
         );
         interaction.recordReviewScheduledAt(reviewScheduledAt);
         interaction.recordPullRequestNotifiedAt(pullRequestNotifiedAt);
 
-        tryCreateOrOnDuplicate(
-                interaction,
-                () -> updateReviewScheduledAtAndPullRequestNotifiedAt(
-                        teamId, projectId, pullRequestId, reviewerSlackId, reviewScheduledAt, pullRequestNotifiedAt
-                )
-        );
+        try {
+            reviewReservationInteractionCreator.create(interaction);
+        } catch (DataIntegrityViolationException exception) {
+            if (mysqlDuplicateKeyDetector.isNotDuplicateKey(exception)) {
+                throw exception;
+            }
+            updateReviewScheduledAtAndPullRequestNotifiedAt(
+                    teamId,
+                    projectId,
+                    pullRequestId,
+                    reviewerSlackId,
+                    reviewScheduledAt,
+                    pullRequestNotifiedAt
+            );
+        }
     }
 
     @Override
@@ -157,33 +206,37 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
             Instant pullRequestNotifiedAt
     ) {
         if (markReviewFulfilledAndUpdatePullRequestNotifiedAt(
-                teamId, projectId, pullRequestId, reviewerSlackId, pullRequestNotifiedAt
+                teamId,
+                projectId,
+                pullRequestId,
+                reviewerSlackId,
+                pullRequestNotifiedAt
         )) {
             return;
         }
 
         ReviewReservationInteraction interaction = ReviewReservationInteraction.create(
-                teamId, projectId, pullRequestId, reviewerSlackId
+                teamId,
+                projectId,
+                pullRequestId,
+                reviewerSlackId
         );
         interaction.markReviewFulfilled();
         interaction.recordPullRequestNotifiedAt(pullRequestNotifiedAt);
 
-        tryCreateOrOnDuplicate(
-                interaction,
-                () -> markReviewFulfilledAndUpdatePullRequestNotifiedAt(
-                        teamId, projectId, pullRequestId, reviewerSlackId, pullRequestNotifiedAt
-                )
-        );
-    }
-
-    private void tryCreateOrOnDuplicate(ReviewReservationInteraction interaction, Runnable onDuplicate) {
         try {
             reviewReservationInteractionCreator.create(interaction);
         } catch (DataIntegrityViolationException exception) {
             if (mysqlDuplicateKeyDetector.isNotDuplicateKey(exception)) {
                 throw exception;
             }
-            onDuplicate.run();
+            markReviewFulfilledAndUpdatePullRequestNotifiedAt(
+                    teamId,
+                    projectId,
+                    pullRequestId,
+                    reviewerSlackId,
+                    pullRequestNotifiedAt
+            );
         }
     }
 
@@ -298,5 +351,4 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
 
         return updatedCount > 0;
     }
-
 }

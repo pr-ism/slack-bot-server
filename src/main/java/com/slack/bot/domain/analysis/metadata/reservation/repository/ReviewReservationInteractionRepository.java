@@ -51,6 +51,4 @@ public interface ReviewReservationInteractionRepository {
             String reviewerSlackId,
             Instant pullRequestNotifiedAt
     );
-
-    ReviewReservationInteraction create(ReviewReservationInteraction interaction);
 }
