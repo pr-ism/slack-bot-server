@@ -1,6 +1,7 @@
 package com.slack.bot.application.interactivity.block.handler;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -98,13 +99,14 @@ class StartReviewActionHandlerUnitTest {
                 .willThrow(new RuntimeException("cancel failed"));
 
         // when & then
-        assertThatThrownBy(() -> handler.handle(command))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessage("cancel failed");
-
-        verify(startReviewMarkStore).remove("T1:123:10:U2");
-        verify(reviewReservationNotifier, never()).notifyStartNowToParticipants(any(), any(), any());
-        verify(notificationDispatcher, never()).sendEphemeral(any(), any(), any(), any());
+        assertAll(
+                () -> assertThatThrownBy(() -> handler.handle(command))
+                        .isInstanceOf(RuntimeException.class)
+                        .hasMessage("cancel failed"),
+                () -> verify(startReviewMarkStore).remove("T1:123:10:U2"),
+                () -> verify(reviewReservationNotifier, never()).notifyStartNowToParticipants(any(), any(), any()),
+                () -> verify(notificationDispatcher, never()).sendEphemeral(any(), any(), any(), any())
+        );
     }
 
     private BlockActionCommandDto commandWithMeta(String metaJson, String reviewerSlackId) {

@@ -196,6 +196,7 @@ public class StartReviewActionHandler implements BlockActionHandler {
         }
 
         Long projectId = parseProjectId(meta.projectId());
+
         if (projectId == null) {
             return;
         }
@@ -216,6 +217,7 @@ public class StartReviewActionHandler implements BlockActionHandler {
                 meta.pullRequestId(),
                 Instant.now(clock)
         );
+
         reviewInteractionEventPublisher.publish(event);
     }
 }
