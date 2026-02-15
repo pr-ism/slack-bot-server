@@ -232,6 +232,47 @@ class StartReviewActionHandlerUnitTest {
         );
     }
 
+    @Test
+    void 이행_이벤트_발행_실패여도_시작_ACK는_전송한다() {
+        // given
+        Instant now = Instant.parse("2026-02-13T00:00:00Z");
+        Clock clock = Clock.fixed(now, ZoneOffset.UTC);
+        StartReviewActionHandler handler = new StartReviewActionHandler(
+                clock,
+                authorResolver,
+                startReviewMarkStore,
+                notificationDispatcher,
+                reservationMetaResolver,
+                errorNotifier,
+                reviewReservationNotifier,
+                reviewReservationCoordinator,
+                reviewInteractionEventPublisher
+        );
+        ReviewScheduleMetaDto meta = validMeta();
+        BlockActionCommandDto command = commandWithMeta("meta-json", "U2");
+
+        given(reservationMetaResolver.parseMeta("meta-json")).willReturn(meta);
+        given(authorResolver.resolveAuthorSlackId(meta)).willReturn("U1");
+        given(startReviewMarkStore.putIfAbsent("T1:123:10:U2", now)).willReturn(null);
+        given(reviewReservationCoordinator.cancelActive("T1", 123L, "U2", 10L)).willReturn(Optional.empty());
+        willThrow(new RuntimeException("publish failed"))
+                .given(reviewInteractionEventPublisher)
+                .publish(any(ReviewReservationFulfilledEvent.class));
+
+        // when
+        BlockActionOutcomeDto actual = handler.handle(command);
+
+        // then
+        assertAll(
+                () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
+                () -> verify(reviewReservationNotifier).notifyStartNowToParticipants(meta, "U2", "xoxb-test-token"),
+                () -> verify(reviewInteractionEventPublisher).publish(any(ReviewReservationFulfilledEvent.class)),
+                () -> verify(notificationDispatcher)
+                        .sendEphemeral("xoxb-test-token", "C1", "U2", "리뷰 시작 알림을 전송했습니다."),
+                () -> verify(startReviewMarkStore, never()).remove("T1:123:10:U2")
+        );
+    }
+
     private ReviewScheduleMetaDto validMeta() {
         return ReviewScheduleMetaDto.builder()
                                     .teamId("T1")

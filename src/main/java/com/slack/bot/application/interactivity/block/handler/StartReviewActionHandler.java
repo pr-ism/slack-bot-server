@@ -121,18 +121,44 @@ public class StartReviewActionHandler implements BlockActionHandler {
     }
 
     private void notifyStartReview(ReviewScheduleMetaDto meta, BlockActionCommandDto command) {
+        if (!notifyStartNow(meta, command)) {
+            return;
+        }
+
+        publishReviewFulfilledEventSafely(meta, command.slackUserId());
+        sendStartReviewAcknowledgementSafely(command);
+    }
+
+    private boolean notifyStartNow(ReviewScheduleMetaDto meta, BlockActionCommandDto command) {
         try {
             reviewReservationNotifier.notifyStartNowToParticipants(
                     meta,
                     command.slackUserId(),
                     command.botToken()
             );
-            publishReviewFulfilledEvent(meta, command.slackUserId());
-            sendStartReviewAcknowledgement(command);
+            return true;
         } catch (SlackBotMessageDispatchException e) {
             log.warn("리뷰 시작 알림 전송 실패", e);
+            return false;
         } catch (RuntimeException e) {
             log.error("예상치 못한 리뷰 시작 알림 전송 실패", e);
+            return false;
+        }
+    }
+
+    private void publishReviewFulfilledEventSafely(ReviewScheduleMetaDto meta, String reviewerSlackUserId) {
+        try {
+            publishReviewFulfilledEvent(meta, reviewerSlackUserId);
+        } catch (RuntimeException e) {
+            log.error("리뷰 이행 이벤트 발행 실패", e);
+        }
+    }
+
+    private void sendStartReviewAcknowledgementSafely(BlockActionCommandDto command) {
+        try {
+            sendStartReviewAcknowledgement(command);
+        } catch (RuntimeException e) {
+            log.warn("리뷰 시작 ACK 전송 실패", e);
         }
     }
 
