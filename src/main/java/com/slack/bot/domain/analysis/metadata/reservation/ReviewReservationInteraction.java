@@ -6,7 +6,6 @@ import com.slack.bot.domain.analysis.metadata.reservation.vo.ReviewReservationIn
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -14,19 +13,16 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(
-        name = "review_reservation_interactions",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_review_reservation_interactions_review_key",
-                columnNames = {"team_id", "project_id", "pull_request_id", "reviewer_slack_id"}
-        )
-)
+@Table(name = "review_reservation_interactions")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ReviewReservationInteraction extends BaseTimeEntity {
 
     private String teamId;
+
     private Long projectId;
+
     private Long pullRequestId;
+
     private String reviewerSlackId;
 
     @Embedded
