@@ -2,6 +2,8 @@ package com.slack.bot.application.interactivity.workflow;
 
 import com.slack.bot.application.interactivity.dto.ReviewScheduleMetaDto;
 import com.slack.bot.application.interactivity.notification.ReviewReservationNotifier;
+import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventPublisher;
+import com.slack.bot.application.interactivity.publisher.ReviewReservationScheduledEvent;
 import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
 import com.slack.bot.application.interactivity.reply.SlackActionErrorNotifier;
 import com.slack.bot.application.interactivity.reply.dto.response.SlackActionResponse;
@@ -36,6 +38,7 @@ public class ReviewReservationWorkflow {
     private final SlackActionErrorNotifier errorNotifier;
     private final ReviewReservationNotifier reservationNotifier;
     private final ReviewReservationCoordinator reviewReservationCoordinator;
+    private final ReviewInteractionEventPublisher reviewInteractionEventPublisher;
 
     public SlackActionResponse reserveReview(
             ReviewScheduleMetaDto meta,
@@ -57,6 +60,7 @@ public class ReviewReservationWorkflow {
         ReviewReservation reservation = strategy.persist(reviewReservationCoordinator, context);
 
         notifySuccess(strategy, context, reservation);
+        publishScheduledEvent(context, reservation);
         return SlackActionResponse.clear();
     }
 
@@ -90,6 +94,21 @@ public class ReviewReservationWorkflow {
                 reservation,
                 strategy.successMessage()
         );
+    }
+
+    private void publishScheduledEvent(ReservationContextDto context, ReviewReservation reservation) {
+        ReviewReservationScheduledEvent event = new ReviewReservationScheduledEvent(
+                context.meta().teamId(),
+                context.meta().channelId(),
+                context.reviewerId(),
+                reservation.getId(),
+                reservation.getProjectId(),
+                reservation.getReservationPullRequest().getPullRequestId(),
+                reservation.getScheduledAt(),
+                Instant.now(clock)
+        );
+
+        reviewInteractionEventPublisher.publish(event);
     }
 
     private void notifyTiming(ReservationContextDto context) {

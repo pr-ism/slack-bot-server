@@ -4,6 +4,8 @@ public record ReviewReservationChangeEvent(
         String teamId,
         String channelId,
         String slackUserId,
-        Long reservationId
+        Long reservationId,
+        Long projectId,
+        Long pullRequestId
 ) implements ReviewInteractionEvent {
 }

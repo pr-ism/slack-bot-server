@@ -61,7 +61,7 @@ public class ReviewSchedulerWorkflow {
 
         try {
             Long projectId = projectIdResolver.resolve(meta.projectId(), context.teamId());
-            publishReservationRequest(context);
+            publishReservationRequest(context, meta, projectId);
 
             return findActiveReservation(meta, context, projectId).or(() -> {
                 openReviewTimeModal(context);
@@ -168,11 +168,17 @@ public class ReviewSchedulerWorkflow {
         slackApiClient.openModal(context.token(), context.triggerId(), view);
     }
 
-    private void publishReservationRequest(SchedulerContextDto context) {
+    private void publishReservationRequest(
+            SchedulerContextDto context,
+            ReviewScheduleMetaDto meta,
+            Long projectId
+    ) {
         ReviewReservationRequestEvent event = new ReviewReservationRequestEvent(
                 context.teamId(),
                 context.channelId(),
                 context.slackUserId(),
+                projectId,
+                meta.pullRequestId(),
                 context.metaJson()
         );
 

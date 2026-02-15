@@ -110,7 +110,7 @@ public class ReviewReservation extends BaseTimeEntity {
 
     private void validateReservationPullRequest(ReservationPullRequest reservationPullRequest) {
         if (reservationPullRequest == null) {
-            throw new IllegalArgumentException("예약 대상 PR 정보는 비어 있을 수 없습니다.");
+            throw new IllegalArgumentException("예약 대상 pullRequest 정보는 비어 있을 수 없습니다.");
         }
     }
 

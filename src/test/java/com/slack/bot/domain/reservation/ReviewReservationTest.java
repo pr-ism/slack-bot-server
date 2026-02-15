@@ -109,7 +109,7 @@ class ReviewReservationTest {
     }
 
     @Test
-    void 예약_대상_PR_정보가_없으면_초기화할_수_없다() {
+    void 예약_대상_pullRequest_정보가_없으면_초기화할_수_없다() {
         // when & then
         assertThatThrownBy(() -> ReviewReservation.builder()
                                                   .teamId("T1")
@@ -122,7 +122,7 @@ class ReviewReservationTest {
                                                   .status(ReservationStatus.ACTIVE)
                                                   .build()
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("예약 대상 PR 정보는 비어 있을 수 없습니다.");
+         .hasMessageContaining("예약 대상 pullRequest 정보는 비어 있을 수 없습니다.");
     }
 
     @ParameterizedTest

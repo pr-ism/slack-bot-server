@@ -8,6 +8,8 @@ import com.slack.bot.application.interactivity.client.exception.SlackBotMessageD
 import com.slack.bot.application.interactivity.dto.ReviewScheduleMetaDto;
 import com.slack.bot.application.interactivity.notification.NotificationDispatcher;
 import com.slack.bot.application.interactivity.notification.ReviewReservationNotifier;
+import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventPublisher;
+import com.slack.bot.application.interactivity.publisher.ReviewReservationFulfilledEvent;
 import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
 import com.slack.bot.application.interactivity.reply.SlackActionErrorNotifier;
 import com.slack.bot.application.interactivity.reservation.AuthorResolver;
@@ -38,67 +40,135 @@ public class StartReviewActionHandler implements BlockActionHandler {
     private final SlackActionErrorNotifier errorNotifier;
     private final ReviewReservationNotifier reviewReservationNotifier;
     private final ReviewReservationCoordinator reviewReservationCoordinator;
+    private final ReviewInteractionEventPublisher reviewInteractionEventPublisher;
 
     @Override
     public BlockActionOutcomeDto handle(BlockActionCommandDto command) {
-        String metaJson = command.action().path("value").asText(null);
+        ReviewScheduleMetaDto meta = resolveMeta(command);
 
-        if (metaJson == null || metaJson.isBlank()) {
-            return BlockActionOutcomeDto.empty();
-        }
-
-        ReviewScheduleMetaDto meta = parseMeta(metaJson);
         if (meta == null) {
             return BlockActionOutcomeDto.empty();
         }
 
-        if (isRevieweeRequester(meta, command.slackUserId())) {
-            errorNotifier.notify(
-                    command.botToken(),
-                    command.channelId(),
-                    command.slackUserId(),
-                    InteractivityErrorType.REVIEWEE_CANNOT_RESERVE
-            );
+        if (isBlockedRevieweeRequest(meta, command)) {
             return BlockActionOutcomeDto.empty();
         }
 
         String duplicatePreventionKey = createDuplicatePreventionKey(meta, command.slackUserId());
-        if (!tryMarkStarted(duplicatePreventionKey)) {
-            notificationDispatcher.sendEphemeral(
-                    command.botToken(),
-                    command.channelId(),
-                    command.slackUserId(),
-                    ALREADY_STARTED_MESSAGE
-            );
+
+        if (isAlreadyStarted(command, duplicatePreventionKey)) {
             return BlockActionOutcomeDto.empty();
         }
 
+        cancelActiveReservationOrRollback(meta, command.slackUserId(), duplicatePreventionKey);
+        notifyStartReview(meta, command);
+
+        return BlockActionOutcomeDto.empty();
+    }
+
+    private ReviewScheduleMetaDto resolveMeta(BlockActionCommandDto command) {
+        String metaJson = command.action()
+                                 .path("value")
+                                 .asText(null);
+
+        if (metaJson == null || metaJson.isBlank()) {
+            return null;
+        }
+
+        return parseMeta(metaJson);
+    }
+
+    private boolean isBlockedRevieweeRequest(ReviewScheduleMetaDto meta, BlockActionCommandDto command) {
+        if (!isRevieweeRequester(meta, command.slackUserId())) {
+            return false;
+        }
+
+        errorNotifier.notify(
+                command.botToken(),
+                command.channelId(),
+                command.slackUserId(),
+                InteractivityErrorType.REVIEWEE_CANNOT_RESERVE
+        );
+
+        return true;
+    }
+
+    private boolean isAlreadyStarted(BlockActionCommandDto command, String duplicatePreventionKey) {
+        if (tryMarkStarted(duplicatePreventionKey)) {
+            return false;
+        }
+
+        notificationDispatcher.sendEphemeral(
+                command.botToken(),
+                command.channelId(),
+                command.slackUserId(),
+                ALREADY_STARTED_MESSAGE
+        );
+        return true;
+    }
+
+    private void cancelActiveReservationOrRollback(
+            ReviewScheduleMetaDto meta,
+            String reviewerSlackUserId,
+            String duplicatePreventionKey
+    ) {
         try {
-            cancelActiveReservation(meta, command.slackUserId());
+            cancelActiveReservation(meta, reviewerSlackUserId);
         } catch (RuntimeException e) {
             rollbackStartedMark(duplicatePreventionKey);
             throw e;
         }
+    }
 
+    private void notifyStartReview(ReviewScheduleMetaDto meta, BlockActionCommandDto command) {
+        if (!notifyStartNow(meta, command)) {
+            return;
+        }
+
+        publishReviewFulfilledEventSafely(meta, command.slackUserId());
+        sendStartReviewAcknowledgementSafely(command);
+    }
+
+    private boolean notifyStartNow(ReviewScheduleMetaDto meta, BlockActionCommandDto command) {
         try {
             reviewReservationNotifier.notifyStartNowToParticipants(
                     meta,
                     command.slackUserId(),
                     command.botToken()
             );
-            notificationDispatcher.sendEphemeral(
-                    command.botToken(),
-                    command.channelId(),
-                    command.slackUserId(),
-                    START_REVIEW_ACK_MESSAGE
-            );
+            return true;
         } catch (SlackBotMessageDispatchException e) {
             log.warn("리뷰 시작 알림 전송 실패", e);
+            return false;
         } catch (RuntimeException e) {
             log.error("예상치 못한 리뷰 시작 알림 전송 실패", e);
+            return false;
         }
+    }
 
-        return BlockActionOutcomeDto.empty();
+    private void publishReviewFulfilledEventSafely(ReviewScheduleMetaDto meta, String reviewerSlackUserId) {
+        try {
+            publishReviewFulfilledEvent(meta, reviewerSlackUserId);
+        } catch (RuntimeException e) {
+            log.error("리뷰 이행 이벤트 발행 실패", e);
+        }
+    }
+
+    private void sendStartReviewAcknowledgementSafely(BlockActionCommandDto command) {
+        try {
+            sendStartReviewAcknowledgement(command);
+        } catch (RuntimeException e) {
+            log.warn("리뷰 시작 ACK 전송 실패", e);
+        }
+    }
+
+    private void sendStartReviewAcknowledgement(BlockActionCommandDto command) {
+        notificationDispatcher.sendEphemeral(
+                command.botToken(),
+                command.channelId(),
+                command.slackUserId(),
+                START_REVIEW_ACK_MESSAGE
+        );
     }
 
     private ReviewScheduleMetaDto parseMeta(String metaJson) {
@@ -125,10 +195,25 @@ public class StartReviewActionHandler implements BlockActionHandler {
     }
 
     private String createDuplicatePreventionKey(ReviewScheduleMetaDto meta, String reviewerSlackUserId) {
-        String teamId = meta.teamId() == null ? "" : meta.teamId();
-        String projectId = meta.projectId() == null ? "" : meta.projectId();
-        String pullRequestId = meta.pullRequestId() == null ? "" : String.valueOf(meta.pullRequestId());
-        String reviewerId = reviewerSlackUserId == null ? "" : reviewerSlackUserId;
+        String teamId = meta.teamId();
+        if (teamId == null) {
+            teamId = "";
+        }
+
+        String projectId = meta.projectId();
+        if (projectId == null) {
+            projectId = "";
+        }
+
+        String pullRequestId = "";
+        if (meta.pullRequestId() != null) {
+            pullRequestId = String.valueOf(meta.pullRequestId());
+        }
+
+        String reviewerId = reviewerSlackUserId;
+        if (reviewerId == null) {
+            reviewerId = "";
+        }
 
         return teamId + ":" + projectId + ":" + pullRequestId + ":" + reviewerId;
     }
@@ -184,5 +269,36 @@ public class StartReviewActionHandler implements BlockActionHandler {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    private void publishReviewFulfilledEvent(ReviewScheduleMetaDto meta, String reviewerSlackUserId) {
+        if (meta == null) {
+            return;
+        }
+
+        Long projectId = parseProjectId(meta.projectId());
+
+        if (projectId == null) {
+            return;
+        }
+        if (meta.teamId() == null || meta.teamId().isBlank()) {
+            return;
+        }
+        if (reviewerSlackUserId == null || reviewerSlackUserId.isBlank()) {
+            return;
+        }
+        if (meta.pullRequestId() == null) {
+            return;
+        }
+
+        ReviewReservationFulfilledEvent event = new ReviewReservationFulfilledEvent(
+                meta.teamId(),
+                projectId,
+                reviewerSlackUserId,
+                meta.pullRequestId(),
+                Instant.now(clock)
+        );
+
+        reviewInteractionEventPublisher.publish(event);
     }
 }

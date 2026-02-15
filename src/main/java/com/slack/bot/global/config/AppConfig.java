@@ -15,6 +15,7 @@ import com.slack.bot.application.interactivity.block.handler.CancelReviewReserva
 import com.slack.bot.application.interactivity.block.handler.ChangeReviewReservationActionHandler;
 import com.slack.bot.application.interactivity.block.handler.ClaimMappingActionHandler;
 import com.slack.bot.application.interactivity.block.handler.OpenReviewSchedulerActionHandler;
+import com.slack.bot.application.interactivity.block.handler.StartReviewActionHandler;
 import com.slack.bot.application.setting.strategy.NotificationSettingsUpdater;
 import com.slack.bot.global.config.properties.AccessLinkKeyProperties;
 import com.slack.bot.global.config.properties.AppProperties;
@@ -118,6 +119,7 @@ public class AppConfig {
     public BlockActionDispatcher blockActionDispatcher(
             ClaimMappingActionHandler claimMappingActionHandler,
             OpenReviewSchedulerActionHandler openReviewSchedulerActionHandler,
+            StartReviewActionHandler startReviewActionHandler,
             ChangeReviewReservationActionHandler changeReviewReservationActionHandler,
             CancelReviewReservationActionHandler cancelReviewReservationActionHandler
     ) {
@@ -125,6 +127,7 @@ public class AppConfig {
 
         handlerMap.put(BlockActionType.CLAIM_PREFIX, claimMappingActionHandler);
         handlerMap.put(BlockActionType.OPEN_REVIEW_SCHEDULER, openReviewSchedulerActionHandler);
+        handlerMap.put(BlockActionType.START_REVIEW, startReviewActionHandler);
         handlerMap.put(BlockActionType.CHANGE_REVIEW_RESERVATION, changeReviewReservationActionHandler);
         handlerMap.put(BlockActionType.CANCEL_REVIEW_RESERVATION, cancelReviewReservationActionHandler);
 
