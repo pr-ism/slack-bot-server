@@ -127,8 +127,8 @@ public class StartReviewActionHandler implements BlockActionHandler {
                     command.slackUserId(),
                     command.botToken()
             );
-            sendStartReviewAcknowledgement(command);
             publishReviewFulfilledEvent(meta, command.slackUserId());
+            sendStartReviewAcknowledgement(command);
         } catch (SlackBotMessageDispatchException e) {
             log.warn("리뷰 시작 알림 전송 실패", e);
         } catch (RuntimeException e) {

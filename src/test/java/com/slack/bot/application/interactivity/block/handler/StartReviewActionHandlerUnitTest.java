@@ -20,6 +20,7 @@ import com.slack.bot.application.interactivity.dto.ReviewScheduleMetaDto;
 import com.slack.bot.application.interactivity.notification.NotificationDispatcher;
 import com.slack.bot.application.interactivity.notification.ReviewReservationNotifier;
 import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventPublisher;
+import com.slack.bot.application.interactivity.publisher.ReviewReservationFulfilledEvent;
 import com.slack.bot.application.interactivity.reply.SlackActionErrorNotifier;
 import com.slack.bot.application.interactivity.reservation.AuthorResolver;
 import com.slack.bot.application.interactivity.reservation.ReservationMetaResolver;
@@ -188,6 +189,45 @@ class StartReviewActionHandlerUnitTest {
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
                 () -> verify(notificationDispatcher, never()).sendEphemeral(any(), any(), any(), any()),
                 () -> verify(reviewInteractionEventPublisher, never()).publish(any()),
+                () -> verify(startReviewMarkStore, never()).remove("T1:123:10:U2")
+        );
+    }
+
+    @Test
+    void 시작_ACK_전송_실패여도_이행_이벤트는_발행한다() {
+        // given
+        Instant now = Instant.parse("2026-02-13T00:00:00Z");
+        Clock clock = Clock.fixed(now, ZoneOffset.UTC);
+        StartReviewActionHandler handler = new StartReviewActionHandler(
+                clock,
+                authorResolver,
+                startReviewMarkStore,
+                notificationDispatcher,
+                reservationMetaResolver,
+                errorNotifier,
+                reviewReservationNotifier,
+                reviewReservationCoordinator,
+                reviewInteractionEventPublisher
+        );
+        ReviewScheduleMetaDto meta = validMeta();
+        BlockActionCommandDto command = commandWithMeta("meta-json", "U2");
+
+        given(reservationMetaResolver.parseMeta("meta-json")).willReturn(meta);
+        given(authorResolver.resolveAuthorSlackId(meta)).willReturn("U1");
+        given(startReviewMarkStore.putIfAbsent("T1:123:10:U2", now)).willReturn(null);
+        given(reviewReservationCoordinator.cancelActive("T1", 123L, "U2", 10L)).willReturn(Optional.empty());
+        willThrow(new RuntimeException("ack failed"))
+                .given(notificationDispatcher)
+                .sendEphemeral("xoxb-test-token", "C1", "U2", "리뷰 시작 알림을 전송했습니다.");
+
+        // when
+        BlockActionOutcomeDto actual = handler.handle(command);
+
+        // then
+        assertAll(
+                () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
+                () -> verify(reviewReservationNotifier).notifyStartNowToParticipants(meta, "U2", "xoxb-test-token"),
+                () -> verify(reviewInteractionEventPublisher).publish(any(ReviewReservationFulfilledEvent.class)),
                 () -> verify(startReviewMarkStore, never()).remove("T1:123:10:U2")
         );
     }
