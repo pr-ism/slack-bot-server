@@ -13,7 +13,7 @@ public interface ReviewReservationInteractionRepository {
             String reviewerSlackId
     );
 
-    boolean updateReviewTimeSelectedAt(
+    void recordReviewTimeSelected(
             String teamId,
             Long projectId,
             Long pullRequestId,
@@ -21,21 +21,21 @@ public interface ReviewReservationInteractionRepository {
             Instant reviewTimeSelectedAt
     );
 
-    boolean increaseScheduleChangeCount(
+    void recordScheduleChanged(
             String teamId,
             Long projectId,
             Long pullRequestId,
             String reviewerSlackId
     );
 
-    boolean increaseScheduleCancelCount(
+    void recordScheduleCanceled(
             String teamId,
             Long projectId,
             Long pullRequestId,
             String reviewerSlackId
     );
 
-    boolean updateReviewScheduledAtAndPullRequestNotifiedAt(
+    void recordReviewScheduled(
             String teamId,
             Long projectId,
             Long pullRequestId,
@@ -44,7 +44,7 @@ public interface ReviewReservationInteractionRepository {
             Instant pullRequestNotifiedAt
     );
 
-    boolean markReviewFulfilledAndUpdatePullRequestNotifiedAt(
+    void recordReviewFulfilled(
             String teamId,
             Long projectId,
             Long pullRequestId,

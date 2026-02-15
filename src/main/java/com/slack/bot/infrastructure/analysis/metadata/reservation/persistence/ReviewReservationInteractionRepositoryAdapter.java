@@ -5,12 +5,12 @@ import static com.slack.bot.domain.analysis.metadata.reservation.QReviewReservat
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.domain.analysis.metadata.reservation.ReviewReservationInteraction;
 import com.slack.bot.domain.analysis.metadata.reservation.repository.ReviewReservationInteractionRepository;
-import jakarta.persistence.EntityManager;
+import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
 import java.time.Instant;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Repository
@@ -18,14 +18,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReviewReservationInteractionRepositoryAdapter implements ReviewReservationInteractionRepository {
 
     private final JPAQueryFactory queryFactory;
-    private final EntityManager entityManager;
+    private final ReviewReservationInteractionCreator reviewReservationInteractionCreator;
+    private final MysqlDuplicateKeyDetector mysqlDuplicateKeyDetector;
 
     @Override
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ReviewReservationInteraction create(ReviewReservationInteraction interaction) {
-        entityManager.persist(interaction);
-        entityManager.flush();
-        return interaction;
+        return reviewReservationInteractionCreator.create(interaction);
     }
 
     @Override
@@ -51,7 +49,145 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
 
     @Override
     @Transactional
-    public boolean updateReviewTimeSelectedAt(
+    public void recordReviewTimeSelected(
+            String teamId,
+            Long projectId,
+            Long pullRequestId,
+            String reviewerSlackId,
+            Instant reviewTimeSelectedAt
+    ) {
+        if (updateReviewTimeSelectedAt(teamId, projectId, pullRequestId, reviewerSlackId, reviewTimeSelectedAt)) {
+            return;
+        }
+
+        ReviewReservationInteraction interaction = ReviewReservationInteraction.create(
+                teamId, projectId, pullRequestId, reviewerSlackId
+        );
+        interaction.recordReviewTimeSelectedAt(reviewTimeSelectedAt);
+
+        tryCreateOrOnDuplicate(
+                interaction,
+                () -> updateReviewTimeSelectedAt(teamId, projectId, pullRequestId, reviewerSlackId, reviewTimeSelectedAt)
+        );
+    }
+
+    @Override
+    @Transactional
+    public void recordScheduleChanged(
+            String teamId,
+            Long projectId,
+            Long pullRequestId,
+            String reviewerSlackId
+    ) {
+        if (increaseScheduleChangeCount(teamId, projectId, pullRequestId, reviewerSlackId)) {
+            return;
+        }
+
+        ReviewReservationInteraction interaction = ReviewReservationInteraction.create(
+                teamId, projectId, pullRequestId, reviewerSlackId
+        );
+        interaction.increaseScheduleChangeCount();
+
+        tryCreateOrOnDuplicate(
+                interaction,
+                () -> increaseScheduleChangeCount(teamId, projectId, pullRequestId, reviewerSlackId)
+        );
+    }
+
+    @Override
+    @Transactional
+    public void recordScheduleCanceled(
+            String teamId,
+            Long projectId,
+            Long pullRequestId,
+            String reviewerSlackId
+    ) {
+        if (increaseScheduleCancelCount(teamId, projectId, pullRequestId, reviewerSlackId)) {
+            return;
+        }
+
+        ReviewReservationInteraction interaction = ReviewReservationInteraction.create(
+                teamId, projectId, pullRequestId, reviewerSlackId
+        );
+        interaction.increaseScheduleCancelCount();
+
+        tryCreateOrOnDuplicate(
+                interaction,
+                () -> increaseScheduleCancelCount(teamId, projectId, pullRequestId, reviewerSlackId)
+        );
+    }
+
+    @Override
+    @Transactional
+    public void recordReviewScheduled(
+            String teamId,
+            Long projectId,
+            Long pullRequestId,
+            String reviewerSlackId,
+            Instant reviewScheduledAt,
+            Instant pullRequestNotifiedAt
+    ) {
+        if (updateReviewScheduledAtAndPullRequestNotifiedAt(
+                teamId, projectId, pullRequestId, reviewerSlackId, reviewScheduledAt, pullRequestNotifiedAt
+        )) {
+            return;
+        }
+
+        ReviewReservationInteraction interaction = ReviewReservationInteraction.create(
+                teamId, projectId, pullRequestId, reviewerSlackId
+        );
+        interaction.recordReviewScheduledAt(reviewScheduledAt);
+        interaction.recordPullRequestNotifiedAt(pullRequestNotifiedAt);
+
+        tryCreateOrOnDuplicate(
+                interaction,
+                () -> updateReviewScheduledAtAndPullRequestNotifiedAt(
+                        teamId, projectId, pullRequestId, reviewerSlackId, reviewScheduledAt, pullRequestNotifiedAt
+                )
+        );
+    }
+
+    @Override
+    @Transactional
+    public void recordReviewFulfilled(
+            String teamId,
+            Long projectId,
+            Long pullRequestId,
+            String reviewerSlackId,
+            Instant pullRequestNotifiedAt
+    ) {
+        if (markReviewFulfilledAndUpdatePullRequestNotifiedAt(
+                teamId, projectId, pullRequestId, reviewerSlackId, pullRequestNotifiedAt
+        )) {
+            return;
+        }
+
+        ReviewReservationInteraction interaction = ReviewReservationInteraction.create(
+                teamId, projectId, pullRequestId, reviewerSlackId
+        );
+        interaction.markReviewFulfilled();
+        interaction.recordPullRequestNotifiedAt(pullRequestNotifiedAt);
+
+        tryCreateOrOnDuplicate(
+                interaction,
+                () -> markReviewFulfilledAndUpdatePullRequestNotifiedAt(
+                        teamId, projectId, pullRequestId, reviewerSlackId, pullRequestNotifiedAt
+                )
+        );
+    }
+
+    private void tryCreateOrOnDuplicate(ReviewReservationInteraction interaction, Runnable onDuplicate) {
+        try {
+            reviewReservationInteractionCreator.create(interaction);
+        } catch (DataIntegrityViolationException exception) {
+            if (mysqlDuplicateKeyDetector.isNotDuplicateKey(exception)) {
+                throw exception;
+            }
+            onDuplicate.run();
+        }
+    }
+
+    private boolean updateReviewTimeSelectedAt(
             String teamId,
             Long projectId,
             Long pullRequestId,
@@ -72,9 +208,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
         return updatedCount > 0;
     }
 
-    @Override
-    @Transactional
-    public boolean increaseScheduleChangeCount(
+    private boolean increaseScheduleChangeCount(
             String teamId,
             Long projectId,
             Long pullRequestId,
@@ -97,9 +231,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
         return updatedCount > 0;
     }
 
-    @Override
-    @Transactional
-    public boolean increaseScheduleCancelCount(
+    private boolean increaseScheduleCancelCount(
             String teamId,
             Long projectId,
             Long pullRequestId,
@@ -122,9 +254,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
         return updatedCount > 0;
     }
 
-    @Override
-    @Transactional
-    public boolean updateReviewScheduledAtAndPullRequestNotifiedAt(
+    private boolean updateReviewScheduledAtAndPullRequestNotifiedAt(
             String teamId,
             Long projectId,
             Long pullRequestId,
@@ -147,9 +277,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
         return updatedCount > 0;
     }
 
-    @Override
-    @Transactional
-    public boolean markReviewFulfilledAndUpdatePullRequestNotifiedAt(
+    private boolean markReviewFulfilledAndUpdatePullRequestNotifiedAt(
             String teamId,
             Long projectId,
             Long pullRequestId,
@@ -170,4 +298,5 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
 
         return updatedCount > 0;
     }
+
 }
