@@ -1,11 +1,15 @@
 package com.slack.bot.application.interactivity.publisher;
 
-public record ReviewReservationRequestEvent(
+import java.time.Instant;
+
+public record ReviewReservationScheduledEvent(
         String teamId,
         String channelId,
         String slackUserId,
+        Long reservationId,
         Long projectId,
         Long pullRequestId,
-        String metaJson
+        Instant reviewScheduledAt,
+        Instant pullRequestNotifiedAt
 ) implements ReviewInteractionEvent {
 }

@@ -21,11 +21,11 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ReservationCommandWorkflow {
 
+    private final Clock clock;
     private final NotificationApiClient slackApiClient;
     private final SlackActionErrorNotifier errorNotifier;
     private final ReviewReservationTimeViewFactory slackViews;
     private final ReviewScheduleMetaBuilder reviewScheduleMetaBuilder;
-    private final Clock clock;
     private final ReviewReservationCoordinator reviewReservationCoordinator;
     private final ReviewInteractionEventPublisher reviewInteractionEventPublisher;
 
@@ -101,12 +101,12 @@ public class ReservationCommandWorkflow {
             Long reservationId,
             ReviewReservation reservation
     ) {
-        Optional<ReviewReservation> cancelled = reviewReservationCoordinator.cancel(reservationId);
-        if (cancelled.isPresent()) {
-            publishCancelEvent(teamId, channelId, slackUserId, reservation);
-            return cancelled;
-        }
-        return Optional.of(reservation);
+        return reviewReservationCoordinator.cancel(reservationId)
+                                          .map(cancelled -> {
+                                              publishCancelEvent(teamId, channelId, slackUserId, reservation);
+                                              return cancelled;
+                                          })
+                                          .or(() -> Optional.of(reservation));
     }
 
     private ReviewReservation findReservationOrNotify(
@@ -117,7 +117,12 @@ public class ReservationCommandWorkflow {
     ) {
         return reviewReservationCoordinator.findById(reservationId)
                                            .orElseGet(() -> {
-                                               errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.RESERVATION_NOT_FOUND);
+                                               errorNotifier.notify(
+                                                       token,
+                                                       channelId,
+                                                       slackUserId,
+                                                       InteractivityErrorType.RESERVATION_NOT_FOUND
+                                               );
                                                return null;
                                            });
     }
@@ -195,19 +200,16 @@ public class ReservationCommandWorkflow {
             String token,
             ReviewReservation reservation
     ) {
-        final String metaJson;
         try {
-            metaJson = reviewScheduleMetaBuilder.buildForChange(reservation);
+            String metaJson = reviewScheduleMetaBuilder.buildForChange(reservation);
+            String triggerId = payload.path("trigger_id")
+                                      .asText();
+            Object view = slackViews.reviewTimeSubmitModal(metaJson);
+
+            slackApiClient.openModal(token, triggerId, view);
         } catch (RuntimeException e) {
             errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.RESERVATION_LOAD_FAILURE);
-            return;
         }
-
-        String triggerId = payload.path("trigger_id")
-                                  .asText();
-        Object view = slackViews.reviewTimeSubmitModal(metaJson);
-
-        slackApiClient.openModal(token, triggerId, view);
     }
 
     private void publishCancelEvent(
@@ -220,7 +222,9 @@ public class ReservationCommandWorkflow {
                 teamId,
                 channelId,
                 slackUserId,
-                reservation.getId()
+                reservation.getId(),
+                reservation.getProjectId(),
+                reservation.getReservationPullRequest().getPullRequestId()
         );
 
         reviewInteractionEventPublisher.publish(event);
@@ -236,7 +240,9 @@ public class ReservationCommandWorkflow {
                 teamId,
                 channelId,
                 slackUserId,
-                reservation.getId()
+                reservation.getId(),
+                reservation.getProjectId(),
+                reservation.getReservationPullRequest().getPullRequestId()
         );
 
         reviewInteractionEventPublisher.publish(event);
