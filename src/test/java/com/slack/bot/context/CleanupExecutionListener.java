@@ -80,7 +80,6 @@ public class CleanupExecutionListener extends AbstractTestExecutionListener impl
 
     private void waitForAllTaskExecutorsIdle(ApplicationContext applicationContext) {
         Map<String, ThreadPoolTaskExecutor> executors = applicationContext.getBeansOfType(ThreadPoolTaskExecutor.class);
-
         executors.forEach((beanName, taskExecutor) -> waitForTaskExecutorIdle(beanName, taskExecutor));
     }
 
@@ -114,12 +113,17 @@ public class CleanupExecutionListener extends AbstractTestExecutionListener impl
     private void waitUntilIdle(String target, BooleanSupplier condition) {
         long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(DRAIN_TIMEOUT_MILLIS);
 
-        while (System.nanoTime() < deadlineNanos) {
+        while (!Thread.currentThread().isInterrupted() && System.nanoTime() < deadlineNanos) {
             if (condition.getAsBoolean()) {
                 return;
             }
 
             sleepSilently(DRAIN_POLL_INTERVAL_MILLIS);
+        }
+
+        if (Thread.currentThread().isInterrupted()) {
+            log.warn("Cleanup 중단: 인터럽트가 발생했습니다. target={}", target);
+            return;
         }
 
         String exceptionMessage = String.format(
