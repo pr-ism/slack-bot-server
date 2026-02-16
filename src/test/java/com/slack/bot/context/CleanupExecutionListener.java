@@ -122,7 +122,12 @@ public class CleanupExecutionListener extends AbstractTestExecutionListener impl
             sleepSilently(DRAIN_POLL_INTERVAL_MILLIS);
         }
 
-        log.warn("background task drain timeout. target={}", target);
+        String exceptionMessage = String.format(
+                "Cleanup 실패: 백그라운드 작업이 %dms 내에 종료되지 않았습니다. target=%s",
+                DRAIN_TIMEOUT_MILLIS, target
+        );
+
+        throw new IllegalStateException(exceptionMessage);
     }
 
     private void sleepSilently(long millis) {
