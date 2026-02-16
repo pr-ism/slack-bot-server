@@ -60,7 +60,7 @@ class ReviewReservationWorkflowTest {
         Instant scheduledAt = Instant.now().plusSeconds(3600);
 
         // when
-        Object actual = reviewReservationWorkflow.reserveReview(meta, "U1", "xoxb-test-token", scheduledAt);
+        SlackActionResponse actual = reviewReservationWorkflow.reserveReview(meta, "U1", "xoxb-test-token", scheduledAt);
 
         // then
         Optional<ReviewReservation> saved = reviewReservationRepository.findActive("T1", 123L, "U1");
@@ -84,7 +84,7 @@ class ReviewReservationWorkflowTest {
         Instant scheduledAt = Instant.now().plusSeconds(3600);
 
         // when
-        Object actual = reviewReservationWorkflow.reserveReview(meta, "U1", "xoxb-test-token", scheduledAt);
+        SlackActionResponse actual = reviewReservationWorkflow.reserveReview(meta, "U1", "xoxb-test-token", scheduledAt);
 
         // then
         Optional<ReviewReservation> active = reviewReservationRepository.findById(100L);
@@ -103,7 +103,7 @@ class ReviewReservationWorkflowTest {
         Instant scheduledAt = Instant.now().plusSeconds(3600);
 
         // when
-        Object actual = reviewReservationWorkflow.reserveReview(meta, "U1", "xoxb-test-token", scheduledAt);
+        SlackActionResponse actual = reviewReservationWorkflow.reserveReview(meta, "U1", "xoxb-test-token", scheduledAt);
 
         // then
         assertAll(
@@ -125,7 +125,7 @@ class ReviewReservationWorkflowTest {
         Instant scheduledAt = Instant.now().plusSeconds(3600);
 
         // when
-        Object actual = reviewReservationWorkflow.reserveReview(meta, "U1", "xoxb-test-token", scheduledAt);
+        SlackActionResponse actual = reviewReservationWorkflow.reserveReview(meta, "U1", "xoxb-test-token", scheduledAt);
 
         // then
         Optional<ReviewReservation> saved = reviewReservationRepository.findActive("T1", 123L, "U1");
@@ -148,7 +148,7 @@ class ReviewReservationWorkflowTest {
         Instant scheduledAt = Instant.parse("2099-01-01T10:00:00Z");
 
         // when
-        Object actual = reviewReservationWorkflow.reserveReview(meta, "U1", "xoxb-test-token", scheduledAt);
+        SlackActionResponse actual = reviewReservationWorkflow.reserveReview(meta, "U1", "xoxb-test-token", scheduledAt);
 
         // then
         Optional<ReviewReservation> changed = reviewReservationRepository.findById(100L);
@@ -193,7 +193,7 @@ class ReviewReservationWorkflowTest {
                 .findActive(anyString(), anyLong(), anyString(), anyLong());
 
         // when
-        Object actual = reviewReservationWorkflow.reserveReview(
+        SlackActionResponse actual = reviewReservationWorkflow.reserveReview(
                 meta,
                 "U1",
                 "xoxb-test-token",
@@ -208,14 +208,14 @@ class ReviewReservationWorkflowTest {
     @Sql("classpath:sql/fixtures/interactivity/project_123.sql")
     void 즉시_알림_분기를_통과한다() {
         // given
-        Instant nowForValidation = Instant.parse("2026-01-01T00:00:00Z");
-        Instant scheduledAt = Instant.parse("2026-01-01T00:00:10Z");
-        Instant nowForImmediate = Instant.parse("2026-01-01T00:00:20Z");
+        Instant nowForValidation = Instant.parse("2099-01-01T00:00:00Z");
+        Instant scheduledAt = Instant.parse("2099-01-01T00:00:10Z");
+        Instant nowForImmediate = Instant.parse("2099-01-01T00:00:20Z");
         ReviewScheduleMetaDto meta = meta("123", null);
         doReturn(nowForValidation, nowForImmediate).when(clock).instant();
 
         // when
-        Object actual = reviewReservationWorkflow.reserveReview(meta, "U1", "xoxb-test-token", scheduledAt);
+        SlackActionResponse actual = reviewReservationWorkflow.reserveReview(meta, "U1", "xoxb-test-token", scheduledAt);
 
         // then
         assertThat(actual).isEqualTo(SlackActionResponse.clear());
