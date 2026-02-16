@@ -11,7 +11,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
-import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventPublisher;
+import com.slack.bot.application.interactivity.publisher.ReviewInteractionEvent;
 import com.slack.bot.application.interactivity.publisher.ReviewReservationCancelEvent;
 import com.slack.bot.application.interactivity.publisher.ReviewReservationChangeEvent;
 import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
@@ -23,11 +23,13 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.context.jdbc.Sql;
 
 @IntegrationTest
+@RecordApplicationEvents
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class ReservationCommandWorkflowTest {
@@ -44,11 +46,8 @@ class ReservationCommandWorkflowTest {
     @Autowired
     NotificationApiClient notificationApiClient;
 
-    @Autowired
-    ReviewInteractionEventPublisher reviewInteractionEventPublisher;
-
     @Test
-    void 예약_ID가_없으면_아무_동작도_하지_않는다() {
+    void 예약_ID가_없으면_아무_동작도_하지_않는다(ApplicationEvents applicationEvents) {
         // given
         JsonNode action = actionWithReservationId(" ");
 
@@ -65,12 +64,12 @@ class ReservationCommandWorkflowTest {
         assertAll(
                 () -> assertThat(actual).isEmpty(),
                 () -> verify(notificationApiClient, never()).sendEphemeralMessage(any(), any(), any(), any()),
-                () -> verify(reviewInteractionEventPublisher, never()).publish(any())
+                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 
     @Test
-    void 예약_ID가_숫자가_아니면_아무_동작도_하지_않는다() {
+    void 예약_ID가_숫자가_아니면_아무_동작도_하지_않는다(ApplicationEvents applicationEvents) {
         // given
         JsonNode action = actionWithReservationId("invalid");
 
@@ -87,12 +86,12 @@ class ReservationCommandWorkflowTest {
         assertAll(
                 () -> assertThat(actual).isEmpty(),
                 () -> verify(notificationApiClient, never()).sendEphemeralMessage(any(), any(), any(), any()),
-                () -> verify(reviewInteractionEventPublisher, never()).publish(any())
+                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 
     @Test
-    void 예약이_없으면_예약_없음_알림을_보내고_빈_값을_반환한다() {
+    void 예약이_없으면_예약_없음_알림을_보내고_빈_값을_반환한다(ApplicationEvents applicationEvents) {
         // given
         JsonNode action = actionWithReservationId("999");
 
@@ -114,13 +113,13 @@ class ReservationCommandWorkflowTest {
                         eq("U1"),
                         eq(InteractivityErrorType.RESERVATION_NOT_FOUND.message())
                 ),
-                () -> verify(reviewInteractionEventPublisher, never()).publish(any())
+                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 
     @Test
     @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
-    void 리뷰_예약_취소_요청은_예약을_취소하고_취소_이벤트를_발행한다() {
+    void 리뷰_예약_취소_요청은_예약을_취소하고_취소_이벤트를_발행한다(ApplicationEvents applicationEvents) {
         // given
         JsonNode action = actionWithReservationId("100");
 
@@ -135,22 +134,27 @@ class ReservationCommandWorkflowTest {
 
         // then
         Optional<ReviewReservation> cancelled = reviewReservationRepository.findById(100L);
-        ArgumentCaptor<ReviewReservationCancelEvent> eventCaptor = ArgumentCaptor.forClass(ReviewReservationCancelEvent.class);
 
         assertAll(
-                () -> verify(reviewInteractionEventPublisher).publish(eventCaptor.capture()),
+                () -> assertThat(applicationEvents.stream(ReviewReservationCancelEvent.class).toList())
+                        .singleElement()
+                        .satisfies(event -> assertAll(
+                                () -> assertThat(event.teamId()).isEqualTo("T1"),
+                                () -> assertThat(event.channelId()).isEqualTo("C1"),
+                                () -> assertThat(event.slackUserId()).isEqualTo("U1"),
+                                () -> assertThat(event.reservationId()).isEqualTo(100L)
+                        )),
                 () -> verify(notificationApiClient, never()).sendEphemeralMessage(any(), any(), any(), any()),
                 () -> assertThat(actual).isPresent(),
                 () -> assertThat(actual.get().getId()).isEqualTo(100L),
                 () -> assertThat(cancelled).isPresent(),
-                () -> assertThat(cancelled.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED),
-                () -> assertThat(eventCaptor.getValue().reservationId()).isEqualTo(100L)
+                () -> assertThat(cancelled.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED)
         );
     }
 
     @Test
     @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
-    void 리뷰_예약_취소는_본인만_가능하다는_알림을_보낸다() {
+    void 리뷰_예약_취소는_본인만_가능하다는_알림을_보낸다(ApplicationEvents applicationEvents) {
         // given
         JsonNode action = actionWithReservationId("100");
 
@@ -172,13 +176,13 @@ class ReservationCommandWorkflowTest {
                         eq("U2"),
                         eq(InteractivityErrorType.NOT_OWNER_CANCEL.message())
                 ),
-                () -> verify(reviewInteractionEventPublisher, never()).publish(any())
+                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 
     @Test
     @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
-    void 이미_취소된_예약은_취소할_수_없다는_알림을_보낸다() {
+    void 이미_취소된_예약은_취소할_수_없다는_알림을_보낸다(ApplicationEvents applicationEvents) {
         // given
         JsonNode action = actionWithReservationId("100");
         ReviewReservation reservation = reviewReservationRepository.findById(100L).orElseThrow();
@@ -203,13 +207,13 @@ class ReservationCommandWorkflowTest {
                         eq("U1"),
                         eq(InteractivityErrorType.RESERVATION_ALREADY_CANCELLED.message())
                 ),
-                () -> verify(reviewInteractionEventPublisher, never()).publish(any())
+                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 
     @Test
     @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
-    void 이미_시작된_예약은_취소할_수_없다는_알림을_보낸다() {
+    void 이미_시작된_예약은_취소할_수_없다는_알림을_보낸다(ApplicationEvents applicationEvents) {
         // given
         JsonNode action = actionWithReservationId("100");
         ReviewReservation reservation = reviewReservationRepository.findById(100L).orElseThrow();
@@ -234,16 +238,16 @@ class ReservationCommandWorkflowTest {
                         eq("U1"),
                         eq(InteractivityErrorType.RESERVATION_ALREADY_STARTED.message())
                 ),
-                () -> verify(reviewInteractionEventPublisher, never()).publish(any())
+                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 
     @Test
     @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
-    void 리뷰_예약_변경_요청은_모달을_열고_변경_이벤트를_발행한다() {
+    void 리뷰_예약_변경_요청은_모달을_열고_변경_이벤트를_발행한다(ApplicationEvents applicationEvents) {
         // given
         JsonNode payload = objectMapper.createObjectNode()
-                .put("trigger_id", "TRIGGER_1");
+                                       .put("trigger_id", "TRIGGER_1");
         JsonNode action = actionWithReservationId("100");
 
         // when
@@ -257,25 +261,29 @@ class ReservationCommandWorkflowTest {
         );
 
         // then
-        ArgumentCaptor<ReviewReservationChangeEvent> eventCaptor = ArgumentCaptor.forClass(ReviewReservationChangeEvent.class);
-
         assertAll(
-                () -> verify(reviewInteractionEventPublisher).publish(eventCaptor.capture()),
+                () -> assertThat(applicationEvents.stream(ReviewReservationChangeEvent.class).toList())
+                        .singleElement()
+                        .satisfies(event -> assertAll(
+                                () -> assertThat(event.teamId()).isEqualTo("T1"),
+                                () -> assertThat(event.channelId()).isEqualTo("C1"),
+                                () -> assertThat(event.slackUserId()).isEqualTo("U1"),
+                                () -> assertThat(event.reservationId()).isEqualTo(100L)
+                        )),
                 () -> verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
                         any()
-                ),
-                () -> assertThat(eventCaptor.getValue().reservationId()).isEqualTo(100L)
+                )
         );
     }
 
     @Test
     @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
-    void 리뷰_예약_변경은_본인만_가능하다는_알림을_보낸다() {
+    void 리뷰_예약_변경은_본인만_가능하다는_알림을_보낸다(ApplicationEvents applicationEvents) {
         // given
         JsonNode payload = objectMapper.createObjectNode()
-                .put("trigger_id", "TRIGGER_1");
+                                       .put("trigger_id", "TRIGGER_1");
         JsonNode action = actionWithReservationId("100");
 
         // when
@@ -296,13 +304,13 @@ class ReservationCommandWorkflowTest {
                         eq("U2"),
                         eq(InteractivityErrorType.NOT_OWNER_CHANGE.message())
                 ),
-                () -> verify(reviewInteractionEventPublisher, never()).publish(any())
+                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 
     @Test
     @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
-    void 이미_취소된_예약은_변경할_수_없다는_알림을_보낸다() {
+    void 이미_취소된_예약은_변경할_수_없다는_알림을_보낸다(ApplicationEvents applicationEvents) {
         // given
         JsonNode payload = objectMapper.createObjectNode()
                                        .put("trigger_id", "TRIGGER_1");
@@ -330,13 +338,13 @@ class ReservationCommandWorkflowTest {
                         eq(InteractivityErrorType.RESERVATION_CHANGE_NOT_ALLOWED_CANCELLED.message())
                 ),
                 () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
-                () -> verify(reviewInteractionEventPublisher, never()).publish(any())
+                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 
     @Test
     @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
-    void 이미_시작된_예약은_변경할_수_없다는_알림을_보낸다() {
+    void 이미_시작된_예약은_변경할_수_없다는_알림을_보낸다(ApplicationEvents applicationEvents) {
         // given
         JsonNode payload = objectMapper.createObjectNode()
                                        .put("trigger_id", "TRIGGER_1");
@@ -364,15 +372,15 @@ class ReservationCommandWorkflowTest {
                         eq(InteractivityErrorType.RESERVATION_ALREADY_STARTED.message())
                 ),
                 () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
-                () -> verify(reviewInteractionEventPublisher, never()).publish(any())
+                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 
     @Test
-    void 리뷰_예약_변경_요청에서_예약이_없으면_예약_없음_알림을_보낸다() {
+    void 리뷰_예약_변경_요청에서_예약이_없으면_예약_없음_알림을_보낸다(ApplicationEvents applicationEvents) {
         // given
         JsonNode payload = objectMapper.createObjectNode()
-                .put("trigger_id", "TRIGGER_1");
+                                       .put("trigger_id", "TRIGGER_1");
         JsonNode action = actionWithReservationId("999");
 
         // when
@@ -393,7 +401,7 @@ class ReservationCommandWorkflowTest {
                         eq("U1"),
                         eq(InteractivityErrorType.RESERVATION_NOT_FOUND.message())
                 ),
-                () -> verify(reviewInteractionEventPublisher, never()).publish(any()),
+                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty(),
                 () -> verify(notificationApiClient, never()).openModal(any(), any(), any())
         );
     }

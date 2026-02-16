@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
+import com.slack.bot.application.interactivity.publisher.ReviewInteractionEvent;
 import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventPublisher;
 import com.slack.bot.application.interactivity.publisher.ReviewReservationRequestEvent;
 import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
@@ -20,11 +21,13 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.context.jdbc.Sql;
 
 @IntegrationTest
+@RecordApplicationEvents
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class ReviewSchedulerWorkflowTest {
@@ -42,7 +45,7 @@ class ReviewSchedulerWorkflowTest {
     ReviewInteractionEventPublisher reviewInteractionEventPublisher;
 
     @Test
-    void 예약_메타가_없으면_오류_알림을_보내고_빈_값을_반환한다() {
+    void 예약_메타가_없으면_오류_알림을_보내고_빈_값을_반환한다(ApplicationEvents applicationEvents) {
         // given
         JsonNode payload = payloadWithTriggerId("TRIGGER_1");
         JsonNode action = actionWithMetaJson("");
@@ -66,12 +69,13 @@ class ReviewSchedulerWorkflowTest {
                         InteractivityErrorType.INVALID_META.message()
                 ),
                 () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
-                () -> assertThat(actual).isEmpty()
+                () -> assertThat(actual).isEmpty(),
+                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 
     @Test
-    void 예약_메타가_잘못되면_오류_알림을_보내고_빈_값을_반환한다() {
+    void 예약_메타가_잘못되면_오류_알림을_보내고_빈_값을_반환한다(ApplicationEvents applicationEvents) {
         // given
         JsonNode payload = payloadWithTriggerId("TRIGGER_1");
         JsonNode action = actionWithMetaJson("{invalid-json");
@@ -95,12 +99,13 @@ class ReviewSchedulerWorkflowTest {
                         InteractivityErrorType.INVALID_META.message()
                 ),
                 () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
-                () -> assertThat(actual).isEmpty()
+                () -> assertThat(actual).isEmpty(),
+                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 
     @Test
-    void 트리거_ID가_없으면_오류_알림을_보내고_빈_값을_반환한다() {
+    void 트리거_ID가_없으면_오류_알림을_보내고_빈_값을_반환한다(ApplicationEvents applicationEvents) {
         // given
         JsonNode payload = objectMapper.createObjectNode();
         JsonNode action = actionWithMetaJson(metaJsonWithProjectId("123"));
@@ -124,7 +129,8 @@ class ReviewSchedulerWorkflowTest {
                         InteractivityErrorType.INVALID_META.message()
                 ),
                 () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
-                () -> assertThat(actual).isEmpty()
+                () -> assertThat(actual).isEmpty(),
+                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 
@@ -133,7 +139,7 @@ class ReviewSchedulerWorkflowTest {
             "classpath:sql/fixtures/reservation/project_123.sql",
             "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
     })
-    void 활성_예약이_있으면_모달을_열지_않고_기존_예약을_반환한다() {
+    void 활성_예약이_있으면_모달을_열지_않고_기존_예약을_반환한다(ApplicationEvents applicationEvents) {
         // given
         String metaJson = metaJsonWithProjectId("123");
         JsonNode payload = payloadWithTriggerId("TRIGGER_1");
@@ -150,21 +156,24 @@ class ReviewSchedulerWorkflowTest {
         );
 
         // then
-        ArgumentCaptor<ReviewReservationRequestEvent> eventCaptor = ArgumentCaptor.forClass(ReviewReservationRequestEvent.class);
-
         assertAll(
-                () -> verify(reviewInteractionEventPublisher).publish(eventCaptor.capture()),
+                () -> assertThat(applicationEvents.stream(ReviewReservationRequestEvent.class).toList())
+                        .singleElement()
+                        .satisfies(event -> assertAll(
+                                () -> assertThat(event.teamId()).isEqualTo("T1"),
+                                () -> assertThat(event.channelId()).isEqualTo("C1"),
+                                () -> assertThat(event.slackUserId()).isEqualTo("U1"),
+                                () -> assertThat(event.metaJson()).isEqualTo(metaJson)
+                        )),
                 () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
                 () -> assertThat(actual).isPresent(),
-                () -> assertThat(actual.get().getId()).isEqualTo(100L),
-                () -> assertThat(eventCaptor.getValue().teamId()).isEqualTo("T1"),
-                () -> assertThat(eventCaptor.getValue().metaJson()).isEqualTo(metaJson)
+                () -> assertThat(actual.get().getId()).isEqualTo(100L)
         );
     }
 
     @Test
     @Sql("classpath:sql/fixtures/reservation/project_123.sql")
-    void 처리_중_오류가_발생하면_오류_알림을_보내고_빈_값을_반환한다() {
+    void 처리_중_오류가_발생하면_오류_알림을_보내고_빈_값을_반환한다(ApplicationEvents applicationEvents) {
         // given
         String metaJson = metaJsonWithProjectId("123");
         JsonNode payload = payloadWithTriggerId("TRIGGER_1");
@@ -193,13 +202,14 @@ class ReviewSchedulerWorkflowTest {
                         InteractivityErrorType.RESERVATION_LOAD_FAILURE.message()
                 ),
                 () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
-                () -> assertThat(actual).isEmpty()
+                () -> assertThat(actual).isEmpty(),
+                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 
     @Test
     @Sql("classpath:sql/fixtures/reservation/project_123.sql")
-    void 활성_예약이_없으면_모달을_열고_빈_값을_반환한다() {
+    void 활성_예약이_없으면_모달을_열고_빈_값을_반환한다(ApplicationEvents applicationEvents) {
         // given
         String metaJson = metaJsonWithProjectId("123");
         JsonNode payload = payloadWithTriggerId("TRIGGER_1");
@@ -216,18 +226,21 @@ class ReviewSchedulerWorkflowTest {
         );
 
         // then
-        ArgumentCaptor<ReviewReservationRequestEvent> eventCaptor = ArgumentCaptor.forClass(ReviewReservationRequestEvent.class);
-
         assertAll(
-                () -> verify(reviewInteractionEventPublisher).publish(eventCaptor.capture()),
+                () -> assertThat(applicationEvents.stream(ReviewReservationRequestEvent.class).toList())
+                        .singleElement()
+                        .satisfies(event -> assertAll(
+                                () -> assertThat(event.teamId()).isEqualTo("T1"),
+                                () -> assertThat(event.channelId()).isEqualTo("C1"),
+                                () -> assertThat(event.slackUserId()).isEqualTo("U1"),
+                                () -> assertThat(event.metaJson()).isEqualTo(metaJson)
+                        )),
                 () -> verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
                         any()
                 ),
-                () -> assertThat(actual).isEmpty(),
-                () -> assertThat(eventCaptor.getValue().teamId()).isEqualTo("T1"),
-                () -> assertThat(eventCaptor.getValue().metaJson()).isEqualTo(metaJson)
+                () -> assertThat(actual).isEmpty()
         );
     }
 
@@ -236,7 +249,7 @@ class ReviewSchedulerWorkflowTest {
             "classpath:sql/fixtures/reservation/project_123.sql",
             "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
     })
-    void 같은_리뷰어의_다른_PR이면_중복으로_보지_않고_모달을_연다() {
+    void 같은_리뷰어의_다른_PR이면_중복으로_보지_않고_모달을_연다(ApplicationEvents applicationEvents) {
         // given
         String metaJson = metaJsonWithProjectIdAndPullRequest("123", 11L, 11);
         JsonNode payload = payloadWithTriggerId("TRIGGER_1");
@@ -255,6 +268,13 @@ class ReviewSchedulerWorkflowTest {
         // then
         assertAll(
                 () -> assertThat(actual).isEmpty(),
+                () -> assertThat(applicationEvents.stream(ReviewReservationRequestEvent.class).toList())
+                        .singleElement()
+                        .satisfies(event -> assertAll(
+                                () -> assertThat(event.teamId()).isEqualTo("T1"),
+                                () -> assertThat(event.pullRequestId()).isEqualTo(11L),
+                                () -> assertThat(event.metaJson()).isEqualTo(metaJson)
+                        )),
                 () -> verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
@@ -264,7 +284,7 @@ class ReviewSchedulerWorkflowTest {
     }
 
     @Test
-    void 리뷰이가_리뷰_예약을_누르면_예약_불가_알림을_보내고_모달을_열지_않는다() {
+    void 리뷰이가_리뷰_예약을_누르면_예약_불가_알림을_보내고_모달을_열지_않는다(ApplicationEvents applicationEvents) {
         // given
         JsonNode payload = payloadWithTriggerId("TRIGGER_1");
         String metaJson = objectMapper.createObjectNode()
@@ -301,13 +321,13 @@ class ReviewSchedulerWorkflowTest {
                         InteractivityErrorType.REVIEWEE_CANNOT_RESERVE.message()
                 ),
                 () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
-                () -> verify(reviewInteractionEventPublisher, never()).publish(any())
+                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 
     @Test
     @Sql("classpath:sql/fixtures/reservation/project_123.sql")
-    void 요청자_Slack_ID가_공백이면_리뷰이로_판단하지_않고_모달을_연다() {
+    void 요청자_Slack_ID가_공백이면_리뷰이로_판단하지_않고_모달을_연다(ApplicationEvents applicationEvents) {
         // given
         String metaJson = metaJsonWithProjectId("123");
         JsonNode payload = payloadWithTriggerId("TRIGGER_1");
@@ -326,6 +346,13 @@ class ReviewSchedulerWorkflowTest {
         // then
         assertAll(
                 () -> assertThat(actual).isEmpty(),
+                () -> assertThat(applicationEvents.stream(ReviewReservationRequestEvent.class).toList())
+                        .singleElement()
+                        .satisfies(event -> assertAll(
+                                () -> assertThat(event.teamId()).isEqualTo("T1"),
+                                () -> assertThat(event.slackUserId()).isEqualTo(" "),
+                                () -> assertThat(event.metaJson()).isEqualTo(metaJson)
+                        )),
                 () -> verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
