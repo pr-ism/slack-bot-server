@@ -15,7 +15,9 @@ import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.block.dto.BlockActionCommandDto;
 import com.slack.bot.application.interactivity.block.dto.BlockActionOutcomeDto;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
-import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventPublisher;
+import com.slack.bot.application.interactivity.publisher.ReviewInteractionEvent;
+import com.slack.bot.application.interactivity.publisher.ReviewReservationChangeEvent;
+import com.slack.bot.application.interactivity.publisher.ReviewReservationRequestEvent;
 import com.slack.bot.domain.member.ProjectMember;
 import com.slack.bot.domain.member.repository.ProjectMemberRepository;
 import com.slack.bot.domain.reservation.ReservationStatus;
@@ -26,9 +28,12 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.context.jdbc.Sql;
 
 @IntegrationTest
+@RecordApplicationEvents
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class BlockActionDispatcherTest {
@@ -44,9 +49,6 @@ class BlockActionDispatcherTest {
 
     @Autowired
     NotificationApiClient notificationApiClient;
-
-    @Autowired
-    ReviewInteractionEventPublisher reviewInteractionEventPublisher;
 
     @Autowired
     ObjectMapper objectMapper;
@@ -94,7 +96,7 @@ class BlockActionDispatcherTest {
 
     @Test
     @Sql("classpath:sql/fixtures/reservation/project_123.sql")
-    void 예약_생성_모달_열기_액션이면_예약_요청_이벤트를_발행하고_모달을_연다() {
+    void 예약_생성_모달_열기_액션이면_예약_요청_이벤트를_발행하고_모달을_연다(ApplicationEvents applicationEvents) {
         // given
         BlockActionCommandDto command = command(
                 objectMapper.createObjectNode().put("trigger_id", "TRIGGER_1"),
@@ -110,7 +112,13 @@ class BlockActionDispatcherTest {
         // then
         assertAll(
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
-                () -> verify(reviewInteractionEventPublisher).publish(any()),
+                () -> assertThat(applicationEvents.stream(ReviewReservationRequestEvent.class).toList())
+                        .singleElement()
+                        .satisfies(event -> assertAll(
+                                () -> assertThat(event.teamId()).isEqualTo("T1"),
+                                () -> assertThat(event.channelId()).isEqualTo("C1"),
+                                () -> assertThat(event.slackUserId()).isEqualTo("U1")
+                        )),
                 () -> verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
@@ -121,7 +129,7 @@ class BlockActionDispatcherTest {
 
     @Test
     @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
-    void 예약_변경_액션이면_변경_모달을_열고_변경_이벤트를_발행한다() {
+    void 예약_변경_액션이면_변경_모달을_열고_변경_이벤트를_발행한다(ApplicationEvents applicationEvents) {
         // given
         BlockActionCommandDto command = command(
                 objectMapper.createObjectNode().put("trigger_id", "TRIGGER_1"),
@@ -137,7 +145,14 @@ class BlockActionDispatcherTest {
         // then
         assertAll(
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
-                () -> verify(reviewInteractionEventPublisher).publish(any()),
+                () -> assertThat(applicationEvents.stream(ReviewReservationChangeEvent.class).toList())
+                        .singleElement()
+                        .satisfies(event -> assertAll(
+                                () -> assertThat(event.teamId()).isEqualTo("T1"),
+                                () -> assertThat(event.channelId()).isEqualTo("C1"),
+                                () -> assertThat(event.slackUserId()).isEqualTo("U1"),
+                                () -> assertThat(event.reservationId()).isEqualTo(100L)
+                        )),
                 () -> verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
@@ -174,7 +189,7 @@ class BlockActionDispatcherTest {
     }
 
     @Test
-    void 알수없는_액션_타입이면_아무것도_수행하지_않고_빈_결과를_반환한다() {
+    void 알수없는_액션_타입이면_아무것도_수행하지_않고_빈_결과를_반환한다(ApplicationEvents applicationEvents) {
         // given
         BlockActionCommandDto command = command(
                 objectMapper.createObjectNode().put("trigger_id", "TRIGGER_1"),
@@ -190,7 +205,7 @@ class BlockActionDispatcherTest {
         // then
         assertAll(
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
-                () -> verify(reviewInteractionEventPublisher, never()).publish(any()),
+                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty(),
                 () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
                 () -> verify(notificationApiClient, never()).sendEphemeralMessage(any(), any(), any(), any())
         );
@@ -217,16 +232,16 @@ class BlockActionDispatcherTest {
 
     private String metaJsonWithProjectId(String projectId) {
         return objectMapper.createObjectNode()
-                .put("team_id", "T1")
-                .put("channel_id", "C1")
-                .put("pull_request_id", 10L)
-                .put("pull_request_number", 10)
-                .put("pull_request_title", "PR 제목")
-                .put("pull_request_url", "https://github.com/org/repo/pull/10")
-                .put("project_id", projectId)
-                .put("author_github_id", "author-gh")
-                .put("author_slack_id", "U_AUTHOR")
-                .put("reservation_id", "R1")
-                .toString();
+                           .put("team_id", "T1")
+                           .put("channel_id", "C1")
+                           .put("pull_request_id", 10L)
+                           .put("pull_request_number", 10)
+                           .put("pull_request_title", "PR 제목")
+                           .put("pull_request_url", "https://github.com/org/repo/pull/10")
+                           .put("project_id", projectId)
+                           .put("author_github_id", "author-gh")
+                           .put("author_slack_id", "U_AUTHOR")
+                           .put("reservation_id", "R1")
+                           .toString();
     }
 }

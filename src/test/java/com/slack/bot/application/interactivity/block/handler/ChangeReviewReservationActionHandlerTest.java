@@ -14,15 +14,19 @@ import com.slack.bot.application.interactivity.block.BlockActionType;
 import com.slack.bot.application.interactivity.block.dto.BlockActionCommandDto;
 import com.slack.bot.application.interactivity.block.dto.BlockActionOutcomeDto;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
-import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventPublisher;
+import com.slack.bot.application.interactivity.publisher.ReviewInteractionEvent;
+import com.slack.bot.application.interactivity.publisher.ReviewReservationChangeEvent;
 import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.context.jdbc.Sql;
 
 @IntegrationTest
+@RecordApplicationEvents
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class ChangeReviewReservationActionHandlerTest {
@@ -36,12 +40,9 @@ class ChangeReviewReservationActionHandlerTest {
     @Autowired
     NotificationApiClient notificationApiClient;
 
-    @Autowired
-    ReviewInteractionEventPublisher reviewInteractionEventPublisher;
-
     @Test
     @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
-    void 리뷰_예약_변경_요청이면_모달을_열고_이벤트를_발행하며_빈_응답을_반환한다() {
+    void 리뷰_예약_변경_요청이면_모달을_열고_이벤트를_발행하며_빈_응답을_반환한다(ApplicationEvents applicationEvents) {
         // given
         BlockActionCommandDto command = commandWithReservationId("100", "U1", "TRIGGER_1");
 
@@ -52,7 +53,14 @@ class ChangeReviewReservationActionHandlerTest {
         assertAll(
                 () -> assertThat(actual.duplicateReservation()).isNull(),
                 () -> assertThat(actual.cancelledReservation()).isNull(),
-                () -> verify(reviewInteractionEventPublisher).publish(any()),
+                () -> assertThat(applicationEvents.stream(ReviewReservationChangeEvent.class).toList())
+                        .singleElement()
+                        .satisfies(event -> assertAll(
+                                () -> assertThat(event.teamId()).isEqualTo("T1"),
+                                () -> assertThat(event.channelId()).isEqualTo("C1"),
+                                () -> assertThat(event.slackUserId()).isEqualTo("U1"),
+                                () -> assertThat(event.reservationId()).isEqualTo(100L)
+                        )),
                 () -> verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
@@ -63,7 +71,7 @@ class ChangeReviewReservationActionHandlerTest {
 
     @Test
     @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
-    void 본인_소유가_아닌_리뷰_예약_변경_요청이면_권한_오류_알림을_보내고_모달을_열지_않는다() {
+    void 본인_소유가_아닌_리뷰_예약_변경_요청이면_권한_오류_알림을_보내고_모달을_열지_않는다(ApplicationEvents applicationEvents) {
         // given
         BlockActionCommandDto command = commandWithReservationId("100", "U2", "TRIGGER_1");
 
@@ -81,7 +89,7 @@ class ChangeReviewReservationActionHandlerTest {
                         eq(InteractivityErrorType.NOT_OWNER_CHANGE.message())
                 ),
                 () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
-                () -> verify(reviewInteractionEventPublisher, never()).publish(any())
+                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 

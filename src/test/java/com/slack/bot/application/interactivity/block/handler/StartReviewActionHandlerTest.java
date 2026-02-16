@@ -18,6 +18,7 @@ import com.slack.bot.application.interactivity.block.dto.BlockActionCommandDto;
 import com.slack.bot.application.interactivity.block.dto.BlockActionOutcomeDto;
 import com.slack.bot.application.interactivity.block.handler.store.StartReviewMarkStore;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
+import com.slack.bot.application.interactivity.publisher.ReviewReservationFulfilledEvent;
 import com.slack.bot.domain.reservation.ReservationStatus;
 import com.slack.bot.domain.reservation.repository.ReviewReservationRepository;
 import java.time.Instant;
@@ -26,9 +27,12 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.context.jdbc.Sql;
 
 @IntegrationTest
+@RecordApplicationEvents
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class StartReviewActionHandlerTest {
@@ -54,7 +58,7 @@ class StartReviewActionHandlerTest {
             "classpath:sql/fixtures/notification/project_member_t1.sql",
             "classpath:sql/fixtures/notification/notification_settings_t1_u1_dm_enabled.sql"
     })
-    void 리뷰_바로_시작_액션이면_리뷰이_DM_설정이_켜져있을때_즉시_DM을_보낸다() {
+    void 리뷰_바로_시작_액션이면_리뷰이_DM_설정이_켜져있을때_즉시_DM을_보낸다(ApplicationEvents applicationEvents) {
         // given
         given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U1")).willReturn("D_AUTHOR");
         given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U2")).willReturn("D_REVIEWER");
@@ -83,12 +87,20 @@ class StartReviewActionHandlerTest {
                         eq("xoxb-test-token"),
                         eq("D_REVIEWER"),
                         argThat(message -> message.contains("<@U1>") && message.contains("<@U2>"))
-                )
+                ),
+                () -> assertThat(applicationEvents.stream(ReviewReservationFulfilledEvent.class).toList())
+                        .singleElement()
+                        .satisfies(event -> assertAll(
+                                () -> assertThat(event.teamId()).isEqualTo("T1"),
+                                () -> assertThat(event.projectId()).isEqualTo(123L),
+                                () -> assertThat(event.slackUserId()).isEqualTo("U2"),
+                                () -> assertThat(event.pullRequestId()).isEqualTo(10L)
+                        ))
         );
     }
 
     @Test
-    void 메타가_없으면_리뷰_시작_DM을_보내지_않는다() {
+    void 메타가_없으면_리뷰_시작_DM을_보내지_않는다(ApplicationEvents applicationEvents) {
         // given
         BlockActionCommandDto command = new BlockActionCommandDto(
                 objectMapper.createObjectNode(),
@@ -108,12 +120,13 @@ class StartReviewActionHandlerTest {
         assertAll(
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
                 () -> verify(notificationApiClient, never()).openDirectMessageChannel(any(), any()),
-                () -> verify(notificationApiClient, never()).sendMessage(any(), any(), any())
+                () -> verify(notificationApiClient, never()).sendMessage(any(), any(), any()),
+                () -> assertThat(applicationEvents.stream(ReviewReservationFulfilledEvent.class).toList()).isEmpty()
         );
     }
 
     @Test
-    void 메타가_잘못되면_아무_알림도_보내지_않는다() {
+    void 메타가_잘못되면_아무_알림도_보내지_않는다(ApplicationEvents applicationEvents) {
         // given
         BlockActionCommandDto command = commandWithMeta("invalid-json", "U2");
 
@@ -125,12 +138,13 @@ class StartReviewActionHandlerTest {
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
                 () -> verify(notificationApiClient, never()).sendEphemeralMessage(any(), any(), any(), any()),
                 () -> verify(notificationApiClient, never()).openDirectMessageChannel(any(), any()),
-                () -> verify(notificationApiClient, never()).sendMessage(any(), any(), any())
+                () -> verify(notificationApiClient, never()).sendMessage(any(), any(), any()),
+                () -> assertThat(applicationEvents.stream(ReviewReservationFulfilledEvent.class).toList()).isEmpty()
         );
     }
 
     @Test
-    void 리뷰이가_리뷰_바로_시작을_누르면_예약_불가_알림을_보내고_DM을_보내지_않는다() {
+    void 리뷰이가_리뷰_바로_시작을_누르면_예약_불가_알림을_보내고_DM을_보내지_않는다(ApplicationEvents applicationEvents) {
         // given
         BlockActionCommandDto command = commandWithMeta(metaJson(), "U1");
 
@@ -147,7 +161,8 @@ class StartReviewActionHandlerTest {
                         eq("리뷰이는 해당 PR에 대한 리뷰를 할 수 없습니다.")
                 ),
                 () -> verify(notificationApiClient, never()).openDirectMessageChannel(any(), any()),
-                () -> verify(notificationApiClient, never()).sendMessage(any(), any(), any())
+                () -> verify(notificationApiClient, never()).sendMessage(any(), any(), any()),
+                () -> assertThat(applicationEvents.stream(ReviewReservationFulfilledEvent.class).toList()).isEmpty()
         );
     }
 
@@ -157,7 +172,7 @@ class StartReviewActionHandlerTest {
             "classpath:sql/fixtures/notification/project_member_t1.sql",
             "classpath:sql/fixtures/notification/notification_settings_t1_u1_dm_enabled.sql"
     })
-    void 요청자_슬랙_ID가_비어있으면_리뷰이_자기예약_검증을_건너뛰고_알림을_보낸다() {
+    void 요청자_슬랙_ID가_비어있으면_리뷰이_자기예약_검증을_건너뛰고_알림을_보낸다(ApplicationEvents applicationEvents) {
         // given
         BlockActionCommandDto command = commandWithMeta(metaJson(), "");
 
@@ -174,7 +189,8 @@ class StartReviewActionHandlerTest {
                         eq("C1"),
                         eq(""),
                         eq("리뷰 시작 알림을 전송했습니다.")
-                )
+                ),
+                () -> assertThat(applicationEvents.stream(ReviewReservationFulfilledEvent.class).toList()).isEmpty()
         );
     }
 
@@ -184,7 +200,7 @@ class StartReviewActionHandlerTest {
             "classpath:sql/fixtures/notification/project_member_t1.sql",
             "classpath:sql/fixtures/notification/notification_settings_t1_u1_dm_enabled.sql"
     })
-    void 같은_리뷰어가_같은_PR에서_리뷰_바로_시작을_다시_누르면_이미_시작_안내를_보낸다() {
+    void 같은_리뷰어가_같은_PR에서_리뷰_바로_시작을_다시_누르면_이미_시작_안내를_보낸다(ApplicationEvents applicationEvents) {
         // given
         given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U1")).willReturn("D_AUTHOR");
         BlockActionCommandDto command = commandWithMeta(metaJson(), "U9");
@@ -207,7 +223,15 @@ class StartReviewActionHandlerTest {
                         eq("C1"),
                         eq("U9"),
                         eq("이미 해당 PR에 대한 리뷰를 시작했습니다.")
-                )
+                ),
+                () -> assertThat(applicationEvents.stream(ReviewReservationFulfilledEvent.class).toList())
+                        .singleElement()
+                        .satisfies(event -> assertAll(
+                                () -> assertThat(event.teamId()).isEqualTo("T1"),
+                                () -> assertThat(event.projectId()).isEqualTo(123L),
+                                () -> assertThat(event.slackUserId()).isEqualTo("U9"),
+                                () -> assertThat(event.pullRequestId()).isEqualTo(10L)
+                        ))
         );
     }
 
@@ -217,7 +241,7 @@ class StartReviewActionHandlerTest {
             "classpath:sql/fixtures/notification/project_member_t1.sql",
             "classpath:sql/fixtures/notification/notification_settings_t1_u1_dm_enabled.sql"
     })
-    void 시작_마크가_TTL_만료면_다시_리뷰_시작_알림을_보낸다() {
+    void 시작_마크가_TTL_만료면_다시_리뷰_시작_알림을_보낸다(ApplicationEvents applicationEvents) {
         // given
         given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U1")).willReturn("D_AUTHOR");
         startReviewMarkStore.put("T1:123:10:U9", Instant.now().minusSeconds(8L * 24 * 60 * 60));
@@ -240,7 +264,15 @@ class StartReviewActionHandlerTest {
                         eq("C1"),
                         eq("U9"),
                         eq("리뷰 시작 알림을 전송했습니다.")
-                )
+                ),
+                () -> assertThat(applicationEvents.stream(ReviewReservationFulfilledEvent.class).toList())
+                        .singleElement()
+                        .satisfies(event -> assertAll(
+                                () -> assertThat(event.teamId()).isEqualTo("T1"),
+                                () -> assertThat(event.projectId()).isEqualTo(123L),
+                                () -> assertThat(event.slackUserId()).isEqualTo("U9"),
+                                () -> assertThat(event.pullRequestId()).isEqualTo(10L)
+                        ))
         );
     }
 
@@ -250,7 +282,7 @@ class StartReviewActionHandlerTest {
             "classpath:sql/fixtures/notification/project_member_t1.sql",
             "classpath:sql/fixtures/notification/notification_settings_t1_u2_dm_disabled.sql"
     })
-    void 리뷰이가_DM_비활성_설정이면_리뷰_바로_시작시_리뷰이에게_DM을_보내지_않는다() {
+    void 리뷰이가_DM_비활성_설정이면_리뷰_바로_시작시_리뷰이에게_DM을_보내지_않는다(ApplicationEvents applicationEvents) {
         // given
         given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U2")).willReturn("D_REVIEWEE");
         BlockActionCommandDto command = commandWithMeta(metaJsonWithAuthor("U2"), "U8");
@@ -272,13 +304,21 @@ class StartReviewActionHandlerTest {
                         eq("C1"),
                         eq("U8"),
                         eq("리뷰 시작 알림을 전송했습니다.")
-                )
+                ),
+                () -> assertThat(applicationEvents.stream(ReviewReservationFulfilledEvent.class).toList())
+                        .singleElement()
+                        .satisfies(event -> assertAll(
+                                () -> assertThat(event.teamId()).isEqualTo("T1"),
+                                () -> assertThat(event.projectId()).isEqualTo(123L),
+                                () -> assertThat(event.slackUserId()).isEqualTo("U8"),
+                                () -> assertThat(event.pullRequestId()).isEqualTo(10L)
+                        ))
         );
     }
 
     @Test
     @Sql("classpath:sql/fixtures/notification/workspace_t1.sql")
-    void 리뷰이_DM_설정이_없으면_기본값으로_리뷰_바로_시작시_리뷰이에게_DM을_보낸다() {
+    void 리뷰이_DM_설정이_없으면_기본값으로_리뷰_바로_시작시_리뷰이에게_DM을_보낸다(ApplicationEvents applicationEvents) {
         // given
         given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U3")).willReturn("D_REVIEWEE");
         BlockActionCommandDto command = commandWithMeta(metaJsonWithAuthor("U3"), "U7");
@@ -300,7 +340,15 @@ class StartReviewActionHandlerTest {
                         eq("C1"),
                         eq("U7"),
                         eq("리뷰 시작 알림을 전송했습니다.")
-                )
+                ),
+                () -> assertThat(applicationEvents.stream(ReviewReservationFulfilledEvent.class).toList())
+                        .singleElement()
+                        .satisfies(event -> assertAll(
+                                () -> assertThat(event.teamId()).isEqualTo("T1"),
+                                () -> assertThat(event.projectId()).isEqualTo(123L),
+                                () -> assertThat(event.slackUserId()).isEqualTo("U7"),
+                                () -> assertThat(event.pullRequestId()).isEqualTo(10L)
+                        ))
         );
     }
 
@@ -310,7 +358,7 @@ class StartReviewActionHandlerTest {
             "classpath:sql/fixtures/notification/project_member_t1.sql",
             "classpath:sql/fixtures/notification/notification_settings_t1_u1_dm_enabled.sql"
     })
-    void 리뷰어_DM_설정이_켜져있으면_리뷰어에게도_지금_시작_알림_DM을_보낸다() {
+    void 리뷰어_DM_설정이_켜져있으면_리뷰어에게도_지금_시작_알림_DM을_보낸다(ApplicationEvents applicationEvents) {
         // given
         given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U2")).willReturn("D_REVIEWEE");
         given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U1")).willReturn("D_REVIEWER");
@@ -328,13 +376,21 @@ class StartReviewActionHandlerTest {
                         eq("xoxb-test-token"),
                         any(),
                         argThat(message -> message.contains("<@U2>") && message.contains("<@U1>"))
-                )
+                ),
+                () -> assertThat(applicationEvents.stream(ReviewReservationFulfilledEvent.class).toList())
+                        .singleElement()
+                        .satisfies(event -> assertAll(
+                                () -> assertThat(event.teamId()).isEqualTo("T1"),
+                                () -> assertThat(event.projectId()).isEqualTo(123L),
+                                () -> assertThat(event.slackUserId()).isEqualTo("U1"),
+                                () -> assertThat(event.pullRequestId()).isEqualTo(11L)
+                        ))
         );
     }
 
     @Test
     @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
-    void 리뷰_바로_시작을_누르면_해당_활성_예약을_즉시_종료한다() {
+    void 리뷰_바로_시작을_누르면_해당_활성_예약을_즉시_종료한다(ApplicationEvents applicationEvents) {
         // given
         given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U_AUTHOR")).willReturn("D_AUTHOR");
         BlockActionCommandDto command = commandWithMeta(metaJsonWithAuthor("U_AUTHOR"), "U1");
@@ -348,7 +404,15 @@ class StartReviewActionHandlerTest {
         assertAll(
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
                 () -> assertThat(reservation).isPresent(),
-                () -> assertThat(reservation.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED)
+                () -> assertThat(reservation.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED),
+                () -> assertThat(applicationEvents.stream(ReviewReservationFulfilledEvent.class).toList())
+                        .singleElement()
+                        .satisfies(event -> assertAll(
+                                () -> assertThat(event.teamId()).isEqualTo("T1"),
+                                () -> assertThat(event.projectId()).isEqualTo(123L),
+                                () -> assertThat(event.slackUserId()).isEqualTo("U1"),
+                                () -> assertThat(event.pullRequestId()).isEqualTo(10L)
+                        ))
         );
     }
 
@@ -358,7 +422,7 @@ class StartReviewActionHandlerTest {
             "classpath:sql/fixtures/interactivity/project_member_t1.sql",
             "classpath:sql/fixtures/interactivity/notification_settings_t1_u1_dm_enabled.sql"
     })
-    void 프로젝트_ID가_숫자가_아니면_예약_취소는_건너뛰고_알림은_보낸다() {
+    void 프로젝트_ID가_숫자가_아니면_예약_취소는_건너뛰고_알림은_보낸다(ApplicationEvents applicationEvents) {
         // given
         given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U1")).willReturn("D_AUTHOR");
         BlockActionCommandDto command = commandWithMeta(metaJsonWithAuthorAndProjectId("U1", "project-x"), "U9");
@@ -380,7 +444,8 @@ class StartReviewActionHandlerTest {
                         eq("C1"),
                         eq("U9"),
                         eq("리뷰 시작 알림을 전송했습니다.")
-                )
+                ),
+                () -> assertThat(applicationEvents.stream(ReviewReservationFulfilledEvent.class).toList()).isEmpty()
         );
     }
 

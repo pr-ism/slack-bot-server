@@ -19,8 +19,11 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 
 @IntegrationTest
+@RecordApplicationEvents
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class ReviewInteractionEventHandlerTest {
@@ -35,7 +38,7 @@ class ReviewInteractionEventHandlerTest {
     JpaReviewReservationInteractionRepository jpaReviewReservationInteractionRepository;
 
     @Test
-    void 리뷰_예약_관련_이벤트를_처리하면_슬랙_연동_정보를_저장한다() {
+    void 리뷰_예약_관련_이벤트를_처리하면_슬랙_연동_정보를_저장한다(ApplicationEvents applicationEvents) {
         // given
         String teamId = "T1";
         Long projectId = 123L;
@@ -89,6 +92,14 @@ class ReviewInteractionEventHandlerTest {
         ));
 
         // then
+        assertAll(
+                () -> assertThat(applicationEvents.stream(ReviewReservationRequestEvent.class).toList()).hasSize(1),
+                () -> assertThat(applicationEvents.stream(ReviewReservationChangeEvent.class).toList()).hasSize(1),
+                () -> assertThat(applicationEvents.stream(ReviewReservationCancelEvent.class).toList()).hasSize(1),
+                () -> assertThat(applicationEvents.stream(ReviewReservationScheduledEvent.class).toList()).hasSize(1),
+                () -> assertThat(applicationEvents.stream(ReviewReservationFulfilledEvent.class).toList()).hasSize(1)
+        );
+
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
             Optional<ReviewReservationInteraction> actual = reviewReservationInteractionRepository.findByReviewKey(
                     teamId,
@@ -111,7 +122,7 @@ class ReviewInteractionEventHandlerTest {
     }
 
     @Test
-    void 같은_리뷰_키의_이벤트는_기존_엔티티를_재사용한다() {
+    void 같은_리뷰_키의_이벤트는_기존_엔티티를_재사용한다(ApplicationEvents applicationEvents) {
         // given
         ReviewReservationRequestEvent requestEvent = new ReviewReservationRequestEvent(
                 "T1",
@@ -135,6 +146,11 @@ class ReviewInteractionEventHandlerTest {
         ));
 
         // then
+        assertAll(
+                () -> assertThat(applicationEvents.stream(ReviewReservationRequestEvent.class).toList()).hasSize(2),
+                () -> assertThat(applicationEvents.stream(ReviewReservationChangeEvent.class).toList()).hasSize(1)
+        );
+
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
             Optional<ReviewReservationInteraction> actual = reviewReservationInteractionRepository.findByReviewKey(
                     "T1",
@@ -153,7 +169,7 @@ class ReviewInteractionEventHandlerTest {
     }
 
     @Test
-    void 리뷰_키가_유효하지_않은_이벤트는_저장하지_않는다() {
+    void 리뷰_키가_유효하지_않은_이벤트는_저장하지_않는다(ApplicationEvents applicationEvents) {
         // when
         reviewInteractionEventPublisher.publish(new ReviewReservationFulfilledEvent(
                 "T1",
@@ -164,6 +180,8 @@ class ReviewInteractionEventHandlerTest {
         ));
 
         // then
+        assertThat(applicationEvents.stream(ReviewReservationFulfilledEvent.class).toList()).hasSize(1);
+
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
             long actual = jpaReviewReservationInteractionRepository.count();
             assertThat(actual).isZero();
@@ -171,7 +189,7 @@ class ReviewInteractionEventHandlerTest {
     }
 
     @Test
-    void 리뷰_키의_상위_필드가_유효하지_않은_이벤트는_저장하지_않는다() {
+    void 리뷰_키의_상위_필드가_유효하지_않은_이벤트는_저장하지_않는다(ApplicationEvents applicationEvents) {
         // when
         reviewInteractionEventPublisher.publish(new ReviewReservationChangeEvent(
                 "",
@@ -199,6 +217,8 @@ class ReviewInteractionEventHandlerTest {
         ));
 
         // then
+        assertThat(applicationEvents.stream(ReviewReservationChangeEvent.class).toList()).hasSize(3);
+
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
             long actual = jpaReviewReservationInteractionRepository.count();
             assertThat(actual).isZero();
@@ -206,7 +226,7 @@ class ReviewInteractionEventHandlerTest {
     }
 
     @Test
-    void pullRequest_알림_발송_시각이_비어_있으면_현재_시각으로_저장한다() {
+    void pullRequest_알림_발송_시각이_비어_있으면_현재_시각으로_저장한다(ApplicationEvents applicationEvents) {
         // when
         reviewInteractionEventPublisher.publish(new ReviewReservationFulfilledEvent(
                 "T1",
@@ -217,6 +237,8 @@ class ReviewInteractionEventHandlerTest {
         ));
 
         // then
+        assertThat(applicationEvents.stream(ReviewReservationFulfilledEvent.class).toList()).hasSize(1);
+
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
             Optional<ReviewReservationInteraction> actual = reviewReservationInteractionRepository.findByReviewKey(
                     "T1",
@@ -233,7 +255,7 @@ class ReviewInteractionEventHandlerTest {
     }
 
     @Test
-    void 동일_리뷰_키_병렬_이벤트를_처리해도_엔티티는_한_건만_생성되고_변경_횟수_누락이_없다() throws InterruptedException {
+    void 동일_리뷰_키_병렬_이벤트를_처리해도_엔티티는_한_건만_생성되고_변경_횟수_누락이_없다(ApplicationEvents applicationEvents) throws InterruptedException {
         // given
         CountDownLatch startSignal = new CountDownLatch(1);
         ExecutorService executorService = Executors.newFixedThreadPool(2);
@@ -266,6 +288,8 @@ class ReviewInteractionEventHandlerTest {
         executorService.awaitTermination(3, TimeUnit.SECONDS);
 
         // then
+        assertThat(applicationEvents.stream(ReviewReservationChangeEvent.class).toList()).hasSize(2);
+
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
             Optional<ReviewReservationInteraction> actual = reviewReservationInteractionRepository.findByReviewKey(
                     "T1",

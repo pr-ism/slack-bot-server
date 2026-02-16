@@ -9,14 +9,18 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.dto.ReviewScheduleMetaDto;
+import com.slack.bot.application.interactivity.publisher.ReviewReservationScheduledEvent;
 import com.slack.bot.application.interactivity.reply.dto.response.SlackActionResponse;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.context.jdbc.Sql;
 
 @IntegrationTest
+@RecordApplicationEvents
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class ReviewTimeSubmissionProcessorTest {
@@ -72,7 +76,7 @@ class ReviewTimeSubmissionProcessorTest {
 
     @Test
     @Sql("classpath:sql/fixtures/reservation/project_123.sql")
-    void 분_옵션을_선택하면_예약_워크플로우를_수행한다() {
+    void 분_옵션을_선택하면_예약_워크플로우를_수행한다(ApplicationEvents applicationEvents) {
         // given
         JsonNode payload = defaultSubmitPayload("30");
         ReviewScheduleMetaDto meta = meta("123", null);
@@ -87,7 +91,18 @@ class ReviewTimeSubmissionProcessorTest {
         );
 
         // then
-        assertThat(actual).isEqualTo(SlackActionResponse.clear());
+        assertAll(
+                () -> assertThat(actual).isEqualTo(SlackActionResponse.clear()),
+                () -> assertThat(applicationEvents.stream(ReviewReservationScheduledEvent.class).toList())
+                        .singleElement()
+                        .satisfies(event -> assertAll(
+                                () -> assertThat(event.teamId()).isEqualTo("T1"),
+                                () -> assertThat(event.channelId()).isEqualTo("C1"),
+                                () -> assertThat(event.slackUserId()).isEqualTo("U1"),
+                                () -> assertThat(event.projectId()).isEqualTo(123L),
+                                () -> assertThat(event.pullRequestId()).isEqualTo(10L)
+                        ))
+        );
     }
 
     @Test
@@ -169,15 +184,15 @@ class ReviewTimeSubmissionProcessorTest {
 
     private String metaJson(String projectId, String reservationId) {
         ObjectNode meta = objectMapper.createObjectNode()
-                .put("team_id", "T1")
-                .put("channel_id", "C1")
-                .put("pull_request_id", 10L)
-                .put("pull_request_number", 10)
-                .put("pull_request_title", "PR 제목")
-                .put("pull_request_url", "https://github.com/org/repo/pull/10")
-                .put("project_id", projectId)
-                .put("author_github_id", "author-gh")
-                .put("author_slack_id", "U_AUTHOR");
+                                      .put("team_id", "T1")
+                                      .put("channel_id", "C1")
+                                      .put("pull_request_id", 10L)
+                                      .put("pull_request_number", 10)
+                                      .put("pull_request_title", "PR 제목")
+                                      .put("pull_request_url", "https://github.com/org/repo/pull/10")
+                                      .put("project_id", projectId)
+                                      .put("author_github_id", "author-gh")
+                                      .put("author_slack_id", "U_AUTHOR");
 
         meta.set("reservation_id", TextNode.valueOf(reservationId));
 
