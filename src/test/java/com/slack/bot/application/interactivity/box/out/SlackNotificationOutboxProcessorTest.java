@@ -1,6 +1,7 @@
 package com.slack.bot.application.interactivity.box.out;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -10,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.client.exception.SlackBotMessageDispatchException;
+import com.slack.bot.application.interactivity.box.out.exception.UnsupportedSlackNotificationOutboxMessageTypeException;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
@@ -20,6 +22,7 @@ import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @IntegrationTest
 @SuppressWarnings("NonAsciiCharacters")
@@ -177,5 +180,21 @@ class SlackNotificationOutboxProcessorTest {
                 () -> assertThat(failed.getProcessingAttempt()).isEqualTo(1),
                 () -> assertThat(failed.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT)
         );
+    }
+
+    @Test
+    void 지원하지_않는_message_type이면_custom_exception을_던진다() {
+        // given
+        SlackNotificationOutbox outbox = SlackNotificationOutbox.builder()
+                                                                 .idempotencyKey("IDEMP-UNKNOWN-TYPE")
+                                                                 .token("xoxb-test-token")
+                                                                 .channelId("C1")
+                                                                 .text("hello")
+                                                                 .build();
+
+        // when & then
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(slackNotificationOutboxProcessor, "dispatch", outbox))
+                .isInstanceOf(UnsupportedSlackNotificationOutboxMessageTypeException.class)
+                .hasMessage("지원하지 않는 메시지 타입입니다: null");
     }
 }

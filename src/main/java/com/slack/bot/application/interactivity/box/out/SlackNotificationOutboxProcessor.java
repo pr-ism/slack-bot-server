@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interactivity.box.retry.InteractivityRetryExceptionClassifier;
+import com.slack.bot.application.interactivity.box.out.exception.UnsupportedSlackNotificationOutboxMessageTypeException;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
@@ -93,7 +94,10 @@ public class SlackNotificationOutboxProcessor {
                     readBlocks(outbox.getBlocksJson()),
                     outbox.getFallbackText()
             );
+            return;
         }
+
+        throw new UnsupportedSlackNotificationOutboxMessageTypeException(messageType);
     }
 
     private JsonNode readBlocks(String blocksJson) throws JsonProcessingException {
