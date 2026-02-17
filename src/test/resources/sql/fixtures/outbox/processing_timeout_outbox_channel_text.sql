@@ -27,7 +27,7 @@ INSERT INTO slack_notification_outbox (
     NULL,
     NULL,
     'PROCESSING',
-    0,
+    1,
     DATEADD('MINUTE', -10, NOW()),
     NOW(),
     NOW()

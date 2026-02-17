@@ -20,7 +20,7 @@ INSERT INTO slack_interaction_inbox (
     'BLOCK-ACTION-TIMEOUT-200',
     '{"team":{"id":"T1"},"channel":{"id":"C1"},"user":{"id":"U1"},"actions":[{"action_id":"cancel_review_reservation","value":"100"}]}',
     'PROCESSING',
-    0,
+    1,
     DATEADD('MINUTE', -10, NOW()),
     NULL,
     NULL,

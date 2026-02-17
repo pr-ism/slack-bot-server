@@ -136,7 +136,7 @@ class SlackNotificationOutboxProcessorTest {
         assertAll(
                 () -> verify(notificationTransportApiClient).sendMessage("xoxb-test-token", "C1", "hello-timeout-200"),
                 () -> assertThat(processed.getStatus()).isEqualTo(SlackNotificationOutboxStatus.SENT),
-                () -> assertThat(processed.getProcessingAttempt()).isEqualTo(1)
+                () -> assertThat(processed.getProcessingAttempt()).isEqualTo(2)
         );
     }
 

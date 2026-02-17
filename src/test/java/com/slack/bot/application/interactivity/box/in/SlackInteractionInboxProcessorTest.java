@@ -107,7 +107,7 @@ class SlackInteractionInboxProcessorTest {
 
         assertAll(
                 () -> assertThat(processedInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
-                () -> assertThat(processedInbox.getProcessingAttempt()).isEqualTo(1),
+                () -> assertThat(processedInbox.getProcessingAttempt()).isEqualTo(2),
                 () -> verify(notificationApiClient, times(1)).openDirectMessageChannel("xoxb-test-token", "U1"),
                 () -> verify(notificationApiClient, times(1)).sendBlockMessage(
                         eq("xoxb-test-token"),
