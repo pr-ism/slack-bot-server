@@ -10,8 +10,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interactivity.box.aop.EnqueueBlockActionInInbox;
 import com.slack.bot.application.interactivity.box.aop.exception.BlockActionAopProceedException;
+import com.slack.bot.application.interactivity.box.ProcessingSourceContext;
 import com.slack.bot.application.interactivity.box.in.SlackInteractionInboxProcessor;
-import com.slack.bot.application.interactivity.box.out.OutboxIdempotencySourceContext;
 import java.io.IOException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -30,17 +30,17 @@ class BlockActionInboxEnqueueAspectTest {
     @Mock
     SlackInteractionInboxProcessor slackInteractionInboxProcessor;
 
-    OutboxIdempotencySourceContext outboxIdempotencySourceContext;
+    ProcessingSourceContext processingSourceContext;
     BlockActionInboxEnqueueAspect blockActionInboxEnqueueAspect;
     BlockActionAopTestTarget proxyTarget;
     JsonNode payload;
 
     @BeforeEach
     void setUp() {
-        outboxIdempotencySourceContext = new OutboxIdempotencySourceContext();
+        processingSourceContext = new ProcessingSourceContext();
         blockActionInboxEnqueueAspect = new BlockActionInboxEnqueueAspect(
                 slackInteractionInboxProcessor,
-                outboxIdempotencySourceContext
+                processingSourceContext
         );
         proxyTarget = createProxyTarget(new BlockActionAopTestTarget());
         payload = new ObjectMapper().createObjectNode().put("type", "block_actions");
@@ -59,7 +59,7 @@ class BlockActionInboxEnqueueAspectTest {
     @Test
     void 인박스_컨텍스트에서_checked_예외는_custom_exception으로_래핑된다() {
         // when & then
-        assertThatThrownBy(() -> outboxIdempotencySourceContext.withInboxSource(1L, () -> proxyTarget.throwChecked(payload)))
+        assertThatThrownBy(() -> processingSourceContext.withInboxProcessing(() -> proxyTarget.throwChecked(payload)))
                 .isInstanceOf(BlockActionAopProceedException.class)
                 .hasMessage("block action enqueue AOP proceed 실패.")
                 .hasCauseInstanceOf(IOException.class);
@@ -70,7 +70,7 @@ class BlockActionInboxEnqueueAspectTest {
     @Test
     void 인박스_컨텍스트에서_runtime_예외는_그대로_전파된다() {
         // when & then
-        assertThatThrownBy(() -> outboxIdempotencySourceContext.withInboxSource(1L, () -> proxyTarget.throwRuntime(payload)))
+        assertThatThrownBy(() -> processingSourceContext.withInboxProcessing(() -> proxyTarget.throwRuntime(payload)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("runtime-failure");
 

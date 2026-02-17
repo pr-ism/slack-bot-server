@@ -11,10 +11,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interactivity.box.aop.EnqueueViewSubmissionInInbox;
 import com.slack.bot.application.interactivity.box.aop.exception.ViewSubmissionAopProceedException;
+import com.slack.bot.application.interactivity.box.ProcessingSourceContext;
 import com.slack.bot.application.interactivity.box.in.SlackInteractionInboxProcessor;
 import com.slack.bot.application.interactivity.reply.dto.response.SlackActionResponse;
 import com.slack.bot.application.interactivity.view.dto.ViewSubmissionSyncResultDto;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -32,13 +34,18 @@ class ViewSubmissionInboxEnqueueAspectTest {
     @Mock
     SlackInteractionInboxProcessor slackInteractionInboxProcessor;
 
+    ProcessingSourceContext processingSourceContext;
     ViewSubmissionInboxEnqueueAspect viewSubmissionInboxEnqueueAspect;
     ViewSubmissionAopTestTarget proxyTarget;
     JsonNode payload;
 
     @BeforeEach
     void setUp() {
-        viewSubmissionInboxEnqueueAspect = new ViewSubmissionInboxEnqueueAspect(slackInteractionInboxProcessor);
+        processingSourceContext = new ProcessingSourceContext();
+        viewSubmissionInboxEnqueueAspect = new ViewSubmissionInboxEnqueueAspect(
+                slackInteractionInboxProcessor,
+                processingSourceContext
+        );
         proxyTarget = createProxyTarget(new ViewSubmissionAopTestTarget());
         payload = new ObjectMapper().createObjectNode().put("type", "view_submission");
     }
@@ -65,6 +72,20 @@ class ViewSubmissionInboxEnqueueAspectTest {
         // then
         assertThat(actual.shouldEnqueue()).isTrue();
         verify(slackInteractionInboxProcessor).enqueueViewSubmission(payload.toString());
+    }
+
+    @Test
+    void 인박스_컨텍스트에서는_원본을_수행하고_enqueue하지_않는다() {
+        // given
+        AtomicReference<ViewSubmissionSyncResultDto> resultRef = new AtomicReference<>();
+
+        // when
+        processingSourceContext.withInboxProcessing(() -> resultRef.set(proxyTarget.happyPath(payload)));
+
+        // then
+        ViewSubmissionSyncResultDto actual = resultRef.get();
+        assertThat(actual.shouldEnqueue()).isTrue();
+        verify(slackInteractionInboxProcessor, never()).enqueueViewSubmission(anyString());
     }
 
     @Test

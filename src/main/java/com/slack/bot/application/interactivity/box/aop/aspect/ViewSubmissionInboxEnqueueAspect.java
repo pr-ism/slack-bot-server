@@ -2,6 +2,7 @@ package com.slack.bot.application.interactivity.box.aop.aspect;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.slack.bot.application.interactivity.box.aop.exception.ViewSubmissionAopProceedException;
+import com.slack.bot.application.interactivity.box.ProcessingSourceContext;
 import com.slack.bot.application.interactivity.box.in.SlackInteractionInboxProcessor;
 import com.slack.bot.application.interactivity.view.dto.ViewSubmissionSyncResultDto;
 import lombok.RequiredArgsConstructor;
@@ -18,9 +19,14 @@ import org.springframework.stereotype.Component;
 public class ViewSubmissionInboxEnqueueAspect {
 
     private final SlackInteractionInboxProcessor slackInteractionInboxProcessor;
+    private final ProcessingSourceContext processingSourceContext;
 
     @Around("@annotation(com.slack.bot.application.interactivity.box.aop.EnqueueViewSubmissionInInbox) && args(payload,..)")
     public Object enqueue(ProceedingJoinPoint joinPoint, JsonNode payload) {
+        if (processingSourceContext.isInboxProcessing()) {
+            return proceedInViewSubmissionContext(joinPoint);
+        }
+
         ViewSubmissionSyncResultDto syncResultDto = proceedInViewSubmissionContext(joinPoint);
 
         if (syncResultDto.shouldEnqueue()) {

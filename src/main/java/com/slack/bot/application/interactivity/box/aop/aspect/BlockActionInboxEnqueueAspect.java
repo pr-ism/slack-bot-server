@@ -2,8 +2,8 @@ package com.slack.bot.application.interactivity.box.aop.aspect;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.slack.bot.application.interactivity.box.aop.exception.BlockActionAopProceedException;
+import com.slack.bot.application.interactivity.box.ProcessingSourceContext;
 import com.slack.bot.application.interactivity.box.in.SlackInteractionInboxProcessor;
-import com.slack.bot.application.interactivity.box.out.OutboxIdempotencySourceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -18,11 +18,11 @@ import org.springframework.stereotype.Component;
 public class BlockActionInboxEnqueueAspect {
 
     private final SlackInteractionInboxProcessor slackInteractionInboxProcessor;
-    private final OutboxIdempotencySourceContext outboxIdempotencySourceContext;
+    private final ProcessingSourceContext processingSourceContext;
 
     @Around("@annotation(com.slack.bot.application.interactivity.box.aop.EnqueueBlockActionInInbox) && args(payload,..)")
     public Object enqueue(ProceedingJoinPoint joinPoint, JsonNode payload) {
-        if (outboxIdempotencySourceContext.currentSourceKey().isPresent()) {
+        if (processingSourceContext.isInboxProcessing()) {
             return proceedInInboxContext(joinPoint);
         }
 
