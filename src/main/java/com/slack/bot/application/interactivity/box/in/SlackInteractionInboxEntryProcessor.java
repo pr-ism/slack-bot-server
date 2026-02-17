@@ -3,6 +3,7 @@ package com.slack.bot.application.interactivity.box.in;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interactivity.BlockActionInteractionService;
+import com.slack.bot.application.interactivity.box.aop.BindInboxToOutboxSource;
 import com.slack.bot.application.interactivity.box.retry.InteractivityRetryExceptionClassifier;
 import com.slack.bot.application.interactivity.view.ViewSubmissionRouter;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
@@ -30,6 +31,7 @@ public class SlackInteractionInboxEntryProcessor {
     private final InteractivityRetryExceptionClassifier retryExceptionClassifier;
     private final SlackInteractionInboxRepository slackInteractionInboxRepository;
 
+    @BindInboxToOutboxSource
     public void processBlockAction(SlackInteractionInbox inbox) {
         process(
                 inbox,
@@ -38,6 +40,7 @@ public class SlackInteractionInboxEntryProcessor {
         );
     }
 
+    @BindInboxToOutboxSource
     public void processViewSubmission(SlackInteractionInbox inbox) {
         process(
                 inbox,
