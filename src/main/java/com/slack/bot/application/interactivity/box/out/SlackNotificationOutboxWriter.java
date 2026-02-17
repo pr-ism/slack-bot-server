@@ -25,11 +25,11 @@ public class SlackNotificationOutboxWriter {
 
     @ResolveOutboxSource
     @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
-    public void enqueueEphemeralText(String sourceKey, String token, String channelId, String userId, String text) {
+    public void enqueueEphemeralText(String sourceKey, String teamId, String channelId, String userId, String text) {
         enqueue(
                 sourceKey,
                 SlackNotificationOutboxMessageType.EPHEMERAL_TEXT,
-                token,
+                teamId,
                 channelId,
                 userId,
                 text,
@@ -42,7 +42,7 @@ public class SlackNotificationOutboxWriter {
     @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
     public void enqueueEphemeralBlocks(
             String sourceKey,
-            String token,
+            String teamId,
             String channelId,
             String userId,
             Object blocks,
@@ -51,7 +51,7 @@ public class SlackNotificationOutboxWriter {
         enqueue(
                 sourceKey,
                 SlackNotificationOutboxMessageType.EPHEMERAL_BLOCKS,
-                token,
+                teamId,
                 channelId,
                 userId,
                 null,
@@ -62,11 +62,11 @@ public class SlackNotificationOutboxWriter {
 
     @ResolveOutboxSource
     @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
-    public void enqueueChannelText(String sourceKey, String token, String channelId, String text) {
+    public void enqueueChannelText(String sourceKey, String teamId, String channelId, String text) {
         enqueue(
                 sourceKey,
                 SlackNotificationOutboxMessageType.CHANNEL_TEXT,
-                token,
+                teamId,
                 channelId,
                 null,
                 text,
@@ -77,12 +77,12 @@ public class SlackNotificationOutboxWriter {
 
     @ResolveOutboxSource
     @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
-    public void enqueueChannelBlocks(String sourceKey, String token, String channelId, Object blocks,
+    public void enqueueChannelBlocks(String sourceKey, String teamId, String channelId, Object blocks,
             String fallbackText) {
         enqueue(
                 sourceKey,
                 SlackNotificationOutboxMessageType.CHANNEL_BLOCKS,
-                token,
+                teamId,
                 channelId,
                 null,
                 null,
@@ -114,18 +114,18 @@ public class SlackNotificationOutboxWriter {
     private void enqueue(
             String sourceKey,
             SlackNotificationOutboxMessageType messageType,
-            String token,
+            String teamId,
             String channelId,
             String userId,
             String text,
             String blocksJson,
             String fallbackText
     ) {
-        String key = idempotencyKey(sourceKey, messageType, token, channelId, userId);
+        String key = idempotencyKey(sourceKey, messageType, teamId, channelId, userId);
         SlackNotificationOutbox outbox = SlackNotificationOutbox.builder()
                                                                 .messageType(messageType)
                                                                 .idempotencyKey(key)
-                                                                .token(token)
+                                                                .teamId(teamId)
                                                                 .channelId(channelId)
                                                                 .userId(userId)
                                                                 .text(text)
@@ -139,7 +139,7 @@ public class SlackNotificationOutboxWriter {
     private String idempotencyKey(
             String sourceKey,
             SlackNotificationOutboxMessageType messageType,
-            String token,
+            String teamId,
             String channelId,
             String userId
     ) {
@@ -147,7 +147,7 @@ public class SlackNotificationOutboxWriter {
 
         source.put("source", sourceKey);
         source.put("messageType", messageType.name());
-        source.put("target", targetKey(token, channelId, userId));
+        source.put("target", targetKey(teamId, channelId, userId));
 
         return idempotencyKeyGenerator.generate(
                 SlackInteractionIdempotencyScope.SLACK_NOTIFICATION_OUTBOX,
@@ -155,8 +155,8 @@ public class SlackNotificationOutboxWriter {
         );
     }
 
-    private String targetKey(String token, String channelId, String userId) {
-        return nullToEmpty(token) + ":" + nullToEmpty(channelId) + ":" + nullToEmpty(userId);
+    private String targetKey(String teamId, String channelId, String userId) {
+        return nullToEmpty(teamId) + ":" + nullToEmpty(channelId) + ":" + nullToEmpty(userId);
     }
 
     private String nullToEmpty(String value) {

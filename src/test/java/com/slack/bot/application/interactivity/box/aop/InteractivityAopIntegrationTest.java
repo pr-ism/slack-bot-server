@@ -167,7 +167,7 @@ class InteractivityAopIntegrationTest {
     @Test
     void outbox_writer_enqueue시_즉시처리_AOP가_트리거된다() {
         // when
-        slackNotificationOutboxWriter.enqueueChannelText("SRC-OUTBOX", "xoxb-token", "C1", "hello");
+        slackNotificationOutboxWriter.enqueueChannelText("SRC-OUTBOX", "T1", "C1", "hello");
 
         // then
         verify(interactivityImmediateProcessor, atLeastOnce()).triggerOutbox();
@@ -177,13 +177,13 @@ class InteractivityAopIntegrationTest {
     void enqueue_ephemeral_text_호출시_resolve_outbox_source_AOP와_즉시처리_AOP가_동작한다() {
         // given
         String sourceKey = "SRC-EPHEMERAL-TEXT";
-        String token = "xoxb-token";
+        String teamId = "T1";
         String channelId = "C1";
         String userId = "U1";
         String text = "hello-ephemeral";
 
         // when
-        slackNotificationOutboxWriter.enqueueEphemeralText(sourceKey, token, channelId, userId, text);
+        slackNotificationOutboxWriter.enqueueEphemeralText(sourceKey, teamId, channelId, userId, text);
 
         // then
         List<SlackNotificationOutbox> outboxes = jpaSlackNotificationOutboxRepository.findAll();
@@ -192,7 +192,7 @@ class InteractivityAopIntegrationTest {
 
         assertAll(
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.EPHEMERAL_TEXT),
-                () -> assertThat(actual.getToken()).isEqualTo(token),
+                () -> assertThat(actual.getTeamId()).isEqualTo(teamId),
                 () -> assertThat(actual.getChannelId()).isEqualTo(channelId),
                 () -> assertThat(actual.getUserId()).isEqualTo(userId),
                 () -> assertThat(actual.getText()).isEqualTo(text),
@@ -200,7 +200,7 @@ class InteractivityAopIntegrationTest {
                         outboxIdempotencyKey(
                                 sourceKey,
                                 SlackNotificationOutboxMessageType.EPHEMERAL_TEXT,
-                                token,
+                                teamId,
                                 channelId,
                                 userId
                         )
@@ -213,7 +213,7 @@ class InteractivityAopIntegrationTest {
     void enqueue_ephemeral_blocks_호출시_resolve_outbox_source_AOP와_즉시처리_AOP가_동작한다() {
         // given
         String sourceKey = "SRC-EPHEMERAL-BLOCKS";
-        String token = "xoxb-token";
+        String teamId = "T1";
         String channelId = "C1";
         String userId = "U1";
         Object blocks = List.of();
@@ -222,7 +222,7 @@ class InteractivityAopIntegrationTest {
         // when
         slackNotificationOutboxWriter.enqueueEphemeralBlocks(
                 sourceKey,
-                token,
+                teamId,
                 channelId,
                 userId,
                 blocks,
@@ -236,7 +236,7 @@ class InteractivityAopIntegrationTest {
 
         assertAll(
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.EPHEMERAL_BLOCKS),
-                () -> assertThat(actual.getToken()).isEqualTo(token),
+                () -> assertThat(actual.getTeamId()).isEqualTo(teamId),
                 () -> assertThat(actual.getChannelId()).isEqualTo(channelId),
                 () -> assertThat(actual.getUserId()).isEqualTo(userId),
                 () -> assertThat(actual.getBlocksJson()).isEqualTo("[]"),
@@ -245,7 +245,7 @@ class InteractivityAopIntegrationTest {
                         outboxIdempotencyKey(
                                 sourceKey,
                                 SlackNotificationOutboxMessageType.EPHEMERAL_BLOCKS,
-                                token,
+                                teamId,
                                 channelId,
                                 userId
                         )
@@ -258,7 +258,7 @@ class InteractivityAopIntegrationTest {
     void enqueue_channel_blocks_호출시_resolve_outbox_source_AOP와_즉시처리_AOP가_동작한다() {
         // given
         String sourceKey = "SRC-CHANNEL-BLOCKS";
-        String token = "xoxb-token";
+        String teamId = "T1";
         String channelId = "C1";
         Object blocks = List.of();
         String fallbackText = "fallback-channel";
@@ -266,7 +266,7 @@ class InteractivityAopIntegrationTest {
         // when
         slackNotificationOutboxWriter.enqueueChannelBlocks(
                 sourceKey,
-                token,
+                teamId,
                 channelId,
                 blocks,
                 fallbackText
@@ -279,7 +279,7 @@ class InteractivityAopIntegrationTest {
 
         assertAll(
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.CHANNEL_BLOCKS),
-                () -> assertThat(actual.getToken()).isEqualTo(token),
+                () -> assertThat(actual.getTeamId()).isEqualTo(teamId),
                 () -> assertThat(actual.getChannelId()).isEqualTo(channelId),
                 () -> assertThat(actual.getUserId()).isNull(),
                 () -> assertThat(actual.getBlocksJson()).isEqualTo("[]"),
@@ -288,7 +288,7 @@ class InteractivityAopIntegrationTest {
                         outboxIdempotencyKey(
                                 sourceKey,
                                 SlackNotificationOutboxMessageType.CHANNEL_BLOCKS,
-                                token,
+                                teamId,
                                 channelId,
                                 null
                         )
@@ -301,12 +301,12 @@ class InteractivityAopIntegrationTest {
     void resolve_outbox_source_AOP는_명시적_source를_그대로_사용한다() {
         // given
         String sourceKey = "SRC-EXPLICIT";
-        String token = "xoxb-token";
+        String teamId = "T1";
         String channelId = "C1";
         String text = "hello";
 
         // when
-        slackNotificationOutboxWriter.enqueueChannelText(sourceKey, token, channelId, text);
+        slackNotificationOutboxWriter.enqueueChannelText(sourceKey, teamId, channelId, text);
 
         // then
         List<SlackNotificationOutbox> outboxes = jpaSlackNotificationOutboxRepository.findAll();
@@ -315,20 +315,20 @@ class InteractivityAopIntegrationTest {
         SlackNotificationOutbox actual = outboxes.getFirst();
 
         assertThat(actual.getIdempotencyKey()).isEqualTo(
-                outboxIdempotencyKey(sourceKey, SlackNotificationOutboxMessageType.CHANNEL_TEXT, token, channelId, null)
+                outboxIdempotencyKey(sourceKey, SlackNotificationOutboxMessageType.CHANNEL_TEXT, teamId, channelId, null)
         );
     }
 
     @Test
     void resolve_outbox_source_AOP는_null_source에_context_source를_주입한다() {
         // given
-        String token = "xoxb-token";
+        String teamId = "T1";
         String channelId = "C1";
         String text = "hello";
 
         // when
         outboxIdempotencySourceContext.withBusinessEventSource("EVT-1", () -> {
-            slackNotificationOutboxWriter.enqueueChannelText(null, token, channelId, text);
+            slackNotificationOutboxWriter.enqueueChannelText(null, teamId, channelId, text);
             return null;
         });
 
@@ -342,7 +342,7 @@ class InteractivityAopIntegrationTest {
                 outboxIdempotencyKey(
                         "BUSINESS:EVT-1",
                         SlackNotificationOutboxMessageType.CHANNEL_TEXT,
-                        token,
+                        teamId,
                         channelId,
                         null
                 )
@@ -352,12 +352,12 @@ class InteractivityAopIntegrationTest {
     @Test
     void resolve_outbox_source_AOP는_source가_없으면_예외를_던진다() {
         // given
-        String token = "xoxb-token";
+        String teamId = "T1";
         String channelId = "C1";
         String text = "hello";
 
         // when & then
-        assertThatThrownBy(() -> slackNotificationOutboxWriter.enqueueChannelText(null, token, channelId, text))
+        assertThatThrownBy(() -> slackNotificationOutboxWriter.enqueueChannelText(null, teamId, channelId, text))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("아웃박스 멱등성 source 키가 필요합니다.");
 
@@ -462,7 +462,7 @@ class InteractivityAopIntegrationTest {
     private String outboxIdempotencyKey(
             String sourceKey,
             SlackNotificationOutboxMessageType messageType,
-            String token,
+            String teamId,
             String channelId,
             String userId
     ) {
@@ -470,7 +470,7 @@ class InteractivityAopIntegrationTest {
 
         source.put("source", sourceKey);
         source.put("messageType", messageType.name());
-        source.put("target", nullToEmpty(token) + ":" + nullToEmpty(channelId) + ":" + nullToEmpty(userId));
+        source.put("target", nullToEmpty(teamId) + ":" + nullToEmpty(channelId) + ":" + nullToEmpty(userId));
 
         return slackInteractionIdempotencyKeyGenerator.generate(
                 SlackInteractionIdempotencyScope.SLACK_NOTIFICATION_OUTBOX,

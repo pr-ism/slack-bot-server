@@ -23,7 +23,7 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
 
     private String idempotencyKey;
 
-    private String token;
+    private String teamId;
 
     private String channelId;
 
@@ -55,7 +55,7 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
     private SlackNotificationOutbox(
             SlackNotificationOutboxMessageType messageType,
             String idempotencyKey,
-            String token,
+            String teamId,
             String channelId,
             String userId,
             String text,
@@ -64,7 +64,7 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
     ) {
         this.messageType = messageType;
         this.idempotencyKey = idempotencyKey;
-        this.token = token;
+        this.teamId = teamId;
         this.channelId = channelId;
         this.userId = userId;
         this.text = text;

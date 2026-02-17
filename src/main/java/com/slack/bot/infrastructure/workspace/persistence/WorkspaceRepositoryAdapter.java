@@ -27,6 +27,12 @@ public class WorkspaceRepositoryAdapter implements WorkspaceRepository {
 
     @Override
     @Transactional(readOnly = true)
+    public Optional<Workspace> findByAccessToken(String accessToken) {
+        return jpaWorkspaceRepository.findByAccessToken(accessToken);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Optional<Workspace> findByUserId(Long userId) {
         return jpaWorkspaceRepository.findByUserId(userId);
     }

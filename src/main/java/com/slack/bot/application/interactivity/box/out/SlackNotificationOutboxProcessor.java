@@ -5,7 +5,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interactivity.box.InteractivityFailureReasonTruncator;
 import com.slack.bot.application.interactivity.box.retry.InteractivityRetryExceptionClassifier;
+import com.slack.bot.application.interactivity.box.out.exception.OutboxWorkspaceNotFoundException;
 import com.slack.bot.application.interactivity.box.out.exception.UnsupportedSlackNotificationOutboxMessageTypeException;
+import com.slack.bot.domain.workspace.Workspace;
+import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.InteractivityRetryProperties;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
@@ -33,6 +36,7 @@ public class SlackNotificationOutboxProcessor {
     private final InteractivityRetryProperties interactivityRetryProperties;
     private final InteractivityFailureReasonTruncator failureReasonTruncator;
     private final InteractivityRetryExceptionClassifier retryExceptionClassifier;
+    private final WorkspaceRepository workspaceRepository;
 
     public void processPending(int limit) {
         List<SlackNotificationOutbox> pendings = slackNotificationOutboxRepository.findPending(limit);
@@ -66,8 +70,9 @@ public class SlackNotificationOutboxProcessor {
         SlackNotificationOutboxMessageType messageType = outbox.getMessageType();
 
         if (messageType == SlackNotificationOutboxMessageType.EPHEMERAL_TEXT) {
+            String token = resolveToken(outbox.getTeamId());
             notificationTransportApiClient.sendEphemeralMessage(
-                    outbox.getToken(),
+                    token,
                     outbox.getChannelId(),
                     outbox.getUserId(),
                     outbox.getText()
@@ -75,8 +80,9 @@ public class SlackNotificationOutboxProcessor {
             return;
         }
         if (messageType == SlackNotificationOutboxMessageType.EPHEMERAL_BLOCKS) {
+            String token = resolveToken(outbox.getTeamId());
             notificationTransportApiClient.sendEphemeralBlockMessage(
-                    outbox.getToken(),
+                    token,
                     outbox.getChannelId(),
                     outbox.getUserId(),
                     readBlocks(outbox.getBlocksJson()),
@@ -85,12 +91,14 @@ public class SlackNotificationOutboxProcessor {
             return;
         }
         if (messageType == SlackNotificationOutboxMessageType.CHANNEL_TEXT) {
-            notificationTransportApiClient.sendMessage(outbox.getToken(), outbox.getChannelId(), outbox.getText());
+            String token = resolveToken(outbox.getTeamId());
+            notificationTransportApiClient.sendMessage(token, outbox.getChannelId(), outbox.getText());
             return;
         }
         if (messageType == SlackNotificationOutboxMessageType.CHANNEL_BLOCKS) {
+            String token = resolveToken(outbox.getTeamId());
             notificationTransportApiClient.sendBlockMessage(
-                    outbox.getToken(),
+                    token,
                     outbox.getChannelId(),
                     readBlocks(outbox.getBlocksJson()),
                     outbox.getFallbackText()
@@ -103,6 +111,13 @@ public class SlackNotificationOutboxProcessor {
 
     private JsonNode readBlocks(String blocksJson) throws JsonProcessingException {
         return objectMapper.readTree(blocksJson);
+    }
+
+    private String resolveToken(String teamId) {
+        Workspace workspace = workspaceRepository.findByTeamId(teamId)
+                                                 .orElseThrow(() -> OutboxWorkspaceNotFoundException.forTeamId(teamId));
+
+        return workspace.getAccessToken();
     }
 
     private void markFailureStatus(SlackNotificationOutbox outbox, Exception exception) {

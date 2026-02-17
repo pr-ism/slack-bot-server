@@ -9,6 +9,8 @@ public interface WorkspaceRepository {
 
     Optional<Workspace> findByTeamId(String teamId);
 
+    Optional<Workspace> findByAccessToken(String accessToken);
+
     Optional<Workspace> findByUserId(Long userId);
 
     void deleteByTeamId(String teamId);

@@ -63,6 +63,8 @@ app:
         worker-enabled: false
       view-submission:
         worker-enabled: false
+    outbox:
+      worker-enabled: false
 
 review:
   notification:

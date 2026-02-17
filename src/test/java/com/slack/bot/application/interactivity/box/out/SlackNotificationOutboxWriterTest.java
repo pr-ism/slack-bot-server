@@ -36,13 +36,13 @@ class SlackNotificationOutboxWriterTest {
     void 에페메랄_텍스트_메시지를_enqueue한다() {
         // given
         String sourceKey = "EVENT-1";
-        String token = "xoxb-token";
+        String teamId = "T1";
         String channelId = "C1";
         String userId = "U1";
         String text = "hello";
 
         // when
-        targetWriter().enqueueEphemeralText(sourceKey, token, channelId, userId, text);
+        targetWriter().enqueueEphemeralText(sourceKey, teamId, channelId, userId, text);
 
         // then
         List<SlackNotificationOutbox> pendings = slackNotificationOutboxRepository.findPending(10);
@@ -53,7 +53,7 @@ class SlackNotificationOutboxWriterTest {
 
         assertAll(
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.EPHEMERAL_TEXT),
-                () -> assertThat(actual.getToken()).isEqualTo(token),
+                () -> assertThat(actual.getTeamId()).isEqualTo(teamId),
                 () -> assertThat(actual.getChannelId()).isEqualTo(channelId),
                 () -> assertThat(actual.getUserId()).isEqualTo(userId),
                 () -> assertThat(actual.getText()).isEqualTo(text),
@@ -65,14 +65,14 @@ class SlackNotificationOutboxWriterTest {
     void 에페메랄_블록_메시지를_enqueue한다() {
         // given
         String sourceKey = "EVENT-2";
-        String token = "xoxb-token";
+        String teamId = "T1";
         String channelId = "C1";
         String userId = "U1";
         Object blocks = List.of();
         String fallbackText = "fallback";
 
         // when
-        targetWriter().enqueueEphemeralBlocks(sourceKey, token, channelId, userId, blocks, fallbackText);
+        targetWriter().enqueueEphemeralBlocks(sourceKey, teamId, channelId, userId, blocks, fallbackText);
 
         // then
         List<SlackNotificationOutbox> pendings = slackNotificationOutboxRepository.findPending(10);
@@ -83,7 +83,7 @@ class SlackNotificationOutboxWriterTest {
 
         assertAll(
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.EPHEMERAL_BLOCKS),
-                () -> assertThat(actual.getToken()).isEqualTo(token),
+                () -> assertThat(actual.getTeamId()).isEqualTo(teamId),
                 () -> assertThat(actual.getChannelId()).isEqualTo(channelId),
                 () -> assertThat(actual.getUserId()).isEqualTo(userId),
                 () -> assertThat(actual.getBlocksJson()).isEqualTo("[]"),
@@ -96,12 +96,12 @@ class SlackNotificationOutboxWriterTest {
     void 채널_텍스트_메시지를_enqueue한다() {
         // given
         String sourceKey = "EVENT-3";
-        String token = "xoxb-token";
+        String teamId = "T1";
         String channelId = "C1";
         String text = "hello channel";
 
         // when
-        targetWriter().enqueueChannelText(sourceKey, token, channelId, text);
+        targetWriter().enqueueChannelText(sourceKey, teamId, channelId, text);
 
         // then
         List<SlackNotificationOutbox> pendings = slackNotificationOutboxRepository.findPending(10);
@@ -112,7 +112,7 @@ class SlackNotificationOutboxWriterTest {
 
         assertAll(
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.CHANNEL_TEXT),
-                () -> assertThat(actual.getToken()).isEqualTo(token),
+                () -> assertThat(actual.getTeamId()).isEqualTo(teamId),
                 () -> assertThat(actual.getChannelId()).isEqualTo(channelId),
                 () -> assertThat(actual.getText()).isEqualTo(text),
                 () -> assertThat(actual.getUserId()).isNull(),
@@ -124,13 +124,13 @@ class SlackNotificationOutboxWriterTest {
     void 채널_블록_메시지를_enqueue한다() {
         // given
         String sourceKey = "EVENT-4";
-        String token = "xoxb-token";
+        String teamId = "T1";
         String channelId = "C1";
         Object blocks = List.of();
         String fallbackText = "fallback";
 
         // when
-        targetWriter().enqueueChannelBlocks(sourceKey, token, channelId, blocks, fallbackText);
+        targetWriter().enqueueChannelBlocks(sourceKey, teamId, channelId, blocks, fallbackText);
 
         // then
         List<SlackNotificationOutbox> pendings = slackNotificationOutboxRepository.findPending(10);
@@ -141,7 +141,7 @@ class SlackNotificationOutboxWriterTest {
 
         assertAll(
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.CHANNEL_BLOCKS),
-                () -> assertThat(actual.getToken()).isEqualTo(token),
+                () -> assertThat(actual.getTeamId()).isEqualTo(teamId),
                 () -> assertThat(actual.getChannelId()).isEqualTo(channelId),
                 () -> assertThat(actual.getBlocksJson()).isEqualTo("[]"),
                 () -> assertThat(actual.getFallbackText()).isEqualTo(fallbackText),
@@ -154,13 +154,13 @@ class SlackNotificationOutboxWriterTest {
     void 블록_문자열_JSON을_전달하면_이중_직렬화하지않고_그대로_enqueue한다() {
         // given
         String sourceKey = "EVENT-STRING-BLOCKS";
-        String token = "xoxb-token";
+        String teamId = "T1";
         String channelId = "C1";
         String blocks = "[]";
         String fallbackText = "fallback";
 
         // when
-        targetWriter().enqueueChannelBlocks(sourceKey, token, channelId, blocks, fallbackText);
+        targetWriter().enqueueChannelBlocks(sourceKey, teamId, channelId, blocks, fallbackText);
 
         // then
         List<SlackNotificationOutbox> pendings = slackNotificationOutboxRepository.findPending(10);
@@ -180,14 +180,14 @@ class SlackNotificationOutboxWriterTest {
     void 블록_문자열이_유효한_JSON이_아니면_custom_exception을_던지고_enqueue하지않는다() {
         // given
         String sourceKey = "EVENT-INVALID-BLOCKS";
-        String token = "xoxb-token";
+        String teamId = "T1";
         String channelId = "C1";
         String invalidBlocks = "not-json";
 
         // when & then
         assertThatThrownBy(() -> targetWriter().enqueueChannelBlocks(
                 sourceKey,
-                token,
+                teamId,
                 channelId,
                 invalidBlocks,
                 "fallback"
@@ -202,13 +202,13 @@ class SlackNotificationOutboxWriterTest {
     void 동일한_요청은_멱등성이_보장되어_중복_enqueue되지_않는다() {
         // given
         String sourceKey = "EVENT-IDEMPOTENT";
-        String token = "xoxb-token";
+        String teamId = "T1";
         String channelId = "C1";
         String text = "hello";
 
         // when
-        targetWriter().enqueueChannelText(sourceKey, token, channelId, text);
-        targetWriter().enqueueChannelText(sourceKey, token, channelId, text);
+        targetWriter().enqueueChannelText(sourceKey, teamId, channelId, text);
+        targetWriter().enqueueChannelText(sourceKey, teamId, channelId, text);
 
         // then
         List<SlackNotificationOutbox> pendings = slackNotificationOutboxRepository.findPending(10);

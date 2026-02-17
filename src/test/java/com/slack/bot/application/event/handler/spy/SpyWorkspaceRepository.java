@@ -27,6 +27,11 @@ public class SpyWorkspaceRepository implements WorkspaceRepository {
     }
 
     @Override
+    public Optional<Workspace> findByAccessToken(String accessToken) {
+        return Optional.empty();
+    }
+
+    @Override
     public Optional<Workspace> findByUserId(Long userId) {
         return Optional.empty();
     }

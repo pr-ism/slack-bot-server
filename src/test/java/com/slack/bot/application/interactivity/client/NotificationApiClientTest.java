@@ -1,15 +1,7 @@
 package com.slack.bot.application.interactivity.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
-import com.slack.bot.application.interactivity.box.out.OutboxIdempotencySourceContext;
-import com.slack.bot.application.interactivity.box.out.SlackNotificationOutboxWriter;
-import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayNameGeneration;
-import org.junit.jupiter.api.DisplayNameGenerator;
-import org.junit.jupiter.api.Test;
-
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -17,6 +9,18 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+
+import com.slack.bot.application.interactivity.box.out.OutboxIdempotencySourceContext;
+import com.slack.bot.application.interactivity.box.out.SlackNotificationOutboxWriter;
+import com.slack.bot.application.interactivity.box.out.exception.OutboxWorkspaceNotFoundException;
+import com.slack.bot.domain.workspace.Workspace;
+import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
+import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
+import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayNameGeneration;
+import org.junit.jupiter.api.DisplayNameGenerator;
+import org.junit.jupiter.api.Test;
 
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
@@ -27,16 +31,24 @@ class NotificationApiClientTest {
     SlackNotificationOutboxWriter slackNotificationOutboxWriter;
     NotificationTransportApiClient notificationTransportApiClient;
     OutboxIdempotencySourceContext outboxIdempotencySourceContext;
+    WorkspaceRepository workspaceRepository;
 
     @BeforeEach
     void setUp() {
         slackNotificationOutboxWriter = mock(SlackNotificationOutboxWriter.class);
         notificationTransportApiClient = mock(NotificationTransportApiClient.class);
         outboxIdempotencySourceContext = mock(OutboxIdempotencySourceContext.class);
+        workspaceRepository = mock(WorkspaceRepository.class);
+
+        Workspace workspace = mock(Workspace.class);
+        given(workspace.getTeamId()).willReturn("T1");
+        given(workspaceRepository.findByAccessToken("token")).willReturn(Optional.of(workspace));
+
         notificationApiClient = new NotificationApiClient(
                 slackNotificationOutboxWriter,
                 notificationTransportApiClient,
-                outboxIdempotencySourceContext
+                outboxIdempotencySourceContext,
+                workspaceRepository
         );
     }
 
@@ -48,7 +60,7 @@ class NotificationApiClientTest {
         // then
         verify(slackNotificationOutboxWriter).enqueueEphemeralText(
                 isNull(),
-                eq("token"),
+                eq("T1"),
                 eq("C1"),
                 eq("U1"),
                 eq("hello")
@@ -63,7 +75,7 @@ class NotificationApiClientTest {
         // then
         verify(slackNotificationOutboxWriter).enqueueEphemeralBlocks(
                 isNull(),
-                eq("token"),
+                eq("T1"),
                 eq("C1"),
                 eq("U1"),
                 eq("[]"),
@@ -79,7 +91,7 @@ class NotificationApiClientTest {
         // then
         verify(slackNotificationOutboxWriter).enqueueChannelText(
                 isNull(),
-                eq("token"),
+                eq("T1"),
                 eq("C1"),
                 eq("hello")
         );
@@ -93,11 +105,22 @@ class NotificationApiClientTest {
         // then
         verify(slackNotificationOutboxWriter).enqueueChannelBlocks(
                 isNull(),
-                eq("token"),
+                eq("T1"),
                 eq("C1"),
                 eq("[]"),
                 eq("fallback")
         );
+    }
+
+    @Test
+    void 토큰에_해당하는_workspace가_없으면_custom_exception을_던진다() {
+        // given
+        given(workspaceRepository.findByAccessToken("unknown-token")).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> notificationApiClient.sendMessage("unknown-token", "C1", "hello"))
+                .isInstanceOf(OutboxWorkspaceNotFoundException.class)
+                .hasMessageContaining("outbox 적재 대상 워크스페이스를 찾을 수 없습니다.");
     }
 
     @Test

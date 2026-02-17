@@ -8,15 +8,17 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.client.exception.SlackBotMessageDispatchException;
 import com.slack.bot.application.interactivity.box.out.exception.UnsupportedSlackNotificationOutboxMessageTypeException;
+import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
+import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
+import com.slack.bot.infrastructure.workspace.persistence.JpaWorkspaceRepository;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -39,7 +41,7 @@ class SlackNotificationOutboxProcessorTest {
     NotificationTransportApiClient notificationTransportApiClient;
 
     @Autowired
-    ObjectMapper objectMapper;
+    JpaWorkspaceRepository jpaWorkspaceRepository;
 
     @Test
     @Sql(scripts = "/sql/fixtures/outbox/pending_outbox.sql")
@@ -105,6 +107,22 @@ class SlackNotificationOutboxProcessorTest {
                 () -> verify(notificationTransportApiClient).sendMessage("xoxb-test-token", "C1", "hello-102"),
                 () -> assertThat(processed.getStatus()).isEqualTo(SlackNotificationOutboxStatus.SENT)
         );
+    }
+
+    @Test
+    @Sql(scripts = "/sql/fixtures/outbox/pending_outbox.sql")
+    void workspace_토큰이_갱신되어도_outbox는_최신_토큰으로_전송한다() {
+        // given
+        Workspace workspace = jpaWorkspaceRepository.findByTeamId("T1")
+                                                    .orElseThrow();
+        workspace.reconnect("xoxb-rotated-token", workspace.getBotUserId());
+        jpaWorkspaceRepository.save(workspace);
+
+        // when
+        slackNotificationOutboxProcessor.processPending(10);
+
+        // then
+        verify(notificationTransportApiClient).sendMessage("xoxb-rotated-token", "C1", "hello-102");
     }
 
     @Test
@@ -186,11 +204,36 @@ class SlackNotificationOutboxProcessorTest {
     }
 
     @Test
+    void workspace가_없는_outbox는_비즈니스_불변식_실패로_FAILED_마킹된다() {
+        // given
+        SlackNotificationOutbox outbox = SlackNotificationOutbox.builder()
+                                                                 .messageType(SlackNotificationOutboxMessageType.CHANNEL_TEXT)
+                                                                 .idempotencyKey("OUTBOX-NO-WORKSPACE")
+                                                                 .teamId("UNKNOWN-TEAM")
+                                                                 .channelId("C1")
+                                                                 .text("hello")
+                                                                 .build();
+        SlackNotificationOutbox pending = slackNotificationOutboxRepository.save(outbox);
+
+        // when
+        slackNotificationOutboxProcessor.processPending(10);
+        SlackNotificationOutbox failed = slackNotificationOutboxRepository.findById(pending.getId())
+                                                                          .orElseThrow();
+
+        // then
+        assertAll(
+                () -> assertThat(failed.getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED),
+                () -> assertThat(failed.getProcessingAttempt()).isEqualTo(1),
+                () -> assertThat(failed.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT)
+        );
+    }
+
+    @Test
     void 지원하지_않는_message_type이면_custom_exception을_던진다() {
         // given
         SlackNotificationOutbox outbox = SlackNotificationOutbox.builder()
                                                                  .idempotencyKey("IDEMP-UNKNOWN-TYPE")
-                                                                 .token("xoxb-test-token")
+                                                                 .teamId("T1")
                                                                  .channelId("C1")
                                                                  .text("hello")
                                                                  .build();

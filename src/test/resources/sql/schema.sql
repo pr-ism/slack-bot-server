@@ -164,7 +164,7 @@ CREATE TABLE IF NOT EXISTS slack_notification_outbox (
     updated_at TIMESTAMP(6) NOT NULL,
     message_type VARCHAR(40) NOT NULL,
     idempotency_key VARCHAR(64) NOT NULL,
-    token VARCHAR(255) NOT NULL,
+    team_id VARCHAR(255) NOT NULL,
     channel_id VARCHAR(255) NOT NULL,
     user_id VARCHAR(255),
     text CLOB,
