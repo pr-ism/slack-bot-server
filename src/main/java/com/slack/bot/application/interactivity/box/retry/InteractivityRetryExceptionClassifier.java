@@ -39,7 +39,11 @@ public class InteractivityRetryExceptionClassifier {
                 }
             }
 
-            cursor = cursor.getCause();
+            Throwable next = cursor.getCause();
+            if (next == cursor) {
+                break;
+            }
+            cursor = next;
         }
 
         return false;

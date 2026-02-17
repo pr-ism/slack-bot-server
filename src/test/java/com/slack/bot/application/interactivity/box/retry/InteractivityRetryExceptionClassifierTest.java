@@ -44,6 +44,31 @@ class InteractivityRetryExceptionClassifierTest {
         // when
         boolean actual = exceptionClassifier.isRetryable(new IllegalArgumentException("invalid"));
 
+        // then
         assertThat(actual).isFalse();
+    }
+
+    @Test
+    void cause가_자기_자신을_반환해도_무한_루프없이_non_retryable로_판단한다() {
+        // given
+        InteractivityRetryExceptionClassifier exceptionClassifier = InteractivityRetryExceptionClassifier.create();
+
+        // when
+        boolean actual = exceptionClassifier.isRetryable(new SelfCauseRuntimeException("self-cause"));
+
+        // then
+        assertThat(actual).isFalse();
+    }
+
+    private static class SelfCauseRuntimeException extends RuntimeException {
+
+        private SelfCauseRuntimeException(String message) {
+            super(message);
+        }
+
+        @Override
+        public Throwable getCause() {
+            return this;
+        }
     }
 }
