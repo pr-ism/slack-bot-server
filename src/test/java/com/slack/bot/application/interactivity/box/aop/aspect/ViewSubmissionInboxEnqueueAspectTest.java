@@ -57,7 +57,7 @@ class ViewSubmissionInboxEnqueueAspectTest {
         // when & then
         assertThatThrownBy(() -> proxyTarget.throwChecked(payload))
                 .isInstanceOf(ViewSubmissionAopProceedException.class)
-                .hasMessage("view submission AOP proceed 실패.")
+                .hasMessage("view submission AOP proceed 실패")
                 .hasCauseInstanceOf(IOException.class);
 
         verify(slackInteractionInboxProcessor, never()).enqueueViewSubmission(anyString());
