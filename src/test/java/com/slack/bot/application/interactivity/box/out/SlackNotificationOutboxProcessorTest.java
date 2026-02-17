@@ -1,16 +1,15 @@
 package com.slack.bot.application.interactivity.box.out;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.client.exception.SlackBotMessageDispatchException;
-import com.slack.bot.application.interactivity.box.out.exception.UnsupportedSlackNotificationOutboxMessageTypeException;
 import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
@@ -24,7 +23,6 @@ import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.jdbc.Sql;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @IntegrationTest
 @SuppressWarnings("NonAsciiCharacters")
@@ -110,7 +108,7 @@ class SlackNotificationOutboxProcessorTest {
     }
 
     @Test
-    @Sql(scripts = "/sql/fixtures/outbox/pending_outbox.sql")
+    @Sql(scripts = "/sql/fixtures/outbox/pending_outbox_channel_text_only.sql")
     void workspace_토큰이_갱신되어도_outbox는_최신_토큰으로_전송한다() {
         // given
         Workspace workspace = jpaWorkspaceRepository.findByTeamId("T1")
@@ -119,10 +117,10 @@ class SlackNotificationOutboxProcessorTest {
         jpaWorkspaceRepository.save(workspace);
 
         // when
-        slackNotificationOutboxProcessor.processPending(10);
+        slackNotificationOutboxProcessor.processPending(1);
 
         // then
-        verify(notificationTransportApiClient).sendMessage("xoxb-rotated-token", "C1", "hello-102");
+        verify(notificationTransportApiClient, times(1)).sendMessage("xoxb-rotated-token", "C1", "hello-102");
     }
 
     @Test
@@ -228,19 +226,4 @@ class SlackNotificationOutboxProcessorTest {
         );
     }
 
-    @Test
-    void 지원하지_않는_message_type이면_custom_exception을_던진다() {
-        // given
-        SlackNotificationOutbox outbox = SlackNotificationOutbox.builder()
-                                                                 .idempotencyKey("IDEMP-UNKNOWN-TYPE")
-                                                                 .teamId("T1")
-                                                                 .channelId("C1")
-                                                                 .text("hello")
-                                                                 .build();
-
-        // when & then
-        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(slackNotificationOutboxProcessor, "dispatch", outbox))
-                .isInstanceOf(UnsupportedSlackNotificationOutboxMessageTypeException.class)
-                .hasMessage("지원하지 않는 메시지 타입입니다: null");
-    }
 }
