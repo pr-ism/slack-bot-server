@@ -57,6 +57,16 @@ class BlockActionInboxEnqueueAspectTest {
     }
 
     @Test
+    void 인박스_컨텍스트에서는_원본_메서드가_실행된다() {
+        // when
+        processingSourceContext.withInboxProcessing(() -> proxyTarget.noProceed(payload));
+
+        // then
+        assertThat(proxyTarget.noProceedInvocationCount()).isOne();
+        verify(slackInteractionInboxProcessor, never()).enqueueBlockAction(anyString());
+    }
+
+    @Test
     void 인박스_컨텍스트에서_checked_예외는_custom_exception으로_래핑된다() {
         // when & then
         assertThatThrownBy(() -> processingSourceContext.withInboxProcessing(() -> proxyTarget.throwChecked(payload)))
