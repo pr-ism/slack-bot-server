@@ -27,7 +27,8 @@ public class BlockActionInboxEnqueueAspect {
         }
 
         String payloadJson = payload.toString();
-        String payloadType = payload.path("type").asText(null);
+        String payloadType = payload.path("type")
+                                    .asText(null);
 
         try {
             boolean enqueued = slackInteractionInboxProcessor.enqueueBlockAction(payloadJson);
@@ -43,6 +44,7 @@ public class BlockActionInboxEnqueueAspect {
             throw runtimeException;
         }
 
+        // block action은 Slack에 즉시 ack만 하므로 반환 값이 필요하지 않음
         return null;
     }
 
