@@ -37,13 +37,13 @@ public class ViewSubmissionInboxEnqueueAspect {
                 if (!enqueued) {
                     log.info("view submission enqueue가 중복 요청으로 스킵되었습니다. payloadType={}", payloadType);
                 }
-            } catch (RuntimeException runtimeException) {
+            } catch (Throwable throwable) {
                 log.error(
                         "view submission enqueue 처리 중 예외가 발생했습니다. payloadType={}",
                         payloadType,
-                        runtimeException
+                        throwable
                 );
-                throw runtimeException;
+                throw throwable;
             }
         }
 
