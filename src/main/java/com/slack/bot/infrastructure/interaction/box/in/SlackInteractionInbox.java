@@ -92,6 +92,7 @@ public class SlackInteractionInbox extends BaseTimeEntity {
 
     public void markProcessing(Instant processingStartedAt) {
         validateProcessingStartedAt(processingStartedAt);
+        validateProcessingTransition();
 
         this.status = SlackInteractionInboxStatus.PROCESSING;
         this.processingAttempt += 1;
@@ -103,6 +104,7 @@ public class SlackInteractionInbox extends BaseTimeEntity {
 
     public void markProcessed(Instant processedAt) {
         validateProcessedAt(processedAt);
+        validateTransition(SlackInteractionInboxStatus.PROCESSING, "PROCESSED");
 
         this.status = SlackInteractionInboxStatus.PROCESSED;
         this.processingStartedAt = null;
@@ -115,6 +117,7 @@ public class SlackInteractionInbox extends BaseTimeEntity {
     public void markRetryPending(Instant failedAt, String failureReason) {
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
+        validateTransition(SlackInteractionInboxStatus.PROCESSING, "RETRY_PENDING");
 
         this.status = SlackInteractionInboxStatus.RETRY_PENDING;
         this.processingStartedAt = null;
@@ -131,6 +134,7 @@ public class SlackInteractionInbox extends BaseTimeEntity {
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
         validateFailureType(failureType);
+        validateTransition(SlackInteractionInboxStatus.PROCESSING, "FAILED");
 
         this.status = SlackInteractionInboxStatus.FAILED;
         this.processingStartedAt = null;
@@ -158,7 +162,7 @@ public class SlackInteractionInbox extends BaseTimeEntity {
     }
 
     private void validateFailureReason(String failureReason) {
-        if (failureReason == null) {
+        if (failureReason == null || failureReason.isBlank()) {
             throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
         }
     }
@@ -167,5 +171,26 @@ public class SlackInteractionInbox extends BaseTimeEntity {
         if (failureType == null) {
             throw new IllegalArgumentException("failureType은 비어 있을 수 없습니다.");
         }
+    }
+
+    private void validateProcessingTransition() {
+        if (this.status == SlackInteractionInboxStatus.PENDING
+                || this.status == SlackInteractionInboxStatus.RETRY_PENDING) {
+            return;
+        }
+
+        throw new IllegalStateException(
+                "PROCESSING 전이는 PENDING 또는 RETRY_PENDING 상태에서만 가능합니다. 현재: " + this.status
+        );
+    }
+
+    private void validateTransition(SlackInteractionInboxStatus expectedStatus, String targetStatus) {
+        if (this.status == expectedStatus) {
+            return;
+        }
+
+        throw new IllegalStateException(
+                targetStatus + " 전이는 " + expectedStatus + " 상태에서만 가능합니다. 현재: " + this.status
+        );
     }
 }

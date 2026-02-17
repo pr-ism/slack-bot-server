@@ -26,6 +26,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class SlackInteractionInboxEntryProcessor {
 
+    private static final String UNKNOWN_FAILURE_REASON = "unknown failure";
+
     private final Clock clock;
     private final ObjectMapper objectMapper;
     private final BlockActionInteractionService blockActionInteractionService;
@@ -96,7 +98,7 @@ public class SlackInteractionInboxEntryProcessor {
     }
 
     private void markFailureStatus(SlackInteractionInbox inbox, Exception exception) {
-        String reason = failureReasonTruncator.truncate(exception.getMessage());
+        String reason = resolveFailureReason(exception);
 
         if (!retryExceptionClassifier.isRetryable(exception)) {
             inbox.markFailed(clock.instant(), reason, SlackInteractivityFailureType.BUSINESS_INVARIANT);
@@ -109,5 +111,14 @@ public class SlackInteractionInboxEntryProcessor {
         }
 
         inbox.markFailed(clock.instant(), reason, SlackInteractivityFailureType.RETRY_EXHAUSTED);
+    }
+
+    private String resolveFailureReason(Exception exception) {
+        String reason = failureReasonTruncator.truncate(exception.getMessage());
+        if (reason == null || reason.isBlank()) {
+            return UNKNOWN_FAILURE_REASON;
+        }
+
+        return reason;
     }
 }

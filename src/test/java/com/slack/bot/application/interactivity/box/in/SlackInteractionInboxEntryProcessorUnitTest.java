@@ -145,7 +145,8 @@ class SlackInteractionInboxEntryProcessorUnitTest {
                 "{}"
         );
         processingInbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
-        processingInbox.markProcessing(Instant.parse("2026-02-15T00:01:00Z"));
+        processingInbox.markRetryPending(Instant.parse("2026-02-15T00:01:00Z"), "previous retry failure");
+        processingInbox.markProcessing(Instant.parse("2026-02-15T00:02:00Z"));
 
         given(slackInteractionInboxRepository.markProcessingIfPending(eq(10L), any())).willReturn(true);
         given(slackInteractionInboxRepository.findById(10L)).willReturn(Optional.of(processingInbox));
@@ -192,6 +193,37 @@ class SlackInteractionInboxEntryProcessorUnitTest {
                 () -> assertThat(processingInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
                 () -> assertThat(processingInbox.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT),
                 () -> assertThat(processingInbox.getFailureReason()).hasSize(500),
+                () -> verify(slackInteractionInboxRepository).save(processingInbox)
+        );
+    }
+
+    @Test
+    void 예외메시지가_비어있으면_unknown_failure로_저장된다() {
+        // given
+        SlackInteractionInbox pending = org.mockito.Mockito.mock(SlackInteractionInbox.class);
+        given(pending.getId()).willReturn(10L);
+
+        SlackInteractionInbox processingInbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "empty-failure-reason",
+                "{}"
+        );
+        processingInbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+
+        given(slackInteractionInboxRepository.markProcessingIfPending(eq(10L), any())).willReturn(true);
+        given(slackInteractionInboxRepository.findById(10L)).willReturn(Optional.of(processingInbox));
+        willThrow(new RuntimeException())
+                .given(blockActionInteractionService)
+                .handle(any());
+
+        // when
+        slackInteractionInboxEntryProcessor.processBlockAction(pending);
+
+        // then
+        assertAll(
+                () -> assertThat(processingInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
+                () -> assertThat(processingInbox.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT),
+                () -> assertThat(processingInbox.getFailureReason()).isEqualTo("unknown failure"),
                 () -> verify(slackInteractionInboxRepository).save(processingInbox)
         );
     }

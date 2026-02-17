@@ -104,9 +104,10 @@ class SlackInteractionInboxTest {
                 "key",
                 "{}"
         );
+        inbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
 
         // when
-        Instant processedAt = Instant.parse("2026-02-15T00:00:00Z");
+        Instant processedAt = Instant.parse("2026-02-15T00:01:00Z");
 
         inbox.markProcessed(processedAt);
 
@@ -125,6 +126,7 @@ class SlackInteractionInboxTest {
                 "key",
                 "{}"
         );
+        inbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
 
         // when
         Instant failedAt = Instant.parse("2026-02-15T01:00:00Z");
@@ -148,6 +150,7 @@ class SlackInteractionInboxTest {
                 "key",
                 "{}"
         );
+        inbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
 
         // when
         Instant failedAt = Instant.parse("2026-02-15T03:00:00Z");
@@ -209,6 +212,22 @@ class SlackInteractionInboxTest {
     }
 
     @Test
+    void markRetryPending은_failureReason이_공백이면_예외를_던진다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+        Instant failedAt = Instant.parse("2026-02-15T03:00:00Z");
+
+        // when & then
+        assertThatThrownBy(() -> inbox.markRetryPending(failedAt, " "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("failureReason은 비어 있을 수 없습니다.");
+    }
+
+    @Test
     void markFailed는_failedAt이_null이면_예외를_던진다() {
         // given
         SlackInteractionInbox inbox = SlackInteractionInbox.pending(
@@ -235,6 +254,22 @@ class SlackInteractionInboxTest {
 
         // when & then
         assertThatThrownBy(() -> inbox.markFailed(failedAt, null, SlackInteractivityFailureType.BUSINESS_INVARIANT))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("failureReason은 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void markFailed는_failureReason이_공백이면_예외를_던진다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+        Instant failedAt = Instant.parse("2026-02-15T01:00:00Z");
+
+        // when & then
+        assertThatThrownBy(() -> inbox.markFailed(failedAt, " ", SlackInteractivityFailureType.BUSINESS_INVARIANT))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("failureReason은 비어 있을 수 없습니다.");
     }
@@ -268,5 +303,71 @@ class SlackInteractionInboxTest {
         assertThatThrownBy(() -> inbox.markProcessing(null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("processingStartedAt은 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void markProcessing은_PENDING이나_RETRY_PENDING이_아니면_예외를_던진다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+        inbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        inbox.markProcessed(Instant.parse("2026-02-15T00:01:00Z"));
+
+        // when & then
+        assertThatThrownBy(() -> inbox.markProcessing(Instant.parse("2026-02-15T00:02:00Z")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("PROCESSING 전이는 PENDING 또는 RETRY_PENDING 상태에서만 가능합니다. 현재: PROCESSED");
+    }
+
+    @Test
+    void markProcessed는_PROCESSING이_아니면_예외를_던진다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+
+        // when & then
+        assertThatThrownBy(() -> inbox.markProcessed(Instant.parse("2026-02-15T00:00:00Z")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("PROCESSED 전이는 PROCESSING 상태에서만 가능합니다. 현재: PENDING");
+    }
+
+    @Test
+    void markRetryPending은_PROCESSING이_아니면_예외를_던진다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+
+        // when & then
+        assertThatThrownBy(() -> inbox.markRetryPending(Instant.parse("2026-02-15T03:00:00Z"), "retry"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("RETRY_PENDING 전이는 PROCESSING 상태에서만 가능합니다. 현재: PENDING");
+    }
+
+    @Test
+    void markFailed는_PROCESSING이_아니면_예외를_던진다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+
+        // when & then
+        assertThatThrownBy(() -> inbox.markFailed(
+                Instant.parse("2026-02-15T01:00:00Z"),
+                "failure",
+                SlackInteractivityFailureType.BUSINESS_INVARIANT
+        ))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("FAILED 전이는 PROCESSING 상태에서만 가능합니다. 현재: PENDING");
     }
 }
