@@ -5,6 +5,7 @@ import com.slack.bot.application.interactivity.reservation.ReviewReservationCoor
 import com.slack.bot.context.CleanupExecutionListener;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.domain.auth.TokenDecoder;
+import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -26,7 +27,8 @@ import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventP
         DateTimeProvider.class,
         TokenDecoder.class,
         SlackEventHandlerRegistry.class,
-        NotificationApiClient.class
+        NotificationApiClient.class,
+        NotificationTransportApiClient.class
 })
 @MockitoSpyBean(types = {
         Clock.class,

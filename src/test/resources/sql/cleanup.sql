@@ -2,6 +2,7 @@ SET REFERENTIAL_INTEGRITY FALSE;
 
 TRUNCATE TABLE review_reminders;
 TRUNCATE TABLE slack_interaction_inbox;
+TRUNCATE TABLE slack_notification_outbox;
 TRUNCATE TABLE review_reservation_interactions;
 TRUNCATE TABLE review_reservations;
 TRUNCATE TABLE workspaces;
