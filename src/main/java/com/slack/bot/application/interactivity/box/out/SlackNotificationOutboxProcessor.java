@@ -17,7 +17,6 @@ import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotifica
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import java.time.Clock;
 import java.util.List;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.retry.support.RetryTemplate;
@@ -47,30 +46,44 @@ public class SlackNotificationOutboxProcessor {
     }
 
     private void processOne(SlackNotificationOutbox pending) {
-        Optional.ofNullable(pending.getId())
-                .filter(id -> slackNotificationOutboxRepository.markProcessingIfPending(id, clock.instant()))
-                .flatMap(slackNotificationOutboxRepository::findById)
-                .ifPresent(outbox -> {
-                    try {
-                        slackNotificationOutboxRetryTemplate.execute(context -> {
-                            dispatch(outbox);
-                            return null;
-                        });
-                        outbox.markSent(clock.instant());
-                        slackNotificationOutboxRepository.save(outbox);
-                    } catch (Exception e) {
-                        log.error("슬랙 알림 outbox 처리에 실패했습니다. outboxId={}", outbox.getId(), e);
-                        markFailureStatus(outbox, e);
-                        slackNotificationOutboxRepository.save(outbox);
-                    }
-                });
+        Long outboxId = pending.getId();
+        if (outboxId == null) {
+            return;
+        }
+
+        if (!slackNotificationOutboxRepository.markProcessingIfPending(outboxId, clock.instant())) {
+            return;
+        }
+
+        slackNotificationOutboxRepository.findById(outboxId)
+                                         .ifPresentOrElse(outbox -> {
+                                             try {
+                                                 slackNotificationOutboxRetryTemplate.execute(context -> {
+                                                     dispatch(outbox);
+                                                     return null;
+                                                 });
+                                                 outbox.markSent(clock.instant());
+                                                 slackNotificationOutboxRepository.save(outbox);
+                                             } catch (Exception e) {
+                                                 log.warn(
+                                                         "슬랙 알림 outbox 처리에 실패했습니다. outboxId={}",
+                                                         outbox.getId(),
+                                                         e
+                                                 );
+                                                 markFailureStatus(outbox, e);
+                                                 slackNotificationOutboxRepository.save(outbox);
+                                             }
+                                         }, () -> log.warn(
+                                                 "PROCESSING으로 전이된 outbox를 조회하지 못했습니다. outboxId={}",
+                                                 outboxId
+                                         ));
     }
 
     private void dispatch(SlackNotificationOutbox outbox) throws JsonProcessingException {
         SlackNotificationOutboxMessageType messageType = outbox.getMessageType();
+        String token = resolveToken(outbox.getTeamId());
 
         if (messageType == SlackNotificationOutboxMessageType.EPHEMERAL_TEXT) {
-            String token = resolveToken(outbox.getTeamId());
             notificationTransportApiClient.sendEphemeralMessage(
                     token,
                     outbox.getChannelId(),
@@ -80,7 +93,6 @@ public class SlackNotificationOutboxProcessor {
             return;
         }
         if (messageType == SlackNotificationOutboxMessageType.EPHEMERAL_BLOCKS) {
-            String token = resolveToken(outbox.getTeamId());
             notificationTransportApiClient.sendEphemeralBlockMessage(
                     token,
                     outbox.getChannelId(),
@@ -91,12 +103,10 @@ public class SlackNotificationOutboxProcessor {
             return;
         }
         if (messageType == SlackNotificationOutboxMessageType.CHANNEL_TEXT) {
-            String token = resolveToken(outbox.getTeamId());
             notificationTransportApiClient.sendMessage(token, outbox.getChannelId(), outbox.getText());
             return;
         }
         if (messageType == SlackNotificationOutboxMessageType.CHANNEL_BLOCKS) {
-            String token = resolveToken(outbox.getTeamId());
             notificationTransportApiClient.sendBlockMessage(
                     token,
                     outbox.getChannelId(),
