@@ -38,7 +38,6 @@ public class ViewSubmissionInboxEnqueueAspect {
                         payloadType,
                         ex
                 );
-                throw ex;
             }
         }
 

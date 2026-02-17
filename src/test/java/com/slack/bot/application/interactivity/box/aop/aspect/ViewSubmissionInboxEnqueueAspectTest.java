@@ -3,6 +3,7 @@ package com.slack.bot.application.interactivity.box.aop.aspect;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -44,6 +45,20 @@ class ViewSubmissionInboxEnqueueAspectTest {
 
     @Test
     void ViewSubmissionSyncResultDto를_정상_반환하면_enqueueViewSubmission이_호출된다() {
+        // when
+        ViewSubmissionSyncResultDto actual = proxyTarget.happyPath(payload);
+
+        // then
+        assertThat(actual.shouldEnqueue()).isTrue();
+        verify(slackInteractionInboxProcessor).enqueueViewSubmission(payload.toString());
+    }
+
+    @Test
+    void enqueue_중_runtime_예외가_발생해도_sync_response는_반환된다() {
+        // given
+        given(slackInteractionInboxProcessor.enqueueViewSubmission(payload.toString()))
+                .willThrow(new IllegalStateException("enqueue-failure"));
+
         // when
         ViewSubmissionSyncResultDto actual = proxyTarget.happyPath(payload);
 
