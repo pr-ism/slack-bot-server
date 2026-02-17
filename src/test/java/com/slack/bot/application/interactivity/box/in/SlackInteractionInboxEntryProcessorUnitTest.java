@@ -31,6 +31,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.retry.backoff.ExponentialRandomBackOffPolicy;
+import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.web.client.ResourceAccessException;
 
@@ -56,18 +58,40 @@ class SlackInteractionInboxEntryProcessorUnitTest {
                 new InteractivityRetryProperties.Retry(2, 100, 2.0, 1000),
                 new InteractivityRetryProperties.Retry(2, 100, 2.0, 1000)
         );
+        InteractivityRetryExceptionClassifier classifier = InteractivityRetryExceptionClassifier.create();
 
         slackInteractionInboxEntryProcessor = new SlackInteractionInboxEntryProcessor(
                 Clock.systemUTC(),
                 new ObjectMapper(),
                 blockActionInteractionService,
                 viewSubmissionInteractionService,
-                new RetryTemplate(),
+                createInboxRetryTemplate(retryProperties, classifier),
                 retryProperties,
                 new InteractivityFailureReasonTruncator(),
-                InteractivityRetryExceptionClassifier.create(),
+                classifier,
                 slackInteractionInboxRepository
         );
+    }
+
+    private RetryTemplate createInboxRetryTemplate(
+            InteractivityRetryProperties retryProperties,
+            InteractivityRetryExceptionClassifier classifier
+    ) {
+        RetryTemplate retryTemplate = new RetryTemplate();
+        retryTemplate.setRetryPolicy(new SimpleRetryPolicy(
+                retryProperties.inbox().maxAttempts(),
+                classifier.getRetryableExceptions(),
+                true,
+                false
+        ));
+
+        ExponentialRandomBackOffPolicy backOffPolicy = new ExponentialRandomBackOffPolicy();
+        backOffPolicy.setInitialInterval(retryProperties.inbox().initialDelayMs());
+        backOffPolicy.setMultiplier(retryProperties.inbox().multiplier());
+        backOffPolicy.setMaxInterval(retryProperties.inbox().maxDelayMs());
+        retryTemplate.setBackOffPolicy(backOffPolicy);
+
+        return retryTemplate;
     }
 
     @Test
