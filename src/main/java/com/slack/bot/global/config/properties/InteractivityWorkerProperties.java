@@ -52,11 +52,12 @@ public record InteractivityWorkerProperties(
     }
 
     public record ViewSubmission(
+            @DefaultValue("true") boolean workerEnabled,
             @DefaultValue("200") long pollDelayMs
     ) {
 
         public ViewSubmission() {
-            this(200L);
+            this(true, 200L);
         }
     }
 

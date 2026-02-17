@@ -104,8 +104,8 @@ class SlackInteractionInboxWorkerTest {
         // given
         interactivityWorkerProperties = new InteractivityWorkerProperties(
                 new InteractivityWorkerProperties.Inbox(
-                        new InteractivityWorkerProperties.BlockActions(false, 200L),
-                        new InteractivityWorkerProperties.ViewSubmission()
+                        new InteractivityWorkerProperties.BlockActions(true, 200L),
+                        new InteractivityWorkerProperties.ViewSubmission(false, 200L)
                 ),
                 new InteractivityWorkerProperties.Outbox()
         );
@@ -119,5 +119,27 @@ class SlackInteractionInboxWorkerTest {
 
         // then
         verify(slackInteractionInboxProcessor, never()).processPendingViewSubmissions(30);
+    }
+
+    @Test
+    void block_actions_worker_enabled가_false여도_view_submission_worker_enabled가_true면_view_submission은_처리한다() {
+        // given
+        interactivityWorkerProperties = new InteractivityWorkerProperties(
+                new InteractivityWorkerProperties.Inbox(
+                        new InteractivityWorkerProperties.BlockActions(false, 200L),
+                        new InteractivityWorkerProperties.ViewSubmission(true, 200L)
+                ),
+                new InteractivityWorkerProperties.Outbox()
+        );
+        slackInteractionInboxWorker = new SlackInteractionInboxWorker(
+                slackInteractionInboxProcessor,
+                interactivityWorkerProperties
+        );
+
+        // when
+        slackInteractionInboxWorker.processViewSubmissionInbox();
+
+        // then
+        verify(slackInteractionInboxProcessor).processPendingViewSubmissions(30);
     }
 }

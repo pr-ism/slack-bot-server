@@ -61,6 +61,8 @@ app:
     inbox:
       block-actions:
         worker-enabled: false
+      view-submission:
+        worker-enabled: false
 
 review:
   notification:

@@ -18,7 +18,7 @@ public class SlackInteractionInboxWorker {
 
     @Scheduled(fixedDelayString = "${app.interactivity.inbox.block-actions.poll-delay-ms:200}")
     public void processBlockActionInbox() {
-        if (isWorkerDisabled()) {
+        if (isBlockActionWorkerDisabled()) {
             return;
         }
 
@@ -31,7 +31,7 @@ public class SlackInteractionInboxWorker {
 
     @Scheduled(fixedDelayString = "${app.interactivity.inbox.view-submission.poll-delay-ms:200}")
     public void processViewSubmissionInbox() {
-        if (isWorkerDisabled()) {
+        if (isViewSubmissionWorkerDisabled()) {
             return;
         }
 
@@ -42,9 +42,15 @@ public class SlackInteractionInboxWorker {
         }
     }
 
-    private boolean isWorkerDisabled() {
+    private boolean isBlockActionWorkerDisabled() {
         return !interactivityWorkerProperties.inbox()
                                              .blockActions()
+                                             .workerEnabled();
+    }
+
+    private boolean isViewSubmissionWorkerDisabled() {
+        return !interactivityWorkerProperties.inbox()
+                                             .viewSubmission()
                                              .workerEnabled();
     }
 }
