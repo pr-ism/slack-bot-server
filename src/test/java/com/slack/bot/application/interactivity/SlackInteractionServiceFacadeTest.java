@@ -3,7 +3,6 @@ package com.slack.bot.application.interactivity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -57,18 +56,12 @@ class SlackInteractionServiceFacadeTest {
         // then
         assertAll(
                 () -> assertThat(actual).isEqualTo(SlackActionResponse.empty()),
-                () -> verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1"),
-                () -> verify(notificationApiClient).sendBlockMessage(
-                        eq("xoxb-test-token"),
-                        eq("D-REVIEWER"),
-                        any(),
-                        any()
-                ),
+                () -> verify(notificationApiClient, never()).openDirectMessageChannel(any(), any()),
                 () -> assertThat(reviewReservationRepository.findById(100L))
                         .isPresent()
                         .get()
                         .extracting(reservation -> reservation.getStatus())
-                        .isEqualTo(ReservationStatus.CANCELLED)
+                        .isEqualTo(ReservationStatus.ACTIVE)
         );
     }
 

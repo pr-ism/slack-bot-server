@@ -5,6 +5,7 @@ import com.slack.bot.application.interactivity.block.BlockActionRouter;
 import com.slack.bot.application.interactivity.block.dto.BlockActionContextDto;
 import com.slack.bot.application.interactivity.block.dto.BlockActionHandlingResultDto;
 import com.slack.bot.application.interactivity.block.dto.BlockActionOutcomeDto;
+import com.slack.bot.application.interactivity.box.aop.EnqueueBlockActionInInbox;
 import com.slack.bot.application.interactivity.notification.ReviewReservationNotifier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,7 +17,12 @@ public class BlockActionInteractionService {
     private final BlockActionRouter blockActionRouter;
     private final ReviewReservationNotifier reservationNotifier;
 
+    @EnqueueBlockActionInInbox
     public void handle(JsonNode payload) {
+        handleEnqueued(payload);
+    }
+
+    public void handleEnqueued(JsonNode payload) {
         blockActionRouter.route(payload)
                          .ifPresent(result -> processResult(result));
     }

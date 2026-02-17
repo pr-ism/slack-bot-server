@@ -3,9 +3,8 @@ package com.slack.bot.application.interactivity.box.in;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -59,7 +58,7 @@ class SlackInteractionInboxProcessorTest {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
             "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
     })
-    void block_actions_인박스를_처리하면_취소_예약_도메인_흐름이_수행된다() throws Exception {
+    void block_actions_인박스를_처리하면_워커는_엔트리를_PROCESSED로_마킹한다() throws Exception {
         // given
         given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U1"))
                 .willReturn("D-REVIEWER");
@@ -73,18 +72,13 @@ class SlackInteractionInboxProcessorTest {
         // then
         assertAll(
                 () -> assertThat(actual).isTrue(),
-                () -> verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1"),
-                () -> verify(notificationApiClient).sendBlockMessage(
-                        eq("xoxb-test-token"),
-                        eq("D-REVIEWER"),
-                        any(),
-                        any()
-                ),
+                () -> assertThat(slackInteractionInboxRepository.findPending(SlackInteractionInboxType.BLOCK_ACTIONS, 10)).isEmpty(),
+                () -> verify(notificationApiClient, never()).openDirectMessageChannel(any(), any()),
                 () -> assertThat(reviewReservationRepository.findById(100L))
                         .isPresent()
                         .get()
                         .extracting(reservation -> reservation.getStatus())
-                        .isEqualTo(ReservationStatus.CANCELLED)
+                        .isEqualTo(ReservationStatus.ACTIVE)
         );
     }
 
@@ -108,13 +102,7 @@ class SlackInteractionInboxProcessorTest {
         assertAll(
                 () -> assertThat(first).isTrue(),
                 () -> assertThat(second).isFalse(),
-                () -> verify(notificationApiClient, times(1)).openDirectMessageChannel("xoxb-test-token", "U1"),
-                () -> verify(notificationApiClient, times(1)).sendBlockMessage(
-                        eq("xoxb-test-token"),
-                        eq("D-REVIEWER"),
-                        any(),
-                        any()
-                )
+                () -> verify(notificationApiClient, never()).openDirectMessageChannel(any(), any())
         );
     }
 

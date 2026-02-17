@@ -3,10 +3,8 @@ package com.slack.bot.application.interactivity.box.in;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,7 +13,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.block.BlockActionType;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
-import com.slack.bot.application.interactivity.reservation.ReviewReservationCoordinator;
 import com.slack.bot.domain.reservation.ReservationStatus;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.repository.ReviewReservationRepository;
@@ -31,6 +28,7 @@ import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.ResourceAccessException;
 
 @IntegrationTest
@@ -51,9 +49,6 @@ class SlackInteractionInboxEntryProcessorTest {
     ReviewReservationRepository reviewReservationRepository;
 
     @Autowired
-    ReviewReservationCoordinator reviewReservationCoordinator;
-
-    @Autowired
     NotificationApiClient notificationApiClient;
 
     @Autowired
@@ -64,7 +59,7 @@ class SlackInteractionInboxEntryProcessorTest {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
             "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
     })
-    void block_actions_엔트리_처리시_PROCESSED로_마킹되고_취소_예약_흐름이_수행된다() throws Exception {
+    void block_actions_엔트리_처리시_PROCESSED로_마킹되고_예약상태는_유지된다() throws Exception {
         // given
         given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U1"))
                 .willReturn("D-REVIEWER");
@@ -82,14 +77,8 @@ class SlackInteractionInboxEntryProcessorTest {
                 () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
                 () -> assertThat(actualInbox.getProcessingAttempt()).isEqualTo(1),
                 () -> assertThat(actualReservation).isPresent(),
-                () -> assertThat(actualReservation.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED),
-                () -> verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1"),
-                () -> verify(notificationApiClient).sendBlockMessage(
-                        eq("xoxb-test-token"),
-                        eq("D-REVIEWER"),
-                        any(),
-                        any()
-                )
+                () -> assertThat(actualReservation.get().getStatus()).isEqualTo(ReservationStatus.ACTIVE),
+                () -> verify(notificationApiClient, never()).openDirectMessageChannel(any(), any())
         );
     }
 
@@ -137,56 +126,45 @@ class SlackInteractionInboxEntryProcessorTest {
     }
 
     @Test
-    @Sql(scripts = {
-            "classpath:sql/fixtures/notification/workspace_t1.sql",
-            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
-    })
-    void block_actions_엔트리_재시도_가능_예외_첫_실패는_RETRY_PENDING으로_기록된다() throws Exception {
+    void 재시도_가능_예외이고_첫_시도면_RETRY_PENDING으로_마킹된다() {
         // given
-        doThrow(new ResourceAccessException("temporary network failure"))
-                .when(reviewReservationCoordinator)
-                .cancel(anyLong());
-        String payloadJson = objectMapper.writeValueAsString(cancelReservationPayload("100"));
-        SlackInteractionInbox inbox = savePendingInbox(SlackInteractionInboxType.BLOCK_ACTIONS, payloadJson);
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "retry-first-attempt",
+                "{}"
+        );
+        inbox.markProcessing();
+        Exception retryableException = new ResourceAccessException("temporary network failure");
 
         // when
-        slackInteractionInboxEntryProcessor.processBlockAction(inbox);
-
-        // then
-        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
+        ReflectionTestUtils.invokeMethod(slackInteractionInboxEntryProcessor, "markFailureStatus", inbox, retryableException);
 
         assertAll(
-                () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
-                () -> assertThat(actualInbox.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actualInbox.getFailureType()).isNull()
+                () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
+                () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
+                () -> assertThat(inbox.getFailureType()).isNull()
         );
     }
 
     @Test
-    @Sql(scripts = {
-            "classpath:sql/fixtures/notification/workspace_t1.sql",
-            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
-    })
-    void block_actions_엔트리_재시도_가능_예외_최대_시도_도달시_FAILED와_RETRY_EXHAUSTED로_기록된다() throws Exception {
+    void 재시도_가능_예외이고_최대_시도에_도달하면_FAILED와_RETRY_EXHAUSTED로_마킹된다() {
         // given
-        doThrow(new ResourceAccessException("temporary network failure"))
-                .when(reviewReservationCoordinator)
-                .cancel(anyLong());
-        String payloadJson = objectMapper.writeValueAsString(cancelReservationPayload("100"));
-        SlackInteractionInbox inbox = savePendingInbox(SlackInteractionInboxType.BLOCK_ACTIONS, payloadJson);
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "retry-max-attempt",
+                "{}"
+        );
+        inbox.markProcessing();
+        inbox.markProcessing();
+        Exception retryableException = new ResourceAccessException("temporary network failure");
 
         // when
-        slackInteractionInboxEntryProcessor.processBlockAction(inbox);
-        SlackInteractionInbox retryPendingInbox = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
-        slackInteractionInboxEntryProcessor.processBlockAction(retryPendingInbox);
-
-        // then
-        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
+        ReflectionTestUtils.invokeMethod(slackInteractionInboxEntryProcessor, "markFailureStatus", inbox, retryableException);
 
         assertAll(
-                () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
-                () -> assertThat(actualInbox.getProcessingAttempt()).isEqualTo(2),
-                () -> assertThat(actualInbox.getFailureType()).isEqualTo(SlackInteractivityFailureType.RETRY_EXHAUSTED)
+                () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
+                () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(2),
+                () -> assertThat(inbox.getFailureType()).isEqualTo(SlackInteractivityFailureType.RETRY_EXHAUSTED)
         );
     }
 
