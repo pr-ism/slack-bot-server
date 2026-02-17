@@ -58,8 +58,9 @@ public class SlackInteractionInboxEntryProcessor {
         slackInteractionInboxRepository.save(inbox);
 
         try {
+            JsonNode payload = objectMapper.readTree(inbox.getPayloadJson());
+
             slackInteractionInboxRetryTemplate.execute(context -> {
-                JsonNode payload = objectMapper.readTree(inbox.getPayloadJson());
                 consumer.accept(payload);
                 return null;
             });
