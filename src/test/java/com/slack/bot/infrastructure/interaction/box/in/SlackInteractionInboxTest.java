@@ -1,6 +1,7 @@
 package com.slack.bot.infrastructure.interaction.box.in;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
@@ -119,5 +120,113 @@ class SlackInteractionInboxTest {
                 () -> assertThat(inbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(inbox.getFailureReason()).isEqualTo("retry")
         );
+    }
+
+    @Test
+    void markProcessed는_processedAt이_null이면_예외를_던진다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+
+        // when & then
+        assertThatThrownBy(() -> inbox.markProcessed(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("processedAt은 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void markRetryPending은_failedAt이_null이면_예외를_던진다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+
+        // when & then
+        assertThatThrownBy(() -> inbox.markRetryPending(null, "retry"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("failedAt은 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void markRetryPending은_failureReason이_null이면_예외를_던진다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+        Instant failedAt = Instant.parse("2026-02-15T03:00:00Z");
+
+        // when & then
+        assertThatThrownBy(() -> inbox.markRetryPending(failedAt, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("failureReason은 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void markFailed는_failedAt이_null이면_예외를_던진다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+
+        // when & then
+        assertThatThrownBy(() -> inbox.markFailed(null, "failure", SlackInteractivityFailureType.BUSINESS_INVARIANT))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("failedAt은 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void markFailed는_failureReason이_null이면_예외를_던진다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+        Instant failedAt = Instant.parse("2026-02-15T01:00:00Z");
+
+        // when & then
+        assertThatThrownBy(() -> inbox.markFailed(failedAt, null, SlackInteractivityFailureType.BUSINESS_INVARIANT))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("failureReason은 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void markFailed는_failureType이_null이면_예외를_던진다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+        Instant failedAt = Instant.parse("2026-02-15T01:00:00Z");
+
+        // when & then
+        assertThatThrownBy(() -> inbox.markFailed(failedAt, "failure", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("failureType은 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void markProcessing은_processingStartedAt이_null이면_예외를_던진다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+
+        // when & then
+        assertThatThrownBy(() -> inbox.markProcessing(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("processingStartedAt은 비어 있을 수 없습니다.");
     }
 }

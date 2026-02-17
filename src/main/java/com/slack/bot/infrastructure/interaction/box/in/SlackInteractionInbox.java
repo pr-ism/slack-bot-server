@@ -7,7 +7,6 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.time.Instant;
-import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -62,7 +61,7 @@ public class SlackInteractionInbox extends BaseTimeEntity {
     }
 
     public void markProcessing(Instant processingStartedAt) {
-        Objects.requireNonNull(processingStartedAt, "processingStartedAt은 비어 있을 수 없습니다.");
+        validateProcessingStartedAt(processingStartedAt);
 
         this.status = SlackInteractionInboxStatus.PROCESSING;
         this.processingAttempt += 1;
@@ -73,6 +72,8 @@ public class SlackInteractionInbox extends BaseTimeEntity {
     }
 
     public void markProcessed(Instant processedAt) {
+        validateProcessedAt(processedAt);
+
         this.status = SlackInteractionInboxStatus.PROCESSED;
         this.processingStartedAt = null;
         this.processedAt = processedAt;
@@ -82,6 +83,9 @@ public class SlackInteractionInbox extends BaseTimeEntity {
     }
 
     public void markRetryPending(Instant failedAt, String failureReason) {
+        validateFailedAt(failedAt);
+        validateFailureReason(failureReason);
+
         this.status = SlackInteractionInboxStatus.RETRY_PENDING;
         this.processingStartedAt = null;
         this.failedAt = failedAt;
@@ -94,10 +98,44 @@ public class SlackInteractionInbox extends BaseTimeEntity {
             String failureReason,
             SlackInteractivityFailureType failureType
     ) {
+        validateFailedAt(failedAt);
+        validateFailureReason(failureReason);
+        validateFailureType(failureType);
+
         this.status = SlackInteractionInboxStatus.FAILED;
         this.processingStartedAt = null;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = failureType;
+    }
+
+    private void validateProcessingStartedAt(Instant processingStartedAt) {
+        if (processingStartedAt == null) {
+            throw new IllegalArgumentException("processingStartedAt은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateProcessedAt(Instant processedAt) {
+        if (processedAt == null) {
+            throw new IllegalArgumentException("processedAt은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateFailedAt(Instant failedAt) {
+        if (failedAt == null) {
+            throw new IllegalArgumentException("failedAt은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateFailureReason(String failureReason) {
+        if (failureReason == null) {
+            throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateFailureType(SlackInteractivityFailureType failureType) {
+        if (failureType == null) {
+            throw new IllegalArgumentException("failureType은 비어 있을 수 없습니다.");
+        }
     }
 }
