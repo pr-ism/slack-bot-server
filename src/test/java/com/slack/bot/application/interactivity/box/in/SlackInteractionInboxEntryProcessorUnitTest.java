@@ -227,4 +227,33 @@ class SlackInteractionInboxEntryProcessorUnitTest {
                 () -> verify(slackInteractionInboxRepository).save(processingInbox)
         );
     }
+
+    @Test
+    void view_submission_정상처리시_handleEnqueued가_호출되고_PROCESSED로_저장된다() {
+        // given
+        SlackInteractionInbox pending = org.mockito.Mockito.mock(SlackInteractionInbox.class);
+        given(pending.getId()).willReturn(20L);
+
+        SlackInteractionInbox processingInbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.VIEW_SUBMISSION,
+                "view-submission-success",
+                "{\"type\":\"view_submission\"}"
+        );
+        processingInbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+
+        given(slackInteractionInboxRepository.markProcessingIfPending(eq(20L), any())).willReturn(true);
+        given(slackInteractionInboxRepository.findById(20L)).willReturn(Optional.of(processingInbox));
+
+        // when
+        slackInteractionInboxEntryProcessor.processViewSubmission(pending);
+
+        // then
+        assertAll(
+                () -> assertThat(processingInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
+                () -> assertThat(processingInbox.getProcessingAttempt()).isEqualTo(1),
+                () -> verify(viewSubmissionInteractionService).handleEnqueued(any()),
+                () -> verify(blockActionInteractionService, never()).handle(any()),
+                () -> verify(slackInteractionInboxRepository).save(processingInbox)
+        );
+    }
 }
