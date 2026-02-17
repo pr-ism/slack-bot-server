@@ -16,7 +16,7 @@ public class ViewSubmissionInboxEnqueueAspect {
 
     private final SlackInteractionInboxProcessor slackInteractionInboxProcessor;
 
-    @Around("@annotation(com.slack.bot.application.interactivity.box.aop.EnqueueViewSubmissionInInbox) && args(payload)")
+    @Around("@annotation(com.slack.bot.application.interactivity.box.aop.EnqueueViewSubmissionInInbox) && args(payload,..)")
     public Object enqueue(ProceedingJoinPoint joinPoint, JsonNode payload) throws Throwable {
         Object result = joinPoint.proceed();
 

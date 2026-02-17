@@ -20,7 +20,7 @@ public class BlockActionInboxEnqueueAspect {
     private final SlackInteractionInboxProcessor slackInteractionInboxProcessor;
     private final OutboxIdempotencySourceContext outboxIdempotencySourceContext;
 
-    @Around("@annotation(com.slack.bot.application.interactivity.box.aop.EnqueueBlockActionInInbox) && args(payload)")
+    @Around("@annotation(com.slack.bot.application.interactivity.box.aop.EnqueueBlockActionInInbox) && args(payload,..)")
     public Object enqueue(ProceedingJoinPoint joinPoint, JsonNode payload) {
         if (outboxIdempotencySourceContext.currentSourceKey().isPresent()) {
             return proceedInInboxContext(joinPoint);
