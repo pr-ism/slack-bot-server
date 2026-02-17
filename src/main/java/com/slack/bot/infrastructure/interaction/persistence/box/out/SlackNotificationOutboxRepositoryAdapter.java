@@ -2,6 +2,7 @@ package com.slack.bot.infrastructure.interaction.persistence.box.out;
 
 import static com.slack.bot.infrastructure.interaction.box.out.QSlackNotificationOutbox.slackNotificationOutbox;
 
+import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
@@ -76,6 +77,9 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                 .set(slackNotificationOutbox.status, SlackNotificationOutboxStatus.PROCESSING)
                 .set(slackNotificationOutbox.processingStartedAt, processingStartedAt)
                 .set(slackNotificationOutbox.processingAttempt, slackNotificationOutbox.processingAttempt.add(1))
+                .set(slackNotificationOutbox.failedAt, Expressions.nullExpression(Instant.class))
+                .set(slackNotificationOutbox.failureReason, Expressions.nullExpression(String.class))
+                .set(slackNotificationOutbox.failureType, Expressions.nullExpression(SlackInteractivityFailureType.class))
                 .where(
                         slackNotificationOutbox.id.eq(outboxId),
                         slackNotificationOutbox.status.in(
@@ -94,10 +98,10 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
         return Math.toIntExact(queryFactory
                 .update(slackNotificationOutbox)
                 .set(slackNotificationOutbox.status, SlackNotificationOutboxStatus.RETRY_PENDING)
-                .set(slackNotificationOutbox.processingStartedAt, (Instant) null)
+                .set(slackNotificationOutbox.processingStartedAt, Expressions.nullExpression(Instant.class))
                 .set(slackNotificationOutbox.failedAt, failedAt)
                 .set(slackNotificationOutbox.failureReason, failureReason)
-                .set(slackNotificationOutbox.failureType, (SlackInteractivityFailureType) null)
+                .set(slackNotificationOutbox.failureType, Expressions.nullExpression(SlackInteractivityFailureType.class))
                 .where(
                         slackNotificationOutbox.status.eq(SlackNotificationOutboxStatus.PROCESSING),
                         slackNotificationOutbox.processingStartedAt.isNull()
