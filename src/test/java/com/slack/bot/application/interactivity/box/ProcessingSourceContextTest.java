@@ -1,6 +1,7 @@
 package com.slack.bot.application.interactivity.box;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -28,6 +29,16 @@ class ProcessingSourceContextTest {
 
         // then
         assertThat(actual).isEqualTo("INBOX");
+        assertThat(context.isInboxProcessing()).isFalse();
+    }
+
+    @Test
+    void withInboxProcessing_내부에서_예외가_발생해도_컨텍스트는_복원된다() {
+        // when & then
+        assertThatThrownBy(() -> context.withInboxProcessing(() -> {
+            throw new RuntimeException("test");
+        })).isInstanceOf(RuntimeException.class);
+
         assertThat(context.isInboxProcessing()).isFalse();
     }
 }
