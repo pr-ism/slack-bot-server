@@ -1,6 +1,7 @@
 package com.slack.bot.infrastructure.interaction.box.out;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
@@ -16,16 +17,7 @@ class SlackNotificationOutboxTest {
     @Test
     void pending_생성시_기본_상태는_PENDING이고_시도횟수는_0이다() {
         // when
-        SlackNotificationOutbox actual = SlackNotificationOutbox.builder()
-                                                                .messageType(SlackNotificationOutboxMessageType.EPHEMERAL_TEXT)
-                                                                .idempotencyKey("key")
-                                                                .teamId("T1")
-                                                                .channelId("channel1")
-                                                                .userId("user1")
-                                                                .text("text")
-                                                                .blocksJson(null)
-                                                                .fallbackText(null)
-                                                                .build();
+        SlackNotificationOutbox actual = pendingOutbox();
 
         // then
         assertAll(
@@ -39,18 +31,48 @@ class SlackNotificationOutboxTest {
     }
 
     @Test
+    void 빌더_필수_필드가_없으면_예외를_던진다() {
+        // when & then
+        assertAll(
+                () -> assertThatThrownBy(() -> SlackNotificationOutbox.builder()
+                                                                      .messageType(null)
+                                                                      .idempotencyKey("key")
+                                                                      .teamId("T1")
+                                                                      .channelId("channel1")
+                                                                      .build())
+                        .isInstanceOf(NullPointerException.class)
+                        .hasMessage("outbox messageType은 비어 있을 수 없습니다."),
+                () -> assertThatThrownBy(() -> SlackNotificationOutbox.builder()
+                                                                      .messageType(SlackNotificationOutboxMessageType.CHANNEL_TEXT)
+                                                                      .idempotencyKey(" ")
+                                                                      .teamId("T1")
+                                                                      .channelId("channel1")
+                                                                      .build())
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessage("outbox idempotencyKey는 비어 있을 수 없습니다."),
+                () -> assertThatThrownBy(() -> SlackNotificationOutbox.builder()
+                                                                      .messageType(SlackNotificationOutboxMessageType.CHANNEL_TEXT)
+                                                                      .idempotencyKey("key")
+                                                                      .teamId(" ")
+                                                                      .channelId("channel1")
+                                                                      .build())
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessage("outbox teamId는 비어 있을 수 없습니다."),
+                () -> assertThatThrownBy(() -> SlackNotificationOutbox.builder()
+                                                                      .messageType(SlackNotificationOutboxMessageType.CHANNEL_TEXT)
+                                                                      .idempotencyKey("key")
+                                                                      .teamId("T1")
+                                                                      .channelId(" ")
+                                                                      .build())
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessage("outbox channelId는 비어 있을 수 없습니다.")
+        );
+    }
+
+    @Test
     void markProcessing_호출시_PROCESSING_상태로_변경되고_시도횟수가_증가한다() {
         // given
-        SlackNotificationOutbox outbox = SlackNotificationOutbox.builder()
-                                                                .messageType(SlackNotificationOutboxMessageType.EPHEMERAL_TEXT)
-                                                                .idempotencyKey("key")
-                                                                .teamId("T1")
-                                                                .channelId("channel1")
-                                                                .userId("user1")
-                                                                .text("text")
-                                                                .blocksJson("[{}]")
-                                                                .fallbackText("fallback")
-                                                                .build();
+        SlackNotificationOutbox outbox = pendingOutbox();
 
         // when
         Instant processingStartedAt = Instant.parse("2026-02-15T00:00:00Z");
@@ -68,16 +90,8 @@ class SlackNotificationOutboxTest {
     @Test
     void markSent_호출시_SENT_상태와_전송시각이_저장된다() {
         // given
-        SlackNotificationOutbox outbox = SlackNotificationOutbox.builder()
-                                                                .messageType(SlackNotificationOutboxMessageType.EPHEMERAL_TEXT)
-                                                                .idempotencyKey("key")
-                                                                .teamId("T1")
-                                                                .channelId("channel1")
-                                                                .userId("user1")
-                                                                .text("text")
-                                                                .blocksJson("[{}]")
-                                                                .fallbackText("fallback")
-                                                                .build();
+        SlackNotificationOutbox outbox = pendingOutbox();
+        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
 
         // when
         Instant sentAt = Instant.parse("2026-02-15T01:00:00Z");
@@ -96,16 +110,8 @@ class SlackNotificationOutboxTest {
     @Test
     void markFailed_호출시_FAILED_상태와_실패정보가_저장된다() {
         // given
-        SlackNotificationOutbox outbox = SlackNotificationOutbox.builder()
-                                                                .messageType(SlackNotificationOutboxMessageType.EPHEMERAL_TEXT)
-                                                                .idempotencyKey("key")
-                                                                .teamId("T1")
-                                                                .channelId("channel1")
-                                                                .userId("user1")
-                                                                .text("text")
-                                                                .blocksJson("[{}]")
-                                                                .fallbackText("fallback")
-                                                                .build();
+        SlackNotificationOutbox outbox = pendingOutbox();
+        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
 
         // when
         Instant failedAt = Instant.parse("2026-02-15T02:00:00Z");
@@ -124,16 +130,8 @@ class SlackNotificationOutboxTest {
     @Test
     void markRetryPending_호출시_RETRY_PENDING_상태와_실패정보가_저장된다() {
         // given
-        SlackNotificationOutbox outbox = SlackNotificationOutbox.builder()
-                                                                .messageType(SlackNotificationOutboxMessageType.EPHEMERAL_TEXT)
-                                                                .idempotencyKey("key")
-                                                                .teamId("T1")
-                                                                .channelId("channel1")
-                                                                .userId("user1")
-                                                                .text("text")
-                                                                .blocksJson("[{}]")
-                                                                .fallbackText("fallback")
-                                                                .build();
+        SlackNotificationOutbox outbox = pendingOutbox();
+        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
 
         // when
         Instant failedAt = Instant.parse("2026-02-15T03:00:00Z");
@@ -146,5 +144,47 @@ class SlackNotificationOutboxTest {
                 () -> assertThat(outbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(outbox.getFailureReason()).isEqualTo("retry")
         );
+    }
+
+    @Test
+    void 허용되지_않은_상태전이면_예외를_던진다() {
+        // given
+        SlackNotificationOutbox pending = pendingOutbox();
+        SlackNotificationOutbox sent = pendingOutbox();
+        sent.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        sent.markSent(Instant.parse("2026-02-15T01:00:00Z"));
+
+        // when & then
+        assertAll(
+                () -> assertThatThrownBy(() -> pending.markSent(Instant.parse("2026-02-15T01:00:00Z")))
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining("SENT 전이는 PROCESSING 상태에서만 가능합니다."),
+                () -> assertThatThrownBy(() -> pending.markRetryPending(Instant.parse("2026-02-15T02:00:00Z"), "retry"))
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining("RETRY_PENDING 전이는 PROCESSING 상태에서만 가능합니다."),
+                () -> assertThatThrownBy(() -> pending.markFailed(
+                        Instant.parse("2026-02-15T03:00:00Z"),
+                        "failure",
+                        SlackInteractivityFailureType.RETRY_EXHAUSTED
+                ))
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining("FAILED 전이는 PROCESSING 상태에서만 가능합니다."),
+                () -> assertThatThrownBy(() -> sent.markProcessing(Instant.parse("2026-02-15T04:00:00Z")))
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining("PROCESSING 전이는 PENDING 또는 RETRY_PENDING 상태에서만 가능합니다.")
+        );
+    }
+
+    private SlackNotificationOutbox pendingOutbox() {
+        return SlackNotificationOutbox.builder()
+                                      .messageType(SlackNotificationOutboxMessageType.EPHEMERAL_TEXT)
+                                      .idempotencyKey("key")
+                                      .teamId("T1")
+                                      .channelId("channel1")
+                                      .userId("user1")
+                                      .text("text")
+                                      .blocksJson("[{}]")
+                                      .fallbackText("fallback")
+                                      .build();
     }
 }

@@ -7,6 +7,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -62,10 +63,10 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
             String blocksJson,
             String fallbackText
     ) {
-        this.messageType = messageType;
-        this.idempotencyKey = idempotencyKey;
-        this.teamId = teamId;
-        this.channelId = channelId;
+        this.messageType = Objects.requireNonNull(messageType, "outbox messageType은 비어 있을 수 없습니다.");
+        this.idempotencyKey = requireNonBlank(idempotencyKey, "outbox idempotencyKey는 비어 있을 수 없습니다.");
+        this.teamId = requireNonBlank(teamId, "outbox teamId는 비어 있을 수 없습니다.");
+        this.channelId = requireNonBlank(channelId, "outbox channelId는 비어 있을 수 없습니다.");
         this.userId = userId;
         this.text = text;
         this.blocksJson = blocksJson;
@@ -75,12 +76,18 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
     }
 
     public void markProcessing(Instant processingStartedAt) {
+        validateProcessingTransition();
+        Objects.requireNonNull(processingStartedAt, "processingStartedAt은 비어 있을 수 없습니다.");
+
         this.status = SlackNotificationOutboxStatus.PROCESSING;
         this.processingStartedAt = processingStartedAt;
         this.processingAttempt += 1;
     }
 
     public void markSent(Instant sentAt) {
+        validateTransition(SlackNotificationOutboxStatus.PROCESSING, "SENT");
+        Objects.requireNonNull(sentAt, "sentAt은 비어 있을 수 없습니다.");
+
         this.status = SlackNotificationOutboxStatus.SENT;
         this.sentAt = sentAt;
         this.failedAt = null;
@@ -89,6 +96,9 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
     }
 
     public void markRetryPending(Instant failedAt, String failureReason) {
+        validateTransition(SlackNotificationOutboxStatus.PROCESSING, "RETRY_PENDING");
+        Objects.requireNonNull(failedAt, "failedAt은 비어 있을 수 없습니다.");
+
         this.status = SlackNotificationOutboxStatus.RETRY_PENDING;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
@@ -100,9 +110,46 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
             String failureReason,
             SlackInteractivityFailureType failureType
     ) {
+        validateTransition(SlackNotificationOutboxStatus.PROCESSING, "FAILED");
+        Objects.requireNonNull(failedAt, "failedAt은 비어 있을 수 없습니다.");
+        Objects.requireNonNull(failureType, "failureType은 비어 있을 수 없습니다.");
+
         this.status = SlackNotificationOutboxStatus.FAILED;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = failureType;
+    }
+
+    private void validateProcessingTransition() {
+        if (isPendingOrRetryPendingStatus()) {
+            return;
+        }
+
+        throw new IllegalStateException(
+                "PROCESSING 전이는 PENDING 또는 RETRY_PENDING 상태에서만 가능합니다. 현재: " + this.status
+        );
+    }
+
+    private boolean isPendingOrRetryPendingStatus() {
+        return this.status == SlackNotificationOutboxStatus.PENDING
+                || this.status == SlackNotificationOutboxStatus.RETRY_PENDING;
+    }
+
+    private void validateTransition(SlackNotificationOutboxStatus expected, String targetStatus) {
+        if (this.status == expected) {
+            return;
+        }
+
+        throw new IllegalStateException(
+                targetStatus + " 전이는 " + expected + " 상태에서만 가능합니다. 현재: " + this.status
+        );
+    }
+
+    private String requireNonBlank(String value, String message) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(message);
+        }
+
+        return value;
     }
 }
