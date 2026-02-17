@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interactivity.box.retry.InteractivityRetryExceptionClassifier;
 import com.slack.bot.application.interactivity.box.out.exception.UnsupportedSlackNotificationOutboxMessageTypeException;
+import com.slack.bot.global.config.properties.InteractivityRetryProperties;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
@@ -24,13 +25,13 @@ import org.springframework.stereotype.Component;
 public class SlackNotificationOutboxProcessor {
 
     private static final int FAILURE_REASON_MAX_LENGTH = 500;
-    private static final int MAX_RETRY_ATTEMPTS = 2;
 
     private final Clock clock;
     private final ObjectMapper objectMapper;
     private final RetryTemplate slackNotificationOutboxRetryTemplate;
     private final NotificationTransportApiClient notificationTransportApiClient;
     private final SlackNotificationOutboxRepository slackNotificationOutboxRepository;
+    private final InteractivityRetryProperties interactivityRetryProperties;
     private final InteractivityRetryExceptionClassifier retryExceptionClassifier;
 
     public void processPending(int limit) {
@@ -123,7 +124,7 @@ public class SlackNotificationOutboxProcessor {
             return;
         }
 
-        if (outbox.getProcessingAttempt() < MAX_RETRY_ATTEMPTS) {
+        if (outbox.getProcessingAttempt() < interactivityRetryProperties.outbox().maxAttempts()) {
             outbox.markRetryPending(clock.instant(), reason);
             return;
         }

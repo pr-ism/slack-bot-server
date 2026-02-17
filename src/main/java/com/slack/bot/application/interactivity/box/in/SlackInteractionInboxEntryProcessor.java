@@ -6,6 +6,7 @@ import com.slack.bot.application.interactivity.BlockActionInteractionService;
 import com.slack.bot.application.interactivity.view.ViewSubmissionInteractionService;
 import com.slack.bot.application.interactivity.box.aop.BindInboxToOutboxSource;
 import com.slack.bot.application.interactivity.box.retry.InteractivityRetryExceptionClassifier;
+import com.slack.bot.global.config.properties.InteractivityRetryProperties;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
@@ -22,13 +23,12 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class SlackInteractionInboxEntryProcessor {
 
-    private static final int MAX_RETRY_ATTEMPTS = 2;
-
     private final Clock clock;
     private final ObjectMapper objectMapper;
     private final BlockActionInteractionService blockActionInteractionService;
     private final ViewSubmissionInteractionService viewSubmissionInteractionService;
     private final RetryTemplate slackInteractionInboxRetryTemplate;
+    private final InteractivityRetryProperties interactivityRetryProperties;
     private final InteractivityRetryExceptionClassifier retryExceptionClassifier;
     private final SlackInteractionInboxRepository slackInteractionInboxRepository;
 
@@ -84,7 +84,7 @@ public class SlackInteractionInboxEntryProcessor {
             return;
         }
 
-        if (inbox.getProcessingAttempt() < MAX_RETRY_ATTEMPTS) {
+        if (inbox.getProcessingAttempt() < interactivityRetryProperties.inbox().maxAttempts()) {
             inbox.markRetryPending(clock.instant(), reason);
             return;
         }
