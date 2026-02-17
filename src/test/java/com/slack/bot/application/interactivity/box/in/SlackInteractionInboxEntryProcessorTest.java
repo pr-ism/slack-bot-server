@@ -22,15 +22,12 @@ import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStat
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import com.slack.bot.infrastructure.interaction.persistence.box.in.JpaSlackInteractionInboxRepository;
-import java.time.Clock;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.jdbc.Sql;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.client.ResourceAccessException;
 
 @IntegrationTest
 @SuppressWarnings("NonAsciiCharacters")
@@ -54,9 +51,6 @@ class SlackInteractionInboxEntryProcessorTest {
 
     @Autowired
     ObjectMapper objectMapper;
-
-    @Autowired
-    Clock clock;
 
     @Test
     @Sql(scripts = {
@@ -167,71 +161,6 @@ class SlackInteractionInboxEntryProcessorTest {
                 () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
                 () -> assertThat(actualInbox.getProcessingAttempt()).isEqualTo(1),
                 () -> assertThat(actualInbox.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT)
-        );
-    }
-
-    @Test
-    void 재시도_가능_예외이고_첫_시도면_RETRY_PENDING으로_마킹된다() {
-        // given
-        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
-                SlackInteractionInboxType.BLOCK_ACTIONS,
-                "retry-first-attempt",
-                "{}"
-        );
-        inbox.markProcessing(clock.instant());
-        Exception retryableException = new ResourceAccessException("temporary network failure");
-
-        // when
-        ReflectionTestUtils.invokeMethod(slackInteractionInboxEntryProcessor, "markFailureStatus", inbox, retryableException);
-
-        assertAll(
-                () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
-                () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(inbox.getFailureType()).isNull()
-        );
-    }
-
-    @Test
-    void 재시도_가능_예외이고_최대_시도에_도달하면_FAILED와_RETRY_EXHAUSTED로_마킹된다() {
-        // given
-        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
-                SlackInteractionInboxType.BLOCK_ACTIONS,
-                "retry-max-attempt",
-                "{}"
-        );
-        inbox.markProcessing(clock.instant());
-        inbox.markProcessing(clock.instant());
-        Exception retryableException = new ResourceAccessException("temporary network failure");
-
-        // when
-        ReflectionTestUtils.invokeMethod(slackInteractionInboxEntryProcessor, "markFailureStatus", inbox, retryableException);
-
-        assertAll(
-                () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
-                () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(2),
-                () -> assertThat(inbox.getFailureType()).isEqualTo(SlackInteractivityFailureType.RETRY_EXHAUSTED)
-        );
-    }
-
-    @Test
-    void 긴_실패사유는_잘려서_저장된다() {
-        // given
-        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
-                SlackInteractionInboxType.BLOCK_ACTIONS,
-                "long-failure-reason",
-                "{}"
-        );
-        inbox.markProcessing(clock.instant());
-        Exception nonRetryableException = new IllegalArgumentException("x".repeat(600));
-
-        // when
-        ReflectionTestUtils.invokeMethod(slackInteractionInboxEntryProcessor, "markFailureStatus", inbox, nonRetryableException);
-
-        // then
-        assertAll(
-                () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
-                () -> assertThat(inbox.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT),
-                () -> assertThat(inbox.getFailureReason()).hasSize(500)
         );
     }
 

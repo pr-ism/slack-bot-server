@@ -1,9 +1,12 @@
 package com.slack.bot.application.interactivity.box.in;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -13,9 +16,13 @@ import com.slack.bot.application.interactivity.box.InteractivityFailureReasonTru
 import com.slack.bot.application.interactivity.box.retry.InteractivityRetryExceptionClassifier;
 import com.slack.bot.application.interactivity.view.ViewSubmissionInteractionService;
 import com.slack.bot.global.config.properties.InteractivityRetryProperties;
+import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
+import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStatus;
+import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -25,6 +32,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.retry.support.RetryTemplate;
+import org.springframework.web.client.ResourceAccessException;
 
 @SuppressWarnings("NonAsciiCharacters")
 @ExtendWith(MockitoExtension.class)
@@ -92,5 +100,99 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         // then
         verify(slackInteractionInboxRepository, never()).save(any());
         verify(blockActionInteractionService, never()).handle(any());
+    }
+
+    @Test
+    void 재시도_가능_예외이고_첫_시도면_RETRY_PENDING으로_마킹된다() {
+        // given
+        SlackInteractionInbox pending = org.mockito.Mockito.mock(SlackInteractionInbox.class);
+        given(pending.getId()).willReturn(10L);
+
+        SlackInteractionInbox processingInbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "retry-first-attempt",
+                "{}"
+        );
+        processingInbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+
+        given(slackInteractionInboxRepository.markProcessingIfPending(eq(10L), any())).willReturn(true);
+        given(slackInteractionInboxRepository.findById(10L)).willReturn(Optional.of(processingInbox));
+        willThrow(new ResourceAccessException("temporary network failure"))
+                .given(blockActionInteractionService)
+                .handle(any());
+
+        // when
+        slackInteractionInboxEntryProcessor.processBlockAction(pending);
+
+        // then
+        assertAll(
+                () -> assertThat(processingInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
+                () -> assertThat(processingInbox.getProcessingAttempt()).isEqualTo(1),
+                () -> assertThat(processingInbox.getFailureType()).isNull(),
+                () -> verify(slackInteractionInboxRepository).save(processingInbox)
+        );
+    }
+
+    @Test
+    void 재시도_가능_예외이고_최대_시도에_도달하면_FAILED와_RETRY_EXHAUSTED로_마킹된다() {
+        // given
+        SlackInteractionInbox pending = org.mockito.Mockito.mock(SlackInteractionInbox.class);
+        given(pending.getId()).willReturn(10L);
+
+        SlackInteractionInbox processingInbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "retry-max-attempt",
+                "{}"
+        );
+        processingInbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        processingInbox.markProcessing(Instant.parse("2026-02-15T00:01:00Z"));
+
+        given(slackInteractionInboxRepository.markProcessingIfPending(eq(10L), any())).willReturn(true);
+        given(slackInteractionInboxRepository.findById(10L)).willReturn(Optional.of(processingInbox));
+        willThrow(new ResourceAccessException("temporary network failure"))
+                .given(blockActionInteractionService)
+                .handle(any());
+
+        // when
+        slackInteractionInboxEntryProcessor.processBlockAction(pending);
+
+        // then
+        assertAll(
+                () -> assertThat(processingInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
+                () -> assertThat(processingInbox.getProcessingAttempt()).isEqualTo(2),
+                () -> assertThat(processingInbox.getFailureType()).isEqualTo(SlackInteractivityFailureType.RETRY_EXHAUSTED),
+                () -> verify(slackInteractionInboxRepository).save(processingInbox)
+        );
+    }
+
+    @Test
+    void 긴_실패사유는_잘려서_저장된다() {
+        // given
+        SlackInteractionInbox pending = org.mockito.Mockito.mock(SlackInteractionInbox.class);
+        given(pending.getId()).willReturn(10L);
+
+        SlackInteractionInbox processingInbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "long-failure-reason",
+                "{}"
+        );
+        processingInbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+
+        given(slackInteractionInboxRepository.markProcessingIfPending(eq(10L), any())).willReturn(true);
+        given(slackInteractionInboxRepository.findById(10L)).willReturn(Optional.of(processingInbox));
+        willThrow(new IllegalArgumentException("x".repeat(600)))
+                .given(blockActionInteractionService)
+                .handle(any());
+
+        // when
+        slackInteractionInboxEntryProcessor.processBlockAction(pending);
+
+        // then
+        assertAll(
+                () -> assertThat(processingInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
+                () -> assertThat(processingInbox.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT),
+                () -> assertThat(processingInbox.getFailureReason()).hasSize(500),
+                () -> verify(slackInteractionInboxRepository).save(processingInbox)
+        );
     }
 }
