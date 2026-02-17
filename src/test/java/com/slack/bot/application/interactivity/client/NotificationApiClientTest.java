@@ -111,11 +111,18 @@ class NotificationApiClientTest {
 
     @Test
     void DM_채널_오픈은_전송_클라이언트에_위임한다() {
+        // given
+        given(notificationTransportApiClient.openDirectMessageChannel("token", "U1"))
+                .willReturn("D123");
+
         // when
-        notificationApiClient.openDirectMessageChannel("token", "U1");
+        String channelId = notificationApiClient.openDirectMessageChannel("token", "U1");
 
         // then
-        verify(notificationTransportApiClient).openDirectMessageChannel("token", "U1");
+        assertAll(
+                () -> assertThat(channelId).isEqualTo("D123"),
+                () -> verify(notificationTransportApiClient).openDirectMessageChannel("token", "U1")
+        );
     }
 
     @Test
