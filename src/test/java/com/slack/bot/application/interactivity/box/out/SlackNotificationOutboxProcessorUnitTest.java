@@ -69,6 +69,24 @@ class SlackNotificationOutboxProcessorUnitTest {
     }
 
     @Test
+    void markProcessing_선점에_실패하면_처리를_건너뛴다() {
+        // given
+        SlackNotificationOutbox pending = org.mockito.Mockito.mock(SlackNotificationOutbox.class);
+        given(pending.getId()).willReturn(10L);
+        given(slackNotificationOutboxRepository.findPending(10)).willReturn(List.of(pending));
+        given(slackNotificationOutboxRepository.markProcessingIfPending(eq(10L), any())).willReturn(false);
+
+        // when
+        slackNotificationOutboxProcessor.processPending(10);
+
+        // then
+        verify(slackNotificationOutboxRepository, never()).findById(any());
+        verify(slackNotificationOutboxRepository, never()).save(any());
+        verify(workspaceRepository, never()).findByTeamId(anyString());
+        verify(notificationTransportApiClient, never()).sendMessage(anyString(), anyString(), anyString());
+    }
+
+    @Test
     void 지원하지_않는_message_type이면_processPending에서_FAILED_마킹으로_처리한다() {
         // given
         SlackNotificationOutbox outbox = org.mockito.Mockito.mock(SlackNotificationOutbox.class);

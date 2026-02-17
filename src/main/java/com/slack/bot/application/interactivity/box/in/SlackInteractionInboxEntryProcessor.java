@@ -13,6 +13,7 @@ import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import java.time.Clock;
+import java.util.Optional;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,24 +58,38 @@ public class SlackInteractionInboxEntryProcessor {
             Consumer<JsonNode> consumer,
             SlackInteractionInboxType interactionType
     ) {
-        inbox.markProcessing();
-        slackInteractionInboxRepository.save(inbox);
+        Long inboxId = inbox.getId();
+        if (inboxId == null) {
+            return;
+        }
+
+        if (!slackInteractionInboxRepository.markProcessingIfPending(inboxId)) {
+            return;
+        }
+
+        Optional<SlackInteractionInbox> processingInbox = slackInteractionInboxRepository.findById(inboxId);
+        if (processingInbox.isEmpty()) {
+            log.warn("PROCESSING으로 전이된 inbox를 조회하지 못했습니다. inboxId={}", inboxId);
+            return;
+        }
+
+        SlackInteractionInbox claimedInbox = processingInbox.get();
 
         try {
-            JsonNode payload = objectMapper.readTree(inbox.getPayloadJson());
+            JsonNode payload = objectMapper.readTree(claimedInbox.getPayloadJson());
 
             slackInteractionInboxRetryTemplate.execute(context -> {
                 consumer.accept(payload);
                 return null;
             });
 
-            inbox.markProcessed(clock.instant());
-            slackInteractionInboxRepository.save(inbox);
+            claimedInbox.markProcessed(clock.instant());
+            slackInteractionInboxRepository.save(claimedInbox);
         } catch (Exception e) {
-            log.error("{} inbox 처리에 실패했습니다. inboxId={}", interactionType, inbox.getId(), e);
+            log.error("{} inbox 처리에 실패했습니다. inboxId={}", interactionType, claimedInbox.getId(), e);
 
-            markFailureStatus(inbox, e);
-            slackInteractionInboxRepository.save(inbox);
+            markFailureStatus(claimedInbox, e);
+            slackInteractionInboxRepository.save(claimedInbox);
         }
     }
 
