@@ -1,6 +1,9 @@
 package com.slack.bot.application;
 
 import com.slack.bot.application.event.handler.SlackEventHandlerRegistry;
+import com.slack.bot.application.interactivity.box.InteractivityImmediateProcessor;
+import com.slack.bot.application.interactivity.box.in.SlackInteractionInboxProcessor;
+import com.slack.bot.application.interactivity.box.out.OutboxIdempotencySourceContext;
 import com.slack.bot.application.interactivity.reservation.ReviewReservationCoordinator;
 import com.slack.bot.context.CleanupExecutionListener;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
@@ -33,7 +36,10 @@ import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventP
 @MockitoSpyBean(types = {
         Clock.class,
         ReviewInteractionEventPublisher.class,
-        ReviewReservationCoordinator.class
+        ReviewReservationCoordinator.class,
+        SlackInteractionInboxProcessor.class,
+        InteractivityImmediateProcessor.class,
+        OutboxIdempotencySourceContext.class
 })
 @TestExecutionListeners(listeners = CleanupExecutionListener.class, mergeMode = TestExecutionListeners.MergeMode.MERGE_WITH_DEFAULTS)
 public @interface IntegrationTest {
