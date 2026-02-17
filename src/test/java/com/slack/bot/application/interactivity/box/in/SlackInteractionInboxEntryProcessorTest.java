@@ -22,6 +22,7 @@ import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStat
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import com.slack.bot.infrastructure.interaction.persistence.box.in.JpaSlackInteractionInboxRepository;
+import java.time.Clock;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -53,6 +54,9 @@ class SlackInteractionInboxEntryProcessorTest {
 
     @Autowired
     ObjectMapper objectMapper;
+
+    @Autowired
+    Clock clock;
 
     @Test
     @Sql(scripts = {
@@ -174,7 +178,7 @@ class SlackInteractionInboxEntryProcessorTest {
                 "retry-first-attempt",
                 "{}"
         );
-        inbox.markProcessing();
+        inbox.markProcessing(clock.instant());
         Exception retryableException = new ResourceAccessException("temporary network failure");
 
         // when
@@ -195,8 +199,8 @@ class SlackInteractionInboxEntryProcessorTest {
                 "retry-max-attempt",
                 "{}"
         );
-        inbox.markProcessing();
-        inbox.markProcessing();
+        inbox.markProcessing(clock.instant());
+        inbox.markProcessing(clock.instant());
         Exception retryableException = new ResourceAccessException("temporary network failure");
 
         // when
@@ -217,7 +221,7 @@ class SlackInteractionInboxEntryProcessorTest {
                 "long-failure-reason",
                 "{}"
         );
-        inbox.markProcessing();
+        inbox.markProcessing(clock.instant());
         Exception nonRetryableException = new IllegalArgumentException("x".repeat(600));
 
         // when

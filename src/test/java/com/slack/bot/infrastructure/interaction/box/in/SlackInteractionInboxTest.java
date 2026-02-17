@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -40,14 +42,16 @@ class SlackInteractionInboxTest {
                 "key",
                 "{}"
         );
+        Clock fixedClock = Clock.fixed(Instant.parse("2026-02-15T00:00:00Z"), ZoneOffset.UTC);
 
         // when
-        inbox.markProcessing();
+        inbox.markProcessing(fixedClock.instant());
 
         // then
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSING),
-                () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1)
+                () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
+                () -> assertThat(inbox.getProcessingStartedAt()).isEqualTo(fixedClock.instant())
         );
     }
 

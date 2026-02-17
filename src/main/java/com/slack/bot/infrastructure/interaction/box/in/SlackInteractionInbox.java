@@ -61,10 +61,6 @@ public class SlackInteractionInbox extends BaseTimeEntity {
         this.processingAttempt = 0;
     }
 
-    public void markProcessing() {
-        markProcessing(Instant.now());
-    }
-
     public void markProcessing(Instant processingStartedAt) {
         Objects.requireNonNull(processingStartedAt, "processingStartedAt은 비어 있을 수 없습니다.");
 
