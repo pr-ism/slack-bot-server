@@ -1,7 +1,8 @@
 SET REFERENTIAL_INTEGRITY FALSE;
 
 TRUNCATE TABLE review_reminders;
-DELETE FROM review_reservation_interactions;
+TRUNCATE TABLE slack_interaction_inbox;
+TRUNCATE TABLE review_reservation_interactions;
 TRUNCATE TABLE review_reservations;
 TRUNCATE TABLE workspaces;
 TRUNCATE TABLE oauth_verification_states;
