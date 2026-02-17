@@ -160,7 +160,8 @@ class SlackInteractionInboxEntryProcessorTest {
         assertAll(
                 () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
                 () -> assertThat(actualInbox.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actualInbox.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT)
+                () -> assertThat(actualInbox.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT),
+                () -> assertThat(actualInbox.getFailureReason()).isNotBlank()
         );
     }
 
