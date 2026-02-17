@@ -11,6 +11,7 @@ import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import java.time.Clock;
+import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.retry.support.RetryTemplate;
@@ -51,7 +52,7 @@ public class SlackInteractionInboxEntryProcessor {
 
     private void process(
             SlackInteractionInbox inbox,
-            java.util.function.Consumer<JsonNode> consumer,
+            Consumer<JsonNode> consumer,
             SlackInteractionInboxType interactionType
     ) {
         inbox.markProcessing();
