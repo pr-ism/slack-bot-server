@@ -57,6 +57,10 @@ app:
       max-pool-size: 4
       thread-name-prefix: review-interaction-
       queue-capacity: 500
+  interactivity:
+    inbox:
+      block-actions:
+        worker-enabled: false
 
 review:
   notification:
