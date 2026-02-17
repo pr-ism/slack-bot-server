@@ -92,7 +92,33 @@ class SlackInteractionInboxTest {
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSING),
                 () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(inbox.getProcessingStartedAt()).isEqualTo(fixedClock.instant())
+                () -> assertThat(inbox.getProcessingStartedAt()).isEqualTo(fixedClock.instant()),
+                () -> assertThat(inbox.getFailedAt()).isNull(),
+                () -> assertThat(inbox.getFailureReason()).isNull(),
+                () -> assertThat(inbox.getFailureType()).isNull()
+        );
+    }
+
+    @Test
+    void markProcessing은_RETRY_PENDING에서_재진입하면_이전_실패정보를_초기화한다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+        inbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        inbox.markRetryPending(Instant.parse("2026-02-15T00:01:00Z"), "retry");
+
+        // when
+        inbox.markProcessing(Instant.parse("2026-02-15T00:02:00Z"));
+
+        // then
+        assertAll(
+                () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSING),
+                () -> assertThat(inbox.getFailedAt()).isNull(),
+                () -> assertThat(inbox.getFailureReason()).isNull(),
+                () -> assertThat(inbox.getFailureType()).isNull()
         );
     }
 
@@ -114,7 +140,8 @@ class SlackInteractionInboxTest {
         // then
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
-                () -> assertThat(inbox.getProcessedAt()).isEqualTo(processedAt)
+                () -> assertThat(inbox.getProcessedAt()).isEqualTo(processedAt),
+                () -> assertThat(inbox.getProcessingStartedAt()).isNull()
         );
     }
 
@@ -161,7 +188,8 @@ class SlackInteractionInboxTest {
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
                 () -> assertThat(inbox.getFailedAt()).isEqualTo(failedAt),
-                () -> assertThat(inbox.getFailureReason()).isEqualTo("retry")
+                () -> assertThat(inbox.getFailureReason()).isEqualTo("retry"),
+                () -> assertThat(inbox.getFailureType()).isNull()
         );
     }
 
