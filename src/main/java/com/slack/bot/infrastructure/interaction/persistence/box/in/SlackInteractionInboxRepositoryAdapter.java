@@ -22,6 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionInboxRepository {
 
+    private static final List<SlackInteractionInboxStatus> PROCESSING_CLAIMABLE_STATUSES = List.of(
+            SlackInteractionInboxStatus.PENDING,
+            SlackInteractionInboxStatus.RETRY_PENDING
+    );
+
     private final JPAQueryFactory queryFactory;
     private final JpaSlackInteractionInboxRepository repository;
     private final MysqlDuplicateKeyDetector mysqlDuplicateKeyDetector;
@@ -48,16 +53,11 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
             return Collections.emptyList();
         }
 
-        List<SlackInteractionInboxStatus> retryableStatuses = List.of(
-                SlackInteractionInboxStatus.PENDING,
-                SlackInteractionInboxStatus.RETRY_PENDING
-        );
-
         return queryFactory
                 .selectFrom(slackInteractionInbox)
                 .where(
                         slackInteractionInbox.interactionType.eq(interactionType),
-                        slackInteractionInbox.status.in(retryableStatuses)
+                        slackInteractionInbox.status.in(PROCESSING_CLAIMABLE_STATUSES)
                 )
                 .orderBy(slackInteractionInbox.id.asc())
                 .limit(limit)
@@ -73,7 +73,13 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
     @Override
     @Transactional
     public boolean markProcessingIfPending(Long inboxId, Instant processingStartedAt) {
-        long updatedCount = queryFactory
+        long updatedCount = markAsProcessingWhenClaimable(inboxId, processingStartedAt);
+
+        return updatedCount > 0;
+    }
+
+    private long markAsProcessingWhenClaimable(Long inboxId, Instant processingStartedAt) {
+        return queryFactory
                 .update(slackInteractionInbox)
                 .set(slackInteractionInbox.status, SlackInteractionInboxStatus.PROCESSING)
                 .set(slackInteractionInbox.processingAttempt, slackInteractionInbox.processingAttempt.add(1))
@@ -83,14 +89,9 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                 .set(slackInteractionInbox.failureType, (SlackInteractivityFailureType) null)
                 .where(
                         slackInteractionInbox.id.eq(inboxId),
-                        slackInteractionInbox.status.in(
-                                SlackInteractionInboxStatus.PENDING,
-                                SlackInteractionInboxStatus.RETRY_PENDING
-                        )
+                        slackInteractionInbox.status.in(PROCESSING_CLAIMABLE_STATUSES)
                 )
                 .execute();
-
-        return updatedCount > 0;
     }
 
     @Override
