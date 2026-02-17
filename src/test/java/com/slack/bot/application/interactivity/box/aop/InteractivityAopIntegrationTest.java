@@ -16,6 +16,7 @@ import com.slack.bot.application.interactivity.BlockActionInteractionService;
 import com.slack.bot.application.interactivity.box.InteractivityImmediateProcessor;
 import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyKeyGenerator;
 import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyScope;
+import com.slack.bot.application.interactivity.box.aop.exception.BlockActionAopProceedException;
 import com.slack.bot.application.interactivity.box.in.SlackInteractionInboxEntryProcessor;
 import com.slack.bot.application.interactivity.box.in.SlackInteractionInboxProcessor;
 import com.slack.bot.application.interactivity.box.out.OutboxIdempotencySourceContext;
@@ -29,13 +30,18 @@ import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import com.slack.bot.infrastructure.interaction.persistence.box.in.JpaSlackInteractionInboxRepository;
 import com.slack.bot.infrastructure.interaction.persistence.box.out.JpaSlackNotificationOutboxRepository;
+import java.io.IOException;
 import java.util.List;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.boot.test.context.TestConfiguration;
 
 @IntegrationTest
+@Import(InteractivityAopIntegrationTest.AopFailureProbeConfig.class)
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class InteractivityAopIntegrationTest {
@@ -75,6 +81,12 @@ class InteractivityAopIntegrationTest {
 
     @Autowired
     ObjectMapper objectMapper;
+
+    @Autowired
+    BlockActionAopFailureProbe blockActionAopFailureProbe;
+
+    @Autowired
+    ViewSubmissionAopFailureProbe viewSubmissionAopFailureProbe;
 
     @Test
     void block_action_핸들_호출시_AOP가_inbox_enqueue를_위임한다() {
@@ -353,6 +365,44 @@ class InteractivityAopIntegrationTest {
     }
 
     @Test
+    void block_action_enqueue_AOP는_인박스_컨텍스트_진행중_체크예외를_custom_exception으로_래핑한다() {
+        // given
+        JsonNode payload = objectMapper.createObjectNode();
+
+        // when & then
+        assertThatThrownBy(() -> outboxIdempotencySourceContext.withInboxSource(1L, () -> {
+            blockActionAopFailureProbe.throwChecked(payload);
+        }))
+                .isInstanceOf(BlockActionAopProceedException.class)
+                .hasMessageContaining("stage=INBOX_SOURCE_BOUND")
+                .hasCauseInstanceOf(IOException.class);
+    }
+
+    @Test
+    void block_action_enqueue_AOP는_인박스_컨텍스트_진행중_런타임예외를_그대로_전파한다() {
+        // given
+        JsonNode payload = objectMapper.createObjectNode();
+
+        // when & then
+        assertThatThrownBy(() -> outboxIdempotencySourceContext.withInboxSource(1L, () -> {
+            blockActionAopFailureProbe.throwRuntime(payload);
+        }))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("runtime-failure");
+    }
+
+    @Test
+    void view_submission_enqueue_AOP는_반환타입이_규약과_다르면_예외를_던진다() {
+        // given
+        JsonNode payload = objectMapper.createObjectNode();
+
+        // when & then
+        assertThatThrownBy(() -> viewSubmissionAopFailureProbe.invalidReturn(payload))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("view_submission enqueue AOP 대상 메서드는 ViewSubmissionSyncResultDto를 반환해야 합니다.");
+    }
+
+    @Test
     void bind_inbox_source_AOP는_block_actions_처리시에_inbox_source를_바인딩한다() {
         // given
         SlackInteractionInbox inbox = savePendingInbox(SlackInteractionInboxType.BLOCK_ACTIONS, "{}");
@@ -434,5 +484,49 @@ class InteractivityAopIntegrationTest {
         }
 
         return value;
+    }
+
+    @TestConfiguration
+    static class AopFailureProbeConfig {
+
+        @Bean
+        BlockActionAopFailureProbe blockActionAopFailureProbe() {
+            return new BlockActionAopFailureProbe();
+        }
+
+        @Bean
+        ViewSubmissionAopFailureProbe viewSubmissionAopFailureProbe() {
+            return new ViewSubmissionAopFailureProbe();
+        }
+    }
+
+    static class BlockActionAopFailureProbe {
+
+        @EnqueueBlockActionInInbox
+        public void throwChecked(JsonNode payload) {
+            throwCheckedIOException();
+        }
+
+        @EnqueueBlockActionInInbox
+        public void throwRuntime(JsonNode payload) {
+            throw new IllegalStateException("runtime-failure");
+        }
+
+        private void throwCheckedIOException() {
+            sneakyThrow(new IOException("checked-failure"));
+        }
+
+        @SuppressWarnings("unchecked")
+        private static <E extends Throwable> void sneakyThrow(Throwable throwable) throws E {
+            throw (E) throwable;
+        }
+    }
+
+    static class ViewSubmissionAopFailureProbe {
+
+        @EnqueueViewSubmissionInInbox
+        public String invalidReturn(JsonNode payload) {
+            return "invalid-return";
+        }
     }
 }

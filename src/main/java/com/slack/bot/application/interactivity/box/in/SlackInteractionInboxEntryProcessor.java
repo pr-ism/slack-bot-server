@@ -3,9 +3,9 @@ package com.slack.bot.application.interactivity.box.in;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interactivity.BlockActionInteractionService;
+import com.slack.bot.application.interactivity.view.ViewSubmissionInteractionService;
 import com.slack.bot.application.interactivity.box.aop.BindInboxToOutboxSource;
 import com.slack.bot.application.interactivity.box.retry.InteractivityRetryExceptionClassifier;
-import com.slack.bot.application.interactivity.view.ViewSubmissionRouter;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
@@ -25,9 +25,9 @@ public class SlackInteractionInboxEntryProcessor {
 
     private final Clock clock;
     private final ObjectMapper objectMapper;
-    private final ViewSubmissionRouter viewSubmissionRouter;
-    private final RetryTemplate slackInteractionInboxRetryTemplate;
     private final BlockActionInteractionService blockActionInteractionService;
+    private final ViewSubmissionInteractionService viewSubmissionInteractionService;
+    private final RetryTemplate slackInteractionInboxRetryTemplate;
     private final InteractivityRetryExceptionClassifier retryExceptionClassifier;
     private final SlackInteractionInboxRepository slackInteractionInboxRepository;
 
@@ -44,7 +44,7 @@ public class SlackInteractionInboxEntryProcessor {
     public void processViewSubmission(SlackInteractionInbox inbox) {
         process(
                 inbox,
-                payload -> viewSubmissionRouter.handle(payload),
+                payload -> viewSubmissionInteractionService.handleEnqueued(payload),
                 SlackInteractionInboxType.VIEW_SUBMISSION
         );
     }

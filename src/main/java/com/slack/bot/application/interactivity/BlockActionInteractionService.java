@@ -19,10 +19,6 @@ public class BlockActionInteractionService {
 
     @EnqueueBlockActionInInbox
     public void handle(JsonNode payload) {
-        handleEnqueued(payload);
-    }
-
-    public void handleEnqueued(JsonNode payload) {
         blockActionRouter.route(payload)
                          .ifPresent(result -> processResult(result));
     }

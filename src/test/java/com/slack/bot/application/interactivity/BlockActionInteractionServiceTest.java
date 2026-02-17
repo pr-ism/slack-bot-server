@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -120,7 +120,7 @@ class BlockActionInteractionServiceTest {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
             "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
     })
-    void block_action_핸들_호출은_AOP로_인박스에_enqueue된_항목이_즉시_소진되고_예약상태는_유지된다() {
+    void block_action_핸들_호출은_AOP로_인박스에_enqueue된_항목이_즉시_처리된다() {
         // given
         given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U1"))
                 .willReturn("D-REVIEWER");
@@ -136,12 +136,12 @@ class BlockActionInteractionServiceTest {
         // then
         assertAll(
                 () -> assertThat(pendingsAfterImmediate).isEmpty(),
-                () -> verify(notificationApiClient, never()).openDirectMessageChannel(any(), any()),
+                () -> verify(notificationApiClient, times(1)).openDirectMessageChannel("xoxb-test-token", "U1"),
                 () -> assertThat(reviewReservationRepository.findById(100L))
                         .isPresent()
                         .get()
                         .extracting(reservation -> reservation.getStatus())
-                        .isEqualTo(ReservationStatus.ACTIVE)
+                        .isEqualTo(ReservationStatus.CANCELLED)
         );
 
         // when
@@ -149,13 +149,22 @@ class BlockActionInteractionServiceTest {
 
         // then
         assertAll(
-                () -> verify(notificationApiClient, never()).openDirectMessageChannel(any(), any()),
+                () -> verify(notificationApiClient, times(1)).openDirectMessageChannel("xoxb-test-token", "U1"),
                 () -> assertThat(reviewReservationRepository.findById(100L))
                         .isPresent()
                         .get()
                         .extracting(reservation -> reservation.getStatus())
-                        .isEqualTo(ReservationStatus.ACTIVE)
+                        .isEqualTo(ReservationStatus.CANCELLED)
         );
+    }
+
+    @Test
+    void handle_타깃_객체_직접_호출은_예외없이_종료된다() {
+        // when
+        targetService().handle(objectMapper.createObjectNode());
+
+        // then
+        assertThat(slackInteractionInboxRepository.findPending(SlackInteractionInboxType.BLOCK_ACTIONS, 10)).isEmpty();
     }
 
     private JsonNode openReviewSchedulerPayload(String metaJson) {
