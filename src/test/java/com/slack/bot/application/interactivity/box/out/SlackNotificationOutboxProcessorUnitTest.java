@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -16,6 +17,7 @@ import com.slack.bot.global.config.properties.InteractivityRetryProperties;
 import com.slack.bot.global.config.properties.InteractivityWorkerProperties;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
+import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.domain.workspace.Workspace;
@@ -133,5 +135,37 @@ class SlackNotificationOutboxProcessorUnitTest {
         verify(slackNotificationOutboxRepository, never()).save(any());
         verify(workspaceRepository, never()).findByTeamId(anyString());
         verify(notificationTransportApiClient, never()).sendMessage(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void 예외메시지가_null이면_unknown_failure로_저장된다() {
+        // given
+        SlackNotificationOutbox outbox = org.mockito.Mockito.mock(SlackNotificationOutbox.class);
+        given(outbox.getId()).willReturn(10L);
+        given(outbox.getMessageType()).willReturn(SlackNotificationOutboxMessageType.CHANNEL_TEXT);
+        given(outbox.getTeamId()).willReturn("T1");
+        given(outbox.getChannelId()).willReturn("C1");
+        given(outbox.getText()).willReturn("hello");
+
+        Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
+        given(workspace.getAccessToken()).willReturn("xoxb-test-token");
+        given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.of(workspace));
+        given(slackNotificationOutboxRepository.findPending(10)).willReturn(List.of(outbox));
+        given(slackNotificationOutboxRepository.markProcessingIfPending(eq(10L), any())).willReturn(true);
+        given(slackNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(outbox));
+
+        RuntimeException noMessageException = new RuntimeException();
+        willThrow(noMessageException)
+                .given(notificationTransportApiClient)
+                .sendMessage("xoxb-test-token", "C1", "hello");
+
+        // when
+        slackNotificationOutboxProcessor.processPending(10);
+
+        // then
+        ArgumentCaptor<String> reasonCaptor = ArgumentCaptor.forClass(String.class);
+        verify(outbox).markFailed(any(), reasonCaptor.capture(), eq(SlackInteractivityFailureType.BUSINESS_INVARIANT));
+        verify(slackNotificationOutboxRepository).save(outbox);
+        assertThat(reasonCaptor.getValue()).isEqualTo("unknown failure");
     }
 }

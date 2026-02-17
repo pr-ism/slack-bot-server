@@ -31,6 +31,7 @@ public class SlackNotificationOutboxProcessor {
 
     private static final String PROCESSING_TIMEOUT_FAILURE_REASON =
             "PROCESSING 타임아웃으로 재시도 대기 상태로 복구되었습니다.";
+    private static final String UNKNOWN_FAILURE_REASON = "unknown failure";
 
     private final Clock clock;
     private final ObjectMapper objectMapper;
@@ -152,7 +153,7 @@ public class SlackNotificationOutboxProcessor {
     }
 
     private void markFailureStatus(SlackNotificationOutbox outbox, Exception exception) {
-        String reason = failureReasonTruncator.truncate(exception.getMessage());
+        String reason = resolveFailureReason(exception);
 
         if (!retryExceptionClassifier.isRetryable(exception)) {
             outbox.markFailed(clock.instant(), reason, SlackInteractivityFailureType.BUSINESS_INVARIANT);
@@ -165,5 +166,14 @@ public class SlackNotificationOutboxProcessor {
         }
 
         outbox.markFailed(clock.instant(), reason, SlackInteractivityFailureType.RETRY_EXHAUSTED);
+    }
+
+    private String resolveFailureReason(Exception exception) {
+        String reason = failureReasonTruncator.truncate(exception.getMessage());
+        if (reason == null || reason.isBlank()) {
+            return UNKNOWN_FAILURE_REASON;
+        }
+
+        return reason;
     }
 }
