@@ -91,7 +91,7 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
     @Override
     @Transactional
     public int recoverTimeoutProcessing(Instant processingStartedBefore, Instant failedAt, String failureReason) {
-        return (int) queryFactory
+        return Math.toIntExact(queryFactory
                 .update(slackNotificationOutbox)
                 .set(slackNotificationOutbox.status, SlackNotificationOutboxStatus.RETRY_PENDING)
                 .set(slackNotificationOutbox.processingStartedAt, (Instant) null)
@@ -105,6 +105,6 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                                                                           processingStartedBefore
                                                                   ))
                 )
-                .execute();
+                .execute());
     }
 }

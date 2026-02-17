@@ -101,7 +101,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
             Instant failedAt,
             String failureReason
     ) {
-        return (int) queryFactory
+        return Math.toIntExact(queryFactory
                 .update(slackInteractionInbox)
                 .set(slackInteractionInbox.status, SlackInteractionInboxStatus.RETRY_PENDING)
                 .set(slackInteractionInbox.processingStartedAt, (Instant) null)
@@ -116,7 +116,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                                                                      processingStartedBefore
                                                              ))
                 )
-                .execute();
+                .execute());
     }
 
     @Override
