@@ -33,6 +33,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.retry.backoff.ExponentialBackOffPolicy;
+import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
 
 @SuppressWarnings("NonAsciiCharacters")
@@ -57,19 +59,41 @@ class SlackNotificationOutboxProcessorUnitTest {
                 new InteractivityRetryProperties.Retry(2, 100, 2.0, 1000),
                 new InteractivityRetryProperties.Retry(2, 100, 2.0, 1000)
         );
+        InteractivityRetryExceptionClassifier classifier = InteractivityRetryExceptionClassifier.create();
 
         slackNotificationOutboxProcessor = new SlackNotificationOutboxProcessor(
                 Clock.systemUTC(),
                 new ObjectMapper(),
-                new RetryTemplate(),
+                createOutboxRetryTemplate(retryProperties, classifier),
                 notificationTransportApiClient,
                 slackNotificationOutboxRepository,
                 new InteractivityWorkerProperties(),
                 retryProperties,
                 new InteractivityFailureReasonTruncator(),
-                InteractivityRetryExceptionClassifier.create(),
+                classifier,
                 workspaceRepository
         );
+    }
+
+    private RetryTemplate createOutboxRetryTemplate(
+            InteractivityRetryProperties retryProperties,
+            InteractivityRetryExceptionClassifier classifier
+    ) {
+        RetryTemplate retryTemplate = new RetryTemplate();
+        retryTemplate.setRetryPolicy(new SimpleRetryPolicy(
+                retryProperties.outbox().maxAttempts(),
+                classifier.getRetryableExceptions(),
+                true,
+                false
+        ));
+
+        ExponentialBackOffPolicy backOffPolicy = new ExponentialBackOffPolicy();
+        backOffPolicy.setInitialInterval(retryProperties.outbox().initialDelayMs());
+        backOffPolicy.setMultiplier(retryProperties.outbox().multiplier());
+        backOffPolicy.setMaxInterval(retryProperties.outbox().maxDelayMs());
+        retryTemplate.setBackOffPolicy(backOffPolicy);
+
+        return retryTemplate;
     }
 
     @Test
@@ -135,6 +159,33 @@ class SlackNotificationOutboxProcessorUnitTest {
         verify(slackNotificationOutboxRepository, never()).save(any());
         verify(workspaceRepository, never()).findByTeamId(anyString());
         verify(notificationTransportApiClient, never()).sendMessage(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void CHANNEL_TEXT_정상처리시_전송후_SENT로_저장된다() {
+        // given
+        SlackNotificationOutbox outbox = org.mockito.Mockito.mock(SlackNotificationOutbox.class);
+        given(outbox.getId()).willReturn(10L);
+        given(outbox.getMessageType()).willReturn(SlackNotificationOutboxMessageType.CHANNEL_TEXT);
+        given(outbox.getTeamId()).willReturn("T1");
+        given(outbox.getChannelId()).willReturn("C1");
+        given(outbox.getText()).willReturn("hello");
+
+        Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
+        given(workspace.getAccessToken()).willReturn("xoxb-test-token");
+        given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.of(workspace));
+        given(slackNotificationOutboxRepository.findPending(10)).willReturn(List.of(outbox));
+        given(slackNotificationOutboxRepository.markProcessingIfPending(eq(10L), any())).willReturn(true);
+        given(slackNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(outbox));
+
+        // when
+        slackNotificationOutboxProcessor.processPending(10);
+
+        // then
+        verify(notificationTransportApiClient).sendMessage("xoxb-test-token", "C1", "hello");
+        verify(outbox).markSent(any());
+        verify(slackNotificationOutboxRepository).save(outbox);
+        verify(outbox, never()).markFailed(any(), anyString(), any());
     }
 
     @Test
