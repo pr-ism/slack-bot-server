@@ -158,7 +158,10 @@ class SlackNotificationOutboxProcessorTest {
                 () -> assertThat(firstFailed.getProcessingAttempt()).isEqualTo(1),
                 () -> assertThat(secondFailed.getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED),
                 () -> assertThat(secondFailed.getProcessingAttempt()).isEqualTo(2),
-                () -> assertThat(secondFailed.getFailureType()).isEqualTo(SlackInteractivityFailureType.RETRY_EXHAUSTED)
+                () -> assertThat(secondFailed.getFailureType()).isEqualTo(SlackInteractivityFailureType.RETRY_EXHAUSTED),
+                () -> assertThat(secondFailed.getFailureReason()).isNotNull(),
+                () -> assertThat(secondFailed.getFailureReason()).hasSize(500),
+                () -> assertThat(secondFailed.getFailureReason()).isEqualTo("x".repeat(500))
         );
     }
 
