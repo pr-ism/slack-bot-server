@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.retry.backoff.ExponentialRandomBackOffPolicy;
+import org.springframework.retry.backoff.NoBackOffPolicy;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.web.client.ResourceAccessException;
@@ -84,12 +84,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
                 true,
                 false
         ));
-
-        ExponentialRandomBackOffPolicy backOffPolicy = new ExponentialRandomBackOffPolicy();
-        backOffPolicy.setInitialInterval(retryProperties.inbox().initialDelayMs());
-        backOffPolicy.setMultiplier(retryProperties.inbox().multiplier());
-        backOffPolicy.setMaxInterval(retryProperties.inbox().maxDelayMs());
-        retryTemplate.setBackOffPolicy(backOffPolicy);
+        retryTemplate.setBackOffPolicy(new NoBackOffPolicy());
 
         return retryTemplate;
     }
@@ -124,6 +119,35 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         // then
         verify(slackInteractionInboxRepository, never()).save(any());
         verify(blockActionInteractionService, never()).handle(any());
+    }
+
+    @Test
+    void block_action_정상처리시_handle이_호출되고_PROCESSED로_저장된다() {
+        // given
+        SlackInteractionInbox pending = org.mockito.Mockito.mock(SlackInteractionInbox.class);
+        given(pending.getId()).willReturn(11L);
+
+        SlackInteractionInbox processingInbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "block-action-success",
+                "{}"
+        );
+        processingInbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+
+        given(slackInteractionInboxRepository.markProcessingIfPending(eq(11L), any())).willReturn(true);
+        given(slackInteractionInboxRepository.findById(11L)).willReturn(Optional.of(processingInbox));
+
+        // when
+        slackInteractionInboxEntryProcessor.processBlockAction(pending);
+
+        // then
+        assertAll(
+                () -> assertThat(processingInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
+                () -> assertThat(processingInbox.getProcessingAttempt()).isEqualTo(1),
+                () -> verify(blockActionInteractionService).handle(any()),
+                () -> verify(viewSubmissionInteractionService, never()).handleEnqueued(any()),
+                () -> verify(slackInteractionInboxRepository).save(processingInbox)
+        );
     }
 
     @Test
