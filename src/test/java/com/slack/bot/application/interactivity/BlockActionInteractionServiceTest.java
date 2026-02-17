@@ -120,7 +120,7 @@ class BlockActionInteractionServiceTest {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
             "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
     })
-    void block_action_핸들_호출은_AOP로_인박스에_enqueue되고_워커_처리후에도_예약상태는_유지된다() {
+    void block_action_핸들_호출은_AOP로_인박스에_enqueue된_항목이_즉시_소진되고_예약상태는_유지된다() {
         // given
         given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U1"))
                 .willReturn("D-REVIEWER");
@@ -128,14 +128,14 @@ class BlockActionInteractionServiceTest {
 
         // when
         blockActionInteractionService.handle(payload);
-        List<SlackInteractionInbox> pendings = slackInteractionInboxRepository.findPending(
+        List<SlackInteractionInbox> pendingsAfterImmediate = slackInteractionInboxRepository.findPending(
                 SlackInteractionInboxType.BLOCK_ACTIONS,
                 10
         );
 
         // then
         assertAll(
-                () -> assertThat(pendings).hasSize(1),
+                () -> assertThat(pendingsAfterImmediate).isEmpty(),
                 () -> verify(notificationApiClient, never()).openDirectMessageChannel(any(), any()),
                 () -> assertThat(reviewReservationRepository.findById(100L))
                         .isPresent()

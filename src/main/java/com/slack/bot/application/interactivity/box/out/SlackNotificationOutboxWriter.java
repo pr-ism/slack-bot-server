@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyKeyGenerator;
 import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyScope;
+import com.slack.bot.application.interactivity.box.aop.InteractivityImmediateTriggerTarget;
 import com.slack.bot.application.interactivity.box.aop.ResolveOutboxSource;
+import com.slack.bot.application.interactivity.box.aop.TriggerInteractivityImmediateProcessing;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
@@ -20,6 +22,7 @@ public class SlackNotificationOutboxWriter {
     private final SlackInteractionIdempotencyKeyGenerator idempotencyKeyGenerator;
 
     @ResolveOutboxSource
+    @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
     public void enqueueEphemeralText(String sourceKey, String token, String channelId, String userId, String text) {
         enqueue(
                 sourceKey,
@@ -34,6 +37,7 @@ public class SlackNotificationOutboxWriter {
     }
 
     @ResolveOutboxSource
+    @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
     public void enqueueEphemeralBlocks(
             String sourceKey,
             String token,
@@ -55,6 +59,7 @@ public class SlackNotificationOutboxWriter {
     }
 
     @ResolveOutboxSource
+    @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
     public void enqueueChannelText(String sourceKey, String token, String channelId, String text) {
         enqueue(
                 sourceKey,
@@ -69,6 +74,7 @@ public class SlackNotificationOutboxWriter {
     }
 
     @ResolveOutboxSource
+    @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
     public void enqueueChannelBlocks(String sourceKey, String token, String channelId, Object blocks,
             String fallbackText) {
         enqueue(

@@ -2,6 +2,8 @@ package com.slack.bot.application.interactivity.box.in;
 
 import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyKeyGenerator;
 import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyScope;
+import com.slack.bot.application.interactivity.box.aop.InteractivityImmediateTriggerTarget;
+import com.slack.bot.application.interactivity.box.aop.TriggerInteractivityImmediateProcessing;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
@@ -17,8 +19,15 @@ public class SlackInteractionInboxProcessor {
     private final SlackInteractionIdempotencyKeyGenerator idempotencyKeyGenerator;
     private final SlackInteractionInboxEntryProcessor slackInteractionInboxEntryProcessor;
 
+    @TriggerInteractivityImmediateProcessing(
+            value = InteractivityImmediateTriggerTarget.BLOCK_ACTION_INBOX,
+            onlyWhenEnqueued = true
+    )
     public boolean enqueueBlockAction(String payloadJson) {
-        String idempotencyKey = idempotencyKeyGenerator.generate(SlackInteractionIdempotencyScope.BLOCK_ACTIONS, payloadJson);
+        String idempotencyKey = idempotencyKeyGenerator.generate(
+                SlackInteractionIdempotencyScope.BLOCK_ACTIONS,
+                payloadJson
+        );
 
         return slackInteractionInboxRepository.enqueue(
                 SlackInteractionInboxType.BLOCK_ACTIONS,
@@ -38,8 +47,16 @@ public class SlackInteractionInboxProcessor {
         }
     }
 
+    @TriggerInteractivityImmediateProcessing(
+            value = InteractivityImmediateTriggerTarget.VIEW_SUBMISSION_INBOX,
+            onlyWhenEnqueued = true
+    )
     public boolean enqueueViewSubmission(String payloadJson) {
-        String idempotencyKey = idempotencyKeyGenerator.generate(SlackInteractionIdempotencyScope.VIEW_SUBMISSION, payloadJson);
+        String idempotencyKey = idempotencyKeyGenerator.generate(
+                SlackInteractionIdempotencyScope.VIEW_SUBMISSION,
+                payloadJson
+        );
+
         return slackInteractionInboxRepository.enqueue(
                 SlackInteractionInboxType.VIEW_SUBMISSION,
                 idempotencyKey,
