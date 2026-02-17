@@ -1,10 +1,12 @@
 package com.slack.bot.application.interactivity.box.out;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.IntegrationTest;
+import com.slack.bot.application.interactivity.box.out.exception.SlackBlocksSerializationException;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
@@ -14,6 +16,7 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.util.AopTestUtils;
 
 @IntegrationTest
 @SuppressWarnings("NonAsciiCharacters")
@@ -39,7 +42,7 @@ class SlackNotificationOutboxWriterTest {
         String text = "hello";
 
         // when
-        slackNotificationOutboxWriter.enqueueEphemeralText(sourceKey, token, channelId, userId, text);
+        targetWriter().enqueueEphemeralText(sourceKey, token, channelId, userId, text);
 
         // then
         List<SlackNotificationOutbox> pendings = slackNotificationOutboxRepository.findPending(10);
@@ -69,7 +72,7 @@ class SlackNotificationOutboxWriterTest {
         String fallbackText = "fallback";
 
         // when
-        slackNotificationOutboxWriter.enqueueEphemeralBlocks(sourceKey, token, channelId, userId, blocks, fallbackText);
+        targetWriter().enqueueEphemeralBlocks(sourceKey, token, channelId, userId, blocks, fallbackText);
 
         // then
         List<SlackNotificationOutbox> pendings = slackNotificationOutboxRepository.findPending(10);
@@ -98,7 +101,7 @@ class SlackNotificationOutboxWriterTest {
         String text = "hello channel";
 
         // when
-        slackNotificationOutboxWriter.enqueueChannelText(sourceKey, token, channelId, text);
+        targetWriter().enqueueChannelText(sourceKey, token, channelId, text);
 
         // then
         List<SlackNotificationOutbox> pendings = slackNotificationOutboxRepository.findPending(10);
@@ -127,7 +130,7 @@ class SlackNotificationOutboxWriterTest {
         String fallbackText = "fallback";
 
         // when
-        slackNotificationOutboxWriter.enqueueChannelBlocks(sourceKey, token, channelId, blocks, fallbackText);
+        targetWriter().enqueueChannelBlocks(sourceKey, token, channelId, blocks, fallbackText);
 
         // then
         List<SlackNotificationOutbox> pendings = slackNotificationOutboxRepository.findPending(10);
@@ -148,6 +151,54 @@ class SlackNotificationOutboxWriterTest {
     }
 
     @Test
+    void 블록_문자열_JSON을_전달하면_이중_직렬화하지않고_그대로_enqueue한다() {
+        // given
+        String sourceKey = "EVENT-STRING-BLOCKS";
+        String token = "xoxb-token";
+        String channelId = "C1";
+        String blocks = "[]";
+        String fallbackText = "fallback";
+
+        // when
+        targetWriter().enqueueChannelBlocks(sourceKey, token, channelId, blocks, fallbackText);
+
+        // then
+        List<SlackNotificationOutbox> pendings = slackNotificationOutboxRepository.findPending(10);
+
+        assertThat(pendings).hasSize(1);
+
+        SlackNotificationOutbox actual = pendings.getFirst();
+
+        assertAll(
+                () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.CHANNEL_BLOCKS),
+                () -> assertThat(actual.getBlocksJson()).isEqualTo("[]"),
+                () -> assertThat(actual.getFallbackText()).isEqualTo(fallbackText)
+        );
+    }
+
+    @Test
+    void 블록_문자열이_유효한_JSON이_아니면_custom_exception을_던지고_enqueue하지않는다() {
+        // given
+        String sourceKey = "EVENT-INVALID-BLOCKS";
+        String token = "xoxb-token";
+        String channelId = "C1";
+        String invalidBlocks = "not-json";
+
+        // when & then
+        assertThatThrownBy(() -> targetWriter().enqueueChannelBlocks(
+                sourceKey,
+                token,
+                channelId,
+                invalidBlocks,
+                "fallback"
+        ))
+                .isInstanceOf(SlackBlocksSerializationException.class)
+                .hasMessage("blocks JSON 직렬화에 실패했습니다.");
+
+        assertThat(slackNotificationOutboxRepository.findPending(10)).isEmpty();
+    }
+
+    @Test
     void 동일한_요청은_멱등성이_보장되어_중복_enqueue되지_않는다() {
         // given
         String sourceKey = "EVENT-IDEMPOTENT";
@@ -156,11 +207,15 @@ class SlackNotificationOutboxWriterTest {
         String text = "hello";
 
         // when
-        slackNotificationOutboxWriter.enqueueChannelText(sourceKey, token, channelId, text);
-        slackNotificationOutboxWriter.enqueueChannelText(sourceKey, token, channelId, text);
+        targetWriter().enqueueChannelText(sourceKey, token, channelId, text);
+        targetWriter().enqueueChannelText(sourceKey, token, channelId, text);
 
         // then
         List<SlackNotificationOutbox> pendings = slackNotificationOutboxRepository.findPending(10);
         assertThat(pendings).hasSize(1);
+    }
+
+    private SlackNotificationOutboxWriter targetWriter() {
+        return AopTestUtils.getTargetObject(slackNotificationOutboxWriter);
     }
 }

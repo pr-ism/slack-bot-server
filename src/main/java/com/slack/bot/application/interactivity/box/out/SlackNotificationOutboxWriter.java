@@ -1,5 +1,6 @@
 package com.slack.bot.application.interactivity.box.out;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyKeyGenerator;
@@ -7,6 +8,7 @@ import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencySc
 import com.slack.bot.application.interactivity.box.aop.InteractivityImmediateTriggerTarget;
 import com.slack.bot.application.interactivity.box.aop.ResolveOutboxSource;
 import com.slack.bot.application.interactivity.box.aop.TriggerInteractivityImmediateProcessing;
+import com.slack.bot.application.interactivity.box.out.exception.SlackBlocksSerializationException;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
@@ -53,7 +55,7 @@ public class SlackNotificationOutboxWriter {
                 channelId,
                 userId,
                 null,
-                objectMapper.valueToTree(blocks).toString(),
+                serializeBlocks(blocks),
                 fallbackText
         );
     }
@@ -84,9 +86,29 @@ public class SlackNotificationOutboxWriter {
                 channelId,
                 null,
                 null,
-                objectMapper.valueToTree(blocks).toString(),
+                serializeBlocks(blocks),
                 fallbackText
         );
+    }
+
+    private String serializeBlocks(Object blocks) {
+        if (blocks == null) {
+            return null;
+        }
+
+        if (blocks instanceof String blocksJson) {
+            return normalizeBlocksJson(blocksJson);
+        }
+
+        return objectMapper.valueToTree(blocks).toString();
+    }
+
+    private String normalizeBlocksJson(String blocksJson) {
+        try {
+            return objectMapper.readTree(blocksJson).toString();
+        } catch (JsonProcessingException exception) {
+            throw new SlackBlocksSerializationException("blocks JSON 직렬화에 실패했습니다.", exception);
+        }
     }
 
     private void enqueue(
