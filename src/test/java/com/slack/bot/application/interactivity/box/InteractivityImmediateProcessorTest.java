@@ -38,7 +38,10 @@ class InteractivityImmediateProcessorTest {
                 slackNotificationOutboxProcessor
         );
 
-        TransactionSynchronizationManager.clear();
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+        TransactionSynchronizationManager.setActualTransactionActive(false);
     }
 
     @Test
