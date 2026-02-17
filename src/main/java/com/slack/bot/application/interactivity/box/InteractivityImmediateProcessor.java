@@ -4,6 +4,7 @@ import com.slack.bot.application.interactivity.box.in.SlackInteractionInboxProce
 import com.slack.bot.application.interactivity.box.out.SlackNotificationOutboxProcessor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -15,6 +16,7 @@ public class InteractivityImmediateProcessor {
 
     private static final int IMMEDIATE_BATCH_SIZE = 1;
 
+    private final TaskExecutor reviewInteractionExecutor;
     private final SlackInteractionInboxProcessor slackInteractionInboxProcessor;
     private final SlackNotificationOutboxProcessor slackNotificationOutboxProcessor;
 
@@ -48,7 +50,7 @@ public class InteractivityImmediateProcessor {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                runSafely(taskName, runnable);
+                runAsync(taskName, runnable);
             }
         });
     }
@@ -59,6 +61,14 @@ public class InteractivityImmediateProcessor {
         }
 
         return TransactionSynchronizationManager.isActualTransactionActive();
+    }
+
+    private void runAsync(String taskName, Runnable runnable) {
+        try {
+            reviewInteractionExecutor.execute(() -> runSafely(taskName, runnable));
+        } catch (Exception e) {
+            log.error("{} 작업을 비동기로 제출하지 못했습니다. 스케줄러 복구에 위임합니다.", taskName, e);
+        }
     }
 
     private void runSafely(String taskName, Runnable runnable) {

@@ -14,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -24,12 +25,15 @@ class InteractivityImmediateProcessorTest {
     private InteractivityImmediateProcessor interactivityImmediateProcessor;
     private SlackInteractionInboxProcessor slackInteractionInboxProcessor;
     private SlackNotificationOutboxProcessor slackNotificationOutboxProcessor;
+    private TaskExecutor interactivityImmediateExecutor;
 
     @BeforeEach
     void setUp() {
         slackInteractionInboxProcessor = mock(SlackInteractionInboxProcessor.class);
         slackNotificationOutboxProcessor = mock(SlackNotificationOutboxProcessor.class);
+        interactivityImmediateExecutor = Runnable::run;
         interactivityImmediateProcessor = new InteractivityImmediateProcessor(
+                interactivityImmediateExecutor,
                 slackInteractionInboxProcessor,
                 slackNotificationOutboxProcessor
         );
@@ -97,5 +101,29 @@ class InteractivityImmediateProcessorTest {
 
         // then
         verify(slackInteractionInboxProcessor).processPendingBlockActions(anyInt());
+    }
+
+    @Test
+    void 커밋후_비동기_제출에_실패해도_예외는_전파되지_않는다() {
+        // given
+        interactivityImmediateExecutor = runnable -> {
+            throw new RuntimeException("executor submit failed");
+        };
+        interactivityImmediateProcessor = new InteractivityImmediateProcessor(
+                interactivityImmediateExecutor,
+                slackInteractionInboxProcessor,
+                slackNotificationOutboxProcessor
+        );
+
+        TransactionSynchronizationManager.initSynchronization();
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+
+        // when
+        interactivityImmediateProcessor.triggerBlockActionInbox();
+        List<TransactionSynchronization> synchronizations = TransactionSynchronizationManager.getSynchronizations();
+        synchronizations.getFirst().afterCommit();
+
+        // then
+        verify(slackInteractionInboxProcessor, never()).processPendingBlockActions(anyInt());
     }
 }
