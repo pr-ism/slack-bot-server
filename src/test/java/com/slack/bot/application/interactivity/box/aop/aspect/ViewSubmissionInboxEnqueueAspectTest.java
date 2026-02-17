@@ -1,13 +1,19 @@
 package com.slack.bot.application.interactivity.box.aop.aspect;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interactivity.box.aop.EnqueueViewSubmissionInInbox;
+import com.slack.bot.application.interactivity.box.aop.exception.ViewSubmissionAopProceedException;
 import com.slack.bot.application.interactivity.box.in.SlackInteractionInboxProcessor;
+import com.slack.bot.application.interactivity.reply.dto.response.SlackActionResponse;
+import com.slack.bot.application.interactivity.view.dto.ViewSubmissionSyncResultDto;
+import java.io.IOException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -37,6 +43,37 @@ class ViewSubmissionInboxEnqueueAspectTest {
     }
 
     @Test
+    void ViewSubmissionSyncResultDto를_정상_반환하면_enqueueViewSubmission이_호출된다() {
+        // when
+        ViewSubmissionSyncResultDto actual = proxyTarget.happyPath(payload);
+
+        // then
+        assertThat(actual.shouldEnqueue()).isTrue();
+        verify(slackInteractionInboxProcessor).enqueueViewSubmission(payload.toString());
+    }
+
+    @Test
+    void checked_예외는_custom_exception으로_래핑된다() {
+        // when & then
+        assertThatThrownBy(() -> proxyTarget.throwChecked(payload))
+                .isInstanceOf(ViewSubmissionAopProceedException.class)
+                .hasMessage("view submission AOP proceed 실패.")
+                .hasCauseInstanceOf(IOException.class);
+
+        verify(slackInteractionInboxProcessor, never()).enqueueViewSubmission(anyString());
+    }
+
+    @Test
+    void runtime_예외는_그대로_전파된다() {
+        // when & then
+        assertThatThrownBy(() -> proxyTarget.throwRuntime(payload))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("runtime-failure");
+
+        verify(slackInteractionInboxProcessor, never()).enqueueViewSubmission(anyString());
+    }
+
+    @Test
     void 반환타입이_규약과_다르면_예외를_던진다() {
         // when & then
         assertThatThrownBy(() -> proxyTarget.invalidReturn(payload))
@@ -55,8 +92,33 @@ class ViewSubmissionInboxEnqueueAspectTest {
     static class ViewSubmissionAopTestTarget {
 
         @EnqueueViewSubmissionInInbox
+        public ViewSubmissionSyncResultDto happyPath(JsonNode payload) {
+            return ViewSubmissionSyncResultDto.enqueue(SlackActionResponse.clear());
+        }
+
+        @EnqueueViewSubmissionInInbox
+        public ViewSubmissionSyncResultDto throwChecked(JsonNode payload) {
+            throwCheckedIOException();
+            return ViewSubmissionSyncResultDto.noEnqueue(SlackActionResponse.empty());
+        }
+
+        @EnqueueViewSubmissionInInbox
+        public ViewSubmissionSyncResultDto throwRuntime(JsonNode payload) {
+            throw new IllegalStateException("runtime-failure");
+        }
+
+        @EnqueueViewSubmissionInInbox
         public String invalidReturn(JsonNode payload) {
             return "invalid-return";
+        }
+
+        private void throwCheckedIOException() {
+            sneakyThrow(new IOException("checked-failure"));
+        }
+
+        @SuppressWarnings("unchecked")
+        private static <E extends Throwable> void sneakyThrow(Throwable throwable) throws E {
+            throw (E) throwable;
         }
     }
 }

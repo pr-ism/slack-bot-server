@@ -61,7 +61,7 @@ class BlockActionInboxEnqueueAspectTest {
         // when & then
         assertThatThrownBy(() -> outboxIdempotencySourceContext.withInboxSource(1L, () -> proxyTarget.throwChecked(payload)))
                 .isInstanceOf(BlockActionAopProceedException.class)
-                .hasMessageContaining("stage=INBOX_SOURCE_BOUND")
+                .hasMessage("block action enqueue AOP proceed 실패.")
                 .hasCauseInstanceOf(IOException.class);
 
         verify(slackInteractionInboxProcessor, never()).enqueueBlockAction(anyString());

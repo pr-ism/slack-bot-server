@@ -44,7 +44,7 @@ public class BlockActionInboxEnqueueAspect {
             throw runtimeException;
         }
 
-        // block action은 Slack에 즉시 ack만 하므로 반환 값이 필요하지 않음
+        // block action은 슬랙에 즉시 ack만 하므로 반환 값이 필요하지 않음
         return null;
     }
 
@@ -59,7 +59,7 @@ public class BlockActionInboxEnqueueAspect {
                 throw error;
             }
 
-            throw new BlockActionAopProceedException("INBOX_SOURCE_BOUND", throwable);
+            throw new BlockActionAopProceedException(throwable);
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.slack.bot.application.interactivity.box.aop.aspect;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.slack.bot.application.interactivity.box.aop.exception.ViewSubmissionAopProceedException;
 import com.slack.bot.application.interactivity.box.in.SlackInteractionInboxProcessor;
 import com.slack.bot.application.interactivity.view.dto.ViewSubmissionSyncResultDto;
 import lombok.RequiredArgsConstructor;
@@ -19,14 +20,8 @@ public class ViewSubmissionInboxEnqueueAspect {
     private final SlackInteractionInboxProcessor slackInteractionInboxProcessor;
 
     @Around("@annotation(com.slack.bot.application.interactivity.box.aop.EnqueueViewSubmissionInInbox) && args(payload,..)")
-    public Object enqueue(ProceedingJoinPoint joinPoint, JsonNode payload) throws Throwable {
-        Object result = joinPoint.proceed();
-
-        if (!(result instanceof ViewSubmissionSyncResultDto syncResultDto)) {
-            throw new IllegalStateException(
-                    "view_submission enqueue AOP 대상 메서드는 ViewSubmissionSyncResultDto를 반환해야 합니다."
-            );
-        }
+    public Object enqueue(ProceedingJoinPoint joinPoint, JsonNode payload) {
+        ViewSubmissionSyncResultDto syncResultDto = proceedInViewSubmissionContext(joinPoint);
 
         if (syncResultDto.shouldEnqueue()) {
             String payloadJson = payload.toString();
@@ -45,6 +40,31 @@ public class ViewSubmissionInboxEnqueueAspect {
                 );
                 throw throwable;
             }
+        }
+
+        return syncResultDto;
+    }
+
+    private ViewSubmissionSyncResultDto proceedInViewSubmissionContext(ProceedingJoinPoint joinPoint) {
+        try {
+            return validateSyncResult(joinPoint.proceed());
+        } catch (Throwable throwable) {
+            if (throwable instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            if (throwable instanceof Error error) {
+                throw error;
+            }
+
+            throw new ViewSubmissionAopProceedException(throwable);
+        }
+    }
+
+    private ViewSubmissionSyncResultDto validateSyncResult(Object result) {
+        if (!(result instanceof ViewSubmissionSyncResultDto syncResultDto)) {
+            throw new IllegalStateException(
+                    "view_submission enqueue AOP 대상 메서드는 ViewSubmissionSyncResultDto를 반환해야 합니다."
+            );
         }
 
         return syncResultDto;
