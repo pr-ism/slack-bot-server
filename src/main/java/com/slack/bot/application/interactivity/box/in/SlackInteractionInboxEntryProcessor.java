@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interactivity.BlockActionInteractionService;
 import com.slack.bot.application.interactivity.view.ViewSubmissionInteractionService;
+import com.slack.bot.application.interactivity.box.InteractivityFailureReasonTruncator;
 import com.slack.bot.application.interactivity.box.aop.BindInboxToOutboxSource;
 import com.slack.bot.application.interactivity.box.retry.InteractivityRetryExceptionClassifier;
 import com.slack.bot.global.config.properties.InteractivityRetryProperties;
@@ -29,6 +30,7 @@ public class SlackInteractionInboxEntryProcessor {
     private final ViewSubmissionInteractionService viewSubmissionInteractionService;
     private final RetryTemplate slackInteractionInboxRetryTemplate;
     private final InteractivityRetryProperties interactivityRetryProperties;
+    private final InteractivityFailureReasonTruncator failureReasonTruncator;
     private final InteractivityRetryExceptionClassifier retryExceptionClassifier;
     private final SlackInteractionInboxRepository slackInteractionInboxRepository;
 
@@ -77,7 +79,7 @@ public class SlackInteractionInboxEntryProcessor {
     }
 
     private void markFailureStatus(SlackInteractionInbox inbox, Exception exception) {
-        String reason = exception.getMessage();
+        String reason = failureReasonTruncator.truncate(exception.getMessage());
 
         if (!retryExceptionClassifier.isRetryable(exception)) {
             inbox.markFailed(clock.instant(), reason, SlackInteractivityFailureType.BUSINESS_INVARIANT);

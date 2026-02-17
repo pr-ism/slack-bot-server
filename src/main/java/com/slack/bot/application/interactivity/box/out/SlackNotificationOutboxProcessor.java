@@ -3,6 +3,7 @@ package com.slack.bot.application.interactivity.box.out;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.slack.bot.application.interactivity.box.InteractivityFailureReasonTruncator;
 import com.slack.bot.application.interactivity.box.retry.InteractivityRetryExceptionClassifier;
 import com.slack.bot.application.interactivity.box.out.exception.UnsupportedSlackNotificationOutboxMessageTypeException;
 import com.slack.bot.global.config.properties.InteractivityRetryProperties;
@@ -24,14 +25,13 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class SlackNotificationOutboxProcessor {
 
-    private static final int FAILURE_REASON_MAX_LENGTH = 500;
-
     private final Clock clock;
     private final ObjectMapper objectMapper;
     private final RetryTemplate slackNotificationOutboxRetryTemplate;
     private final NotificationTransportApiClient notificationTransportApiClient;
     private final SlackNotificationOutboxRepository slackNotificationOutboxRepository;
     private final InteractivityRetryProperties interactivityRetryProperties;
+    private final InteractivityFailureReasonTruncator failureReasonTruncator;
     private final InteractivityRetryExceptionClassifier retryExceptionClassifier;
 
     public void processPending(int limit) {
@@ -105,19 +105,8 @@ public class SlackNotificationOutboxProcessor {
         return objectMapper.readTree(blocksJson);
     }
 
-    private String truncateFailureReason(String reason) {
-        if (reason == null) {
-            return null;
-        }
-        if (reason.length() <= FAILURE_REASON_MAX_LENGTH) {
-            return reason;
-        }
-
-        return reason.substring(0, FAILURE_REASON_MAX_LENGTH);
-    }
-
     private void markFailureStatus(SlackNotificationOutbox outbox, Exception exception) {
-        String reason = truncateFailureReason(exception.getMessage());
+        String reason = failureReasonTruncator.truncate(exception.getMessage());
 
         if (!retryExceptionClassifier.isRetryable(exception)) {
             outbox.markFailed(clock.instant(), reason, SlackInteractivityFailureType.BUSINESS_INVARIANT);

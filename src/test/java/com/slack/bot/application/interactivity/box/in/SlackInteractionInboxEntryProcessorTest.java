@@ -209,6 +209,28 @@ class SlackInteractionInboxEntryProcessorTest {
         );
     }
 
+    @Test
+    void 긴_실패사유는_잘려서_저장된다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "long-failure-reason",
+                "{}"
+        );
+        inbox.markProcessing();
+        Exception nonRetryableException = new IllegalArgumentException("x".repeat(600));
+
+        // when
+        ReflectionTestUtils.invokeMethod(slackInteractionInboxEntryProcessor, "markFailureStatus", inbox, nonRetryableException);
+
+        // then
+        assertAll(
+                () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
+                () -> assertThat(inbox.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT),
+                () -> assertThat(inbox.getFailureReason()).hasSize(500)
+        );
+    }
+
     private SlackInteractionInbox savePendingInbox(SlackInteractionInboxType interactionType, String payloadJson) {
         String idempotencyKey = interactionType + "-entry-" + System.nanoTime();
         SlackInteractionInbox inbox = SlackInteractionInbox.pending(interactionType, idempotencyKey, payloadJson);
