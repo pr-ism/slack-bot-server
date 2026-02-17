@@ -13,6 +13,7 @@ import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
@@ -63,7 +64,8 @@ public class SlackInteractionInboxEntryProcessor {
             return;
         }
 
-        if (!slackInteractionInboxRepository.markProcessingIfPending(inboxId)) {
+        Instant processingStartedAt = clock.instant();
+        if (!slackInteractionInboxRepository.markProcessingIfPending(inboxId, processingStartedAt)) {
             return;
         }
 

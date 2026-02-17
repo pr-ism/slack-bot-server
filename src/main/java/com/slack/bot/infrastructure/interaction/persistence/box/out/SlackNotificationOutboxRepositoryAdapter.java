@@ -4,6 +4,7 @@ import static com.slack.bot.infrastructure.interaction.box.out.QSlackNotificatio
 
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
+import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
@@ -85,5 +86,25 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                 .execute();
 
         return updatedCount > 0;
+    }
+
+    @Override
+    @Transactional
+    public int recoverTimeoutProcessing(Instant processingStartedBefore, Instant failedAt, String failureReason) {
+        return (int) queryFactory
+                .update(slackNotificationOutbox)
+                .set(slackNotificationOutbox.status, SlackNotificationOutboxStatus.RETRY_PENDING)
+                .set(slackNotificationOutbox.processingStartedAt, (Instant) null)
+                .set(slackNotificationOutbox.failedAt, failedAt)
+                .set(slackNotificationOutbox.failureReason, failureReason)
+                .set(slackNotificationOutbox.failureType, (SlackInteractivityFailureType) null)
+                .where(
+                        slackNotificationOutbox.status.eq(SlackNotificationOutboxStatus.PROCESSING),
+                        slackNotificationOutbox.processingStartedAt.isNull()
+                                                                  .or(slackNotificationOutbox.processingStartedAt.lt(
+                                                                          processingStartedBefore
+                                                                  ))
+                )
+                .execute();
     }
 }

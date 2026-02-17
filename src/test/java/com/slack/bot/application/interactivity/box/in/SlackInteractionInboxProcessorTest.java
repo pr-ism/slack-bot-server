@@ -91,6 +91,41 @@ class SlackInteractionInboxProcessorTest {
     @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
+            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql",
+            "classpath:sql/fixtures/interactivity/processing_timeout_block_action_inbox.sql"
+    })
+    void PROCESSING_타임아웃_block_actions_inbox는_RETRY_PENDING으로_복구된_후_정상_재처리된다() {
+        // given
+        given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U1"))
+                .willReturn("D-REVIEWER");
+
+        // when
+        slackInteractionInboxProcessor.processPendingBlockActions(10);
+
+        // then
+        SlackInteractionInbox processedInbox = jpaSlackInteractionInboxRepository.findById(200L).orElseThrow();
+
+        assertAll(
+                () -> assertThat(processedInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
+                () -> assertThat(processedInbox.getProcessingAttempt()).isEqualTo(1),
+                () -> verify(notificationApiClient, times(1)).openDirectMessageChannel("xoxb-test-token", "U1"),
+                () -> verify(notificationApiClient, times(1)).sendBlockMessage(
+                        eq("xoxb-test-token"),
+                        eq("D-REVIEWER"),
+                        any(),
+                        any()
+                ),
+                () -> assertThat(reviewReservationRepository.findById(100L))
+                        .isPresent()
+                        .get()
+                        .extracting(reservation -> reservation.getStatus())
+                        .isEqualTo(ReservationStatus.CANCELLED)
+        );
+    }
+
+    @Test
+    @Sql(scripts = {
+            "classpath:sql/fixtures/notification/workspace_t1.sql",
             "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
     })
     void 동일_payload를_중복_enqueue하면_한번만_적재되고_한번만_처리된다() throws Exception {

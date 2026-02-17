@@ -72,11 +72,12 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
 
     @Override
     @Transactional
-    public boolean markProcessingIfPending(Long inboxId) {
+    public boolean markProcessingIfPending(Long inboxId, Instant processingStartedAt) {
         long updatedCount = queryFactory
                 .update(slackInteractionInbox)
                 .set(slackInteractionInbox.status, SlackInteractionInboxStatus.PROCESSING)
                 .set(slackInteractionInbox.processingAttempt, slackInteractionInbox.processingAttempt.add(1))
+                .set(slackInteractionInbox.processingStartedAt, processingStartedAt)
                 .set(slackInteractionInbox.failedAt, (Instant) null)
                 .set(slackInteractionInbox.failureReason, (String) null)
                 .set(slackInteractionInbox.failureType, (SlackInteractivityFailureType) null)
@@ -90,6 +91,32 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                 .execute();
 
         return updatedCount > 0;
+    }
+
+    @Override
+    @Transactional
+    public int recoverTimeoutProcessing(
+            SlackInteractionInboxType interactionType,
+            Instant processingStartedBefore,
+            Instant failedAt,
+            String failureReason
+    ) {
+        return (int) queryFactory
+                .update(slackInteractionInbox)
+                .set(slackInteractionInbox.status, SlackInteractionInboxStatus.RETRY_PENDING)
+                .set(slackInteractionInbox.processingStartedAt, (Instant) null)
+                .set(slackInteractionInbox.failedAt, failedAt)
+                .set(slackInteractionInbox.failureReason, failureReason)
+                .set(slackInteractionInbox.failureType, (SlackInteractivityFailureType) null)
+                .where(
+                        slackInteractionInbox.interactionType.eq(interactionType),
+                        slackInteractionInbox.status.eq(SlackInteractionInboxStatus.PROCESSING),
+                        slackInteractionInbox.processingStartedAt.isNull()
+                                                             .or(slackInteractionInbox.processingStartedAt.lt(
+                                                                     processingStartedBefore
+                                                             ))
+                )
+                .execute();
     }
 
     @Override

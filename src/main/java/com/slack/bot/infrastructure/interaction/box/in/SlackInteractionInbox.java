@@ -7,6 +7,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -28,6 +29,8 @@ public class SlackInteractionInbox extends BaseTimeEntity {
     private SlackInteractionInboxStatus status;
 
     private int processingAttempt;
+
+    private Instant processingStartedAt;
 
     private Instant processedAt;
 
@@ -59,8 +62,15 @@ public class SlackInteractionInbox extends BaseTimeEntity {
     }
 
     public void markProcessing() {
+        markProcessing(Instant.now());
+    }
+
+    public void markProcessing(Instant processingStartedAt) {
+        Objects.requireNonNull(processingStartedAt, "processingStartedAt은 비어 있을 수 없습니다.");
+
         this.status = SlackInteractionInboxStatus.PROCESSING;
         this.processingAttempt += 1;
+        this.processingStartedAt = processingStartedAt;
         this.failureReason = null;
         this.failureType = null;
         this.failedAt = null;
@@ -68,6 +78,7 @@ public class SlackInteractionInbox extends BaseTimeEntity {
 
     public void markProcessed(Instant processedAt) {
         this.status = SlackInteractionInboxStatus.PROCESSED;
+        this.processingStartedAt = null;
         this.processedAt = processedAt;
         this.failureReason = null;
         this.failureType = null;
@@ -76,6 +87,7 @@ public class SlackInteractionInbox extends BaseTimeEntity {
 
     public void markRetryPending(Instant failedAt, String failureReason) {
         this.status = SlackInteractionInboxStatus.RETRY_PENDING;
+        this.processingStartedAt = null;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = null;
@@ -87,6 +99,7 @@ public class SlackInteractionInbox extends BaseTimeEntity {
             SlackInteractivityFailureType failureType
     ) {
         this.status = SlackInteractionInboxStatus.FAILED;
+        this.processingStartedAt = null;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = failureType;

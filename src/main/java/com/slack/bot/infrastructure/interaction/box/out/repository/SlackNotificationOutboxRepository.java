@@ -16,4 +16,6 @@ public interface SlackNotificationOutboxRepository {
     List<SlackNotificationOutbox> findPending(int limit);
 
     boolean markProcessingIfPending(Long outboxId, Instant processingStartedAt);
+
+    int recoverTimeoutProcessing(Instant processingStartedBefore, Instant failedAt, String failureReason);
 }

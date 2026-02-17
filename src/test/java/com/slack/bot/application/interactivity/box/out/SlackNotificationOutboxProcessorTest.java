@@ -124,6 +124,23 @@ class SlackNotificationOutboxProcessorTest {
     }
 
     @Test
+    @Sql(scripts = "/sql/fixtures/outbox/processing_timeout_outbox_channel_text.sql")
+    void PROCESSING_타임아웃_outbox는_RETRY_PENDING으로_복구된_후_정상_재처리된다() {
+        // when
+        slackNotificationOutboxProcessor.processPending(10);
+
+        // then
+        SlackNotificationOutbox processed = slackNotificationOutboxRepository.findById(200L)
+                                                                             .orElseThrow();
+
+        assertAll(
+                () -> verify(notificationTransportApiClient).sendMessage("xoxb-test-token", "C1", "hello-timeout-200"),
+                () -> assertThat(processed.getStatus()).isEqualTo(SlackNotificationOutboxStatus.SENT),
+                () -> assertThat(processed.getProcessingAttempt()).isEqualTo(1)
+        );
+    }
+
+    @Test
     @Sql(scripts = "/sql/fixtures/outbox/pending_outbox.sql")
     void CHANNEL_BLOCKS_outbox는_채널_블록을_전송한다() {
         // given

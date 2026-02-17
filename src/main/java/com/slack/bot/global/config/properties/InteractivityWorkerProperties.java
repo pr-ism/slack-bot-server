@@ -43,31 +43,46 @@ public record InteractivityWorkerProperties(
 
     public record BlockActions(
             @DefaultValue("true") boolean workerEnabled,
-            @DefaultValue("200") long pollDelayMs
+            @DefaultValue("200") long pollDelayMs,
+            @DefaultValue("60000") long processingTimeoutMs
     ) {
 
         public BlockActions() {
-            this(true, 200L);
+            this(true, 200L, 60000L);
+        }
+
+        public BlockActions(boolean workerEnabled, long pollDelayMs) {
+            this(workerEnabled, pollDelayMs, 60000L);
         }
     }
 
     public record ViewSubmission(
             @DefaultValue("true") boolean workerEnabled,
-            @DefaultValue("200") long pollDelayMs
+            @DefaultValue("200") long pollDelayMs,
+            @DefaultValue("60000") long processingTimeoutMs
     ) {
 
         public ViewSubmission() {
-            this(true, 200L);
+            this(true, 200L, 60000L);
+        }
+
+        public ViewSubmission(boolean workerEnabled, long pollDelayMs) {
+            this(workerEnabled, pollDelayMs, 60000L);
         }
     }
 
     public record Outbox(
             @DefaultValue("true") boolean workerEnabled,
-            @DefaultValue("200") long pollDelayMs
+            @DefaultValue("200") long pollDelayMs,
+            @DefaultValue("60000") long processingTimeoutMs
     ) {
 
         public Outbox() {
-            this(true, 200L);
+            this(true, 200L, 60000L);
+        }
+
+        public Outbox(boolean workerEnabled, long pollDelayMs) {
+            this(workerEnabled, pollDelayMs, 60000L);
         }
     }
 }

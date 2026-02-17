@@ -2,6 +2,7 @@ package com.slack.bot.application.interactivity.box.in;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -66,7 +67,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         // given
         SlackInteractionInbox pending = org.mockito.Mockito.mock(SlackInteractionInbox.class);
         given(pending.getId()).willReturn(10L);
-        given(slackInteractionInboxRepository.markProcessingIfPending(10L)).willReturn(false);
+        given(slackInteractionInboxRepository.markProcessingIfPending(eq(10L), any())).willReturn(false);
 
         // when
         slackInteractionInboxEntryProcessor.processBlockAction(pending);
@@ -82,7 +83,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         // given
         SlackInteractionInbox pending = org.mockito.Mockito.mock(SlackInteractionInbox.class);
         given(pending.getId()).willReturn(10L);
-        given(slackInteractionInboxRepository.markProcessingIfPending(10L)).willReturn(true);
+        given(slackInteractionInboxRepository.markProcessingIfPending(eq(10L), any())).willReturn(true);
         given(slackInteractionInboxRepository.findById(10L)).willReturn(Optional.empty());
 
         // when

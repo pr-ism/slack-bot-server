@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interactivity.box.InteractivityFailureReasonTruncator;
 import com.slack.bot.application.interactivity.box.retry.InteractivityRetryExceptionClassifier;
 import com.slack.bot.global.config.properties.InteractivityRetryProperties;
+import com.slack.bot.global.config.properties.InteractivityWorkerProperties;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
@@ -61,6 +62,7 @@ class SlackNotificationOutboxProcessorUnitTest {
                 new RetryTemplate(),
                 notificationTransportApiClient,
                 slackNotificationOutboxRepository,
+                new InteractivityWorkerProperties(),
                 retryProperties,
                 new InteractivityFailureReasonTruncator(),
                 InteractivityRetryExceptionClassifier.create(),

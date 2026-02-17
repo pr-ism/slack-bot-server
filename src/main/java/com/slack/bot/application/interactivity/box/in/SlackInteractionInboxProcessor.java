@@ -4,17 +4,27 @@ import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyKe
 import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyScope;
 import com.slack.bot.application.interactivity.box.aop.InteractivityImmediateTriggerTarget;
 import com.slack.bot.application.interactivity.box.aop.TriggerInteractivityImmediateProcessing;
+import com.slack.bot.global.config.properties.InteractivityWorkerProperties;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class SlackInteractionInboxProcessor {
 
+    private static final String PROCESSING_TIMEOUT_FAILURE_REASON =
+            "PROCESSING 타임아웃으로 재시도 대기 상태로 복구되었습니다.";
+
+    private final Clock clock;
+    private final InteractivityWorkerProperties interactivityWorkerProperties;
     private final SlackInteractionInboxRepository slackInteractionInboxRepository;
     private final SlackInteractionIdempotencyKeyGenerator idempotencyKeyGenerator;
     private final SlackInteractionInboxEntryProcessor slackInteractionInboxEntryProcessor;
@@ -37,6 +47,11 @@ public class SlackInteractionInboxProcessor {
     }
 
     public void processPendingBlockActions(int limit) {
+        recoverTimeoutProcessing(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                interactivityWorkerProperties.inbox().blockActions().processingTimeoutMs()
+        );
+
         List<SlackInteractionInbox> pendings = slackInteractionInboxRepository.findPending(
                 SlackInteractionInboxType.BLOCK_ACTIONS,
                 limit
@@ -65,6 +80,11 @@ public class SlackInteractionInboxProcessor {
     }
 
     public void processPendingViewSubmissions(int limit) {
+        recoverTimeoutProcessing(
+                SlackInteractionInboxType.VIEW_SUBMISSION,
+                interactivityWorkerProperties.inbox().viewSubmission().processingTimeoutMs()
+        );
+
         List<SlackInteractionInbox> pendings = slackInteractionInboxRepository.findPending(
                 SlackInteractionInboxType.VIEW_SUBMISSION,
                 limit
@@ -72,6 +92,20 @@ public class SlackInteractionInboxProcessor {
 
         for (SlackInteractionInbox pending : pendings) {
             slackInteractionInboxEntryProcessor.processViewSubmission(pending);
+        }
+    }
+
+    private void recoverTimeoutProcessing(SlackInteractionInboxType interactionType, long processingTimeoutMs) {
+        Instant now = clock.instant();
+        int recoveredCount = slackInteractionInboxRepository.recoverTimeoutProcessing(
+                interactionType,
+                now.minusMillis(processingTimeoutMs),
+                now,
+                PROCESSING_TIMEOUT_FAILURE_REASON
+        );
+
+        if (recoveredCount > 0) {
+            log.warn("{} inbox PROCESSING 고착 건을 복구했습니다. count={}", interactionType, recoveredCount);
         }
     }
 }

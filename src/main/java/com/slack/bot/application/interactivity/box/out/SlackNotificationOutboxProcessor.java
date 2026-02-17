@@ -10,12 +10,14 @@ import com.slack.bot.application.interactivity.box.out.exception.UnsupportedSlac
 import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.InteractivityRetryProperties;
+import com.slack.bot.global.config.properties.InteractivityWorkerProperties;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,21 +29,40 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class SlackNotificationOutboxProcessor {
 
+    private static final String PROCESSING_TIMEOUT_FAILURE_REASON =
+            "PROCESSING 타임아웃으로 재시도 대기 상태로 복구되었습니다.";
+
     private final Clock clock;
     private final ObjectMapper objectMapper;
     private final RetryTemplate slackNotificationOutboxRetryTemplate;
     private final NotificationTransportApiClient notificationTransportApiClient;
     private final SlackNotificationOutboxRepository slackNotificationOutboxRepository;
+    private final InteractivityWorkerProperties interactivityWorkerProperties;
     private final InteractivityRetryProperties interactivityRetryProperties;
     private final InteractivityFailureReasonTruncator failureReasonTruncator;
     private final InteractivityRetryExceptionClassifier retryExceptionClassifier;
     private final WorkspaceRepository workspaceRepository;
 
     public void processPending(int limit) {
+        recoverTimeoutProcessing();
+
         List<SlackNotificationOutbox> pendings = slackNotificationOutboxRepository.findPending(limit);
 
         for (SlackNotificationOutbox pending : pendings) {
             processOne(pending);
+        }
+    }
+
+    private void recoverTimeoutProcessing() {
+        Instant now = clock.instant();
+        int recoveredCount = slackNotificationOutboxRepository.recoverTimeoutProcessing(
+                now.minusMillis(interactivityWorkerProperties.outbox().processingTimeoutMs()),
+                now,
+                PROCESSING_TIMEOUT_FAILURE_REASON
+        );
+
+        if (recoveredCount > 0) {
+            log.warn("outbox PROCESSING 고착 건을 복구했습니다. count={}", recoveredCount);
         }
     }
 

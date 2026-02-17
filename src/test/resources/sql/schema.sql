@@ -151,6 +151,7 @@ CREATE TABLE IF NOT EXISTS slack_interaction_inbox (
     payload_json CLOB NOT NULL,
     status VARCHAR(20) NOT NULL,
     processing_attempt INT NOT NULL,
+    processing_started_at TIMESTAMP(6),
     processed_at TIMESTAMP(6),
     failed_at TIMESTAMP(6),
     failure_reason VARCHAR(500),
