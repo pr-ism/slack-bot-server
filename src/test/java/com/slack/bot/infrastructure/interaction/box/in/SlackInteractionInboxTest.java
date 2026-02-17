@@ -36,6 +36,46 @@ class SlackInteractionInboxTest {
     }
 
     @Test
+    void pending은_interactionType이_null이면_예외를_던진다() {
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInbox.pending(null, "key", "{}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("interactionType은 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void pending은_idempotencyKey가_null이면_예외를_던진다() {
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInbox.pending(SlackInteractionInboxType.BLOCK_ACTIONS, null, "{}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("idempotencyKey는 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void pending은_idempotencyKey가_공백이면_예외를_던진다() {
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInbox.pending(SlackInteractionInboxType.BLOCK_ACTIONS, " ", "{}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("idempotencyKey는 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void pending은_payloadJson이_null이면_예외를_던진다() {
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInbox.pending(SlackInteractionInboxType.BLOCK_ACTIONS, "key", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("payloadJson은 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void pending은_payloadJson이_공백이면_예외를_던진다() {
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInbox.pending(SlackInteractionInboxType.BLOCK_ACTIONS, "key", " "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("payloadJson은 비어 있을 수 없습니다.");
+    }
+
+    @Test
     void markProcessing을_호출하면_상태가_PROCESSING으로_변경되고_시도횟수가_증가한다() {
         // given
         SlackInteractionInbox inbox = SlackInteractionInbox.pending(

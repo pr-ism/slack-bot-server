@@ -45,19 +45,49 @@ public class SlackInteractionInbox extends BaseTimeEntity {
             String idempotencyKey,
             String payloadJson
     ) {
-        return new SlackInteractionInbox(interactionType, idempotencyKey, payloadJson);
+        validateInteractionType(interactionType);
+        validateIdempotencyKey(idempotencyKey);
+        validatePayloadJson(payloadJson);
+
+        return new SlackInteractionInbox(
+                interactionType,
+                idempotencyKey,
+                payloadJson,
+                SlackInteractionInboxStatus.PENDING,
+                0
+        );
+    }
+
+    private static void validateInteractionType(SlackInteractionInboxType interactionType) {
+        if (interactionType == null) {
+            throw new IllegalArgumentException("interactionType은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private static void validateIdempotencyKey(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new IllegalArgumentException("idempotencyKey는 비어 있을 수 없습니다.");
+        }
+    }
+
+    private static void validatePayloadJson(String payloadJson) {
+        if (payloadJson == null || payloadJson.isBlank()) {
+            throw new IllegalArgumentException("payloadJson은 비어 있을 수 없습니다.");
+        }
     }
 
     private SlackInteractionInbox(
             SlackInteractionInboxType interactionType,
             String idempotencyKey,
-            String payloadJson
+            String payloadJson,
+            SlackInteractionInboxStatus status,
+            int processingAttempt
     ) {
         this.interactionType = interactionType;
         this.idempotencyKey = idempotencyKey;
         this.payloadJson = payloadJson;
-        this.status = SlackInteractionInboxStatus.PENDING;
-        this.processingAttempt = 0;
+        this.status = status;
+        this.processingAttempt = processingAttempt;
     }
 
     public void markProcessing(Instant processingStartedAt) {
