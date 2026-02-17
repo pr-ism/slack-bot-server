@@ -82,6 +82,9 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
         this.status = SlackNotificationOutboxStatus.PROCESSING;
         this.processingStartedAt = processingStartedAt;
         this.processingAttempt += 1;
+        this.failedAt = null;
+        this.failureReason = null;
+        this.failureType = null;
     }
 
     public void markSent(Instant sentAt) {

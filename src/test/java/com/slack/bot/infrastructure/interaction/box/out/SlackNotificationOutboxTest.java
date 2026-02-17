@@ -147,6 +147,25 @@ class SlackNotificationOutboxTest {
     }
 
     @Test
+    void markProcessing은_RETRY_PENDING에서_재진입하면_이전_실패정보를_초기화한다() {
+        // given
+        SlackNotificationOutbox outbox = pendingOutbox();
+        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        outbox.markRetryPending(Instant.parse("2026-02-15T00:01:00Z"), "retry");
+
+        // when
+        outbox.markProcessing(Instant.parse("2026-02-15T00:02:00Z"));
+
+        // then
+        assertAll(
+                () -> assertThat(outbox.getStatus()).isEqualTo(SlackNotificationOutboxStatus.PROCESSING),
+                () -> assertThat(outbox.getFailedAt()).isNull(),
+                () -> assertThat(outbox.getFailureReason()).isNull(),
+                () -> assertThat(outbox.getFailureType()).isNull()
+        );
+    }
+
+    @Test
     void 허용되지_않은_상태전이면_예외를_던진다() {
         // given
         SlackNotificationOutbox pending = pendingOutbox();
