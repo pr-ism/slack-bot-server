@@ -1,0 +1,49 @@
+package com.slack.bot.application.interactivity.box.retry;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.slack.bot.application.interactivity.client.exception.SlackBotMessageDispatchException;
+import org.junit.jupiter.api.DisplayNameGeneration;
+import org.junit.jupiter.api.DisplayNameGenerator;
+import org.junit.jupiter.api.Test;
+import org.springframework.web.client.ResourceAccessException;
+
+@SuppressWarnings("NonAsciiCharacters")
+@DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
+class InteractivityRetryExceptionClassifierTest {
+
+    @Test
+    void 슬랙_전송_예외는_retryable로_판단한다() {
+        // given
+        InteractivityRetryExceptionClassifier exceptionClassifier = InteractivityRetryExceptionClassifier.create();
+
+        // when
+        boolean actual = exceptionClassifier.isRetryable(new SlackBotMessageDispatchException("temporary"));
+
+        // then
+        assertThat(actual).isTrue();
+    }
+
+    @Test
+    void 네트워크_접근_예외는_retryable로_판단한다() {
+        // given
+        InteractivityRetryExceptionClassifier exceptionClassifier = InteractivityRetryExceptionClassifier.create();
+
+        // when
+        boolean actual = exceptionClassifier.isRetryable(new ResourceAccessException("timeout"));
+
+        // then
+        assertThat(actual).isTrue();
+    }
+
+    @Test
+    void 일반_비즈니스_예외는_non_retryable로_판단한다() {
+        // given
+        InteractivityRetryExceptionClassifier exceptionClassifier = InteractivityRetryExceptionClassifier.create();
+
+        // when
+        boolean actual = exceptionClassifier.isRetryable(new IllegalArgumentException("invalid"));
+
+        assertThat(actual).isFalse();
+    }
+}
