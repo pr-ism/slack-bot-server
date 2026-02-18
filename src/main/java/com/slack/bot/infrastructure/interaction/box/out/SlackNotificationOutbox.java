@@ -103,6 +103,7 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
         Objects.requireNonNull(failedAt, "failedAt은 비어 있을 수 없습니다.");
 
         this.status = SlackNotificationOutboxStatus.RETRY_PENDING;
+        this.processingStartedAt = null;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = null;

@@ -141,6 +141,7 @@ class SlackNotificationOutboxTest {
         // then
         assertAll(
                 () -> assertThat(outbox.getStatus()).isEqualTo(SlackNotificationOutboxStatus.RETRY_PENDING),
+                () -> assertThat(outbox.getProcessingStartedAt()).isNull(),
                 () -> assertThat(outbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(outbox.getFailureReason()).isEqualTo("retry")
         );
