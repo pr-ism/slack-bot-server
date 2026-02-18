@@ -30,6 +30,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
 
     private final JPAQueryFactory queryFactory;
     private final JpaSlackInteractionInboxRepository repository;
+    private final SlackInteractionInboxCreator inboxCreator;
     private final MysqlDuplicateKeyDetector mysqlDuplicateKeyDetector;
 
     @Override
@@ -37,7 +38,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
         SlackInteractionInbox inbox = SlackInteractionInbox.pending(interactionType, idempotencyKey, payloadJson);
 
         try {
-            repository.save(inbox);
+            inboxCreator.saveNew(inbox);
             return true;
         } catch (DataIntegrityViolationException exception) {
             if (mysqlDuplicateKeyDetector.isNotDuplicateKey(exception)) {
@@ -103,6 +104,16 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
             Instant failedAt,
             String failureReason
     ) {
+        if (processingStartedBefore == null) {
+            throw new IllegalArgumentException("processingStartedBefore는 비어 있을 수 없습니다.");
+        }
+        if (failedAt == null) {
+            throw new IllegalArgumentException("failedAt은 비어 있을 수 없습니다.");
+        }
+        if (failureReason == null || failureReason.isBlank()) {
+            throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
+        }
+
         return Math.toIntExact(queryFactory
                 .update(slackInteractionInbox)
                 .set(slackInteractionInbox.status, SlackInteractionInboxStatus.RETRY_PENDING)
