@@ -52,7 +52,7 @@ public class SlackInteractionInboxProcessor {
         );
 
         for (SlackInteractionInbox pending : pendings) {
-            slackInteractionInboxEntryProcessor.processBlockAction(pending);
+            processBlockActionSafely(pending);
         }
     }
 
@@ -81,7 +81,7 @@ public class SlackInteractionInboxProcessor {
         );
 
         for (SlackInteractionInbox pending : pendings) {
-            slackInteractionInboxEntryProcessor.processViewSubmission(pending);
+            processViewSubmissionSafely(pending);
         }
     }
 
@@ -96,6 +96,30 @@ public class SlackInteractionInboxProcessor {
 
         if (recoveredCount > 0) {
             log.warn("{} inbox PROCESSING 고착 건을 복구했습니다. count={}", interactionType, recoveredCount);
+        }
+    }
+
+    private void processViewSubmissionSafely(SlackInteractionInbox pending) {
+        try {
+            slackInteractionInboxEntryProcessor.processViewSubmission(pending);
+        } catch (Exception e) {
+            log.error(
+                    "view_submission inbox 엔트리 처리 중 예상치 못한 오류가 발생했습니다. inboxId={}",
+                    pending.getId(),
+                    e
+            );
+        }
+    }
+
+    private void processBlockActionSafely(SlackInteractionInbox pending) {
+        try {
+            slackInteractionInboxEntryProcessor.processBlockAction(pending);
+        } catch (Exception e) {
+            log.error(
+                    "block_actions inbox 엔트리 처리 중 예상치 못한 오류가 발생했습니다. inboxId={}",
+                    pending.getId(),
+                    e
+            );
         }
     }
 }
