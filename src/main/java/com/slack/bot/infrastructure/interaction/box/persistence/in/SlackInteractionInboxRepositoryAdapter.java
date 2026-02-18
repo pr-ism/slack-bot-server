@@ -75,6 +75,9 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
     @Override
     @Transactional
     public boolean markProcessingIfClaimable(Long inboxId, Instant processingStartedAt) {
+        validateInboxId(inboxId);
+        validateProcessingStartedAt(processingStartedAt);
+
         long updatedCount = markAsProcessingWhenClaimable(inboxId, processingStartedAt);
 
         return updatedCount > 0;
@@ -104,15 +107,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
             Instant failedAt,
             String failureReason
     ) {
-        if (processingStartedBefore == null) {
-            throw new IllegalArgumentException("processingStartedBefore는 비어 있을 수 없습니다.");
-        }
-        if (failedAt == null) {
-            throw new IllegalArgumentException("failedAt은 비어 있을 수 없습니다.");
-        }
-        if (failureReason == null || failureReason.isBlank()) {
-            throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
-        }
+        validateRecoverTimeoutProcessingArguments(processingStartedBefore, failedAt, failureReason);
 
         return Math.toIntExact(queryFactory
                 .update(slackInteractionInbox)
@@ -130,6 +125,46 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                                                              ))
                 )
                 .execute());
+    }
+
+    private void validateRecoverTimeoutProcessingArguments(
+            Instant processingStartedBefore,
+            Instant failedAt,
+            String failureReason
+    ) {
+        validateProcessingStartedBefore(processingStartedBefore);
+        validateFailedAt(failedAt);
+        validateFailureReason(failureReason);
+    }
+
+    private void validateInboxId(Long inboxId) {
+        if (inboxId == null) {
+            throw new IllegalArgumentException("inboxId는 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateProcessingStartedAt(Instant processingStartedAt) {
+        if (processingStartedAt == null) {
+            throw new IllegalArgumentException("processingStartedAt은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateProcessingStartedBefore(Instant processingStartedBefore) {
+        if (processingStartedBefore == null) {
+            throw new IllegalArgumentException("processingStartedBefore는 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateFailedAt(Instant failedAt) {
+        if (failedAt == null) {
+            throw new IllegalArgumentException("failedAt은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateFailureReason(String failureReason) {
+        if (failureReason == null || failureReason.isBlank()) {
+            throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
+        }
     }
 
     @Override

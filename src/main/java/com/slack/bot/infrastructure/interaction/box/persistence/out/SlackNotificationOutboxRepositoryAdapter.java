@@ -75,6 +75,9 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
     @Override
     @Transactional
     public boolean markProcessingIfClaimable(Long outboxId, Instant processingStartedAt) {
+        validateOutboxId(outboxId);
+        validateProcessingStartedAt(processingStartedAt);
+
         long updatedCount = markAsProcessingWhenClaimable(outboxId, processingStartedAt);
 
         return updatedCount > 0;
@@ -99,15 +102,7 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
     @Override
     @Transactional
     public int recoverTimeoutProcessing(Instant processingStartedBefore, Instant failedAt, String failureReason) {
-        if (processingStartedBefore == null) {
-            throw new IllegalArgumentException("processingStartedBefore는 비어 있을 수 없습니다.");
-        }
-        if (failedAt == null) {
-            throw new IllegalArgumentException("failedAt은 비어 있을 수 없습니다.");
-        }
-        if (failureReason == null || failureReason.isBlank()) {
-            throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
-        }
+        validateRecoverTimeoutProcessingArguments(processingStartedBefore, failedAt, failureReason);
 
         return Math.toIntExact(queryFactory
                 .update(slackNotificationOutbox)
@@ -124,5 +119,45 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                                                                   ))
                 )
                 .execute());
+    }
+
+    private void validateRecoverTimeoutProcessingArguments(
+            Instant processingStartedBefore,
+            Instant failedAt,
+            String failureReason
+    ) {
+        validateProcessingStartedBefore(processingStartedBefore);
+        validateFailedAt(failedAt);
+        validateFailureReason(failureReason);
+    }
+
+    private void validateOutboxId(Long outboxId) {
+        if (outboxId == null) {
+            throw new IllegalArgumentException("outboxId는 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateProcessingStartedAt(Instant processingStartedAt) {
+        if (processingStartedAt == null) {
+            throw new IllegalArgumentException("processingStartedAt은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateProcessingStartedBefore(Instant processingStartedBefore) {
+        if (processingStartedBefore == null) {
+            throw new IllegalArgumentException("processingStartedBefore는 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateFailedAt(Instant failedAt) {
+        if (failedAt == null) {
+            throw new IllegalArgumentException("failedAt은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateFailureReason(String failureReason) {
+        if (failureReason == null || failureReason.isBlank()) {
+            throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
+        }
     }
 }
