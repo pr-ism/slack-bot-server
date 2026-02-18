@@ -49,7 +49,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
 
     @Override
     @Transactional(readOnly = true)
-    public List<SlackInteractionInbox> findPending(SlackInteractionInboxType interactionType, int limit) {
+    public List<SlackInteractionInbox> findClaimable(SlackInteractionInboxType interactionType, int limit) {
         if (limit <= 0) {
             return Collections.emptyList();
         }
@@ -73,7 +73,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
 
     @Override
     @Transactional
-    public boolean markProcessingIfPending(Long inboxId, Instant processingStartedAt) {
+    public boolean markProcessingIfClaimable(Long inboxId, Instant processingStartedAt) {
         long updatedCount = markAsProcessingWhenClaimable(inboxId, processingStartedAt);
 
         return updatedCount > 0;

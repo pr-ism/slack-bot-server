@@ -10,11 +10,11 @@ public interface SlackInteractionInboxRepository {
 
     boolean enqueue(SlackInteractionInboxType interactionType, String idempotencyKey, String payloadJson);
 
-    List<SlackInteractionInbox> findPending(SlackInteractionInboxType interactionType, int limit);
+    List<SlackInteractionInbox> findClaimable(SlackInteractionInboxType interactionType, int limit);
 
     Optional<SlackInteractionInbox> findById(Long inboxId);
 
-    boolean markProcessingIfPending(Long inboxId, Instant processingStartedAt);
+    boolean markProcessingIfClaimable(Long inboxId, Instant processingStartedAt);
 
     int recoverTimeoutProcessing(
             SlackInteractionInboxType interactionType,

@@ -59,7 +59,7 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
 
     @Override
     @Transactional(readOnly = true)
-    public List<SlackNotificationOutbox> findPending(int limit) {
+    public List<SlackNotificationOutbox> findClaimable(int limit) {
         if (limit <= 0) {
             return Collections.emptyList();
         }
@@ -74,7 +74,7 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
 
     @Override
     @Transactional
-    public boolean markProcessingIfPending(Long outboxId, Instant processingStartedAt) {
+    public boolean markProcessingIfClaimable(Long outboxId, Instant processingStartedAt) {
         long updatedCount = markAsProcessingWhenClaimable(outboxId, processingStartedAt);
 
         return updatedCount > 0;
