@@ -1,39 +1,47 @@
 package com.slack.bot.application.interactivity.box.retry;
 
 import com.slack.bot.application.interactivity.client.exception.SlackBotMessageDispatchException;
+import java.util.HashSet;
 import java.util.HashMap;
+import java.util.Set;
 import java.util.Map;
-import lombok.Getter;
 import org.springframework.web.client.ResourceAccessException;
 
-@Getter
 public class InteractionRetryExceptionClassifier {
 
-    private final Map<Class<? extends Throwable>, Boolean> retryableExceptions;
+    private final Set<Class<? extends Throwable>> retryableExceptionTypes;
 
     public static InteractionRetryExceptionClassifier create() {
-        Map<Class<? extends Throwable>, Boolean> retryableExceptions = createRetryableExceptions();
+        Set<Class<? extends Throwable>> retryableExceptionTypes = createRetryableExceptionTypes();
 
-        return new InteractionRetryExceptionClassifier(retryableExceptions);
+        return new InteractionRetryExceptionClassifier(retryableExceptionTypes);
     }
 
-    private static Map<Class<? extends Throwable>, Boolean> createRetryableExceptions() {
+    private static Set<Class<? extends Throwable>> createRetryableExceptionTypes() {
+        Set<Class<? extends Throwable>> retryableTypes = new HashSet<>();
+
+        retryableTypes.add(SlackBotMessageDispatchException.class);
+        retryableTypes.add(ResourceAccessException.class);
+        return Set.copyOf(retryableTypes);
+    }
+
+    private InteractionRetryExceptionClassifier(Set<Class<? extends Throwable>> retryableExceptionTypes) {
+        this.retryableExceptionTypes = retryableExceptionTypes;
+    }
+
+    public Map<Class<? extends Throwable>, Boolean> getRetryableExceptions() {
         Map<Class<? extends Throwable>, Boolean> retryables = new HashMap<>();
-
-        retryables.put(SlackBotMessageDispatchException.class, true);
-        retryables.put(ResourceAccessException.class, true);
+        for (Class<? extends Throwable> retryableType : retryableExceptionTypes) {
+            retryables.put(retryableType, true);
+        }
         return Map.copyOf(retryables);
-    }
-
-    private InteractionRetryExceptionClassifier(Map<Class<? extends Throwable>, Boolean> retryableExceptions) {
-        this.retryableExceptions = retryableExceptions;
     }
 
     public boolean isRetryable(Throwable throwable) {
         Throwable cursor = throwable;
 
         while (cursor != null) {
-            for (Class<? extends Throwable> retryableType : retryableExceptions.keySet()) {
+            for (Class<? extends Throwable> retryableType : retryableExceptionTypes) {
                 if (retryableType.isAssignableFrom(cursor.getClass())) {
                     return true;
                 }
@@ -49,4 +57,3 @@ public class InteractionRetryExceptionClassifier {
         return false;
     }
 }
-
