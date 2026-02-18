@@ -2,7 +2,6 @@ package com.slack.bot.application.interactivity.box.out;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyKeyGenerator;
 import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyScope;
 import com.slack.bot.application.interactivity.box.aop.InteractivityImmediateTriggerTarget;
@@ -117,20 +116,31 @@ public class SlackNotificationOutboxWriter {
             String channelId,
             String userId
     ) {
-        ObjectNode source = objectMapper.createObjectNode();
-
-        source.put("source", sourceKey);
-        source.put("messageType", messageType.name());
-        source.put("target", targetKey(teamId, channelId, userId));
+        String sourcePayload = idempotencySourcePayload(sourceKey, messageType, teamId, channelId, userId);
 
         return idempotencyKeyGenerator.generate(
                 SlackInteractionIdempotencyScope.SLACK_NOTIFICATION_OUTBOX,
-                source.toString()
+                sourcePayload
         );
     }
 
-    private String targetKey(String teamId, String channelId, String userId) {
-        return nullToEmpty(teamId) + ":" + nullToEmpty(channelId) + ":" + nullToEmpty(userId);
+    private String idempotencySourcePayload(
+            String sourceKey,
+            SlackNotificationOutboxMessageType messageType,
+            String teamId,
+            String channelId,
+            String userId
+    ) {
+        return "source=" + encodeIdempotencyComponent(sourceKey)
+                + "|messageType=" + encodeIdempotencyComponent(messageType.name())
+                + "|teamId=" + encodeIdempotencyComponent(teamId)
+                + "|channelId=" + encodeIdempotencyComponent(channelId)
+                + "|userId=" + encodeIdempotencyComponent(userId);
+    }
+
+    private String encodeIdempotencyComponent(String value) {
+        String normalized = nullToEmpty(value);
+        return normalized.length() + "#" + normalized;
     }
 
     private String nullToEmpty(String value) {

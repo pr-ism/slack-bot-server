@@ -416,16 +416,29 @@ class InteractivityAopIntegrationTest {
             String channelId,
             String userId
     ) {
-        ObjectNode source = objectMapper.createObjectNode();
-
-        source.put("source", sourceKey);
-        source.put("messageType", messageType.name());
-        source.put("target", nullToEmpty(teamId) + ":" + nullToEmpty(channelId) + ":" + nullToEmpty(userId));
-
         return slackInteractionIdempotencyKeyGenerator.generate(
                 SlackInteractionIdempotencyScope.SLACK_NOTIFICATION_OUTBOX,
-                source.toString()
+                outboxIdempotencySourcePayload(sourceKey, messageType, teamId, channelId, userId)
         );
+    }
+
+    private String outboxIdempotencySourcePayload(
+            String sourceKey,
+            SlackNotificationOutboxMessageType messageType,
+            String teamId,
+            String channelId,
+            String userId
+    ) {
+        return "source=" + encodeIdempotencyComponent(sourceKey)
+                + "|messageType=" + encodeIdempotencyComponent(messageType.name())
+                + "|teamId=" + encodeIdempotencyComponent(teamId)
+                + "|channelId=" + encodeIdempotencyComponent(channelId)
+                + "|userId=" + encodeIdempotencyComponent(userId);
+    }
+
+    private String encodeIdempotencyComponent(String value) {
+        String normalized = nullToEmpty(value);
+        return normalized.length() + "#" + normalized;
     }
 
     private String nullToEmpty(String value) {
