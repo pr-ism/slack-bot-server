@@ -66,6 +66,7 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
         validateIdempotencyKey(idempotencyKey);
         validateTeamId(teamId);
         validateChannelId(channelId);
+        validateMessagePayload(messageType, userId, text, blocksJson);
 
         this.messageType = messageType;
         this.idempotencyKey = idempotencyKey;
@@ -177,6 +178,62 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
         if (channelId == null || channelId.isBlank()) {
             throw new IllegalArgumentException("outbox channelId는 비어 있을 수 없습니다.");
         }
+    }
+
+    private void validateMessagePayload(
+            SlackNotificationOutboxMessageType messageType,
+            String userId,
+            String text,
+            String blocksJson
+    ) {
+        validateUserIdForEphemeral(messageType, userId);
+        validateTextForTextType(messageType, text);
+        validateBlocksJsonForBlocksType(messageType, blocksJson);
+    }
+
+    private void validateUserIdForEphemeral(SlackNotificationOutboxMessageType messageType, String userId) {
+        if (isEphemeralMessageType(messageType) && isMissingUserId(userId)) {
+            throw new IllegalArgumentException("EPHEMERAL 메시지는 userId가 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateTextForTextType(SlackNotificationOutboxMessageType messageType, String text) {
+        if (isTextMessageType(messageType) && isMissingText(text)) {
+            throw new IllegalArgumentException("TEXT 타입 메시지는 text가 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateBlocksJsonForBlocksType(SlackNotificationOutboxMessageType messageType, String blocksJson) {
+        if (isBlocksMessageType(messageType) && isMissingBlocksJson(blocksJson)) {
+            throw new IllegalArgumentException("BLOCKS 타입 메시지는 blocksJson이 비어 있을 수 없습니다.");
+        }
+    }
+
+    private boolean isBlocksMessageType(SlackNotificationOutboxMessageType messageType) {
+        return messageType == SlackNotificationOutboxMessageType.EPHEMERAL_BLOCKS
+                || messageType == SlackNotificationOutboxMessageType.CHANNEL_BLOCKS;
+    }
+
+    private boolean isEphemeralMessageType(SlackNotificationOutboxMessageType messageType) {
+        return messageType == SlackNotificationOutboxMessageType.EPHEMERAL_TEXT
+                || messageType == SlackNotificationOutboxMessageType.EPHEMERAL_BLOCKS;
+    }
+
+    private boolean isTextMessageType(SlackNotificationOutboxMessageType messageType) {
+        return messageType == SlackNotificationOutboxMessageType.EPHEMERAL_TEXT
+                || messageType == SlackNotificationOutboxMessageType.CHANNEL_TEXT;
+    }
+
+    private boolean isMissingUserId(String userId) {
+        return userId == null || userId.isBlank();
+    }
+
+    private boolean isMissingText(String text) {
+        return text == null || text.isBlank();
+    }
+
+    private boolean isMissingBlocksJson(String blocksJson) {
+        return blocksJson == null || blocksJson.isBlank();
     }
 
     private void validateProcessingStartedAt(Instant processingStartedAt) {
