@@ -61,12 +61,38 @@ class SlackNotificationOutboxTest {
     }
 
     @Test
+    void 멱등성_키가_null이면_예외를_던진다() {
+        // when & then
+        assertThatThrownBy(() -> SlackNotificationOutbox.builder()
+                                                        .messageType(SlackNotificationOutboxMessageType.CHANNEL_TEXT)
+                                                        .idempotencyKey(null)
+                                                        .teamId("T1")
+                                                        .channelId("channel1")
+                                                        .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("outbox idempotencyKey는 비어 있을 수 없습니다.");
+    }
+
+    @Test
     void 팀_ID가_없으면_예외를_던진다() {
         // when & then
         assertThatThrownBy(() -> SlackNotificationOutbox.builder()
                                                         .messageType(SlackNotificationOutboxMessageType.CHANNEL_TEXT)
                                                         .idempotencyKey("key")
                                                         .teamId(" ")
+                                                        .channelId("channel1")
+                                                        .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("outbox teamId는 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void 팀_ID가_null이면_예외를_던진다() {
+        // when & then
+        assertThatThrownBy(() -> SlackNotificationOutbox.builder()
+                                                        .messageType(SlackNotificationOutboxMessageType.CHANNEL_TEXT)
+                                                        .idempotencyKey("key")
+                                                        .teamId(null)
                                                         .channelId("channel1")
                                                         .build())
                 .isInstanceOf(IllegalArgumentException.class)
@@ -81,6 +107,19 @@ class SlackNotificationOutboxTest {
                                                         .idempotencyKey("key")
                                                         .teamId("T1")
                                                         .channelId(" ")
+                                                        .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("outbox channelId는 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void 채널_ID가_null이면_예외를_던진다() {
+        // when & then
+        assertThatThrownBy(() -> SlackNotificationOutbox.builder()
+                                                        .messageType(SlackNotificationOutboxMessageType.CHANNEL_TEXT)
+                                                        .idempotencyKey("key")
+                                                        .teamId("T1")
+                                                        .channelId(null)
                                                         .build())
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("outbox channelId는 비어 있을 수 없습니다.");
@@ -201,6 +240,18 @@ class SlackNotificationOutboxTest {
     }
 
     @Test
+    void markRetryPending은_failedAt이_null이면_예외를_던진다() {
+        // given
+        SlackNotificationOutbox outbox = pendingOutbox();
+        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+
+        // when & then
+        assertThatThrownBy(() -> outbox.markRetryPending(null, "retry"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("failedAt은 비어 있을 수 없습니다.");
+    }
+
+    @Test
     void markRetryPending은_failureReason이_공백이면_예외를_던진다() {
         // given
         SlackNotificationOutbox outbox = pendingOutbox();
@@ -228,6 +279,22 @@ class SlackNotificationOutboxTest {
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("failureReason은 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void markFailed는_failedAt이_null이면_예외를_던진다() {
+        // given
+        SlackNotificationOutbox outbox = pendingOutbox();
+        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+
+        // when & then
+        assertThatThrownBy(() -> outbox.markFailed(
+                null,
+                "failure",
+                SlackInteractivityFailureType.RETRY_EXHAUSTED
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("failedAt은 비어 있을 수 없습니다.");
     }
 
     @Test
@@ -279,7 +346,8 @@ class SlackNotificationOutboxTest {
                 () -> assertThat(outbox.getStatus()).isEqualTo(SlackNotificationOutboxStatus.PROCESSING),
                 () -> assertThat(outbox.getFailedAt()).isNull(),
                 () -> assertThat(outbox.getFailureReason()).isNull(),
-                () -> assertThat(outbox.getFailureType()).isNull()
+                () -> assertThat(outbox.getFailureType()).isNull(),
+                () -> assertThat(outbox.getProcessingAttempt()).isEqualTo(2)
         );
     }
 
@@ -331,6 +399,57 @@ class SlackNotificationOutboxTest {
         assertThatThrownBy(() -> sent.markProcessing(Instant.parse("2026-02-15T04:00:00Z")))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("PROCESSING 전이는 PENDING 또는 RETRY_PENDING 상태에서만 가능합니다.");
+    }
+
+    @Test
+    void FAILED_상태에서_PROCESSING_전이는_불가능하다() {
+        // given
+        SlackNotificationOutbox outbox = pendingOutbox();
+        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        outbox.markFailed(
+                Instant.parse("2026-02-15T01:00:00Z"),
+                "failure",
+                SlackInteractivityFailureType.RETRY_EXHAUSTED
+        );
+
+        // when & then
+        assertThatThrownBy(() -> outbox.markProcessing(Instant.parse("2026-02-15T02:00:00Z")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("PROCESSING 전이는 PENDING 또는 RETRY_PENDING 상태에서만 가능합니다.");
+    }
+
+    @Test
+    void FAILED_상태에서_SENT_전이는_불가능하다() {
+        // given
+        SlackNotificationOutbox outbox = pendingOutbox();
+        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        outbox.markFailed(
+                Instant.parse("2026-02-15T01:00:00Z"),
+                "failure",
+                SlackInteractivityFailureType.RETRY_EXHAUSTED
+        );
+
+        // when & then
+        assertThatThrownBy(() -> outbox.markSent(Instant.parse("2026-02-15T02:00:00Z")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("SENT 전이는 PROCESSING 상태에서만 가능합니다.");
+    }
+
+    @Test
+    void FAILED_상태에서_RETRY_PENDING_전이는_불가능하다() {
+        // given
+        SlackNotificationOutbox outbox = pendingOutbox();
+        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        outbox.markFailed(
+                Instant.parse("2026-02-15T01:00:00Z"),
+                "failure",
+                SlackInteractivityFailureType.RETRY_EXHAUSTED
+        );
+
+        // when & then
+        assertThatThrownBy(() -> outbox.markRetryPending(Instant.parse("2026-02-15T02:00:00Z"), "retry"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("RETRY_PENDING 전이는 PROCESSING 상태에서만 가능합니다.");
     }
 
     private SlackNotificationOutbox pendingOutbox() {
