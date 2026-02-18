@@ -105,6 +105,17 @@ class SlackNotificationOutboxTest {
     }
 
     @Test
+    void markProcessing은_processingStartedAt이_null이면_예외를_던진다() {
+        // given
+        SlackNotificationOutbox outbox = pendingOutbox();
+
+        // when & then
+        assertThatThrownBy(() -> outbox.markProcessing(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("processingStartedAt은 비어 있을 수 없습니다.");
+    }
+
+    @Test
     void markSent_호출시_SENT_상태와_전송시각이_저장된다() {
         // given
         SlackNotificationOutbox outbox = pendingOutbox();
@@ -122,6 +133,18 @@ class SlackNotificationOutboxTest {
                 () -> assertThat(outbox.getFailedAt()).isNull(),
                 () -> assertThat(outbox.getFailureReason()).isNull()
         );
+    }
+
+    @Test
+    void markSent는_sentAt이_null이면_예외를_던진다() {
+        // given
+        SlackNotificationOutbox outbox = pendingOutbox();
+        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+
+        // when & then
+        assertThatThrownBy(() -> outbox.markSent(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("sentAt은 비어 있을 수 없습니다.");
     }
 
     @Test
@@ -162,6 +185,83 @@ class SlackNotificationOutboxTest {
                 () -> assertThat(outbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(outbox.getFailureReason()).isEqualTo("retry")
         );
+    }
+
+    @Test
+    void markRetryPending은_failureReason이_null이면_예외를_던진다() {
+        // given
+        SlackNotificationOutbox outbox = pendingOutbox();
+        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        Instant failedAt = Instant.parse("2026-02-15T03:00:00Z");
+
+        // when & then
+        assertThatThrownBy(() -> outbox.markRetryPending(failedAt, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("failureReason은 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void markRetryPending은_failureReason이_공백이면_예외를_던진다() {
+        // given
+        SlackNotificationOutbox outbox = pendingOutbox();
+        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        Instant failedAt = Instant.parse("2026-02-15T03:00:00Z");
+
+        // when & then
+        assertThatThrownBy(() -> outbox.markRetryPending(failedAt, " "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("failureReason은 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void markFailed는_failureReason이_null이면_예외를_던진다() {
+        // given
+        SlackNotificationOutbox outbox = pendingOutbox();
+        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        Instant failedAt = Instant.parse("2026-02-15T02:00:00Z");
+
+        // when & then
+        assertThatThrownBy(() -> outbox.markFailed(
+                failedAt,
+                null,
+                SlackInteractivityFailureType.RETRY_EXHAUSTED
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("failureReason은 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void markFailed는_failureReason이_공백이면_예외를_던진다() {
+        // given
+        SlackNotificationOutbox outbox = pendingOutbox();
+        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        Instant failedAt = Instant.parse("2026-02-15T02:00:00Z");
+
+        // when & then
+        assertThatThrownBy(() -> outbox.markFailed(
+                failedAt,
+                " ",
+                SlackInteractivityFailureType.RETRY_EXHAUSTED
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("failureReason은 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void markFailed는_failureType이_null이면_예외를_던진다() {
+        // given
+        SlackNotificationOutbox outbox = pendingOutbox();
+        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        Instant failedAt = Instant.parse("2026-02-15T02:00:00Z");
+
+        // when & then
+        assertThatThrownBy(() -> outbox.markFailed(
+                failedAt,
+                "failure",
+                null
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("failureType은 비어 있을 수 없습니다.");
     }
 
     @Test
