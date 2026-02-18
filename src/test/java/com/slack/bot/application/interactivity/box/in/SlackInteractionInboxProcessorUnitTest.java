@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyKeyGenerator;
@@ -63,9 +64,9 @@ class SlackInteractionInboxProcessorUnitTest {
     @Test
     void block_actions_한건_처리중_예외가_나도_다음_엔트리를_계속_처리한다() {
         // given
-        SlackInteractionInbox first = org.mockito.Mockito.mock(SlackInteractionInbox.class);
-        SlackInteractionInbox second = org.mockito.Mockito.mock(SlackInteractionInbox.class);
-        SlackInteractionInbox third = org.mockito.Mockito.mock(SlackInteractionInbox.class);
+        SlackInteractionInbox first = mock(SlackInteractionInbox.class);
+        SlackInteractionInbox second = mock(SlackInteractionInbox.class);
+        SlackInteractionInbox third = mock(SlackInteractionInbox.class);
         given(first.getId()).willReturn(1L);
         given(slackInteractionInboxRepository.findClaimable(SlackInteractionInboxType.BLOCK_ACTIONS, 3))
                 .willReturn(List.of(first, second, third));
@@ -88,8 +89,8 @@ class SlackInteractionInboxProcessorUnitTest {
     @Test
     void view_submission_한건_처리중_예외가_나도_다음_엔트리를_계속_처리한다() {
         // given
-        SlackInteractionInbox first = org.mockito.Mockito.mock(SlackInteractionInbox.class);
-        SlackInteractionInbox second = org.mockito.Mockito.mock(SlackInteractionInbox.class);
+        SlackInteractionInbox first = mock(SlackInteractionInbox.class);
+        SlackInteractionInbox second = mock(SlackInteractionInbox.class);
         given(first.getId()).willReturn(11L);
         given(slackInteractionInboxRepository.findClaimable(SlackInteractionInboxType.VIEW_SUBMISSION, 2))
                 .willReturn(List.of(first, second));
