@@ -46,7 +46,7 @@ slack:
       reviewer: |-
         리뷰 예약 시간이 되었습니다.
         PR: %s
-  interactivity:
+  interaction:
     claim-mapping:
       messages:
         success: "✅ 등록되었습니다! (Github: %s)"
@@ -98,6 +98,31 @@ app:
       max-pool-size: 4
       thread-name-prefix: review-interaction-
       queue-capacity: 500
+  interaction:
+    inbox:
+      block-actions:
+        worker-enabled: true
+        poll-delay-ms: 200
+        processing-timeout-ms: 60000
+      view-submission:
+        worker-enabled: true
+        poll-delay-ms: 200
+        processing-timeout-ms: 60000
+    outbox:
+      worker-enabled: true
+      poll-delay-ms: 200
+      processing-timeout-ms: 60000
+    retry:
+      inbox:
+        max-attempts: 2
+        initial-delay-ms: 100
+        multiplier: 2.0
+        max-delay-ms: 1000
+      outbox:
+        max-attempts: 2
+        initial-delay-ms: 100
+        multiplier: 2.0
+        max-delay-ms: 1000
 
 cors:
   allowed-origins:
