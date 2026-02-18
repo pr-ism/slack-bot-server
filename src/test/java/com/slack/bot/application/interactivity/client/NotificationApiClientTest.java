@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -43,6 +43,7 @@ class NotificationApiClientTest {
         Workspace workspace = mock(Workspace.class);
         given(workspace.getTeamId()).willReturn("T1");
         given(workspaceRepository.findByAccessToken("token")).willReturn(Optional.of(workspace));
+        given(outboxIdempotencySourceContext.currentSourceKey()).willReturn(Optional.of("INBOX:1"));
 
         notificationApiClient = new NotificationApiClient(
                 slackNotificationOutboxWriter,
@@ -59,7 +60,7 @@ class NotificationApiClientTest {
 
         // then
         verify(slackNotificationOutboxWriter).enqueueEphemeralText(
-                isNull(),
+                eq("INBOX:1"),
                 eq("T1"),
                 eq("C1"),
                 eq("U1"),
@@ -74,7 +75,7 @@ class NotificationApiClientTest {
 
         // then
         verify(slackNotificationOutboxWriter).enqueueEphemeralBlocks(
-                isNull(),
+                eq("INBOX:1"),
                 eq("T1"),
                 eq("C1"),
                 eq("U1"),
@@ -90,7 +91,7 @@ class NotificationApiClientTest {
 
         // then
         verify(slackNotificationOutboxWriter).enqueueChannelText(
-                isNull(),
+                eq("INBOX:1"),
                 eq("T1"),
                 eq("C1"),
                 eq("hello")
@@ -104,11 +105,42 @@ class NotificationApiClientTest {
 
         // then
         verify(slackNotificationOutboxWriter).enqueueChannelBlocks(
-                isNull(),
+                eq("INBOX:1"),
                 eq("T1"),
                 eq("C1"),
                 eq("[]"),
                 eq("fallback")
+        );
+    }
+
+    @Test
+    void source_컨텍스트가_없으면_ad_hoc_source를_생성해_outbox에_적재한다() {
+        // given
+        given(outboxIdempotencySourceContext.currentSourceKey()).willReturn(Optional.empty());
+
+        // when
+        notificationApiClient.sendMessage("token", "C1", "hello");
+
+        // then
+        verify(slackNotificationOutboxWriter).enqueueChannelText(
+                argThat(sourceKey -> sourceKey != null && sourceKey.startsWith("BUSINESS:ADHOC:")),
+                eq("T1"),
+                eq("C1"),
+                eq("hello")
+        );
+    }
+
+    @Test
+    void 명시적_source를_전달하면_컨텍스트_대신_해당_source를_사용한다() {
+        // when
+        notificationApiClient.sendMessage("EVENT-1", "token", "C1", "hello");
+
+        // then
+        verify(slackNotificationOutboxWriter).enqueueChannelText(
+                eq("EVENT-1"),
+                eq("T1"),
+                eq("C1"),
+                eq("hello")
         );
     }
 

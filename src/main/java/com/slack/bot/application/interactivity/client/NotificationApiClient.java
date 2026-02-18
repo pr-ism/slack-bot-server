@@ -6,6 +6,7 @@ import com.slack.bot.application.interactivity.box.out.exception.OutboxWorkspace
 import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
+import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -14,16 +15,28 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class NotificationApiClient {
 
+    private static final String AD_HOC_SOURCE_PREFIX = "BUSINESS:ADHOC:";
+
     private final SlackNotificationOutboxWriter slackNotificationOutboxWriter;
     private final NotificationTransportApiClient notificationTransportApiClient;
     private final OutboxIdempotencySourceContext outboxIdempotencySourceContext;
     private final WorkspaceRepository workspaceRepository;
 
     public void sendEphemeralMessage(String token, String channelId, String targetUserId, String text) {
+        sendEphemeralMessage(null, token, channelId, targetUserId, text);
+    }
+
+    public void sendEphemeralMessage(
+            String sourceKey,
+            String token,
+            String channelId,
+            String targetUserId,
+            String text
+    ) {
         String teamId = resolveTeamId(token);
 
         slackNotificationOutboxWriter.enqueueEphemeralText(
-                null,
+                resolveSourceKey(sourceKey),
                 teamId,
                 channelId,
                 targetUserId,
@@ -32,10 +45,21 @@ public class NotificationApiClient {
     }
 
     public void sendEphemeralBlockMessage(String token, String channelId, String targetUserId, Object blocks, String text) {
+        sendEphemeralBlockMessage(null, token, channelId, targetUserId, blocks, text);
+    }
+
+    public void sendEphemeralBlockMessage(
+            String sourceKey,
+            String token,
+            String channelId,
+            String targetUserId,
+            Object blocks,
+            String text
+    ) {
         String teamId = resolveTeamId(token);
 
         slackNotificationOutboxWriter.enqueueEphemeralBlocks(
-                null,
+                resolveSourceKey(sourceKey),
                 teamId,
                 channelId,
                 targetUserId,
@@ -45,10 +69,14 @@ public class NotificationApiClient {
     }
 
     public void sendMessage(String token, String channelId, String text) {
+        sendMessage(null, token, channelId, text);
+    }
+
+    public void sendMessage(String sourceKey, String token, String channelId, String text) {
         String teamId = resolveTeamId(token);
 
         slackNotificationOutboxWriter.enqueueChannelText(
-                null,
+                resolveSourceKey(sourceKey),
                 teamId,
                 channelId,
                 text
@@ -56,10 +84,14 @@ public class NotificationApiClient {
     }
 
     public void sendBlockMessage(String token, String channelId, Object blocks, String text) {
+        sendBlockMessage(null, token, channelId, blocks, text);
+    }
+
+    public void sendBlockMessage(String sourceKey, String token, String channelId, Object blocks, String text) {
         String teamId = resolveTeamId(token);
 
         slackNotificationOutboxWriter.enqueueChannelBlocks(
-                null,
+                resolveSourceKey(sourceKey),
                 teamId,
                 channelId,
                 blocks,
@@ -77,6 +109,20 @@ public class NotificationApiClient {
 
     public <T> T withBusinessEventSource(String businessEventId, Supplier<T> supplier) {
         return outboxIdempotencySourceContext.withBusinessEventSource(businessEventId, supplier);
+    }
+
+    private String resolveSourceKey(String sourceKey) {
+        if (sourceKey != null) {
+            return sourceKey;
+        }
+
+        String contextSourceKey = outboxIdempotencySourceContext.currentSourceKey()
+                                                                .orElse(null);
+        if (contextSourceKey != null) {
+            return contextSourceKey;
+        }
+
+        return AD_HOC_SOURCE_PREFIX + UUID.randomUUID();
     }
 
     private String resolveTeamId(String token) {
