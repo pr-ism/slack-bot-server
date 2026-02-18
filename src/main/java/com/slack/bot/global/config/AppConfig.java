@@ -2,6 +2,7 @@ package com.slack.bot.global.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.slack.bot.application.command.AccessLinker;
 import com.slack.bot.application.command.MemberConnector;
 import com.slack.bot.application.command.ProjectMemberReader;
@@ -30,14 +31,17 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.concurrent.TimeUnit;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -54,6 +58,18 @@ import org.springframework.web.client.RestClient;
 public class AppConfig {
 
     private static final String DATE_TIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ss";
+
+    @Bean
+    public CacheManager cacheManager() {
+        CaffeineCacheManager manager = new CaffeineCacheManager("workspaceTeamIdByAccessToken");
+        manager.setCaffeine(
+                Caffeine.newBuilder()
+                        .expireAfterWrite(30, TimeUnit.MINUTES)
+                        .maximumSize(1_000)
+        );
+
+        return manager;
+    }
 
     @Bean
     public RestClient.Builder slackRestClientBuilder() {

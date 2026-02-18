@@ -33,6 +33,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-cache'
 	implementation 'org.springframework.retry:spring-retry'
+	implementation 'com.github.ben-manes.caffeine:caffeine'
 
 	implementation 'com.nimbusds:nimbus-jose-jwt:9.37.4'
 
