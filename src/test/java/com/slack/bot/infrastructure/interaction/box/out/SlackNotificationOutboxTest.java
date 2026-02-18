@@ -156,6 +156,66 @@ class SlackNotificationOutboxTest {
     }
 
     @Test
+    void EPHEMERAL_BLOCKS는_userId가_null이면_예외를_던진다() {
+        // when & then
+        assertThatThrownBy(() -> SlackNotificationOutbox.builder()
+                                                        .messageType(SlackNotificationOutboxMessageType.EPHEMERAL_BLOCKS)
+                                                        .idempotencyKey("key")
+                                                        .teamId("T1")
+                                                        .channelId("channel1")
+                                                        .userId(null)
+                                                        .blocksJson("[{}]")
+                                                        .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("EPHEMERAL 메시지는 userId가 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void EPHEMERAL_BLOCKS는_userId가_공백이면_예외를_던진다() {
+        // when & then
+        assertThatThrownBy(() -> SlackNotificationOutbox.builder()
+                                                        .messageType(SlackNotificationOutboxMessageType.EPHEMERAL_BLOCKS)
+                                                        .idempotencyKey("key")
+                                                        .teamId("T1")
+                                                        .channelId("channel1")
+                                                        .userId(" ")
+                                                        .blocksJson("[{}]")
+                                                        .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("EPHEMERAL 메시지는 userId가 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void EPHEMERAL_TEXT는_text가_null이면_예외를_던진다() {
+        // when & then
+        assertThatThrownBy(() -> SlackNotificationOutbox.builder()
+                                                        .messageType(SlackNotificationOutboxMessageType.EPHEMERAL_TEXT)
+                                                        .idempotencyKey("key")
+                                                        .teamId("T1")
+                                                        .channelId("channel1")
+                                                        .userId("user1")
+                                                        .text(null)
+                                                        .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("TEXT 타입 메시지는 text가 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void EPHEMERAL_TEXT는_text가_공백이면_예외를_던진다() {
+        // when & then
+        assertThatThrownBy(() -> SlackNotificationOutbox.builder()
+                                                        .messageType(SlackNotificationOutboxMessageType.EPHEMERAL_TEXT)
+                                                        .idempotencyKey("key")
+                                                        .teamId("T1")
+                                                        .channelId("channel1")
+                                                        .userId("user1")
+                                                        .text(" ")
+                                                        .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("TEXT 타입 메시지는 text가 비어 있을 수 없습니다.");
+    }
+
+    @Test
     void CHANNEL_TEXT는_text가_null이면_예외를_던진다() {
         // when & then
         assertThatThrownBy(() -> SlackNotificationOutbox.builder()
