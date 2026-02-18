@@ -105,6 +105,7 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
     public void markRetryPending(Instant failedAt, String failureReason) {
         validateTransition(SlackNotificationOutboxStatus.PROCESSING, "RETRY_PENDING");
         validateFailedAt(failedAt);
+        validateFailureReason(failureReason);
 
         this.status = SlackNotificationOutboxStatus.RETRY_PENDING;
         this.processingStartedAt = null;
@@ -120,6 +121,7 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
     ) {
         validateTransition(SlackNotificationOutboxStatus.PROCESSING, "FAILED");
         validateFailedAt(failedAt);
+        validateFailureReason(failureReason);
         validateFailureType(failureType);
 
         this.status = SlackNotificationOutboxStatus.FAILED;
@@ -192,6 +194,12 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
     private void validateFailedAt(Instant failedAt) {
         if (failedAt == null) {
             throw new IllegalArgumentException("failedAt은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateFailureReason(String failureReason) {
+        if (failureReason == null || failureReason.isBlank()) {
+            throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
         }
     }
 
