@@ -272,6 +272,48 @@ class SlackNotificationOutboxWriterTest {
     }
 
     @Test
+    void 에페메랄_텍스트_메시지의_text가_null이면_예외를_던지고_enqueue하지않는다() {
+        // given
+        String sourceKey = "EVENT-NULL-EPHEMERAL-TEXT";
+        String teamId = "T1";
+        String channelId = "C1";
+        String userId = "U1";
+
+        // when & then
+        assertThatThrownBy(() -> targetWriter().enqueueEphemeralText(
+                sourceKey,
+                teamId,
+                channelId,
+                userId,
+                null
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("text는 null일 수 없습니다.");
+
+        assertThat(slackNotificationOutboxRepository.findPending(10)).isEmpty();
+    }
+
+    @Test
+    void 채널_텍스트_메시지의_text가_null이면_예외를_던지고_enqueue하지않는다() {
+        // given
+        String sourceKey = "EVENT-NULL-CHANNEL-TEXT";
+        String teamId = "T1";
+        String channelId = "C1";
+
+        // when & then
+        assertThatThrownBy(() -> targetWriter().enqueueChannelText(
+                sourceKey,
+                teamId,
+                channelId,
+                null
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("text는 null일 수 없습니다.");
+
+        assertThat(slackNotificationOutboxRepository.findPending(10)).isEmpty();
+    }
+
+    @Test
     void 동일한_요청은_멱등성이_보장되어_중복_enqueue되지_않는다() {
         // given
         String sourceKey = "EVENT-IDEMPOTENT";

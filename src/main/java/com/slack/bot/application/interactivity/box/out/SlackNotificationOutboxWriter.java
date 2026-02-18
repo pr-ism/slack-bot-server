@@ -27,7 +27,7 @@ public class SlackNotificationOutboxWriter {
     @ResolveOutboxSource
     @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
     public void enqueueEphemeralText(String sourceKey, String teamId, String channelId, String userId, String text) {
-        enqueue(OutboxEnqueueRequest.ephemeralText(sourceKey, teamId, channelId, userId, text));
+        enqueue(OutboxEnqueueRequest.ephemeralText(sourceKey, teamId, channelId, userId, validateText(text)));
     }
 
     @ResolveOutboxSource
@@ -73,7 +73,7 @@ public class SlackNotificationOutboxWriter {
     @ResolveOutboxSource
     @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
     public void enqueueChannelText(String sourceKey, String teamId, String channelId, String text) {
-        enqueue(OutboxEnqueueRequest.channelText(sourceKey, teamId, channelId, text));
+        enqueue(OutboxEnqueueRequest.channelText(sourceKey, teamId, channelId, validateText(text)));
     }
 
     @ResolveOutboxSource
@@ -113,6 +113,14 @@ public class SlackNotificationOutboxWriter {
         }
 
         return blocks.toString();
+    }
+
+    private String validateText(String text) {
+        if (text == null) {
+            throw new IllegalArgumentException("text는 null일 수 없습니다.");
+        }
+
+        return text;
     }
 
     private String normalizeBlocksJson(String blocksJson) {
