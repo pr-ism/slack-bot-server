@@ -1,4 +1,4 @@
-package com.slack.bot.infrastructure.interactivity.block;
+package com.slack.bot.infrastructure.interaction.block;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
