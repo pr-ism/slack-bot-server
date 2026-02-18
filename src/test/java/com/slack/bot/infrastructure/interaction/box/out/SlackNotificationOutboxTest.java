@@ -186,6 +186,36 @@ class SlackNotificationOutboxTest {
     }
 
     @Test
+    void EPHEMERAL_BLOCKS는_blocksJson이_null이면_예외를_던진다() {
+        // when & then
+        assertThatThrownBy(() -> SlackNotificationOutbox.builder()
+                                                        .messageType(SlackNotificationOutboxMessageType.EPHEMERAL_BLOCKS)
+                                                        .idempotencyKey("key")
+                                                        .teamId("T1")
+                                                        .channelId("channel1")
+                                                        .userId("user1")
+                                                        .blocksJson(null)
+                                                        .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("BLOCKS 타입 메시지는 blocksJson이 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void EPHEMERAL_BLOCKS는_blocksJson이_공백이면_예외를_던진다() {
+        // when & then
+        assertThatThrownBy(() -> SlackNotificationOutbox.builder()
+                                                        .messageType(SlackNotificationOutboxMessageType.EPHEMERAL_BLOCKS)
+                                                        .idempotencyKey("key")
+                                                        .teamId("T1")
+                                                        .channelId("channel1")
+                                                        .userId("user1")
+                                                        .blocksJson(" ")
+                                                        .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("BLOCKS 타입 메시지는 blocksJson이 비어 있을 수 없습니다.");
+    }
+
+    @Test
     void EPHEMERAL_TEXT는_text가_null이면_예외를_던진다() {
         // when & then
         assertThatThrownBy(() -> SlackNotificationOutbox.builder()
@@ -369,7 +399,8 @@ class SlackNotificationOutboxTest {
                 () -> assertThat(outbox.getStatus()).isEqualTo(SlackNotificationOutboxStatus.RETRY_PENDING),
                 () -> assertThat(outbox.getProcessingStartedAt()).isNull(),
                 () -> assertThat(outbox.getFailedAt()).isEqualTo(failedAt),
-                () -> assertThat(outbox.getFailureReason()).isEqualTo("retry")
+                () -> assertThat(outbox.getFailureReason()).isEqualTo("retry"),
+                () -> assertThat(outbox.getFailureType()).isNull()
         );
     }
 
