@@ -22,6 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificationOutboxRepository {
 
+    private static final List<SlackNotificationOutboxStatus> PROCESSING_CLAIMABLE_STATUSES = List.of(
+            SlackNotificationOutboxStatus.PENDING,
+            SlackNotificationOutboxStatus.RETRY_PENDING
+    );
+
     private final JPAQueryFactory queryFactory;
     private final JpaSlackNotificationOutboxRepository repository;
     private final MysqlDuplicateKeyDetector mysqlDuplicateKeyDetector;
@@ -60,10 +65,7 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
 
         return queryFactory
                 .selectFrom(slackNotificationOutbox)
-                .where(slackNotificationOutbox.status.in(
-                        SlackNotificationOutboxStatus.PENDING,
-                        SlackNotificationOutboxStatus.RETRY_PENDING
-                ))
+                .where(slackNotificationOutbox.status.in(PROCESSING_CLAIMABLE_STATUSES))
                 .orderBy(slackNotificationOutbox.id.asc())
                 .limit(limit)
                 .fetch();
@@ -82,10 +84,7 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                 .set(slackNotificationOutbox.failureType, Expressions.nullExpression(SlackInteractivityFailureType.class))
                 .where(
                         slackNotificationOutbox.id.eq(outboxId),
-                        slackNotificationOutbox.status.in(
-                                SlackNotificationOutboxStatus.PENDING,
-                                SlackNotificationOutboxStatus.RETRY_PENDING
-                        )
+                        slackNotificationOutbox.status.in(PROCESSING_CLAIMABLE_STATUSES)
                 )
                 .execute();
 
