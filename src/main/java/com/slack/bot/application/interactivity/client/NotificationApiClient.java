@@ -41,8 +41,14 @@ public class NotificationApiClient {
         );
     }
 
-    public void sendEphemeralBlockMessage(String token, String channelId, String targetUserId, Object blocks, String text) {
-        sendEphemeralBlockMessage(null, token, channelId, targetUserId, blocks, text);
+    public void sendEphemeralBlockMessage(
+            String token,
+            String channelId,
+            String targetUserId,
+            Object blocks,
+            String fallbackText
+    ) {
+        sendEphemeralBlockMessage(null, token, channelId, targetUserId, blocks, fallbackText);
     }
 
     public void sendEphemeralBlockMessage(
@@ -51,7 +57,7 @@ public class NotificationApiClient {
             String channelId,
             String targetUserId,
             Object blocks,
-            String text
+            String fallbackText
     ) {
         String teamId = workspaceAccessTokenTeamIdResolver.resolve(token);
 
@@ -61,7 +67,7 @@ public class NotificationApiClient {
                 channelId,
                 targetUserId,
                 blocks,
-                text
+                fallbackText
         );
     }
 
@@ -80,11 +86,17 @@ public class NotificationApiClient {
         );
     }
 
-    public void sendBlockMessage(String token, String channelId, Object blocks, String text) {
-        sendBlockMessage(null, token, channelId, blocks, text);
+    public void sendBlockMessage(String token, String channelId, Object blocks, String fallbackText) {
+        sendBlockMessage(null, token, channelId, blocks, fallbackText);
     }
 
-    public void sendBlockMessage(String sourceKey, String token, String channelId, Object blocks, String text) {
+    public void sendBlockMessage(
+            String sourceKey,
+            String token,
+            String channelId,
+            Object blocks,
+            String fallbackText
+    ) {
         String teamId = workspaceAccessTokenTeamIdResolver.resolve(token);
 
         slackNotificationOutboxWriter.enqueueChannelBlocks(
@@ -92,7 +104,7 @@ public class NotificationApiClient {
                 teamId,
                 channelId,
                 blocks,
-                text
+                fallbackText
         );
     }
 
