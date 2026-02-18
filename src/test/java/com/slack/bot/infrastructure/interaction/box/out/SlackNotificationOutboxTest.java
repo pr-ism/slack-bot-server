@@ -256,7 +256,8 @@ class SlackNotificationOutboxTest {
                 () -> assertThat(outbox.getStatus()).isEqualTo(SlackNotificationOutboxStatus.SENT),
                 () -> assertThat(outbox.getSentAt()).isEqualTo(sentAt),
                 () -> assertThat(outbox.getFailedAt()).isNull(),
-                () -> assertThat(outbox.getFailureReason()).isNull()
+                () -> assertThat(outbox.getFailureReason()).isNull(),
+                () -> assertThat(outbox.getFailureType()).isNull()
         );
     }
 
