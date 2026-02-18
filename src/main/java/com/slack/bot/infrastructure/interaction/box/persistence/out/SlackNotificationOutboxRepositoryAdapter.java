@@ -29,12 +29,13 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
 
     private final JPAQueryFactory queryFactory;
     private final JpaSlackNotificationOutboxRepository repository;
+    private final SlackNotificationOutboxCreator outboxCreator;
     private final MysqlDuplicateKeyDetector mysqlDuplicateKeyDetector;
 
     @Override
     public boolean enqueue(SlackNotificationOutbox outbox) {
         try {
-            repository.save(outbox);
+            outboxCreator.saveNew(outbox);
             return true;
         } catch (DataIntegrityViolationException exception) {
             if (mysqlDuplicateKeyDetector.isNotDuplicateKey(exception)) {
@@ -98,6 +99,16 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
     @Override
     @Transactional
     public int recoverTimeoutProcessing(Instant processingStartedBefore, Instant failedAt, String failureReason) {
+        if (processingStartedBefore == null) {
+            throw new IllegalArgumentException("processingStartedBefore는 비어 있을 수 없습니다.");
+        }
+        if (failedAt == null) {
+            throw new IllegalArgumentException("failedAt은 비어 있을 수 없습니다.");
+        }
+        if (failureReason == null || failureReason.isBlank()) {
+            throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
+        }
+
         return Math.toIntExact(queryFactory
                 .update(slackNotificationOutbox)
                 .set(slackNotificationOutbox.status, SlackNotificationOutboxStatus.RETRY_PENDING)
