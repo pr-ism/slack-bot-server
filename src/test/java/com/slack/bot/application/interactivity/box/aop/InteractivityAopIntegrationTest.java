@@ -19,6 +19,7 @@ import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencySc
 import com.slack.bot.application.interactivity.box.in.SlackInteractionInboxEntryProcessor;
 import com.slack.bot.application.interactivity.box.in.SlackInteractionInboxProcessor;
 import com.slack.bot.application.interactivity.box.out.OutboxIdempotencySourceContext;
+import com.slack.bot.application.interactivity.box.out.OutboxIdempotencyPayloadEncoder;
 import com.slack.bot.application.interactivity.box.out.SlackNotificationOutboxWriter;
 import com.slack.bot.application.interactivity.view.ViewSubmissionInteractionService;
 import com.slack.bot.application.interactivity.view.dto.ViewSubmissionSyncResultDto;
@@ -72,6 +73,9 @@ class InteractivityAopIntegrationTest {
 
     @Autowired
     SlackInteractionIdempotencyKeyGenerator slackInteractionIdempotencyKeyGenerator;
+
+    @Autowired
+    OutboxIdempotencyPayloadEncoder outboxIdempotencyPayloadEncoder;
 
     @Autowired
     ObjectMapper objectMapper;
@@ -418,34 +422,7 @@ class InteractivityAopIntegrationTest {
     ) {
         return slackInteractionIdempotencyKeyGenerator.generate(
                 SlackInteractionIdempotencyScope.SLACK_NOTIFICATION_OUTBOX,
-                outboxIdempotencySourcePayload(sourceKey, messageType, teamId, channelId, userId)
+                outboxIdempotencyPayloadEncoder.encode(sourceKey, messageType, teamId, channelId, userId)
         );
-    }
-
-    private String outboxIdempotencySourcePayload(
-            String sourceKey,
-            SlackNotificationOutboxMessageType messageType,
-            String teamId,
-            String channelId,
-            String userId
-    ) {
-        return "source=" + encodeIdempotencyComponent(sourceKey)
-                + "|messageType=" + encodeIdempotencyComponent(messageType.name())
-                + "|teamId=" + encodeIdempotencyComponent(teamId)
-                + "|channelId=" + encodeIdempotencyComponent(channelId)
-                + "|userId=" + encodeIdempotencyComponent(userId);
-    }
-
-    private String encodeIdempotencyComponent(String value) {
-        String normalized = nullToEmpty(value);
-        return normalized.length() + "#" + normalized;
-    }
-
-    private String nullToEmpty(String value) {
-        if (value == null) {
-            return "";
-        }
-
-        return value;
     }
 }

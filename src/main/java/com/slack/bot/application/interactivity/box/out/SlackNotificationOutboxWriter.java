@@ -22,6 +22,7 @@ public class SlackNotificationOutboxWriter {
     private final ObjectMapper objectMapper;
     private final SlackNotificationOutboxRepository slackNotificationOutboxRepository;
     private final SlackInteractionIdempotencyKeyGenerator idempotencyKeyGenerator;
+    private final OutboxIdempotencyPayloadEncoder outboxIdempotencyPayloadEncoder;
 
     @ResolveOutboxSource
     @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
@@ -155,39 +156,18 @@ public class SlackNotificationOutboxWriter {
             String channelId,
             String userId
     ) {
-        String sourcePayload = idempotencySourcePayload(sourceKey, messageType, teamId, channelId, userId);
+        String sourcePayload = outboxIdempotencyPayloadEncoder.encode(
+                sourceKey,
+                messageType,
+                teamId,
+                channelId,
+                userId
+        );
 
         return idempotencyKeyGenerator.generate(
                 SlackInteractionIdempotencyScope.SLACK_NOTIFICATION_OUTBOX,
                 sourcePayload
         );
-    }
-
-    private String idempotencySourcePayload(
-            String sourceKey,
-            SlackNotificationOutboxMessageType messageType,
-            String teamId,
-            String channelId,
-            String userId
-    ) {
-        return "source=" + encodeIdempotencyComponent(sourceKey)
-                + "|messageType=" + encodeIdempotencyComponent(messageType.name())
-                + "|teamId=" + encodeIdempotencyComponent(teamId)
-                + "|channelId=" + encodeIdempotencyComponent(channelId)
-                + "|userId=" + encodeIdempotencyComponent(userId);
-    }
-
-    private String encodeIdempotencyComponent(String value) {
-        String normalized = nullToEmpty(value);
-        return normalized.length() + "#" + normalized;
-    }
-
-    private String nullToEmpty(String value) {
-        if (value == null) {
-            return "";
-        }
-
-        return value;
     }
 
     private record OutboxEnqueueRequest(
