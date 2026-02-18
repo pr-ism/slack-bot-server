@@ -297,6 +297,26 @@ class NotificationDispatcherTest {
     }
 
     @Test
+    void DM이_비활성화된_경우_기본_DM_전송_메서드는_DM을_전송하지_않는다() {
+        // given
+        String token = "xoxb-test-token";
+        String userId = "U2";
+        String text = "test message";
+        NotificationSettings settings = NotificationSettings.defaults(2L);
+        settings.changeReservationConfirmedSpace(DeliverySpace.TRIGGER_CHANNEL);
+
+        given(notificationSettingsRepository.findBySlackUser("T1", userId))
+                .willReturn(Optional.of(settings));
+
+        // when
+        notificationDispatcher.sendDirectMessageBySettingOrDefault("T1", token, userId, text);
+
+        // then
+        verify(notificationApiClient, never()).openDirectMessageChannel(anyString(), anyString());
+        verify(notificationApiClient, never()).sendMessage(anyString(), anyString(), anyString());
+    }
+
+    @Test
     void 알림_설정이_없는_사용자에게_텍스트_메시지를_에페메랄로_보낸다() {
         // given
         String token = "xoxb-test-token";
