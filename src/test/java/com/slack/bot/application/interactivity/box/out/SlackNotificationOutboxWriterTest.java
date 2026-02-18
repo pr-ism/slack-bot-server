@@ -8,10 +8,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.box.out.exception.SlackBlocksSerializationException;
+import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -228,6 +230,30 @@ class SlackNotificationOutboxWriterTest {
     }
 
     @Test
+    void 에페메랄_블록_문자열이_유효한_JSON이_아니면_custom_exception을_던지고_enqueue하지않는다() {
+        // given
+        String sourceKey = "EVENT-INVALID-EPHEMERAL-BLOCKS";
+        String teamId = "T1";
+        String channelId = "C1";
+        String userId = "U1";
+        String invalidBlocks = "not-json";
+
+        // when & then
+        assertThatThrownBy(() -> targetWriter().enqueueEphemeralBlocks(
+                sourceKey,
+                teamId,
+                channelId,
+                userId,
+                invalidBlocks,
+                "fallback"
+        ))
+                .isInstanceOf(SlackBlocksSerializationException.class)
+                .hasMessage("blocks JSON 직렬화에 실패했습니다.");
+
+        assertThat(slackNotificationOutboxRepository.findPending(10)).isEmpty();
+    }
+
+    @Test
     void 에페메랄_블록_메시지의_blocks가_null이면_예외를_던지고_enqueue하지않는다() {
         // given
         String sourceKey = "EVENT-NULL-EPHEMERAL-BLOCKS";
@@ -328,6 +354,87 @@ class SlackNotificationOutboxWriterTest {
         // then
         List<SlackNotificationOutbox> pendings = slackNotificationOutboxRepository.findPending(10);
         assertThat(pendings).hasSize(1);
+    }
+
+    @Test
+    void 기존_레코드가_SENT_상태여도_동일한_요청은_중복_enqueue되지_않는다() {
+        // given
+        String sourceKey = "EVENT-IDEMPOTENT-SENT";
+        String teamId = "T1";
+        String channelId = "C1";
+        String text = "hello";
+
+        targetWriter().enqueueChannelText(sourceKey, teamId, channelId, text);
+
+        SlackNotificationOutbox existing = slackNotificationOutboxRepository.findPending(10).getFirst();
+        existing.markProcessing(Instant.parse("2026-02-18T00:00:00Z"));
+        existing.markSent(Instant.parse("2026-02-18T00:00:01Z"));
+        slackNotificationOutboxRepository.save(existing);
+
+        // when
+        targetWriter().enqueueChannelText(sourceKey, teamId, channelId, text);
+
+        // then
+        assertThat(slackNotificationOutboxRepository.findPending(10)).isEmpty();
+        assertThat(slackNotificationOutboxRepository.findById(existing.getId()))
+                .get()
+                .extracting(SlackNotificationOutbox::getStatus)
+                .isEqualTo(SlackNotificationOutboxStatus.SENT);
+    }
+
+    @Test
+    void 기존_레코드가_PROCESSING_상태여도_동일한_요청은_중복_enqueue되지_않는다() {
+        // given
+        String sourceKey = "EVENT-IDEMPOTENT-PROCESSING";
+        String teamId = "T1";
+        String channelId = "C1";
+        String text = "hello";
+
+        targetWriter().enqueueChannelText(sourceKey, teamId, channelId, text);
+
+        SlackNotificationOutbox existing = slackNotificationOutboxRepository.findPending(10).getFirst();
+        existing.markProcessing(Instant.parse("2026-02-18T00:00:00Z"));
+        slackNotificationOutboxRepository.save(existing);
+
+        // when
+        targetWriter().enqueueChannelText(sourceKey, teamId, channelId, text);
+
+        // then
+        assertThat(slackNotificationOutboxRepository.findPending(10)).isEmpty();
+        assertThat(slackNotificationOutboxRepository.findById(existing.getId()))
+                .get()
+                .extracting(SlackNotificationOutbox::getStatus)
+                .isEqualTo(SlackNotificationOutboxStatus.PROCESSING);
+    }
+
+    @Test
+    void 기존_레코드가_FAILED_상태여도_동일한_요청은_중복_enqueue되지_않는다() {
+        // given
+        String sourceKey = "EVENT-IDEMPOTENT-FAILED";
+        String teamId = "T1";
+        String channelId = "C1";
+        String text = "hello";
+
+        targetWriter().enqueueChannelText(sourceKey, teamId, channelId, text);
+
+        SlackNotificationOutbox existing = slackNotificationOutboxRepository.findPending(10).getFirst();
+        existing.markProcessing(Instant.parse("2026-02-18T00:00:00Z"));
+        existing.markFailed(
+                Instant.parse("2026-02-18T00:00:01Z"),
+                "failure",
+                SlackInteractivityFailureType.RETRY_EXHAUSTED
+        );
+        slackNotificationOutboxRepository.save(existing);
+
+        // when
+        targetWriter().enqueueChannelText(sourceKey, teamId, channelId, text);
+
+        // then
+        assertThat(slackNotificationOutboxRepository.findPending(10)).isEmpty();
+        assertThat(slackNotificationOutboxRepository.findById(existing.getId()))
+                .get()
+                .extracting(SlackNotificationOutbox::getStatus)
+                .isEqualTo(SlackNotificationOutboxStatus.FAILED);
     }
 
     private SlackNotificationOutboxWriter targetWriter() {
