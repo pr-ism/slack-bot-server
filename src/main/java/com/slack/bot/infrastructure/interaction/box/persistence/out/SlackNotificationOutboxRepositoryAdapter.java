@@ -74,7 +74,13 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
     @Override
     @Transactional
     public boolean markProcessingIfPending(Long outboxId, Instant processingStartedAt) {
-        long updatedCount = queryFactory
+        long updatedCount = markAsProcessingWhenClaimable(outboxId, processingStartedAt);
+
+        return updatedCount > 0;
+    }
+
+    private long markAsProcessingWhenClaimable(Long outboxId, Instant processingStartedAt) {
+        return queryFactory
                 .update(slackNotificationOutbox)
                 .set(slackNotificationOutbox.status, SlackNotificationOutboxStatus.PROCESSING)
                 .set(slackNotificationOutbox.processingStartedAt, processingStartedAt)
@@ -87,8 +93,6 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                         slackNotificationOutbox.status.in(PROCESSING_CLAIMABLE_STATUSES)
                 )
                 .execute();
-
-        return updatedCount > 0;
     }
 
     @Override
