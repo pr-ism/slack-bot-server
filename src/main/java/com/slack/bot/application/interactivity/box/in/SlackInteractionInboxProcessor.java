@@ -9,6 +9,7 @@ import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteracti
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -41,19 +42,12 @@ public class SlackInteractionInboxProcessor {
     }
 
     public void processPendingBlockActions(int limit) {
-        recoverTimeoutProcessing(
+        processPending(
                 SlackInteractionInboxType.BLOCK_ACTIONS,
-                interactionWorkerProperties.inbox().blockActions().processingTimeoutMs()
+                interactionWorkerProperties.inbox().blockActions().processingTimeoutMs(),
+                limit,
+                pending -> slackInteractionInboxEntryProcessor.processBlockAction(pending)
         );
-
-        List<SlackInteractionInbox> pendings = slackInteractionInboxRepository.findClaimable(
-                SlackInteractionInboxType.BLOCK_ACTIONS,
-                limit
-        );
-
-        for (SlackInteractionInbox pending : pendings) {
-            processBlockActionSafely(pending);
-        }
     }
 
     public boolean enqueueViewSubmission(String payloadJson) {
@@ -70,18 +64,29 @@ public class SlackInteractionInboxProcessor {
     }
 
     public void processPendingViewSubmissions(int limit) {
-        recoverTimeoutProcessing(
+        processPending(
                 SlackInteractionInboxType.VIEW_SUBMISSION,
-                interactionWorkerProperties.inbox().viewSubmission().processingTimeoutMs()
+                interactionWorkerProperties.inbox().viewSubmission().processingTimeoutMs(),
+                limit,
+                pending -> slackInteractionInboxEntryProcessor.processViewSubmission(pending)
         );
+    }
+
+    private void processPending(
+            SlackInteractionInboxType interactionType,
+            long processingTimeoutMs,
+            int limit,
+            Consumer<SlackInteractionInbox> action
+    ) {
+        recoverTimeoutProcessing(interactionType, processingTimeoutMs);
 
         List<SlackInteractionInbox> pendings = slackInteractionInboxRepository.findClaimable(
-                SlackInteractionInboxType.VIEW_SUBMISSION,
+                interactionType,
                 limit
         );
 
         for (SlackInteractionInbox pending : pendings) {
-            processViewSubmissionSafely(pending);
+            processSafely(pending, action, interactionType);
         }
     }
 
@@ -99,24 +104,17 @@ public class SlackInteractionInboxProcessor {
         }
     }
 
-    private void processViewSubmissionSafely(SlackInteractionInbox pending) {
+    private void processSafely(
+            SlackInteractionInbox pending,
+            Consumer<SlackInteractionInbox> action,
+            SlackInteractionInboxType interactionType
+    ) {
         try {
-            slackInteractionInboxEntryProcessor.processViewSubmission(pending);
+            action.accept(pending);
         } catch (Exception e) {
             log.error(
-                    "view_submission inbox 엔트리 처리 중 예상치 못한 오류가 발생했습니다. inboxId={}",
-                    pending.getId(),
-                    e
-            );
-        }
-    }
-
-    private void processBlockActionSafely(SlackInteractionInbox pending) {
-        try {
-            slackInteractionInboxEntryProcessor.processBlockAction(pending);
-        } catch (Exception e) {
-            log.error(
-                    "block_actions inbox 엔트리 처리 중 예상치 못한 오류가 발생했습니다. inboxId={}",
+                    "{} inbox 엔트리 처리 중 예상치 못한 오류가 발생했습니다. inboxId={}",
+                    interactionType,
                     pending.getId(),
                     e
             );
