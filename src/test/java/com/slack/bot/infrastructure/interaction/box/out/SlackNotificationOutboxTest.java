@@ -26,7 +26,11 @@ class SlackNotificationOutboxTest {
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.EPHEMERAL_TEXT),
                 () -> assertThat(actual.getChannelId()).isEqualTo("channel1"),
                 () -> assertThat(actual.getUserId()).isEqualTo("user1"),
-                () -> assertThat(actual.getText()).isEqualTo("text")
+                () -> assertThat(actual.getText()).isEqualTo("text"),
+                () -> assertThat(actual.getBlocksJson()).isEqualTo("[{}]"),
+                () -> assertThat(actual.getFallbackText()).isEqualTo("fallback"),
+                () -> assertThat(actual.getTeamId()).isEqualTo("T1"),
+                () -> assertThat(actual.getIdempotencyKey()).isEqualTo("key")
         );
     }
 
