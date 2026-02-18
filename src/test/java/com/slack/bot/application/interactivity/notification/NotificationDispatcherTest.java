@@ -513,6 +513,40 @@ class NotificationDispatcherTest {
         verify(notificationApiClient).sendBlockMessage(token, "DM-CHANNEL-ID", blocks, fallback);
     }
 
+    @Test
+    void DM이_비활성화된_경우에도_예약_블록은_에페메랄과_DM을_전송한다() {
+        // given
+        String token = "xoxb-test-token";
+        String teamId = "T1";
+        String channelId = "C1";
+        String userId = "U2";
+        JsonNode blocks = blocks();
+        String fallback = "fallback text";
+        String ephemeralText = "예약 완료";
+        NotificationSettings settings = NotificationSettings.defaults(2L);
+        settings.changeReservationConfirmedSpace(DeliverySpace.TRIGGER_CHANNEL);
+
+        given(notificationSettingsRepository.findBySlackUser(teamId, userId))
+                .willReturn(Optional.of(settings));
+        given(notificationApiClient.openDirectMessageChannel(token, userId))
+                .willReturn("DM-CHANNEL-ID");
+
+        // when
+        notificationDispatcher.sendReservationBlockBySettingOrDefault(
+                token,
+                teamId,
+                channelId,
+                userId,
+                blocks,
+                fallback,
+                ephemeralText
+        );
+
+        // then
+        verify(notificationApiClient).sendEphemeralMessage(token, channelId, userId, ephemeralText);
+        verify(notificationApiClient).sendBlockMessage(token, "DM-CHANNEL-ID", blocks, fallback);
+    }
+
     private JsonNode blocks() {
         return OBJECT_MAPPER.createArrayNode()
                             .add("block1")
