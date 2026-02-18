@@ -199,6 +199,50 @@ class SlackNotificationOutboxWriterTest {
     }
 
     @Test
+    void 에페메랄_블록_메시지의_blocks가_null이면_예외를_던지고_enqueue하지않는다() {
+        // given
+        String sourceKey = "EVENT-NULL-EPHEMERAL-BLOCKS";
+        String teamId = "T1";
+        String channelId = "C1";
+        String userId = "U1";
+
+        // when & then
+        assertThatThrownBy(() -> targetWriter().enqueueEphemeralBlocks(
+                sourceKey,
+                teamId,
+                channelId,
+                userId,
+                null,
+                "fallback"
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("blocks는 null일 수 없습니다.");
+
+        assertThat(slackNotificationOutboxRepository.findPending(10)).isEmpty();
+    }
+
+    @Test
+    void 채널_블록_메시지의_blocks가_null이면_예외를_던지고_enqueue하지않는다() {
+        // given
+        String sourceKey = "EVENT-NULL-CHANNEL-BLOCKS";
+        String teamId = "T1";
+        String channelId = "C1";
+
+        // when & then
+        assertThatThrownBy(() -> targetWriter().enqueueChannelBlocks(
+                sourceKey,
+                teamId,
+                channelId,
+                null,
+                "fallback"
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("blocks는 null일 수 없습니다.");
+
+        assertThat(slackNotificationOutboxRepository.findPending(10)).isEmpty();
+    }
+
+    @Test
     void 동일한_요청은_멱등성이_보장되어_중복_enqueue되지_않는다() {
         // given
         String sourceKey = "EVENT-IDEMPOTENT";

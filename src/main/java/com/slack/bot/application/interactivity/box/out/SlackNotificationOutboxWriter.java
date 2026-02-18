@@ -70,7 +70,7 @@ public class SlackNotificationOutboxWriter {
 
     private String serializeBlocks(Object blocks) {
         if (blocks == null) {
-            return null;
+            throw new IllegalArgumentException("blocks는 null일 수 없습니다.");
         }
 
         if (blocks instanceof String blocksJson) {
