@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.box.out.exception.SlackBlocksSerializationException;
@@ -68,7 +69,7 @@ class SlackNotificationOutboxWriterTest {
         String teamId = "T1";
         String channelId = "C1";
         String userId = "U1";
-        Object blocks = List.of();
+        JsonNode blocks = objectMapper.createArrayNode();
         String fallbackText = "fallback";
 
         // when
@@ -126,7 +127,7 @@ class SlackNotificationOutboxWriterTest {
         String sourceKey = "EVENT-4";
         String teamId = "T1";
         String channelId = "C1";
-        Object blocks = List.of();
+        JsonNode blocks = objectMapper.createArrayNode();
         String fallbackText = "fallback";
 
         // when
@@ -177,6 +178,34 @@ class SlackNotificationOutboxWriterTest {
     }
 
     @Test
+    void 에페메랄_블록_문자열_JSON을_전달하면_이중_직렬화하지않고_그대로_enqueue한다() {
+        // given
+        String sourceKey = "EVENT-EPHEMERAL-STRING-BLOCKS";
+        String teamId = "T1";
+        String channelId = "C1";
+        String userId = "U1";
+        String blocks = "[]";
+        String fallbackText = "fallback";
+
+        // when
+        targetWriter().enqueueEphemeralBlocks(sourceKey, teamId, channelId, userId, blocks, fallbackText);
+
+        // then
+        List<SlackNotificationOutbox> pendings = slackNotificationOutboxRepository.findPending(10);
+
+        assertThat(pendings).hasSize(1);
+
+        SlackNotificationOutbox actual = pendings.getFirst();
+
+        assertAll(
+                () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.EPHEMERAL_BLOCKS),
+                () -> assertThat(actual.getUserId()).isEqualTo(userId),
+                () -> assertThat(actual.getBlocksJson()).isEqualTo("[]"),
+                () -> assertThat(actual.getFallbackText()).isEqualTo(fallbackText)
+        );
+    }
+
+    @Test
     void 블록_문자열이_유효한_JSON이_아니면_custom_exception을_던지고_enqueue하지않는다() {
         // given
         String sourceKey = "EVENT-INVALID-BLOCKS";
@@ -212,7 +241,7 @@ class SlackNotificationOutboxWriterTest {
                 teamId,
                 channelId,
                 userId,
-                null,
+                (JsonNode) null,
                 "fallback"
         ))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -233,7 +262,7 @@ class SlackNotificationOutboxWriterTest {
                 sourceKey,
                 teamId,
                 channelId,
-                null,
+                (JsonNode) null,
                 "fallback"
         ))
                 .isInstanceOf(IllegalArgumentException.class)

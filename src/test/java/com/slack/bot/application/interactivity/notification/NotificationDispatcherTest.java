@@ -7,13 +7,14 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.domain.setting.DeliverySpace;
 import com.slack.bot.domain.setting.NotificationSettings;
 import com.slack.bot.domain.setting.repository.NotificationSettingsRepository;
 import com.slack.bot.domain.setting.vo.OptionalNotifications;
 import com.slack.bot.domain.setting.vo.ReservationConfirmed;
-import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -27,6 +28,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 @ExtendWith(MockitoExtension.class)
 class NotificationDispatcherTest {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @Mock
     NotificationApiClient notificationApiClient;
@@ -47,7 +50,7 @@ class NotificationDispatcherTest {
         String token = "xoxb-test-token";
         String channelId = "C1";
         String userId = "U1";
-        List<String> blocks = List.of("block1", "block2");
+        JsonNode blocks = blocks();
         String fallback = "fallback text";
         NotificationSettings settings = NotificationSettings.create(
                 1L,
@@ -72,7 +75,7 @@ class NotificationDispatcherTest {
         String token = "xoxb-test-token";
         String channelId = "C1";
         String userId = "U2";
-        List<String> blocks = List.of("block1", "block2");
+        JsonNode blocks = blocks();
         String fallback = "fallback text";
         ReservationConfirmed reservationConfirmed = ReservationConfirmed.defaults()
                 .changeSpace(DeliverySpace.TRIGGER_CHANNEL);
@@ -102,7 +105,7 @@ class NotificationDispatcherTest {
         String token = "xoxb-test-token";
         String channelId = "C1";
         String userId = "U99";
-        List<String> blocks = List.of("block1", "block2");
+        JsonNode blocks = blocks();
         String fallback = "fallback text";
 
         given(notificationSettingsRepository.findBySlackUser("T1", userId))
@@ -183,7 +186,7 @@ class NotificationDispatcherTest {
         String token = "xoxb-test-token";
         String channelId = "C1";
         String userId = "U1";
-        List<String> blocks = List.of("block1", "block2");
+        JsonNode blocks = blocks();
         String fallback = "fallback text";
 
         // when
@@ -276,7 +279,7 @@ class NotificationDispatcherTest {
         String token = "xoxb-test-token";
         String channelId = "C1";
         String userId = "U1";
-        List<String> blocks = List.of("block1", "block2");
+        JsonNode blocks = blocks();
         String fallback = "fallback text";
 
         given(notificationApiClient.openDirectMessageChannel(token, userId))
@@ -296,7 +299,7 @@ class NotificationDispatcherTest {
         String token = "xoxb-test-token";
         String channelId = "C1";
         String userId = "U1";
-        List<String> blocks = List.of("block1", "block2");
+        JsonNode blocks = blocks();
         String fallback = "fallback text";
 
         doThrow(new RuntimeException("dm open failed"))
@@ -316,7 +319,7 @@ class NotificationDispatcherTest {
         // given
         String token = "xoxb-test-token";
         String userId = "U1";
-        List<String> blocks = List.of("block1", "block2");
+        JsonNode blocks = blocks();
         String fallback = "fallback text";
 
         given(notificationApiClient.openDirectMessageChannel(token, userId))
@@ -335,7 +338,7 @@ class NotificationDispatcherTest {
         // given
         String token = "xoxb-test-token";
         String userId = "U1";
-        List<String> blocks = List.of("block1", "block2");
+        JsonNode blocks = blocks();
         String fallback = "fallback text";
 
         doThrow(new RuntimeException("dm open failed"))
@@ -357,7 +360,7 @@ class NotificationDispatcherTest {
         String teamId = "T1";
         String channelId = "C1";
         String userId = "U1";
-        List<String> blocks = List.of("block1", "block2");
+        JsonNode blocks = blocks();
         String fallback = "fallback text";
         String ephemeralText = "예약 완료";
         NotificationSettings settings = NotificationSettings.defaults(1L);
@@ -390,7 +393,7 @@ class NotificationDispatcherTest {
         String teamId = "T1";
         String channelId = "C1";
         String userId = "U1";
-        List<String> blocks = List.of("block1", "block2");
+        JsonNode blocks = blocks();
         String fallback = "fallback text";
         String ephemeralText = "예약 완료";
         NotificationSettings settings = NotificationSettings.defaults(1L);
@@ -415,5 +418,11 @@ class NotificationDispatcherTest {
         // then
         verify(notificationApiClient, never()).sendEphemeralMessage(anyString(), anyString(), anyString(), anyString());
         verify(notificationApiClient).sendBlockMessage(token, "DM-CHANNEL-ID", blocks, fallback);
+    }
+
+    private JsonNode blocks() {
+        return OBJECT_MAPPER.createArrayNode()
+                            .add("block1")
+                            .add("block2");
     }
 }

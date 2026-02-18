@@ -204,7 +204,7 @@ class InteractivityAopIntegrationTest {
         String teamId = "T1";
         String channelId = "C1";
         String userId = "U1";
-        Object blocks = List.of();
+        JsonNode blocks = objectMapper.createArrayNode();
         String fallbackText = "fallback-ephemeral";
 
         // when
@@ -248,7 +248,7 @@ class InteractivityAopIntegrationTest {
         String sourceKey = "SRC-CHANNEL-BLOCKS";
         String teamId = "T1";
         String channelId = "C1";
-        Object blocks = List.of();
+        JsonNode blocks = objectMapper.createArrayNode();
         String fallbackText = "fallback-channel";
 
         // when

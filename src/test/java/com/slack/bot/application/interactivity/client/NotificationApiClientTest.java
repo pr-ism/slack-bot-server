@@ -10,6 +10,8 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interactivity.box.out.OutboxIdempotencySourceContext;
 import com.slack.bot.application.interactivity.box.out.SlackNotificationOutboxWriter;
 import com.slack.bot.application.interactivity.box.out.exception.OutboxWorkspaceNotFoundException;
@@ -65,8 +67,11 @@ class NotificationApiClientTest {
 
     @Test
     void 에페메랄_블록_메시지는_outbox에_적재한다() {
+        // given
+        JsonNode blocks = new ObjectMapper().createArrayNode();
+
         // when
-        notificationApiClient.sendEphemeralBlockMessage("token", "C1", "U1", "[]", "fallback");
+        notificationApiClient.sendEphemeralBlockMessage("token", "C1", "U1", blocks, "fallback");
 
         // then
         verify(slackNotificationOutboxWriter).enqueueEphemeralBlocks(
@@ -74,7 +79,7 @@ class NotificationApiClientTest {
                 eq("T1"),
                 eq("C1"),
                 eq("U1"),
-                eq("[]"),
+                eq(blocks),
                 eq("fallback")
         );
     }
@@ -95,15 +100,18 @@ class NotificationApiClientTest {
 
     @Test
     void 채널_블록_메시지는_outbox에_적재한다() {
+        // given
+        JsonNode blocks = new ObjectMapper().createArrayNode();
+
         // when
-        notificationApiClient.sendBlockMessage("token", "C1", "[]", "fallback");
+        notificationApiClient.sendBlockMessage("token", "C1", blocks, "fallback");
 
         // then
         verify(slackNotificationOutboxWriter).enqueueChannelBlocks(
                 eq("INBOX:1"),
                 eq("T1"),
                 eq("C1"),
-                eq("[]"),
+                eq(blocks),
                 eq("fallback")
         );
     }

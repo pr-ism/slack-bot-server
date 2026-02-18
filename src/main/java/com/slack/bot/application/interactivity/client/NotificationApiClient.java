@@ -1,5 +1,6 @@
 package com.slack.bot.application.interactivity.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.slack.bot.application.interactivity.box.out.OutboxIdempotencySourceContext;
 import com.slack.bot.application.interactivity.box.out.SlackNotificationOutboxWriter;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
@@ -45,7 +46,7 @@ public class NotificationApiClient {
             String token,
             String channelId,
             String targetUserId,
-            Object blocks,
+            JsonNode blocks,
             String fallbackText
     ) {
         sendEphemeralBlockMessage(null, token, channelId, targetUserId, blocks, fallbackText);
@@ -56,7 +57,7 @@ public class NotificationApiClient {
             String token,
             String channelId,
             String targetUserId,
-            Object blocks,
+            JsonNode blocks,
             String fallbackText
     ) {
         String teamId = workspaceAccessTokenTeamIdResolver.resolve(token);
@@ -86,7 +87,7 @@ public class NotificationApiClient {
         );
     }
 
-    public void sendBlockMessage(String token, String channelId, Object blocks, String fallbackText) {
+    public void sendBlockMessage(String token, String channelId, JsonNode blocks, String fallbackText) {
         sendBlockMessage(null, token, channelId, blocks, fallbackText);
     }
 
@@ -94,7 +95,7 @@ public class NotificationApiClient {
             String sourceKey,
             String token,
             String channelId,
-            Object blocks,
+            JsonNode blocks,
             String fallbackText
     ) {
         String teamId = workspaceAccessTokenTeamIdResolver.resolve(token);

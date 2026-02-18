@@ -1,6 +1,7 @@
 package com.slack.bot.application.interactivity.box.out;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyKeyGenerator;
 import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyScope;
@@ -35,7 +36,7 @@ public class SlackNotificationOutboxWriter {
             String teamId,
             String channelId,
             String userId,
-            Object blocks,
+            JsonNode blocks,
             String fallbackText
     ) {
         enqueue(OutboxEnqueueRequest.ephemeralBlocks(
@@ -50,13 +51,33 @@ public class SlackNotificationOutboxWriter {
 
     @ResolveOutboxSource
     @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
+    public void enqueueEphemeralBlocks(
+            String sourceKey,
+            String teamId,
+            String channelId,
+            String userId,
+            String blocksJson,
+            String fallbackText
+    ) {
+        enqueue(OutboxEnqueueRequest.ephemeralBlocks(
+                sourceKey,
+                teamId,
+                channelId,
+                userId,
+                normalizeBlocksJson(blocksJson),
+                fallbackText
+        ));
+    }
+
+    @ResolveOutboxSource
+    @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
     public void enqueueChannelText(String sourceKey, String teamId, String channelId, String text) {
         enqueue(OutboxEnqueueRequest.channelText(sourceKey, teamId, channelId, text));
     }
 
     @ResolveOutboxSource
     @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
-    public void enqueueChannelBlocks(String sourceKey, String teamId, String channelId, Object blocks,
+    public void enqueueChannelBlocks(String sourceKey, String teamId, String channelId, JsonNode blocks,
             String fallbackText) {
         enqueue(OutboxEnqueueRequest.channelBlocks(
                 sourceKey,
@@ -67,19 +88,37 @@ public class SlackNotificationOutboxWriter {
         ));
     }
 
-    private String serializeBlocks(Object blocks) {
+    @ResolveOutboxSource
+    @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
+    public void enqueueChannelBlocks(
+            String sourceKey,
+            String teamId,
+            String channelId,
+            String blocksJson,
+            String fallbackText
+    ) {
+        enqueue(OutboxEnqueueRequest.channelBlocks(
+                sourceKey,
+                teamId,
+                channelId,
+                normalizeBlocksJson(blocksJson),
+                fallbackText
+        ));
+    }
+
+    private String serializeBlocks(JsonNode blocks) {
         if (blocks == null) {
             throw new IllegalArgumentException("blocks는 null일 수 없습니다.");
         }
 
-        if (blocks instanceof String blocksJson) {
-            return normalizeBlocksJson(blocksJson);
-        }
-
-        return objectMapper.valueToTree(blocks).toString();
+        return blocks.toString();
     }
 
     private String normalizeBlocksJson(String blocksJson) {
+        if (blocksJson == null) {
+            throw new IllegalArgumentException("blocks는 null일 수 없습니다.");
+        }
+
         try {
             return objectMapper.readTree(blocksJson).toString();
         } catch (JsonProcessingException exception) {
