@@ -116,6 +116,7 @@ class SlackInteractionInboxTest {
         // then
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSING),
+                () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(2),
                 () -> assertThat(inbox.getFailedAt()).isNull(),
                 () -> assertThat(inbox.getFailureReason()).isNull(),
                 () -> assertThat(inbox.getFailureType()).isNull()
