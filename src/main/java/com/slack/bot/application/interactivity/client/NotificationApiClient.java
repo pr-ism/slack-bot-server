@@ -2,9 +2,6 @@ package com.slack.bot.application.interactivity.client;
 
 import com.slack.bot.application.interactivity.box.out.OutboxIdempotencySourceContext;
 import com.slack.bot.application.interactivity.box.out.SlackNotificationOutboxWriter;
-import com.slack.bot.application.interactivity.box.out.exception.OutboxWorkspaceNotFoundException;
-import com.slack.bot.domain.workspace.Workspace;
-import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -20,7 +17,7 @@ public class NotificationApiClient {
     private final SlackNotificationOutboxWriter slackNotificationOutboxWriter;
     private final NotificationTransportApiClient notificationTransportApiClient;
     private final OutboxIdempotencySourceContext outboxIdempotencySourceContext;
-    private final WorkspaceRepository workspaceRepository;
+    private final WorkspaceAccessTokenTeamIdResolver workspaceAccessTokenTeamIdResolver;
 
     public void sendEphemeralMessage(String token, String channelId, String targetUserId, String text) {
         sendEphemeralMessage(null, token, channelId, targetUserId, text);
@@ -33,7 +30,7 @@ public class NotificationApiClient {
             String targetUserId,
             String text
     ) {
-        String teamId = resolveTeamId(token);
+        String teamId = workspaceAccessTokenTeamIdResolver.resolve(token);
 
         slackNotificationOutboxWriter.enqueueEphemeralText(
                 resolveSourceKey(sourceKey),
@@ -56,7 +53,7 @@ public class NotificationApiClient {
             Object blocks,
             String text
     ) {
-        String teamId = resolveTeamId(token);
+        String teamId = workspaceAccessTokenTeamIdResolver.resolve(token);
 
         slackNotificationOutboxWriter.enqueueEphemeralBlocks(
                 resolveSourceKey(sourceKey),
@@ -73,7 +70,7 @@ public class NotificationApiClient {
     }
 
     public void sendMessage(String sourceKey, String token, String channelId, String text) {
-        String teamId = resolveTeamId(token);
+        String teamId = workspaceAccessTokenTeamIdResolver.resolve(token);
 
         slackNotificationOutboxWriter.enqueueChannelText(
                 resolveSourceKey(sourceKey),
@@ -88,7 +85,7 @@ public class NotificationApiClient {
     }
 
     public void sendBlockMessage(String sourceKey, String token, String channelId, Object blocks, String text) {
-        String teamId = resolveTeamId(token);
+        String teamId = workspaceAccessTokenTeamIdResolver.resolve(token);
 
         slackNotificationOutboxWriter.enqueueChannelBlocks(
                 resolveSourceKey(sourceKey),
@@ -125,10 +122,4 @@ public class NotificationApiClient {
         return AD_HOC_SOURCE_PREFIX + UUID.randomUUID();
     }
 
-    private String resolveTeamId(String token) {
-        Workspace workspace = workspaceRepository.findByAccessToken(token)
-                                                 .orElseThrow(() -> OutboxWorkspaceNotFoundException.forToken(token));
-
-        return workspace.getTeamId();
-    }
 }

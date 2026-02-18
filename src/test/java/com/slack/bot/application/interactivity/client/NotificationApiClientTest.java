@@ -13,8 +13,6 @@ import static org.mockito.Mockito.verify;
 import com.slack.bot.application.interactivity.box.out.OutboxIdempotencySourceContext;
 import com.slack.bot.application.interactivity.box.out.SlackNotificationOutboxWriter;
 import com.slack.bot.application.interactivity.box.out.exception.OutboxWorkspaceNotFoundException;
-import com.slack.bot.domain.workspace.Workspace;
-import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,25 +29,22 @@ class NotificationApiClientTest {
     SlackNotificationOutboxWriter slackNotificationOutboxWriter;
     NotificationTransportApiClient notificationTransportApiClient;
     OutboxIdempotencySourceContext outboxIdempotencySourceContext;
-    WorkspaceRepository workspaceRepository;
+    WorkspaceAccessTokenTeamIdResolver workspaceAccessTokenTeamIdResolver;
 
     @BeforeEach
     void setUp() {
         slackNotificationOutboxWriter = mock(SlackNotificationOutboxWriter.class);
         notificationTransportApiClient = mock(NotificationTransportApiClient.class);
         outboxIdempotencySourceContext = mock(OutboxIdempotencySourceContext.class);
-        workspaceRepository = mock(WorkspaceRepository.class);
-
-        Workspace workspace = mock(Workspace.class);
-        given(workspace.getTeamId()).willReturn("T1");
-        given(workspaceRepository.findByAccessToken("token")).willReturn(Optional.of(workspace));
+        workspaceAccessTokenTeamIdResolver = mock(WorkspaceAccessTokenTeamIdResolver.class);
+        given(workspaceAccessTokenTeamIdResolver.resolve("token")).willReturn("T1");
         given(outboxIdempotencySourceContext.currentSourceKey()).willReturn(Optional.of("INBOX:1"));
 
         notificationApiClient = new NotificationApiClient(
                 slackNotificationOutboxWriter,
                 notificationTransportApiClient,
                 outboxIdempotencySourceContext,
-                workspaceRepository
+                workspaceAccessTokenTeamIdResolver
         );
     }
 
@@ -147,7 +142,8 @@ class NotificationApiClientTest {
     @Test
     void 토큰에_해당하는_workspace가_없으면_custom_exception을_던진다() {
         // given
-        given(workspaceRepository.findByAccessToken("unknown-token")).willReturn(Optional.empty());
+        given(workspaceAccessTokenTeamIdResolver.resolve("unknown-token"))
+                .willThrow(OutboxWorkspaceNotFoundException.forToken("unknown-token"));
 
         // when & then
         assertThatThrownBy(() -> notificationApiClient.sendMessage("unknown-token", "C1", "hello"))
