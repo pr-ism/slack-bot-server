@@ -32,6 +32,12 @@ public class WorkspaceRepositoryAdapter implements WorkspaceRepository {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Optional<Workspace> findByAccessToken(String accessToken) {
+        return jpaWorkspaceRepository.findByAccessToken(accessToken);
+    }
+
+    @Override
     @Transactional
     public void deleteByTeamId(String teamId) {
         jpaWorkspaceRepository.deleteByTeamId(teamId);
