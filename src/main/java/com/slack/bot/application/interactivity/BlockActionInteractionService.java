@@ -11,12 +11,12 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-class BlockActionInteractionService {
+public class BlockActionInteractionService {
 
     private final BlockActionRouter blockActionRouter;
     private final ReviewReservationNotifier reservationNotifier;
 
-    void handle(JsonNode payload) {
+    public void handle(JsonNode payload) {
         blockActionRouter.route(payload)
                          .ifPresent(result -> processResult(result));
     }
