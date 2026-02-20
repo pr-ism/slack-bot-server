@@ -1,8 +1,10 @@
 package com.slack.bot.application.interactivity.box.out;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
+import com.slack.bot.application.interactivity.box.out.exception.OutboxMessageTypeRequiredException;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -43,5 +45,17 @@ class OutboxIdempotencyPayloadEncoderTest {
                 () -> assertThat(actual).contains("channelId=2#C1"),
                 () -> assertThat(actual).contains("userId=0#")
         );
+    }
+
+    @Test
+    void message_type이_null이면_custom_exception을_던진다() {
+        // given
+        OutboxIdempotencyPayloadEncoder encoder = new OutboxIdempotencyPayloadEncoder();
+
+        // when & then
+        assertThatThrownBy(() -> encoder.encode("SRC", null, "T1", "C1", "U1"))
+                .isInstanceOf(OutboxMessageTypeRequiredException.class)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("messageType은 비어 있을 수 없습니다.");
     }
 }

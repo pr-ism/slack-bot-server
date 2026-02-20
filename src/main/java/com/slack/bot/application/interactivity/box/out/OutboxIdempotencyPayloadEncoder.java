@@ -1,5 +1,6 @@
 package com.slack.bot.application.interactivity.box.out;
 
+import com.slack.bot.application.interactivity.box.out.exception.OutboxMessageTypeRequiredException;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +14,10 @@ public class OutboxIdempotencyPayloadEncoder {
             String channelId,
             String userId
     ) {
+        if (messageType == null) {
+            throw new OutboxMessageTypeRequiredException();
+        }
+
         String messageTypeName = messageType.name();
 
         return "source=" + encodeComponent(sourceKey)
