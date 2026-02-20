@@ -7,7 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -24,26 +24,33 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
+@ExtendWith(MockitoExtension.class)
 class NotificationApiClientTest {
 
-    NotificationApiClient notificationApiClient;
+    private NotificationApiClient notificationApiClient;
 
-    SlackNotificationOutboxWriter slackNotificationOutboxWriter;
-    NotificationTransportApiClient notificationTransportApiClient;
-    OutboxIdempotencySourceContext outboxIdempotencySourceContext;
-    OutboxWorkspaceResolver outboxWorkspaceResolver;
+    @Mock
+    private SlackNotificationOutboxWriter slackNotificationOutboxWriter;
+
+    @Mock
+    private NotificationTransportApiClient notificationTransportApiClient;
+
+    @Mock
+    private OutboxIdempotencySourceContext outboxIdempotencySourceContext;
+
+    @Mock
+    private OutboxWorkspaceResolver outboxWorkspaceResolver;
 
     @BeforeEach
     void setUp() {
-        slackNotificationOutboxWriter = mock(SlackNotificationOutboxWriter.class);
-        notificationTransportApiClient = mock(NotificationTransportApiClient.class);
-        outboxIdempotencySourceContext = mock(OutboxIdempotencySourceContext.class);
-        outboxWorkspaceResolver = mock(OutboxWorkspaceResolver.class);
-        given(outboxWorkspaceResolver.resolve("token")).willReturn("T1");
-        given(outboxIdempotencySourceContext.currentSourceKey()).willReturn(Optional.of("INBOX:1"));
+        lenient().when(outboxWorkspaceResolver.resolve("token")).thenReturn("T1");
+        lenient().when(outboxIdempotencySourceContext.currentSourceKey()).thenReturn(Optional.of("INBOX:1"));
 
         notificationApiClient = new NotificationApiClient(
                 outboxWorkspaceResolver,
