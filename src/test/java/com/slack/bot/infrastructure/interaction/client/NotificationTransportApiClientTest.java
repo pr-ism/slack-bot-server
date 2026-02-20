@@ -15,6 +15,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.slack.api.model.view.View;
 import com.slack.api.model.view.Views;
 import com.slack.bot.application.interactivity.client.exception.SlackBotMessageDispatchException;
@@ -117,11 +118,21 @@ class NotificationTransportApiClientTest {
         String token = "xoxb-token";
         String channelId = "C123";
         String targetUserId = "U123";
-        JsonNode blocks = new ObjectMapper().createArrayNode()
-                                            .addObject()
-                                            .put("type", "section");
+        ArrayNode blocks = sectionBlocks();
         String text = "fallback text";
 
+        String requestBody = """
+                {
+                  "channel": "C123",
+                  "user": "U123",
+                  "blocks": [
+                    {
+                      "type": "section"
+                    }
+                  ],
+                  "text": "fallback text"
+                }
+                """;
         String responseBody = """
                 {
                   "ok": true
@@ -131,6 +142,7 @@ class NotificationTransportApiClientTest {
         mockServer.expect(requestTo("https://slack.com/api/chat.postEphemeral"))
                   .andExpect(method(POST))
                   .andExpect(header("Authorization", "Bearer " + token))
+                  .andExpect(content().json(requestBody))
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when & then
@@ -146,10 +158,19 @@ class NotificationTransportApiClientTest {
         String token = "xoxb-token";
         String channelId = "C123";
         String targetUserId = "U123";
-        JsonNode blocks = new ObjectMapper().createArrayNode()
-                                            .addObject()
-                                            .put("type", "section");
+        ArrayNode blocks = sectionBlocks();
 
+        String requestBody = """
+                {
+                  "channel": "C123",
+                  "user": "U123",
+                  "blocks": [
+                    {
+                      "type": "section"
+                    }
+                  ]
+                }
+                """;
         String responseBody = """
                 {
                   "ok": true
@@ -159,6 +180,7 @@ class NotificationTransportApiClientTest {
         mockServer.expect(requestTo("https://slack.com/api/chat.postEphemeral"))
                   .andExpect(method(POST))
                   .andExpect(header("Authorization", "Bearer " + token))
+                  .andExpect(content().json(requestBody))
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when & then
@@ -288,11 +310,20 @@ class NotificationTransportApiClientTest {
         // given
         String token = "xoxb-token";
         String channelId = "C123";
-        JsonNode blocks = new ObjectMapper().createArrayNode()
-                                            .addObject()
-                                            .put("type", "section");
+        ArrayNode blocks = sectionBlocks();
         String text = "fallback text";
 
+        String requestBody = """
+                {
+                  "channel": "C123",
+                  "blocks": [
+                    {
+                      "type": "section"
+                    }
+                  ],
+                  "text": "fallback text"
+                }
+                """;
         String responseBody = """
                 {
                   "ok": true
@@ -302,6 +333,7 @@ class NotificationTransportApiClientTest {
         mockServer.expect(requestTo("https://slack.com/api/chat.postMessage"))
                   .andExpect(method(POST))
                   .andExpect(header("Authorization", "Bearer " + token))
+                  .andExpect(content().json(requestBody))
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when & then
@@ -316,10 +348,18 @@ class NotificationTransportApiClientTest {
         // given
         String token = "xoxb-token";
         String channelId = "C123";
-        JsonNode blocks = new ObjectMapper().createArrayNode()
-                                            .addObject()
-                                            .put("type", "section");
+        ArrayNode blocks = sectionBlocks();
 
+        String requestBody = """
+                {
+                  "channel": "C123",
+                  "blocks": [
+                    {
+                      "type": "section"
+                    }
+                  ]
+                }
+                """;
         String responseBody = """
                 {
                   "ok": true
@@ -329,6 +369,7 @@ class NotificationTransportApiClientTest {
         mockServer.expect(requestTo("https://slack.com/api/chat.postMessage"))
                   .andExpect(method(POST))
                   .andExpect(header("Authorization", "Bearer " + token))
+                  .andExpect(content().json(requestBody))
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when & then
@@ -746,5 +787,11 @@ class NotificationTransportApiClientTest {
                 .isInstanceOf(SlackBotMessageDispatchException.class)
                 .hasMessageContaining("Slack API 요청 실패")
                 .hasMessageContaining("500");
+    }
+
+    private ArrayNode sectionBlocks() {
+        ArrayNode blocks = new ObjectMapper().createArrayNode();
+        blocks.addObject().put("type", "section");
+        return blocks;
     }
 }
