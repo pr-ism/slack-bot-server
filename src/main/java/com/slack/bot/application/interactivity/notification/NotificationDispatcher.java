@@ -1,5 +1,6 @@
 package com.slack.bot.application.interactivity.notification;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.domain.setting.repository.NotificationSettingsRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +19,7 @@ public class NotificationDispatcher {
         notificationApiClient.sendEphemeralMessage(token, channelId, userId, text);
     }
 
-    public void sendEphemeralBlocks(String token, String channelId, String userId, Object blocks, String fallback) {
+    public void sendEphemeralBlocks(String token, String channelId, String userId, JsonNode blocks, String fallback) {
         notificationApiClient.sendEphemeralBlockMessage(token, channelId, userId, blocks, fallback);
     }
 
@@ -26,7 +27,7 @@ public class NotificationDispatcher {
             String token,
             String channelId,
             String userId,
-            Object blocks,
+            JsonNode blocks,
             String fallback
     ) {
         sendEphemeralBlocks(token, channelId, userId, blocks, fallback);
@@ -43,13 +44,13 @@ public class NotificationDispatcher {
             String teamId,
             String channelId,
             String userId,
-            Object blocks,
+            JsonNode blocks,
             String fallback,
             String ephemeralText
     ) {
         boolean sendChannelEphemeral = notificationSettingsRepository.findBySlackUser(teamId, userId)
-                                                     .map(settings -> settings.isReservationChannelEphemeralEnabled())
-                                                     .orElse(true);
+                                                                     .map(settings -> settings.isReservationChannelEphemeralEnabled())
+                                                                     .orElse(true);
 
         if (sendChannelEphemeral) {
             sendEphemeral(token, channelId, userId, ephemeralText);
@@ -65,7 +66,7 @@ public class NotificationDispatcher {
     public void sendBlockToDirectMessageOnly(
             String token,
             String userId,
-            Object blocks,
+            JsonNode blocks,
             String fallback
     ) {
         try {
@@ -80,7 +81,7 @@ public class NotificationDispatcher {
             String token,
             String channelId,
             String userId,
-            Object blocks,
+            JsonNode blocks,
             String fallback
     ) {
         notificationSettingsRepository.findBySlackUser(teamId, userId)
@@ -149,7 +150,7 @@ public class NotificationDispatcher {
         notificationApiClient.sendMessage(token, dmChannelId, text);
     }
 
-    private void sendDirectMessageBlocks(String token, String userId, Object blocks, String fallback) {
+    private void sendDirectMessageBlocks(String token, String userId, JsonNode blocks, String fallback) {
         String dmChannelId = notificationApiClient.openDirectMessageChannel(token, userId);
 
         notificationApiClient.sendBlockMessage(token, dmChannelId, blocks, fallback);
