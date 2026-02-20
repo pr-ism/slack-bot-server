@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.slack.api.model.view.View;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.application.interactivity.publisher.ReviewInteractionEvent;
@@ -68,7 +69,7 @@ class ReviewSchedulerWorkflowTest {
                         "U1",
                         InteractivityErrorType.INVALID_META.message()
                 ),
-                () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any(View.class)),
                 () -> assertThat(actual).isEmpty(),
                 () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
@@ -98,7 +99,7 @@ class ReviewSchedulerWorkflowTest {
                         "U1",
                         InteractivityErrorType.INVALID_META.message()
                 ),
-                () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any(View.class)),
                 () -> assertThat(actual).isEmpty(),
                 () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
@@ -128,7 +129,7 @@ class ReviewSchedulerWorkflowTest {
                         "U1",
                         InteractivityErrorType.INVALID_META.message()
                 ),
-                () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any(View.class)),
                 () -> assertThat(actual).isEmpty(),
                 () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
@@ -165,7 +166,7 @@ class ReviewSchedulerWorkflowTest {
                                 () -> assertThat(event.slackUserId()).isEqualTo("U1"),
                                 () -> assertThat(event.metaJson()).isEqualTo(metaJson)
                         )),
-                () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any(View.class)),
                 () -> assertThat(actual).isPresent(),
                 () -> assertThat(actual.get().getId()).isEqualTo(100L)
         );
@@ -201,7 +202,7 @@ class ReviewSchedulerWorkflowTest {
                         "U1",
                         InteractivityErrorType.RESERVATION_LOAD_FAILURE.message()
                 ),
-                () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any(View.class)),
                 () -> assertThat(actual).isEmpty(),
                 () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
@@ -238,7 +239,7 @@ class ReviewSchedulerWorkflowTest {
                 () -> verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
-                        any()
+                        any(View.class)
                 ),
                 () -> assertThat(actual).isEmpty()
         );
@@ -278,7 +279,7 @@ class ReviewSchedulerWorkflowTest {
                 () -> verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
-                        any()
+                        any(View.class)
                 )
         );
     }
@@ -320,7 +321,7 @@ class ReviewSchedulerWorkflowTest {
                         "U1",
                         InteractivityErrorType.REVIEWEE_CANNOT_RESERVE.message()
                 ),
-                () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any(View.class)),
                 () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
@@ -356,7 +357,7 @@ class ReviewSchedulerWorkflowTest {
                 () -> verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
-                        any()
+                        any(View.class)
                 ),
                 () -> verify(notificationApiClient, never()).sendEphemeralMessage(
                         eq("xoxb-test-token"),

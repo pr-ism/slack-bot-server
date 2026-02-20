@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.slack.api.model.view.View;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.application.interactivity.publisher.ReviewInteractionEvent;
@@ -273,7 +274,7 @@ class ReservationCommandWorkflowTest {
                 () -> verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
-                        any()
+                        any(View.class)
                 )
         );
     }
@@ -337,7 +338,7 @@ class ReservationCommandWorkflowTest {
                         eq("U1"),
                         eq(InteractivityErrorType.RESERVATION_CHANGE_NOT_ALLOWED_CANCELLED.message())
                 ),
-                () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any(View.class)),
                 () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
@@ -371,7 +372,7 @@ class ReservationCommandWorkflowTest {
                         eq("U1"),
                         eq(InteractivityErrorType.RESERVATION_ALREADY_STARTED.message())
                 ),
-                () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any(View.class)),
                 () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
@@ -402,7 +403,7 @@ class ReservationCommandWorkflowTest {
                         eq(InteractivityErrorType.RESERVATION_NOT_FOUND.message())
                 ),
                 () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty(),
-                () -> verify(notificationApiClient, never()).openModal(any(), any(), any())
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any(View.class))
         );
     }
 

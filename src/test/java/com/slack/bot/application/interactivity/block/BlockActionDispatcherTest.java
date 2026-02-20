@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.slack.api.model.view.View;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.block.dto.BlockActionCommandDto;
 import com.slack.bot.application.interactivity.block.dto.BlockActionOutcomeDto;
@@ -122,7 +123,7 @@ class BlockActionDispatcherTest {
                 () -> verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
-                        any()
+                        any(View.class)
                 )
         );
     }
@@ -156,7 +157,7 @@ class BlockActionDispatcherTest {
                 () -> verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
-                        any()
+                        any(View.class)
                 )
         );
     }
@@ -206,7 +207,7 @@ class BlockActionDispatcherTest {
         assertAll(
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
                 () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty(),
-                () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any(View.class)),
                 () -> verify(notificationApiClient, never()).sendEphemeralMessage(any(), any(), any(), any())
         );
     }
