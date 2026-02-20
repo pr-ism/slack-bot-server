@@ -1,5 +1,6 @@
 package com.slack.bot.infrastructure.interaction.client;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
@@ -241,7 +242,7 @@ public class NotificationTransportApiClient {
 
         try {
             return objectMapper.readTree(snakeCaseJson);
-        } catch (IOException e) {
+        } catch (JsonProcessingException e) {
             throw new SlackBotMessageDispatchException("슬랙 봇 메시지 전송 실패: 모달 view 직렬화 실패", e);
         }
     }
