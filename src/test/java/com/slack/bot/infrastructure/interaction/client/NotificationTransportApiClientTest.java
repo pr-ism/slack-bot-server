@@ -13,12 +13,13 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.slack.api.model.view.View;
 import com.slack.api.model.view.Views;
 import com.slack.bot.application.interactivity.client.exception.SlackBotMessageDispatchException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -116,7 +117,9 @@ class NotificationTransportApiClientTest {
         String token = "xoxb-token";
         String channelId = "C123";
         String targetUserId = "U123";
-        List<String> blocks = List.of("block1", "block2");
+        JsonNode blocks = new ObjectMapper().createArrayNode()
+                                            .addObject()
+                                            .put("type", "section");
         String text = "fallback text";
 
         String responseBody = """
@@ -143,7 +146,9 @@ class NotificationTransportApiClientTest {
         String token = "xoxb-token";
         String channelId = "C123";
         String targetUserId = "U123";
-        List<String> blocks = List.of("block1", "block2");
+        JsonNode blocks = new ObjectMapper().createArrayNode()
+                                            .addObject()
+                                            .put("type", "section");
 
         String responseBody = """
                 {
@@ -283,7 +288,9 @@ class NotificationTransportApiClientTest {
         // given
         String token = "xoxb-token";
         String channelId = "C123";
-        List<String> blocks = List.of("block1", "block2");
+        JsonNode blocks = new ObjectMapper().createArrayNode()
+                                            .addObject()
+                                            .put("type", "section");
         String text = "fallback text";
 
         String responseBody = """
@@ -309,7 +316,9 @@ class NotificationTransportApiClientTest {
         // given
         String token = "xoxb-token";
         String channelId = "C123";
-        List<String> blocks = List.of("block1", "block2");
+        JsonNode blocks = new ObjectMapper().createArrayNode()
+                                            .addObject()
+                                            .put("type", "section");
 
         String responseBody = """
                 {
@@ -441,7 +450,8 @@ class NotificationTransportApiClientTest {
         // given
         String token = "xoxb-token";
         String triggerId = "TRIGGER_ID";
-        java.util.Map<String, Object> view = java.util.Map.of("type", "modal");
+        JsonNode view = new ObjectMapper().createObjectNode()
+                                          .put("type", "modal");
 
         String requestBody = """
                 {
@@ -475,7 +485,8 @@ class NotificationTransportApiClientTest {
         // given
         String token = "xoxb-token";
         String triggerId = "TRIGGER_ID";
-        java.util.Map<String, Object> view = java.util.Map.of("type", "modal");
+        JsonNode view = new ObjectMapper().createObjectNode()
+                                          .put("type", "modal");
 
         String responseBody = """
                 {
@@ -499,7 +510,7 @@ class NotificationTransportApiClientTest {
         // given
         String token = "xoxb-token";
         String triggerId = "TRIGGER_ID";
-        Object view = Views.view(v -> v
+        View view = Views.view(v -> v
                 .type("modal")
                 .callbackId("review_time_submit")
                 .privateMetadata("{\"team_id\":\"T1\"}")
@@ -543,7 +554,7 @@ class NotificationTransportApiClientTest {
         String token = "xoxb-token";
         String triggerId = "TRIGGER_ID";
         ObjectMapper mapper = new ObjectMapper();
-        Object view = mapper.readTree("""
+        JsonNode view = mapper.readTree("""
                 {
                   "type": "modal",
                   "callback_id": "review_time_submit"
@@ -583,7 +594,7 @@ class NotificationTransportApiClientTest {
         // given
         String token = "xoxb-token";
         String triggerId = "TRIGGER_ID";
-        Object view = Views.view(v -> v
+        View view = Views.view(v -> v
                 .type("modal")
                 .callbackId("review_time_submit")
         );

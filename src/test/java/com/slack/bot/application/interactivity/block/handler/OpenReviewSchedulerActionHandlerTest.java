@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.slack.api.model.view.View;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.block.BlockActionType;
 import com.slack.bot.application.interactivity.block.dto.BlockActionCommandDto;
@@ -62,7 +63,7 @@ class OpenReviewSchedulerActionHandlerTest {
                                 () -> assertThat(event.channelId()).isEqualTo("C1"),
                                 () -> assertThat(event.slackUserId()).isEqualTo("U1")
                         )),
-                () -> verify(notificationApiClient, never()).openModal(any(), any(), any())
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any(View.class))
         );
     }
 
@@ -89,7 +90,7 @@ class OpenReviewSchedulerActionHandlerTest {
                 () -> verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
-                        any()
+                        any(View.class)
                 )
         );
     }

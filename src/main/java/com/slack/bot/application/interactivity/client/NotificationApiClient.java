@@ -1,6 +1,7 @@
 package com.slack.bot.application.interactivity.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.slack.api.model.view.View;
 import com.slack.bot.application.interactivity.box.out.OutboxIdempotencySourceContext;
 import com.slack.bot.application.interactivity.box.out.OutboxWorkspaceResolver;
 import com.slack.bot.application.interactivity.box.out.SlackNotificationOutboxWriter;
@@ -110,7 +111,11 @@ public class NotificationApiClient {
         );
     }
 
-    public void openModal(String token, String triggerId, Object view) {
+    public void openModal(String token, String triggerId, View view) {
+        notificationTransportApiClient.openModal(token, triggerId, view);
+    }
+
+    public void openModal(String token, String triggerId, JsonNode view) {
         notificationTransportApiClient.openModal(token, triggerId, view);
     }
 

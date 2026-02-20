@@ -1,6 +1,7 @@
 package com.slack.bot.application.interactivity.workflow;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.slack.api.model.view.View;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.application.interactivity.dto.ReviewScheduleMetaDto;
 import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventPublisher;
@@ -163,7 +164,7 @@ public class ReviewSchedulerWorkflow {
                 abbreviate(context.triggerId()),
                 context.metaJson() == null ? 0 : context.metaJson().length()
         );
-        Object view = slackViews.reviewTimeSubmitModal(context.metaJson());
+        View view = slackViews.reviewTimeSubmitModal(context.metaJson());
 
         slackApiClient.openModal(context.token(), context.triggerId(), view);
     }

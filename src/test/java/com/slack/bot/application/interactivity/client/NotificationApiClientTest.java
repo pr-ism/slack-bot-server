@@ -12,6 +12,8 @@ import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.slack.api.model.view.View;
+import com.slack.api.model.view.Views;
 import com.slack.bot.application.interactivity.box.out.OutboxIdempotencySourceContext;
 import com.slack.bot.application.interactivity.box.out.OutboxWorkspaceResolver;
 import com.slack.bot.application.interactivity.box.out.SlackNotificationOutboxWriter;
@@ -162,11 +164,26 @@ class NotificationApiClientTest {
 
     @Test
     void 모달_오픈은_전송_클라이언트에_위임한다() {
+        // given
+        JsonNode view = new ObjectMapper().createObjectNode();
+
         // when
-        notificationApiClient.openModal("token", "TRIGGER", "{}");
+        notificationApiClient.openModal("token", "TRIGGER", view);
 
         // then
-        verify(notificationTransportApiClient).openModal("token", "TRIGGER", "{}");
+        verify(notificationTransportApiClient).openModal("token", "TRIGGER", view);
+    }
+
+    @Test
+    void View_모달_오픈은_전송_클라이언트에_위임한다() {
+        // given
+        View view = Views.view(v -> v.type("modal"));
+
+        // when
+        notificationApiClient.openModal("token", "TRIGGER", view);
+
+        // then
+        verify(notificationTransportApiClient).openModal("token", "TRIGGER", view);
     }
 
     @Test

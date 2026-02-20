@@ -1,6 +1,7 @@
 package com.slack.bot.application.interactivity.workflow;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.slack.api.model.view.View;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventPublisher;
 import com.slack.bot.application.interactivity.publisher.ReviewReservationCancelEvent;
@@ -204,7 +205,7 @@ public class ReservationCommandWorkflow {
             String metaJson = reviewScheduleMetaBuilder.buildForChange(reservation);
             String triggerId = payload.path("trigger_id")
                                       .asText();
-            Object view = slackViews.reviewTimeSubmitModal(metaJson);
+            View view = slackViews.reviewTimeSubmitModal(metaJson);
 
             slackApiClient.openModal(token, triggerId, view);
         } catch (RuntimeException e) {

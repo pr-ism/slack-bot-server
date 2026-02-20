@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.slack.api.model.view.View;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.block.BlockActionType;
 import com.slack.bot.application.interactivity.block.dto.BlockActionCommandDto;
@@ -64,7 +65,7 @@ class ChangeReviewReservationActionHandlerTest {
                 () -> verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
-                        any()
+                        any(View.class)
                 )
         );
     }
@@ -88,7 +89,7 @@ class ChangeReviewReservationActionHandlerTest {
                         eq("U2"),
                         eq(InteractivityErrorType.NOT_OWNER_CHANGE.message())
                 ),
-                () -> verify(notificationApiClient, never()).openModal(any(), any(), any()),
+                () -> verify(notificationApiClient, never()).openModal(any(), any(), any(View.class)),
                 () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }

@@ -3,11 +3,14 @@ package com.slack.bot.infrastructure.interaction.client;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
+import com.slack.api.model.block.LayoutBlock;
+import com.slack.api.model.view.View;
 import com.slack.api.util.json.GsonFactory;
 import com.slack.bot.application.interactivity.client.exception.SlackBotMessageDispatchException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -31,7 +34,14 @@ public class NotificationTransportApiClient {
         ensureOk(response, "슬랙 봇 메시지 전송 실패: 에페메랄 메시지 전송 실패");
     }
 
-    public void sendEphemeralBlockMessage(String token, String channelId, String targetUserId, Object blocks, String text) {
+    public void sendEphemeralBlockMessage(String token, String channelId, String targetUserId, JsonNode blocks, String text) {
+        Map<String, Object> body = buildEphemeralBlockBody(channelId, targetUserId, blocks, text);
+        JsonNode response = postForJson("chat.postEphemeral", token, body);
+
+        ensureOk(response, "슬랙 봇 메시지 전송 실패: 에페메랄 블록 메시지 전송 실패");
+    }
+
+    public void sendEphemeralBlockMessage(String token, String channelId, String targetUserId, List<LayoutBlock> blocks, String text) {
         Map<String, Object> body = buildEphemeralBlockBody(channelId, targetUserId, blocks, text);
         JsonNode response = postForJson("chat.postEphemeral", token, body);
 
@@ -45,15 +55,29 @@ public class NotificationTransportApiClient {
         ensureOk(response, "슬랙 봇 메시지 전송 실패: 메시지 전송 실패");
     }
 
-    public void sendBlockMessage(String token, String channelId, Object blocks, String text) {
+    public void sendBlockMessage(String token, String channelId, JsonNode blocks, String text) {
         Map<String, Object> body = buildBlockMessageBody(channelId, blocks, text);
         JsonNode response = postForJson("chat.postMessage", token, body);
 
         ensureOk(response, "슬랙 봇 메시지 전송 실패: 블록 메시지 전송 실패");
     }
 
-    public void openModal(String token, String triggerId, Object view) {
-        Map<String, Object> body = buildOpenModalBody(triggerId, normalizeView(view));
+    public void sendBlockMessage(String token, String channelId, List<LayoutBlock> blocks, String text) {
+        Map<String, Object> body = buildBlockMessageBody(channelId, blocks, text);
+        JsonNode response = postForJson("chat.postMessage", token, body);
+
+        ensureOk(response, "슬랙 봇 메시지 전송 실패: 블록 메시지 전송 실패");
+    }
+
+    public void openModal(String token, String triggerId, View view) {
+        Map<String, Object> body = buildOpenModalBody(triggerId, serializeView(view));
+        JsonNode response = postForJson("views.open", token, body);
+
+        ensureOk(response, "슬랙 봇 메시지 전송 실패: 모달 열기 실패");
+    }
+
+    public void openModal(String token, String triggerId, JsonNode view) {
+        Map<String, Object> body = buildOpenModalBody(triggerId, view);
         JsonNode response = postForJson("views.open", token, body);
 
         ensureOk(response, "슬랙 봇 메시지 전송 실패: 모달 열기 실패");
@@ -204,7 +228,7 @@ public class NotificationTransportApiClient {
         return body;
     }
 
-    private Map<String, Object> buildOpenModalBody(String triggerId, Object view) {
+    private Map<String, Object> buildOpenModalBody(String triggerId, JsonNode view) {
         Map<String, Object> body = new HashMap<>();
 
         body.put("trigger_id", triggerId);
@@ -212,11 +236,7 @@ public class NotificationTransportApiClient {
         return body;
     }
 
-    private Object normalizeView(Object view) {
-        if (view == null || view instanceof JsonNode || view instanceof Map<?, ?>) {
-            return view;
-        }
-
+    private JsonNode serializeView(View view) {
         String snakeCaseJson = SNAKE_CASE_GSON.toJson(view);
 
         try {
