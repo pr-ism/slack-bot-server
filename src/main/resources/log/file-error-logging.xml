@@ -14,15 +14,18 @@
             <pattern>yyyy-MM-dd HH:mm:ss</pattern>
           </timestamp>
           <mdc/>
-          <pattern>
-            <pattern>
-              {
-              "level": "%level",
-              "message": "%message",
-              "stacktrace": "%rEx"
-              }
-            </pattern>
-          </pattern>
+          <logLevel>
+            <fieldName>level</fieldName>
+          </logLevel>
+          <message>
+            <fieldName>message</fieldName>
+          </message>
+          <stackTrace>
+            <fieldName>stacktrace</fieldName>
+            <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+              <rootCauseFirst>true</rootCauseFirst>
+            </throwableConverter>
+          </stackTrace>
         </providers>
       </encoder>
 
@@ -39,7 +42,8 @@
         <level>ERROR</level>
       </filter>
       <queueSize>4096</queueSize>
-      <neverBlock>true</neverBlock>
+      <neverBlock>false</neverBlock>
+      <discardingThreshold>0</discardingThreshold>
       <appender-ref ref="FILE_ERROR_APPENDER"/>
     </appender>
   </springProfile>
