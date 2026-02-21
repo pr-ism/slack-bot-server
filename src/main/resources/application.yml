@@ -3,6 +3,14 @@ spring:
     name: bot
   profiles:
     active: local
+    group:
+      local:
+        - console-logging
+      prod:
+        - file-info-logging
+        - file-warn-logging
+        - file-error-logging
+        - slack-error-logging
 
 slack:
   signing-secret: ${SLACK_SIGNING_SECRET:signing-secret}
