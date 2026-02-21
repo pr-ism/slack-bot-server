@@ -1,6 +1,8 @@
 package com.slack.bot.global.log;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.classic.spi.IThrowableProxy;
+import ch.qos.logback.classic.spi.ThrowableProxyUtil;
 import ch.qos.logback.core.AppenderBase;
 import java.io.IOException;
 import java.io.InputStream;
@@ -20,6 +22,8 @@ public class SlackAppender extends AppenderBase<ILoggingEvent> {
     private static final String EXCEPTION_FORMAT = "전송 실패 : %s";
     private static final String SLACK_MESSAGE_FORMAT = "에러가 발생했습니다.\n```%s %s %s [%s] - %s```";
     private static final String INVALID_WEB_HOOK_MESSAGE = "WEB_HOOK 환경변수가 설정되지 않았습니다. SlackAppender를 비활성화합니다.";
+    private static final int MAX_EXCEPTION_INFO_LENGTH = 2_000;
+    private static final int MAX_SLACK_TEXT_LENGTH = 3_500;
 
     private final RestClient restClient;
     private final DateTimeFormatter dateFormatter;
@@ -60,7 +64,7 @@ public class SlackAppender extends AppenderBase<ILoggingEvent> {
                 "attachments", List.of(
                         Map.of(
                                 "fallback", "에러가 발생했습니다.",
-                                "color", "#2EB886",
+                                "color", "danger",
                                 "author_name", "PRism - Slack Server",
                                 "text", text,
                                 "fields", List.of(
@@ -70,7 +74,7 @@ public class SlackAppender extends AppenderBase<ILoggingEvent> {
                                                 "short", false
                                         )
                                 ),
-                                "ts", eventObject.getTimeStamp()
+                                "ts", eventObject.getTimeStamp() / 1_000L
                         )
                 )
         );
@@ -78,14 +82,28 @@ public class SlackAppender extends AppenderBase<ILoggingEvent> {
 
     private String createText(ILoggingEvent eventObject) {
         String formattedTimestamp = formatTimestamp(eventObject.getTimeStamp());
+        String messageWithException = createMessageWithException(eventObject);
         return String.format(
                 SLACK_MESSAGE_FORMAT,
                 formattedTimestamp,
                 eventObject.getLevel(),
                 eventObject.getThreadName(),
                 eventObject.getLoggerName(),
-                eventObject.getFormattedMessage()
+                messageWithException
         );
+    }
+
+    private String createMessageWithException(ILoggingEvent eventObject) {
+        String formattedMessage = eventObject.getFormattedMessage();
+        IThrowableProxy throwableProxy = eventObject.getThrowableProxy();
+        if (throwableProxy == null) {
+            return trimToLength(formattedMessage, MAX_SLACK_TEXT_LENGTH);
+        }
+
+        String exceptionInfo = ThrowableProxyUtil.asString(throwableProxy);
+        String shortenedException = trimToLength(exceptionInfo, MAX_EXCEPTION_INFO_LENGTH);
+        String combinedMessage = formattedMessage + "\n" + shortenedException;
+        return trimToLength(combinedMessage, MAX_SLACK_TEXT_LENGTH);
     }
 
     private void sendMessage(Map<String, Object> message) {
@@ -154,5 +172,19 @@ public class SlackAppender extends AppenderBase<ILoggingEvent> {
     private String formatTimestamp(long epochMilli) {
         Instant instant = Instant.ofEpochMilli(epochMilli);
         return dateFormatter.format(instant);
+    }
+
+    private String trimToLength(String value, int maxLength) {
+        if (value == null) {
+            return "";
+        }
+        if (value.length() <= maxLength) {
+            return value;
+        }
+        int endIndex = maxLength - 3;
+        if (endIndex <= 0) {
+            return "...";
+        }
+        return value.substring(0, endIndex) + "...";
     }
 }
