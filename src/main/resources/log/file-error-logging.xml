@@ -39,8 +39,7 @@
         <level>ERROR</level>
       </filter>
       <queueSize>4096</queueSize>
-      <discardingThreshold>0</discardingThreshold>
-      <neverBlock>false</neverBlock>
+      <neverBlock>true</neverBlock>
       <appender-ref ref="FILE_ERROR_APPENDER"/>
     </appender>
   </springProfile>
