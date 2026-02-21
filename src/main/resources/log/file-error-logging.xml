@@ -1,0 +1,47 @@
+<included>
+  <springProfile name="file-error-logging">
+    <appender name="FILE_ERROR_APPENDER" class="ch.qos.logback.core.rolling.RollingFileAppender">
+      <file>${LOG_DIR}/error/error.log</file>
+
+      <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+        <level>ERROR</level>
+      </filter>
+
+      <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+        <providers>
+          <timestamp>
+            <fieldName>timeStamp</fieldName>
+            <pattern>yyyy-MM-dd HH:mm:ss</pattern>
+          </timestamp>
+          <mdc/>
+          <pattern>
+            <pattern>
+              {
+              "level": "%level",
+              "message": "%message",
+              "stacktrace": "%rEx"
+              }
+            </pattern>
+          </pattern>
+        </providers>
+      </encoder>
+
+      <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+        <fileNamePattern>${LOG_DIR}/backup/error/error-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+        <maxFileSize>100MB</maxFileSize>
+        <maxHistory>30</maxHistory>
+        <totalSizeCap>3GB</totalSizeCap>
+      </rollingPolicy>
+    </appender>
+
+    <appender name="ASYNC_FILE_ERROR_APPENDER" class="ch.qos.logback.classic.AsyncAppender">
+      <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+        <level>ERROR</level>
+      </filter>
+      <queueSize>4096</queueSize>
+      <discardingThreshold>0</discardingThreshold>
+      <neverBlock>false</neverBlock>
+      <appender-ref ref="FILE_ERROR_APPENDER"/>
+    </appender>
+  </springProfile>
+</included>
