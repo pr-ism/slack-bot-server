@@ -1,0 +1,46 @@
+<included>
+  <springProfile name="file-info-logging">
+    <appender name="FILE_INFO_APPENDER" class="ch.qos.logback.core.rolling.RollingFileAppender">
+      <file>${LOG_DIR}/info/info.log</file>
+
+      <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+        <level>INFO</level>
+      </filter>
+
+      <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+        <providers>
+          <timestamp>
+            <fieldName>timeStamp</fieldName>
+            <pattern>yyyy-MM-dd HH:mm:ss</pattern>
+          </timestamp>
+          <mdc/>
+          <pattern>
+            <pattern>
+              {
+              "level": "%level",
+              "message": "%message"
+              }
+            </pattern>
+          </pattern>
+          <stackTrace/>
+        </providers>
+      </encoder>
+
+      <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+        <fileNamePattern>${LOG_DIR}/backup/info/info-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+        <maxFileSize>100MB</maxFileSize>
+        <maxHistory>30</maxHistory>
+        <totalSizeCap>3GB</totalSizeCap>
+      </rollingPolicy>
+    </appender>
+
+    <appender name="ASYNC_FILE_INFO_APPENDER" class="ch.qos.logback.classic.AsyncAppender">
+      <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+        <level>INFO</level>
+      </filter>
+      <queueSize>4096</queueSize>
+      <neverBlock>true</neverBlock>
+      <appender-ref ref="FILE_INFO_APPENDER"/>
+    </appender>
+  </springProfile>
+</included>

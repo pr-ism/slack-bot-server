@@ -140,3 +140,15 @@ cors:
     - "*"
   exposed-headers: []
   max-age: 3600
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,metrics"
+      base-path: /local-actuator
+  endpoint:
+    health:
+      show-components: always
+  server:
+    port: 8888

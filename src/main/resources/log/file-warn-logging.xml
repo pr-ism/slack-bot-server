@@ -1,0 +1,51 @@
+<included>
+  <springProfile name="file-warn-logging">
+
+    <appender name="FILE-WARN-APPENDER" class="ch.qos.logback.core.rolling.RollingFileAppender">
+      <file>${LOG_DIR}/warn/warn.log</file>
+
+      <filter class="ch.qos.logback.classic.filter.LevelFilter">
+        <level>WARN</level>
+        <onMatch>ACCEPT</onMatch>
+        <onMismatch>DENY</onMismatch>
+      </filter>
+
+      <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+        <providers>
+          <timestamp>
+            <fieldName>timeStamp</fieldName>
+            <pattern>yyyy-MM-dd HH:mm:ss</pattern>
+          </timestamp>
+          <pattern>
+            <pattern>
+              {
+              "level": "%level"
+              }
+            </pattern>
+          </pattern>
+          <mdc/>
+          <message/>
+          <stackTrace/>
+        </providers>
+      </encoder>
+
+      <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+        <fileNamePattern>${LOG_DIR}/backup/warn/warn-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+        <maxFileSize>100MB</maxFileSize>
+        <maxHistory>30</maxHistory>
+        <totalSizeCap>3GB</totalSizeCap>
+      </rollingPolicy>
+    </appender>
+
+    <appender name="ASYNC_FILE_WARN_APPENDER" class="ch.qos.logback.classic.AsyncAppender">
+      <filter class="ch.qos.logback.classic.filter.LevelFilter">
+        <level>WARN</level>
+        <onMatch>ACCEPT</onMatch>
+        <onMismatch>DENY</onMismatch>
+      </filter>
+      <queueSize>100</queueSize>
+      <neverBlock>true</neverBlock>
+      <appender-ref ref="FILE-WARN-APPENDER"/>
+    </appender>
+  </springProfile>
+</included>
