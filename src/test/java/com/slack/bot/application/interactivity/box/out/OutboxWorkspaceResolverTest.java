@@ -57,4 +57,37 @@ class OutboxWorkspaceResolverTest {
                 .isInstanceOf(OutboxWorkspaceNotFoundException.class)
                 .hasMessageContaining("outbox 적재 대상 워크스페이스를 찾을 수 없습니다.");
     }
+
+    @Test
+    void null_토큰으로_조회하면_예외_메시지에_tokenPrefix를_포함한다() {
+        // given
+        given(workspaceRepository.findByAccessToken(null)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> resolver.resolve(null))
+                .isInstanceOf(OutboxWorkspaceNotFoundException.class)
+                .hasMessageContaining("tokenPrefix=empty");
+    }
+
+    @Test
+    void 빈_토큰으로_조회하면_예외_메시지에_tokenPrefix를_포함한다() {
+        // given
+        given(workspaceRepository.findByAccessToken("")).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> resolver.resolve(""))
+                .isInstanceOf(OutboxWorkspaceNotFoundException.class)
+                .hasMessageContaining("tokenPrefix=empty");
+    }
+
+    @Test
+    void 정상_토큰_미존재_시_예외_메시지에_마스킹된_토큰을_포함한다() {
+        // given
+        given(workspaceRepository.findByAccessToken("missing-token-123")).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> resolver.resolve("missing-token-123"))
+                .isInstanceOf(OutboxWorkspaceNotFoundException.class)
+                .hasMessageContaining("tokenPrefix=missing-***");
+    }
 }
