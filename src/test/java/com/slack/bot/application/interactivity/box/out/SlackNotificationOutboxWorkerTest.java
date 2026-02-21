@@ -46,18 +46,18 @@ class SlackNotificationOutboxWorkerTest {
 
     @Test
     void 워커_실행_중_예외가_발생해도_예외를_전파하지_않는다() {
-        // when
+        // given
         willThrow(new RuntimeException("worker failure"))
                 .given(slackNotificationOutboxProcessor)
                 .processPending(50);
 
-        // then
+        // when & then
         assertThatCode(() -> slackNotificationOutboxWorker.processPendingOutbox())
                 .doesNotThrowAnyException();
     }
 
     @Test
-    void worker_enabled가_false면_outbox를_처리하지_않는다() {
+    void worker_비활성화_상태라면_outbox를_처리하지_않는다() {
         // given
         interactionWorkerProperties = new InteractionWorkerProperties(
                 new InteractionWorkerProperties.Inbox(),
