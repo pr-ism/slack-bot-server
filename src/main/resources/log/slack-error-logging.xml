@@ -7,7 +7,7 @@
         <level>ERROR</level>
       </filter>
       <queueSize>20</queueSize>
-      <neverBlock>true</neverBlock>
+      <neverBlock>false</neverBlock>
       <appender-ref ref="SLACK_APPENDER"/>
     </appender>
   </springProfile>

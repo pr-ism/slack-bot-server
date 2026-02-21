@@ -4,8 +4,10 @@
     <appender name="FILE-WARN-APPENDER" class="ch.qos.logback.core.rolling.RollingFileAppender">
       <file>${LOG_DIR}/warn/warn.log</file>
 
-      <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+      <filter class="ch.qos.logback.classic.filter.LevelFilter">
         <level>WARN</level>
+        <onMatch>ACCEPT</onMatch>
+        <onMismatch>DENY</onMismatch>
       </filter>
 
       <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
@@ -23,6 +25,7 @@
           </pattern>
           <mdc/>
           <message/>
+          <stackTrace/>
         </providers>
       </encoder>
 
@@ -35,8 +38,10 @@
     </appender>
 
     <appender name="ASYNC_FILE_WARN_APPENDER" class="ch.qos.logback.classic.AsyncAppender">
-      <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+      <filter class="ch.qos.logback.classic.filter.LevelFilter">
         <level>WARN</level>
+        <onMatch>ACCEPT</onMatch>
+        <onMismatch>DENY</onMismatch>
       </filter>
       <queueSize>100</queueSize>
       <neverBlock>true</neverBlock>
