@@ -101,6 +101,7 @@ def jacocoExcludePatterns = [
 		"**/global/**",
 		"**/common/**",
 		"**/exception/**",
+		"**/aop/**",
 
 		"**/Q*",
 		"**/generated/**",
