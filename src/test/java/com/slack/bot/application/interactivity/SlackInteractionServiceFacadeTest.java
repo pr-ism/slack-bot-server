@@ -3,6 +3,7 @@ package com.slack.bot.application.interactivity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -13,6 +14,8 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.block.BlockActionType;
+import com.slack.bot.application.interactivity.box.ProcessingSourceContext;
+import com.slack.bot.application.interactivity.box.in.SlackInteractionInboxProcessor;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.application.interactivity.reply.dto.response.SlackActionResponse;
 import com.slack.bot.domain.reservation.ReservationStatus;
@@ -40,6 +43,12 @@ class SlackInteractionServiceFacadeTest {
     @Autowired
     ObjectMapper objectMapper;
 
+    @Autowired
+    ProcessingSourceContext processingSourceContext;
+
+    @Autowired
+    SlackInteractionInboxProcessor slackInteractionInboxProcessor;
+
     @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
@@ -52,7 +61,9 @@ class SlackInteractionServiceFacadeTest {
         String payloadJson = objectMapper.writeValueAsString(cancelReservationPayloadWithoutType("100"));
 
         // when
-        SlackActionResponse actual = slackInteractionServiceFacade.handle(payloadJson);
+        SlackActionResponse actual = processingSourceContext.withInboxProcessing(
+                () -> slackInteractionServiceFacade.handle(payloadJson)
+        );
 
         // then
         assertAll(
@@ -97,6 +108,21 @@ class SlackInteractionServiceFacadeTest {
     }
 
     @Test
+    void view_submission_입력값이_유효하면_즉시_clear_응답을_반환하고_inbox_enqueue를_시도한다() throws Exception {
+        // given
+        String payloadJson = objectMapper.writeValueAsString(viewSubmissionPayloadForEnqueue("30"));
+
+        // when
+        SlackActionResponse actual = slackInteractionServiceFacade.handle(payloadJson);
+
+        // then
+        assertAll(
+                () -> assertThat(actual).isEqualTo(SlackActionResponse.clear()),
+                () -> verify(slackInteractionInboxProcessor).enqueueViewSubmission(anyString())
+        );
+    }
+
+    @Test
     void 슬랙_인터랙션_payload가_JSON으로_해석되지_않으면_예외를_삼키고_빈_응답을_반환한다() {
         // given
         String invalidPayload = "{invalid-json";
@@ -114,7 +140,9 @@ class SlackInteractionServiceFacadeTest {
         String payloadJson = objectMapper.writeValueAsString(cancelReservationPayloadWithTeam("T404", "100"));
 
         // when
-        SlackActionResponse actual = slackInteractionServiceFacade.handle(payloadJson);
+        SlackActionResponse actual = processingSourceContext.withInboxProcessing(
+                () -> slackInteractionServiceFacade.handle(payloadJson)
+        );
 
         // then
         assertThat(actual).isEqualTo(SlackActionResponse.empty());
@@ -144,7 +172,9 @@ class SlackInteractionServiceFacadeTest {
         String payloadJson = objectMapper.writeValueAsString(cancelReservationPayloadWithoutType("100"));
 
         // when
-        SlackActionResponse actual = slackInteractionServiceFacade.handle(payloadJson);
+        SlackActionResponse actual = processingSourceContext.withInboxProcessing(
+                () -> slackInteractionServiceFacade.handle(payloadJson)
+        );
 
         // then
         assertThat(actual).isEqualTo(SlackActionResponse.empty());
@@ -189,26 +219,52 @@ class SlackInteractionServiceFacadeTest {
         return payload;
     }
 
+    private ObjectNode viewSubmissionPayloadForEnqueue(String selectedOption) {
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.put("type", "view_submission");
+        payload.set("team", objectMapper.createObjectNode().put("id", "T1"));
+        payload.set("user", objectMapper.createObjectNode().put("id", "U1"));
+
+        ObjectNode view = objectMapper.createObjectNode();
+        view.put("callback_id", "review_time_submit");
+        view.put("private_metadata", metaJsonWithProjectId("123"));
+
+        ObjectNode state = objectMapper.createObjectNode();
+        ObjectNode values = objectMapper.createObjectNode();
+        ObjectNode timeBlock = objectMapper.createObjectNode();
+        ObjectNode timeAction = objectMapper.createObjectNode();
+        ObjectNode selected = objectMapper.createObjectNode();
+        selected.put("value", selectedOption);
+        timeAction.set("selected_option", selected);
+        timeBlock.set("time_action", timeAction);
+        values.set("time_block", timeBlock);
+        state.set("values", values);
+        view.set("state", state);
+        payload.set("view", view);
+
+        return payload;
+    }
+
     private ArrayNode actions(String actionId, String value) {
         ArrayNode actions = objectMapper.createArrayNode();
         actions.add(objectMapper.createObjectNode()
-                .put("action_id", actionId)
-                .put("value", value));
+                                .put("action_id", actionId)
+                                .put("value", value));
         return actions;
     }
 
     private String metaJsonWithProjectId(String projectId) {
         return objectMapper.createObjectNode()
-                .put("team_id", "T1")
-                .put("channel_id", "C1")
-                .put("pull_request_id", 10L)
-                .put("pull_request_number", 10)
-                .put("pull_request_title", "PR 제목")
-                .put("pull_request_url", "https://github.com/org/repo/pull/10")
-                .put("project_id", projectId)
-                .put("author_github_id", "author-gh")
-                .put("author_slack_id", "U_AUTHOR")
-                .put("reservation_id", "R1")
-                .toString();
+                           .put("team_id", "T1")
+                           .put("channel_id", "C1")
+                           .put("pull_request_id", 10L)
+                           .put("pull_request_number", 10)
+                           .put("pull_request_title", "PR 제목")
+                           .put("pull_request_url", "https://github.com/org/repo/pull/10")
+                           .put("project_id", projectId)
+                           .put("author_github_id", "author-gh")
+                           .put("author_slack_id", "U_AUTHOR")
+                           .put("reservation_id", "R1")
+                           .toString();
     }
 }

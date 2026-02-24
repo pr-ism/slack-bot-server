@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.block.BlockActionType;
+import com.slack.bot.application.interactivity.box.ProcessingSourceContext;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.domain.reservation.ReservationStatus;
 import com.slack.bot.domain.reservation.repository.ReviewReservationRepository;
@@ -39,6 +40,9 @@ class BlockActionInteractionServiceTest {
     @Autowired
     ObjectMapper objectMapper;
 
+    @Autowired
+    ProcessingSourceContext processingSourceContext;
+
     @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
@@ -52,7 +56,7 @@ class BlockActionInteractionServiceTest {
         JsonNode payload = openReviewSchedulerPayload(metaJsonWithProjectId("123"));
 
         // when
-        blockActionInteractionService.handle(payload);
+        processingSourceContext.withInboxProcessing(() -> blockActionInteractionService.handle(payload));
 
         // then
         assertAll(
@@ -83,7 +87,7 @@ class BlockActionInteractionServiceTest {
         JsonNode payload = cancelReservationPayload("100");
 
         // when
-        blockActionInteractionService.handle(payload);
+        processingSourceContext.withInboxProcessing(() -> blockActionInteractionService.handle(payload));
 
         // then
         assertAll(
@@ -126,23 +130,23 @@ class BlockActionInteractionServiceTest {
     private ArrayNode actions(String actionId, String value) {
         ArrayNode actions = objectMapper.createArrayNode();
         actions.add(objectMapper.createObjectNode()
-                .put("action_id", actionId)
-                .put("value", value));
+                                .put("action_id", actionId)
+                                .put("value", value));
         return actions;
     }
 
     private String metaJsonWithProjectId(String projectId) {
         return objectMapper.createObjectNode()
-                .put("team_id", "T1")
-                .put("channel_id", "C1")
-                .put("pull_request_id", 10L)
-                .put("pull_request_number", 10)
-                .put("pull_request_title", "PR 제목")
-                .put("pull_request_url", "https://github.com/org/repo/pull/10")
-                .put("project_id", projectId)
-                .put("author_github_id", "author-gh")
-                .put("author_slack_id", "U_AUTHOR")
-                .put("reservation_id", "R1")
-                .toString();
+                           .put("team_id", "T1")
+                           .put("channel_id", "C1")
+                           .put("pull_request_id", 10L)
+                           .put("pull_request_number", 10)
+                           .put("pull_request_title", "PR 제목")
+                           .put("pull_request_url", "https://github.com/org/repo/pull/10")
+                           .put("project_id", projectId)
+                           .put("author_github_id", "author-gh")
+                           .put("author_slack_id", "U_AUTHOR")
+                           .put("reservation_id", "R1")
+                           .toString();
     }
 }

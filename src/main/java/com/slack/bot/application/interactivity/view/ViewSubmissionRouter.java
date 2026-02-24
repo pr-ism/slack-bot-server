@@ -2,6 +2,8 @@ package com.slack.bot.application.interactivity.view;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.slack.bot.application.command.exception.WorkspaceNotFoundException;
+import com.slack.bot.application.interactivity.box.ProcessingSourceContext;
+import com.slack.bot.application.interactivity.box.in.ViewSubmissionInboxGateway;
 import com.slack.bot.application.interactivity.dto.ReviewScheduleMetaDto;
 import com.slack.bot.application.interactivity.reply.dto.response.SlackActionResponse;
 import com.slack.bot.application.interactivity.reservation.ReservationMetaResolver;
@@ -18,9 +20,19 @@ public class ViewSubmissionRouter {
 
     private final WorkspaceRepository workspaceRepository;
     private final ReservationMetaResolver reservationMetaResolver;
+    private final ProcessingSourceContext processingSourceContext;
+    private final ViewSubmissionInboxGateway viewSubmissionInboxGateway;
     private final ReviewTimeSubmissionProcessor reviewTimeSubmissionProcessor;
 
     public SlackActionResponse handle(JsonNode payload) {
+        if (!processingSourceContext.isInboxProcessing()) {
+            return viewSubmissionInboxGateway.handle(payload).response();
+        }
+
+        return handleInInbox(payload);
+    }
+
+    private SlackActionResponse handleInInbox(JsonNode payload) {
         ViewCallbackId callbackId = ViewCallbackId.from(readCallbackId(payload));
         String teamId = resolveTeamId(payload);
         validateTeamId(teamId);

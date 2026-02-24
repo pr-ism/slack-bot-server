@@ -1,6 +1,8 @@
 package com.slack.bot.application;
 
 import com.slack.bot.application.event.handler.SlackEventHandlerRegistry;
+import com.slack.bot.application.interactivity.box.in.SlackInteractionInboxProcessor;
+import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventPublisher;
 import com.slack.bot.application.interactivity.reservation.ReviewReservationCoordinator;
 import com.slack.bot.context.CleanupExecutionListener;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
@@ -17,12 +19,14 @@ import org.springframework.data.auditing.DateTimeProvider;
 import org.springframework.test.context.TestExecutionListeners;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
-import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventPublisher;
 
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @SpringBootTest
-@Import(IntegrationTestConfig.class)
+@Import({
+        IntegrationTestConfig.class,
+        IntegrationAspectTestConfig.class
+})
 @MockitoBean(types = {
         DateTimeProvider.class,
         TokenDecoder.class,
@@ -33,7 +37,8 @@ import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventP
 @MockitoSpyBean(types = {
         Clock.class,
         ReviewInteractionEventPublisher.class,
-        ReviewReservationCoordinator.class
+        ReviewReservationCoordinator.class,
+        SlackInteractionInboxProcessor.class
 })
 @TestExecutionListeners(listeners = CleanupExecutionListener.class, mergeMode = TestExecutionListeners.MergeMode.MERGE_WITH_DEFAULTS)
 public @interface IntegrationTest {
