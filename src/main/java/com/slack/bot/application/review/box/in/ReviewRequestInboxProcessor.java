@@ -8,8 +8,9 @@ import com.slack.bot.application.review.ReviewNotificationService;
 import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
 import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
-import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
+import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
+import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -39,6 +40,9 @@ public class ReviewRequestInboxProcessor {
 
     public void enqueue(String apiKey, ReviewAssignmentRequest request, long batchWindowMillis) {
         validateBatchWindowMillis(batchWindowMillis);
+        if (request == null) {
+            throw new IllegalArgumentException("request는 비어 있을 수 없습니다.");
+        }
 
         String coalescingKey = buildCoalescingKey(apiKey, request.githubPullRequestId());
         String requestJson = serializeRequest(request);
@@ -62,7 +66,7 @@ public class ReviewRequestInboxProcessor {
         List<ReviewRequestInbox> pendings = reviewRequestInboxRepository.findClaimable(now, limit);
 
         for (ReviewRequestInbox pending : pendings) {
-            processSafely(pending, now);
+            processSafely(pending);
         }
     }
 
@@ -79,13 +83,14 @@ public class ReviewRequestInboxProcessor {
         }
     }
 
-    private void processSafely(ReviewRequestInbox pending, Instant now) {
+    private void processSafely(ReviewRequestInbox pending) {
         Long inboxId = pending.getId();
         if (inboxId == null) {
             return;
         }
 
-        if (!reviewRequestInboxRepository.markProcessingIfClaimable(inboxId, now, now)) {
+        Instant claimNow = clock.instant();
+        if (!reviewRequestInboxRepository.markProcessingIfClaimable(inboxId, claimNow, claimNow)) {
             return;
         }
 
@@ -123,10 +128,19 @@ public class ReviewRequestInboxProcessor {
     }
 
     private void markFailureStatus(ReviewRequestInbox inbox, Exception exception) {
+        if (inbox.getStatus() != ReviewRequestInboxStatus.PROCESSING) {
+            log.warn(
+                    "PROCESSING이 아닌 상태에서 실패 처리를 시도했습니다. inboxId={}, status={}",
+                    inbox.getId(),
+                    inbox.getStatus()
+            );
+            return;
+        }
+
         String reason = resolveFailureReason(exception);
 
         if (!retryExceptionClassifier.isRetryable(exception)) {
-            inbox.markFailed(clock.instant(), reason, SlackInteractivityFailureType.BUSINESS_INVARIANT);
+            inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.NON_RETRYABLE);
             return;
         }
 
@@ -135,7 +149,7 @@ public class ReviewRequestInboxProcessor {
             return;
         }
 
-        inbox.markFailed(clock.instant(), reason, SlackInteractivityFailureType.RETRY_EXHAUSTED);
+        inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.RETRY_EXHAUSTED);
     }
 
     private String buildCoalescingKey(String apiKey, Long githubPullRequestId) {

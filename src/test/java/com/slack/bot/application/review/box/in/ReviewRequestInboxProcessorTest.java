@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
@@ -14,8 +15,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
 import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
-import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
 import com.slack.bot.infrastructure.review.batch.SpyReviewNotificationService;
+import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
@@ -24,6 +25,7 @@ import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -119,7 +121,7 @@ class ReviewRequestInboxProcessorTest {
     }
 
     @Test
-    void 잘못된_requestJson은_재시도없이_FAILED_BUSINESS_INVARIANT로_마킹된다() {
+    void 잘못된_requestJson은_재시도없이_FAILED_NON_RETRYABLE로_마킹된다() {
         // given
         reviewRequestInboxRepository.upsertPending(
                 "test-api-key:999",
@@ -138,7 +140,7 @@ class ReviewRequestInboxProcessorTest {
                 () -> assertThat(spyReviewNotificationService.getSendCount()).isZero(),
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
                 () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(inbox.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT),
+                () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE),
                 () -> assertThat(inbox.getFailureReason()).isNotBlank(),
                 () -> assertThat(reviewNotificationSourceContext.currentSourceKey()).isEmpty()
         );
@@ -197,6 +199,14 @@ class ReviewRequestInboxProcessorTest {
         assertThatThrownBy(() -> reviewRequestInboxProcessor.enqueue(" ", request, 0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("apiKey는 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void request가_비어_있으면_enqueue는_할_수_없다() {
+        // when & then
+        assertThatThrownBy(() -> reviewRequestInboxProcessor.enqueue("test-api-key", null, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("request는 비어 있을 수 없습니다.");
     }
 
     @Test
@@ -289,8 +299,41 @@ class ReviewRequestInboxProcessorTest {
         assertAll(
                 () -> assertThat(failed.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
                 () -> assertThat(failed.getProcessingAttempt()).isEqualTo(2),
-                () -> assertThat(failed.getFailureType()).isEqualTo(SlackInteractivityFailureType.RETRY_EXHAUSTED),
+                () -> assertThat(failed.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.RETRY_EXHAUSTED),
                 () -> assertThat(failed.getFailureReason()).isNotBlank()
+        );
+    }
+
+    @Test
+    @Sql(scripts = {
+            "classpath:sql/fixtures/review/project_t1.sql",
+            "classpath:sql/fixtures/review/workspace_t1.sql",
+            "classpath:sql/fixtures/review/channel_t1.sql",
+            "classpath:sql/fixtures/review/project_member_t1_mapped.sql"
+    })
+    void PROCESSED_저장실패후_재시도경로에서도_상태전이예외없이_저장된다() {
+        // given
+        ReviewAssignmentRequest request = request(703L, "processed-save-fail");
+        reviewRequestInboxProcessor.enqueue("test-api-key", request, 0);
+
+        AtomicInteger saveCallCount = new AtomicInteger();
+        doAnswer(invocation -> {
+            ReviewRequestInbox inbox = invocation.getArgument(0);
+            if (saveCallCount.getAndIncrement() == 0 && inbox.getStatus() == ReviewRequestInboxStatus.PROCESSED) {
+                throw new RuntimeException("transient save failure");
+            }
+            return invocation.callRealMethod();
+        }).when(reviewRequestInboxRepository).save(any(ReviewRequestInbox.class));
+
+        // when
+        reviewRequestInboxProcessor.processPending(10, 1_000);
+
+        // then
+        ReviewRequestInbox inbox = jpaReviewRequestInboxRepository.findAll().getFirst();
+        assertAll(
+                () -> assertThat(spyReviewNotificationService.getSendCount()).isEqualTo(1),
+                () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
+                () -> assertThat(inbox.getFailureType()).isNull()
         );
     }
 

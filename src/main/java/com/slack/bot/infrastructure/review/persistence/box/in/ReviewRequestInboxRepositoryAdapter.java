@@ -5,7 +5,7 @@ import static com.slack.bot.infrastructure.review.box.in.QReviewRequestInbox.rev
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
-import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
+import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
@@ -113,7 +113,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                                         .set(reviewRequestInbox.failureReason, Expressions.nullExpression(String.class))
                                         .set(
                                                 reviewRequestInbox.failureType,
-                                                Expressions.nullExpression(SlackInteractivityFailureType.class)
+                                                Expressions.nullExpression(ReviewRequestInboxFailureType.class)
                                         )
                                         .where(
                                                 reviewRequestInbox.id.eq(inboxId),
@@ -142,7 +142,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                                          .set(reviewRequestInbox.failureReason, failureReason)
                                          .set(
                                                  reviewRequestInbox.failureType,
-                                                 Expressions.nullExpression(SlackInteractivityFailureType.class)
+                                                 Expressions.nullExpression(ReviewRequestInboxFailureType.class)
                                          )
                                          .where(
                                                  reviewRequestInbox.status.eq(ReviewRequestInboxStatus.PROCESSING),
@@ -183,7 +183,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                            .set(reviewRequestInbox.failureReason, Expressions.nullExpression(String.class))
                            .set(
                                    reviewRequestInbox.failureType,
-                                   Expressions.nullExpression(SlackInteractivityFailureType.class)
+                                   Expressions.nullExpression(ReviewRequestInboxFailureType.class)
                            )
                            .where(reviewRequestInbox.coalescingKey.eq(coalescingKey))
                            .execute();

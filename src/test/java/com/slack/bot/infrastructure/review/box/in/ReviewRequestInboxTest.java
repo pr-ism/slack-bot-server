@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
-import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -358,7 +357,7 @@ class ReviewRequestInboxTest {
 
         // when
         Instant failedAt = Instant.parse("2026-02-24T00:15:00Z");
-        inbox.markFailed(failedAt, "failure", SlackInteractivityFailureType.BUSINESS_INVARIANT);
+        inbox.markFailed(failedAt, "failure", ReviewRequestInboxFailureType.NON_RETRYABLE);
 
         // then
         assertAll(
@@ -366,7 +365,7 @@ class ReviewRequestInboxTest {
                 () -> assertThat(inbox.getProcessingStartedAt()).isNull(),
                 () -> assertThat(inbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(inbox.getFailureReason()).isEqualTo("failure"),
-                () -> assertThat(inbox.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT)
+                () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE)
         );
     }
 
@@ -377,7 +376,7 @@ class ReviewRequestInboxTest {
         inbox.markProcessing(Instant.parse("2026-02-24T00:10:00Z"));
 
         // when & then
-        assertThatThrownBy(() -> inbox.markFailed(null, "failure", SlackInteractivityFailureType.BUSINESS_INVARIANT))
+        assertThatThrownBy(() -> inbox.markFailed(null, "failure", ReviewRequestInboxFailureType.NON_RETRYABLE))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("failedAt은 비어 있을 수 없습니다.");
     }
@@ -393,7 +392,7 @@ class ReviewRequestInboxTest {
                 () -> inbox.markFailed(
                         Instant.parse("2026-02-24T00:15:00Z"),
                         null,
-                        SlackInteractivityFailureType.BUSINESS_INVARIANT
+                        ReviewRequestInboxFailureType.NON_RETRYABLE
                 )
         )
                 .isInstanceOf(IllegalArgumentException.class)
@@ -411,7 +410,7 @@ class ReviewRequestInboxTest {
                 () -> inbox.markFailed(
                         Instant.parse("2026-02-24T00:15:00Z"),
                         " ",
-                        SlackInteractivityFailureType.BUSINESS_INVARIANT
+                        ReviewRequestInboxFailureType.NON_RETRYABLE
                 )
         )
                 .isInstanceOf(IllegalArgumentException.class)
@@ -440,7 +439,7 @@ class ReviewRequestInboxTest {
                 () -> inbox.markFailed(
                         Instant.parse("2026-02-24T00:15:00Z"),
                         "failure",
-                        SlackInteractivityFailureType.BUSINESS_INVARIANT
+                        ReviewRequestInboxFailureType.NON_RETRYABLE
                 )
         )
                 .isInstanceOf(IllegalStateException.class)
@@ -457,4 +456,3 @@ class ReviewRequestInboxTest {
         );
     }
 }
-
