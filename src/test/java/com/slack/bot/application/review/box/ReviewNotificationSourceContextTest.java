@@ -75,4 +75,28 @@ class ReviewNotificationSourceContextTest {
         // then
         assertThat(context.currentSourceKey()).isEmpty();
     }
+
+    @Test
+    void withSourceKey_Supplier가_예외를_던져도_sourceKey가_정리된다() {
+        // when & then
+        assertThatThrownBy(() -> context.<String>withSourceKey("SOURCE:1", () -> {
+            throw new RuntimeException("처리 중 오류");
+        }))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("처리 중 오류");
+
+        assertThat(context.currentSourceKey()).isEmpty();
+    }
+
+    @Test
+    void withSourceKey_Runnable이_예외를_던져도_sourceKey가_정리된다() {
+        // when & then
+        assertThatThrownBy(() -> context.withSourceKey("SOURCE:1", (Runnable) () -> {
+            throw new RuntimeException("처리 중 오류");
+        }))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("처리 중 오류");
+
+        assertThat(context.currentSourceKey()).isEmpty();
+    }
 }
