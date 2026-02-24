@@ -94,7 +94,7 @@ class StartReviewActionHandlerTest {
                                 () -> assertThat(event.teamId()).isEqualTo("T1"),
                                 () -> assertThat(event.projectId()).isEqualTo(123L),
                                 () -> assertThat(event.slackUserId()).isEqualTo("U2"),
-                                () -> assertThat(event.pullRequestId()).isEqualTo(10L)
+                                () -> assertThat(event.githubPullRequestId()).isEqualTo(10L)
                         ))
         );
     }
@@ -230,7 +230,7 @@ class StartReviewActionHandlerTest {
                                 () -> assertThat(event.teamId()).isEqualTo("T1"),
                                 () -> assertThat(event.projectId()).isEqualTo(123L),
                                 () -> assertThat(event.slackUserId()).isEqualTo("U9"),
-                                () -> assertThat(event.pullRequestId()).isEqualTo(10L)
+                                () -> assertThat(event.githubPullRequestId()).isEqualTo(10L)
                         ))
         );
     }
@@ -271,7 +271,7 @@ class StartReviewActionHandlerTest {
                                 () -> assertThat(event.teamId()).isEqualTo("T1"),
                                 () -> assertThat(event.projectId()).isEqualTo(123L),
                                 () -> assertThat(event.slackUserId()).isEqualTo("U9"),
-                                () -> assertThat(event.pullRequestId()).isEqualTo(10L)
+                                () -> assertThat(event.githubPullRequestId()).isEqualTo(10L)
                         ))
         );
     }
@@ -311,7 +311,7 @@ class StartReviewActionHandlerTest {
                                 () -> assertThat(event.teamId()).isEqualTo("T1"),
                                 () -> assertThat(event.projectId()).isEqualTo(123L),
                                 () -> assertThat(event.slackUserId()).isEqualTo("U8"),
-                                () -> assertThat(event.pullRequestId()).isEqualTo(10L)
+                                () -> assertThat(event.githubPullRequestId()).isEqualTo(10L)
                         ))
         );
     }
@@ -347,7 +347,7 @@ class StartReviewActionHandlerTest {
                                 () -> assertThat(event.teamId()).isEqualTo("T1"),
                                 () -> assertThat(event.projectId()).isEqualTo(123L),
                                 () -> assertThat(event.slackUserId()).isEqualTo("U7"),
-                                () -> assertThat(event.pullRequestId()).isEqualTo(10L)
+                                () -> assertThat(event.githubPullRequestId()).isEqualTo(10L)
                         ))
         );
     }
@@ -383,7 +383,7 @@ class StartReviewActionHandlerTest {
                                 () -> assertThat(event.teamId()).isEqualTo("T1"),
                                 () -> assertThat(event.projectId()).isEqualTo(123L),
                                 () -> assertThat(event.slackUserId()).isEqualTo("U1"),
-                                () -> assertThat(event.pullRequestId()).isEqualTo(11L)
+                                () -> assertThat(event.githubPullRequestId()).isEqualTo(11L)
                         ))
         );
     }
@@ -411,7 +411,7 @@ class StartReviewActionHandlerTest {
                                 () -> assertThat(event.teamId()).isEqualTo("T1"),
                                 () -> assertThat(event.projectId()).isEqualTo(123L),
                                 () -> assertThat(event.slackUserId()).isEqualTo("U1"),
-                                () -> assertThat(event.pullRequestId()).isEqualTo(10L)
+                                () -> assertThat(event.githubPullRequestId()).isEqualTo(10L)
                         ))
         );
     }
@@ -489,7 +489,7 @@ class StartReviewActionHandlerTest {
         return objectMapper.createObjectNode()
                            .put("team_id", "T1")
                            .put("channel_id", "C1")
-                           .put("pull_request_id", pullRequestId)
+                           .put("github_pull_request_id", pullRequestId)
                            .put("pull_request_number", pullRequestNumber)
                            .put("pull_request_title", "PR 제목 " + pullRequestNumber)
                            .put("pull_request_url", "https://github.com/org/repo/pull/" + pullRequestNumber)

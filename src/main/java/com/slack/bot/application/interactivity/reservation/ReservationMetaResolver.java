@@ -19,7 +19,7 @@ public class ReservationMetaResolver {
 
         String teamId = textRequired(root, "team_id");
         String channelId = textRequired(root, "channel_id");
-        Long pullRequestId = longRequired(root, "pull_request_id");
+        Long githubPullRequestId = longRequired(root, "github_pull_request_id");
         int pullRequestNumber = intRequired(root, "pull_request_number");
         String pullRequestTitle = textRequired(root, "pull_request_title");
         String pullRequestUrl = textRequired(root, "pull_request_url");
@@ -31,7 +31,7 @@ public class ReservationMetaResolver {
         return ReviewScheduleMetaDto.builder()
                                     .teamId(teamId)
                                     .channelId(channelId)
-                                    .pullRequestId(pullRequestId)
+                                    .githubPullRequestId(githubPullRequestId)
                                     .pullRequestNumber(pullRequestNumber)
                                     .pullRequestTitle(pullRequestTitle)
                                     .pullRequestUrl(pullRequestUrl)

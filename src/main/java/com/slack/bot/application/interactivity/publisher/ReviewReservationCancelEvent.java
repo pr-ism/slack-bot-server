@@ -6,6 +6,6 @@ public record ReviewReservationCancelEvent(
         String slackUserId,
         Long reservationId,
         Long projectId,
-        Long pullRequestId
+        Long githubPullRequestId
 ) implements ReviewInteractionEvent {
 }

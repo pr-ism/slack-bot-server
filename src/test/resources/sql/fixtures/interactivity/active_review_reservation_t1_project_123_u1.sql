@@ -5,7 +5,7 @@ INSERT INTO review_reservations (
     team_id,
     channel_id,
     project_id,
-    pull_request_id,
+    github_pull_request_id,
     pull_request_number,
     pull_request_title,
     pull_request_url,

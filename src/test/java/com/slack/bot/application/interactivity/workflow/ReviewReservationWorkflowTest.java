@@ -73,7 +73,7 @@ class ReviewReservationWorkflowTest {
         assertAll(
                 () -> assertThat(actual).isEqualTo(SlackActionResponse.clear()),
                 () -> assertThat(saved).isPresent(),
-                () -> assertThat(saved.get().getReservationPullRequest().getPullRequestId()).isEqualTo(10L),
+                () -> assertThat(saved.get().getReservationPullRequest().getGithubPullRequestId()).isEqualTo(10L),
                 () -> assertThat(saved.get().getReservationPullRequest().getPullRequestTitle()).isEqualTo("PR 제목"),
                 () -> assertThat(applicationEvents.stream(ReviewReservationScheduledEvent.class).toList())
                         .singleElement()
@@ -82,7 +82,7 @@ class ReviewReservationWorkflowTest {
                                 () -> assertThat(event.channelId()).isEqualTo("C1"),
                                 () -> assertThat(event.slackUserId()).isEqualTo("U1"),
                                 () -> assertThat(event.projectId()).isEqualTo(123L),
-                                () -> assertThat(event.pullRequestId()).isEqualTo(10L)
+                                () -> assertThat(event.githubPullRequestId()).isEqualTo(10L)
                         ))
         );
     }
@@ -157,7 +157,7 @@ class ReviewReservationWorkflowTest {
                                 () -> assertThat(event.channelId()).isEqualTo("C1"),
                                 () -> assertThat(event.slackUserId()).isEqualTo("U1"),
                                 () -> assertThat(event.projectId()).isEqualTo(123L),
-                                () -> assertThat(event.pullRequestId()).isEqualTo(10L)
+                                () -> assertThat(event.githubPullRequestId()).isEqualTo(10L)
                         ))
         );
     }
@@ -192,7 +192,7 @@ class ReviewReservationWorkflowTest {
                                 () -> assertThat(event.slackUserId()).isEqualTo("U1"),
                                 () -> assertThat(event.reservationId()).isEqualTo(100L),
                                 () -> assertThat(event.projectId()).isEqualTo(123L),
-                                () -> assertThat(event.pullRequestId()).isEqualTo(10L)
+                                () -> assertThat(event.githubPullRequestId()).isEqualTo(10L)
                         ))
         );
     }
@@ -206,7 +206,7 @@ class ReviewReservationWorkflowTest {
         // given
         ReviewScheduleMetaDto meta = meta("123", null);
         ReservationPullRequest reservationPullRequest = ReservationPullRequest.builder()
-                                                                              .pullRequestId(10L)
+                                                                              .githubPullRequestId(10L)
                                                                               .pullRequestNumber(10)
                                                                               .pullRequestTitle("PR 제목")
                                                                               .pullRequestUrl("https://github.com/org/repo/pull/10")
@@ -265,7 +265,7 @@ class ReviewReservationWorkflowTest {
                                 () -> assertThat(event.channelId()).isEqualTo("C1"),
                                 () -> assertThat(event.slackUserId()).isEqualTo("U1"),
                                 () -> assertThat(event.projectId()).isEqualTo(123L),
-                                () -> assertThat(event.pullRequestId()).isEqualTo(10L)
+                                () -> assertThat(event.githubPullRequestId()).isEqualTo(10L)
                         ))
         );
     }
@@ -300,7 +300,7 @@ class ReviewReservationWorkflowTest {
         return ReviewScheduleMetaDto.builder()
                                     .teamId("T1")
                                     .channelId("C1")
-                                    .pullRequestId(10L)
+                                    .githubPullRequestId(10L)
                                     .pullRequestNumber(10)
                                     .pullRequestTitle("PR 제목")
                                     .pullRequestUrl("https://github.com/org/repo/pull/10")

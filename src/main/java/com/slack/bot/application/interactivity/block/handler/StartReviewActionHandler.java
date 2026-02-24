@@ -205,9 +205,9 @@ public class StartReviewActionHandler implements BlockActionHandler {
             projectId = "";
         }
 
-        String pullRequestId = "";
-        if (meta.pullRequestId() != null) {
-            pullRequestId = String.valueOf(meta.pullRequestId());
+        String githubPullRequestId = "";
+        if (meta.githubPullRequestId() != null) {
+            githubPullRequestId = String.valueOf(meta.githubPullRequestId());
         }
 
         String reviewerId = reviewerSlackUserId;
@@ -215,7 +215,7 @@ public class StartReviewActionHandler implements BlockActionHandler {
             reviewerId = "";
         }
 
-        return teamId + ":" + projectId + ":" + pullRequestId + ":" + reviewerId;
+        return teamId + ":" + projectId + ":" + githubPullRequestId + ":" + reviewerId;
     }
 
     private boolean tryMarkStarted(String key) {
@@ -255,7 +255,7 @@ public class StartReviewActionHandler implements BlockActionHandler {
                 meta.teamId(),
                 projectId,
                 reviewerSlackUserId,
-                meta.pullRequestId()
+                meta.githubPullRequestId()
         );
     }
 
@@ -287,7 +287,7 @@ public class StartReviewActionHandler implements BlockActionHandler {
         if (reviewerSlackUserId == null || reviewerSlackUserId.isBlank()) {
             return;
         }
-        if (meta.pullRequestId() == null) {
+        if (meta.githubPullRequestId() == null) {
             return;
         }
 
@@ -295,7 +295,7 @@ public class StartReviewActionHandler implements BlockActionHandler {
                 meta.teamId(),
                 projectId,
                 reviewerSlackUserId,
-                meta.pullRequestId(),
+                meta.githubPullRequestId(),
                 Instant.now(clock)
         );
 

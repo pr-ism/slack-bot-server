@@ -37,7 +37,7 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
         // given
         ReviewAssignmentRequest body = new ReviewAssignmentRequest(
                 "my-repo",
-                "PR-1",
+                101L,
                 42,
                 "Fix bug",
                 "https://github.com/pr/1",
@@ -67,7 +67,7 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
                         ),
                         requestFields(
                                 fieldWithPath("repositoryName").type(JsonFieldType.STRING).description("GitHub 레포지토리 이름"),
-                                fieldWithPath("pullRequestId").type(JsonFieldType.STRING).description("Pull Request 식별자"),
+                                fieldWithPath("githubPullRequestId").type(JsonFieldType.NUMBER).description("GitHub Pull Request 식별자"),
                                 fieldWithPath("pullRequestNumber").type(JsonFieldType.NUMBER).description("Pull Request 번호"),
                                 fieldWithPath("pullRequestTitle").type(JsonFieldType.STRING).description("Pull Request 제목"),
                                 fieldWithPath("pullRequestUrl").type(JsonFieldType.STRING).description("Pull Request URL"),
@@ -142,7 +142,7 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
     private ReviewAssignmentRequest defaultBody() {
         return new ReviewAssignmentRequest(
                 "my-repo",
-                "PR-1",
+                101L,
                 42,
                 "Fix bug",
                 "https://github.com/pr/1",

@@ -56,7 +56,7 @@ public class ReviewReservationRepositoryAdapter implements ReviewReservationRepo
             String teamId,
             Long projectId,
             String reviewerSlackId,
-            Long pullRequestId
+            Long githubPullRequestId
     ) {
         ReviewReservation result = queryFactory
                 .selectFrom(reviewReservation)
@@ -64,7 +64,7 @@ public class ReviewReservationRepositoryAdapter implements ReviewReservationRepo
                         reviewReservation.teamId.eq(teamId),
                         reviewReservation.projectId.eq(projectId),
                         reviewReservation.reviewerSlackId.eq(reviewerSlackId),
-                        reviewReservation.reservationPullRequest.pullRequestId.eq(pullRequestId),
+                        reviewReservation.reservationPullRequest.githubPullRequestId.eq(githubPullRequestId),
                         reviewReservation.status.eq(ReservationStatus.ACTIVE)
                 )
                 .fetchOne();

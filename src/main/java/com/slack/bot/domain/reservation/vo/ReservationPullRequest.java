@@ -13,32 +13,35 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ReservationPullRequest {
 
-    private Long pullRequestId;
+    private Long githubPullRequestId;
     private int pullRequestNumber;
     private String pullRequestTitle;
     private String pullRequestUrl;
 
     @Builder
     private ReservationPullRequest(
-            Long pullRequestId,
+            Long githubPullRequestId,
             int pullRequestNumber,
             String pullRequestTitle,
             String pullRequestUrl
     ) {
-        validatePullRequestId(pullRequestId);
+        validateGithubPullRequestId(githubPullRequestId);
         validatePullRequestNumber(pullRequestNumber);
         validatePullRequestTitle(pullRequestTitle);
         validatePullRequestUrl(pullRequestUrl);
 
-        this.pullRequestId = pullRequestId;
+        this.githubPullRequestId = githubPullRequestId;
         this.pullRequestNumber = pullRequestNumber;
         this.pullRequestTitle = pullRequestTitle;
         this.pullRequestUrl = pullRequestUrl;
     }
 
-    private static void validatePullRequestId(Long pullRequestId) {
-        if (pullRequestId == null || pullRequestId <= 0) {
-            throw new IllegalArgumentException("Pull Request ID는 0보다 커야 합니다.");
+    private static void validateGithubPullRequestId(Long githubPullRequestId) {
+        if (githubPullRequestId == null) {
+            throw new IllegalArgumentException("GitHub Pull Request ID는 null일 수 없습니다.");
+        }
+        if (githubPullRequestId <= 0) {
+            throw new IllegalArgumentException("GitHub Pull Request ID는 0보다 커야 합니다.");
         }
     }
 

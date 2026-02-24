@@ -21,7 +21,7 @@ class ReservationPullRequestTest {
         // when & then
         ReservationPullRequest pullRequest = assertDoesNotThrow(
                 () -> ReservationPullRequest.builder()
-                        .pullRequestId(1L)
+                        .githubPullRequestId(1L)
                         .pullRequestNumber(123)
                         .pullRequestTitle("feat: 기능 추가")
                         .pullRequestUrl("https://github.com/org/repo/pull/123")
@@ -29,7 +29,7 @@ class ReservationPullRequestTest {
         );
 
         assertAll(
-                () -> assertThat(pullRequest.getPullRequestId()).isEqualTo(1L),
+                () -> assertThat(pullRequest.getGithubPullRequestId()).isEqualTo(1L),
                 () -> assertThat(pullRequest.getPullRequestNumber()).isEqualTo(123),
                 () -> assertThat(pullRequest.getPullRequestTitle()).isEqualTo("feat: 기능 추가"),
                 () -> assertThat(pullRequest.getPullRequestUrl()).isEqualTo("https://github.com/org/repo/pull/123")
@@ -42,13 +42,13 @@ class ReservationPullRequestTest {
         // when & then
         assertThatThrownBy(
                 () -> ReservationPullRequest.builder()
-                        .pullRequestId(pullRequestId)
+                        .githubPullRequestId(pullRequestId)
                         .pullRequestNumber(123)
                         .pullRequestTitle("feat: 기능 추가")
                         .pullRequestUrl("https://github.com/org/repo/pull/123")
                         .build()
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("Pull Request ID는 0보다 커야 합니다.");
+         .hasMessageContaining("GitHub Pull Request ID는 0보다 커야 합니다.");
     }
 
     @ParameterizedTest
@@ -57,7 +57,7 @@ class ReservationPullRequestTest {
         // when & then
         assertThatThrownBy(
                 () -> ReservationPullRequest.builder()
-                        .pullRequestId(1L)
+                        .githubPullRequestId(1L)
                         .pullRequestNumber(pullRequestNumber)
                         .pullRequestTitle("feat: 기능 추가")
                         .pullRequestUrl("https://github.com/org/repo/pull/123")
@@ -71,13 +71,13 @@ class ReservationPullRequestTest {
         // when & then
         assertThatThrownBy(
                 () -> ReservationPullRequest.builder()
-                                            .pullRequestId(null)
+                                            .githubPullRequestId(null)
                                             .pullRequestNumber(123)
                                             .pullRequestTitle("feat: 기능 추가")
                                             .pullRequestUrl("https://github.com/org/repo/pull/123")
                                             .build()
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("Pull Request ID는 0보다 커야 합니다.");
+         .hasMessageContaining("GitHub Pull Request ID는 null일 수 없습니다.");
     }
 
     @ParameterizedTest
@@ -87,7 +87,7 @@ class ReservationPullRequestTest {
         // when & then
         assertThatThrownBy(
                 () -> ReservationPullRequest.builder()
-                        .pullRequestId(1L)
+                        .githubPullRequestId(1L)
                         .pullRequestNumber(123)
                         .pullRequestTitle(pullRequestTitle)
                         .pullRequestUrl("https://github.com/org/repo/pull/123")
@@ -103,7 +103,7 @@ class ReservationPullRequestTest {
         // when & then
         assertThatThrownBy(
                 () -> ReservationPullRequest.builder()
-                        .pullRequestId(1L)
+                        .githubPullRequestId(1L)
                         .pullRequestNumber(123)
                         .pullRequestTitle("feat: 기능 추가")
                         .pullRequestUrl(pullRequestUrl)

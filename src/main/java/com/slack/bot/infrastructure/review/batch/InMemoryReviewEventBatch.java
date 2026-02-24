@@ -29,7 +29,7 @@ public class InMemoryReviewEventBatch implements ReviewEventBatch {
 
     @Override
     public void buffer(String apiKey, ReviewAssignmentRequest report) {
-        BatchKey key = new BatchKey(apiKey, report.pullRequestId());
+        BatchKey key = new BatchKey(apiKey, report.githubPullRequestId());
 
         batchLock.lock();
         try {
@@ -61,7 +61,7 @@ public class InMemoryReviewEventBatch implements ReviewEventBatch {
         notificationService.sendSimpleNotification(pendingEvent.apiKey(), pendingEvent.request());
     }
 
-    private record BatchKey(String apiKey, String pullRequestId) {
+    private record BatchKey(String apiKey, Long githubPullRequestId) {
     }
 
     private record PendingEvent(String apiKey, ReviewAssignmentRequest request) {

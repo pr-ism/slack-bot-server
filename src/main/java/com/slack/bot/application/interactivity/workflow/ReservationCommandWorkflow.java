@@ -225,7 +225,7 @@ public class ReservationCommandWorkflow {
                 slackUserId,
                 reservation.getId(),
                 reservation.getProjectId(),
-                reservation.getReservationPullRequest().getPullRequestId()
+                reservation.getReservationPullRequest().getGithubPullRequestId()
         );
 
         reviewInteractionEventPublisher.publish(event);
@@ -243,7 +243,7 @@ public class ReservationCommandWorkflow {
                 slackUserId,
                 reservation.getId(),
                 reservation.getProjectId(),
-                reservation.getReservationPullRequest().getPullRequestId()
+                reservation.getReservationPullRequest().getGithubPullRequestId()
         );
 
         reviewInteractionEventPublisher.publish(event);

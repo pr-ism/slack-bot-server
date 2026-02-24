@@ -20,19 +20,19 @@ public class ReviewInteractionEventHandler {
     @EventListener
     @Transactional
     public void handleReviewReservationRequestEvent(ReviewReservationRequestEvent event) {
-        recordReviewTimeSelected(event.teamId(), event.projectId(), event.pullRequestId(), event.slackUserId());
+        recordReviewTimeSelected(event.teamId(), event.projectId(), event.githubPullRequestId(), event.slackUserId());
     }
 
     @EventListener
     @Transactional
     public void handleReviewReservationChangeEvent(ReviewReservationChangeEvent event) {
-        recordScheduleChanged(event.teamId(), event.projectId(), event.pullRequestId(), event.slackUserId());
+        recordScheduleChanged(event.teamId(), event.projectId(), event.githubPullRequestId(), event.slackUserId());
     }
 
     @EventListener
     @Transactional
     public void handleReviewReservationCancelEvent(ReviewReservationCancelEvent event) {
-        recordScheduleCanceled(event.teamId(), event.projectId(), event.pullRequestId(), event.slackUserId());
+        recordScheduleCanceled(event.teamId(), event.projectId(), event.githubPullRequestId(), event.slackUserId());
     }
 
     @EventListener
@@ -43,7 +43,7 @@ public class ReviewInteractionEventHandler {
         recordReviewScheduled(
                 event.teamId(),
                 event.projectId(),
-                event.pullRequestId(),
+                event.githubPullRequestId(),
                 event.slackUserId(),
                 event.reviewScheduledAt(),
                 pullRequestNotifiedAt
@@ -58,45 +58,45 @@ public class ReviewInteractionEventHandler {
         recordReviewFulfilled(
                 event.teamId(),
                 event.projectId(),
-                event.pullRequestId(),
+                event.githubPullRequestId(),
                 event.slackUserId(),
                 pullRequestNotifiedAt
         );
     }
 
-    private void recordReviewTimeSelected(String teamId, Long projectId, Long pullRequestId, String reviewerSlackId) {
-        if (isInvalidReviewKey(teamId, projectId, pullRequestId, reviewerSlackId)) {
+    private void recordReviewTimeSelected(String teamId, Long projectId, Long githubPullRequestId, String reviewerSlackId) {
+        if (isInvalidReviewKey(teamId, projectId, githubPullRequestId, reviewerSlackId)) {
             return;
         }
 
         Instant reviewTimeSelectedAt = clock.instant();
         reviewReservationInteractionRepository.recordReviewTimeSelected(
-                teamId, projectId, pullRequestId, reviewerSlackId, reviewTimeSelectedAt
+                teamId, projectId, githubPullRequestId, reviewerSlackId, reviewTimeSelectedAt
         );
     }
 
-    private void recordScheduleChanged(String teamId, Long projectId, Long pullRequestId, String reviewerSlackId) {
-        if (isInvalidReviewKey(teamId, projectId, pullRequestId, reviewerSlackId)) {
+    private void recordScheduleChanged(String teamId, Long projectId, Long githubPullRequestId, String reviewerSlackId) {
+        if (isInvalidReviewKey(teamId, projectId, githubPullRequestId, reviewerSlackId)) {
             return;
         }
 
         reviewReservationInteractionRepository.recordScheduleChanged(
                 teamId,
                 projectId,
-                pullRequestId,
+                githubPullRequestId,
                 reviewerSlackId
         );
     }
 
-    private void recordScheduleCanceled(String teamId, Long projectId, Long pullRequestId, String reviewerSlackId) {
-        if (isInvalidReviewKey(teamId, projectId, pullRequestId, reviewerSlackId)) {
+    private void recordScheduleCanceled(String teamId, Long projectId, Long githubPullRequestId, String reviewerSlackId) {
+        if (isInvalidReviewKey(teamId, projectId, githubPullRequestId, reviewerSlackId)) {
             return;
         }
 
         reviewReservationInteractionRepository.recordScheduleCanceled(
                 teamId,
                 projectId,
-                pullRequestId,
+                githubPullRequestId,
                 reviewerSlackId
         );
     }
@@ -104,19 +104,19 @@ public class ReviewInteractionEventHandler {
     private void recordReviewScheduled(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId,
             Instant reviewScheduledAt,
             Instant pullRequestNotifiedAt
     ) {
-        if (isInvalidReviewKey(teamId, projectId, pullRequestId, reviewerSlackId)) {
+        if (isInvalidReviewKey(teamId, projectId, githubPullRequestId, reviewerSlackId)) {
             return;
         }
 
         reviewReservationInteractionRepository.recordReviewScheduled(
                 teamId,
                 projectId,
-                pullRequestId,
+                githubPullRequestId,
                 reviewerSlackId,
                 reviewScheduledAt,
                 pullRequestNotifiedAt
@@ -126,18 +126,18 @@ public class ReviewInteractionEventHandler {
     private void recordReviewFulfilled(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId,
             Instant pullRequestNotifiedAt
     ) {
-        if (isInvalidReviewKey(teamId, projectId, pullRequestId, reviewerSlackId)) {
+        if (isInvalidReviewKey(teamId, projectId, githubPullRequestId, reviewerSlackId)) {
             return;
         }
 
         reviewReservationInteractionRepository.recordReviewFulfilled(
                 teamId,
                 projectId,
-                pullRequestId,
+                githubPullRequestId,
                 reviewerSlackId,
                 pullRequestNotifiedAt
         );
@@ -154,7 +154,7 @@ public class ReviewInteractionEventHandler {
     private boolean isInvalidReviewKey(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId
     ) {
         if (teamId == null || teamId.isBlank()) {
@@ -163,7 +163,7 @@ public class ReviewInteractionEventHandler {
         if (projectId == null) {
             return true;
         }
-        if (pullRequestId == null) {
+        if (githubPullRequestId == null) {
             return true;
         }
 

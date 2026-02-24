@@ -137,7 +137,7 @@ class ReservationCommandWorkflowUnitTest {
                                 .projectId(123L)
                                 .reservationPullRequest(
                                         ReservationPullRequest.builder()
-                                                              .pullRequestId(10L)
+                                                              .githubPullRequestId(10L)
                                                               .pullRequestNumber(1)
                                                               .pullRequestTitle("title")
                                                               .pullRequestUrl("https://example.com/pr/1")

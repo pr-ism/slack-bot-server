@@ -257,7 +257,7 @@ class SlackInteractionServiceFacadeTest {
         return objectMapper.createObjectNode()
                            .put("team_id", "T1")
                            .put("channel_id", "C1")
-                           .put("pull_request_id", 10L)
+                           .put("github_pull_request_id", 10L)
                            .put("pull_request_number", 10)
                            .put("pull_request_title", "PR 제목")
                            .put("pull_request_url", "https://github.com/org/repo/pull/10")

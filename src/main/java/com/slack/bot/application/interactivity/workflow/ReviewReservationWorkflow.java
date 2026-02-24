@@ -103,7 +103,7 @@ public class ReviewReservationWorkflow {
                 context.reviewerId(),
                 reservation.getId(),
                 reservation.getProjectId(),
-                reservation.getReservationPullRequest().getPullRequestId(),
+                reservation.getReservationPullRequest().getGithubPullRequestId(),
                 reservation.getScheduledAt(),
                 Instant.now(clock)
         );
@@ -176,7 +176,7 @@ public class ReviewReservationWorkflow {
                 context.meta().teamId(),
                 context.projectId(),
                 context.reviewerId(),
-                context.reservationPullRequest().getPullRequestId()
+                context.reservationPullRequest().getGithubPullRequestId()
         );
     }
 
@@ -193,7 +193,7 @@ public class ReviewReservationWorkflow {
         Long reservationId = parseReservationId(meta.reservationId());
         boolean isReschedule = reservationId != null;
         ReservationPullRequest reservationPullRequest = ReservationPullRequest.builder()
-                                                                          .pullRequestId(meta.pullRequestId())
+                                                                          .githubPullRequestId(meta.githubPullRequestId())
                                                                           .pullRequestNumber(meta.pullRequestNumber())
                                                                           .pullRequestTitle(meta.pullRequestTitle())
                                                                           .pullRequestUrl(meta.pullRequestUrl())

@@ -72,13 +72,13 @@ public class ReviewReservationCoordinator {
             String teamId,
             Long projectId,
             String reviewerSlackId,
-            Long pullRequestId
+            Long githubPullRequestId
     ) {
         return reviewReservationRepository.findActive(
                 teamId,
                 projectId,
                 reviewerSlackId,
-                pullRequestId
+                githubPullRequestId
         );
     }
 
@@ -87,13 +87,13 @@ public class ReviewReservationCoordinator {
             String teamId,
             Long projectId,
             String reviewerSlackId,
-            Long pullRequestId
+            Long githubPullRequestId
     ) {
         return reviewReservationRepository.findActive(
                 teamId,
                 projectId,
                 reviewerSlackId,
-                pullRequestId
+                githubPullRequestId
         ).map(existing -> {
             cancelInternal(existing);
             return existing;

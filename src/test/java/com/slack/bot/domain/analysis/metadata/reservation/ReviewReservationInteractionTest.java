@@ -28,7 +28,7 @@ class ReviewReservationInteractionTest {
         assertAll(
                 () -> assertThat(actual.getTeamId()).isEqualTo("T1"),
                 () -> assertThat(actual.getProjectId()).isEqualTo(123L),
-                () -> assertThat(actual.getPullRequestId()).isEqualTo(10L),
+                () -> assertThat(actual.getGithubPullRequestId()).isEqualTo(10L),
                 () -> assertThat(actual.getReviewerSlackId()).isEqualTo("U1"),
                 () -> assertThat(actual.getInteractionTimeline().getReviewScheduledAt()).isNull(),
                 () -> assertThat(actual.getInteractionTimeline().getReviewTimeSelectedAt()).isNull(),
@@ -58,11 +58,11 @@ class ReviewReservationInteractionTest {
     }
 
     @Test
-    void Pull_Request_ID가_비어_있으면_생성할_수_없다() {
+    void GitHub_Pull_Request_ID가_비어_있으면_생성할_수_없다() {
         // when & then
         assertThatThrownBy(() -> ReviewReservationInteraction.create("T1", 123L, null, "U1"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("pullRequestId는 비어 있을 수 없습니다.");
+                .hasMessageContaining("githubPullRequestId는 비어 있을 수 없습니다.");
     }
 
     @ParameterizedTest

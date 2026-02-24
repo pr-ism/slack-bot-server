@@ -152,7 +152,7 @@ public class ReviewSchedulerWorkflow {
                 meta.teamId(),
                 projectId,
                 context.slackUserId(),
-                meta.pullRequestId()
+                meta.githubPullRequestId()
         );
     }
 
@@ -179,7 +179,7 @@ public class ReviewSchedulerWorkflow {
                 context.channelId(),
                 context.slackUserId(),
                 projectId,
-                meta.pullRequestId(),
+                meta.githubPullRequestId(),
                 context.metaJson()
         );
 

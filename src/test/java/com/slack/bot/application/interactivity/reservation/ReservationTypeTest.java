@@ -90,7 +90,7 @@ class ReservationTypeTest {
                 .build();
 
         ReservationPullRequest pullRequest = ReservationPullRequest.builder()
-                .pullRequestId(1L)
+                .githubPullRequestId(1L)
                 .pullRequestNumber(1)
                 .pullRequestTitle("Test")
                 .pullRequestUrl("https://example.com")
@@ -137,7 +137,7 @@ class ReservationTypeTest {
                 .build();
 
         ReservationPullRequest pullRequest = ReservationPullRequest.builder()
-                .pullRequestId(1L)
+                .githubPullRequestId(1L)
                 .pullRequestNumber(1)
                 .pullRequestTitle("Test")
                 .pullRequestUrl("https://example.com")
