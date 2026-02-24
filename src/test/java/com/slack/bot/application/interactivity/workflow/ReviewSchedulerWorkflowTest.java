@@ -252,7 +252,7 @@ class ReviewSchedulerWorkflowTest {
     })
     void 같은_리뷰어의_다른_PR이면_중복으로_보지_않고_모달을_연다(ApplicationEvents applicationEvents) {
         // given
-        String metaJson = metaJsonWithProjectIdAndPullRequest("123", 11L, 11);
+        String metaJson = metaJsonWithProjectIdAndGithubPullRequest("123", 11L, 11);
         JsonNode payload = payloadWithTriggerId("TRIGGER_1");
         JsonNode action = actionWithMetaJson(metaJson);
 
@@ -379,14 +379,18 @@ class ReviewSchedulerWorkflowTest {
     }
 
     private String metaJsonWithProjectId(String projectId) {
-        return metaJsonWithProjectIdAndPullRequest(projectId, 10L, 10);
+        return metaJsonWithProjectIdAndGithubPullRequest(projectId, 10L, 10);
     }
 
-    private String metaJsonWithProjectIdAndPullRequest(String projectId, Long pullRequestId, int pullRequestNumber) {
+    private String metaJsonWithProjectIdAndGithubPullRequest(
+            String projectId,
+            Long githubPullRequestId,
+            int pullRequestNumber
+    ) {
         return objectMapper.createObjectNode()
                            .put("team_id", "T1")
                            .put("channel_id", "C1")
-                           .put("github_pull_request_id", pullRequestId)
+                           .put("github_pull_request_id", githubPullRequestId)
                            .put("pull_request_number", pullRequestNumber)
                            .put("pull_request_title", "PR 제목 " + pullRequestNumber)
                            .put("pull_request_url", "https://github.com/org/repo/pull/" + pullRequestNumber)

@@ -26,7 +26,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
     public Optional<ReviewReservationInteraction> findByReviewKey(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId
     ) {
         ReviewReservationInteraction found = queryFactory
@@ -34,7 +34,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
                 .where(
                         reviewReservationInteraction.teamId.eq(teamId),
                         reviewReservationInteraction.projectId.eq(projectId),
-                        reviewReservationInteraction.pullRequestId.eq(pullRequestId),
+                        reviewReservationInteraction.githubPullRequestId.eq(githubPullRequestId),
                         reviewReservationInteraction.reviewerSlackId.eq(reviewerSlackId)
                 )
                 .fetchOne();
@@ -47,18 +47,18 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
     public void recordReviewTimeSelected(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId,
             Instant reviewTimeSelectedAt
     ) {
-        if (updateReviewTimeSelectedAt(teamId, projectId, pullRequestId, reviewerSlackId, reviewTimeSelectedAt)) {
+        if (updateReviewTimeSelectedAt(teamId, projectId, githubPullRequestId, reviewerSlackId, reviewTimeSelectedAt)) {
             return;
         }
 
         ReviewReservationInteraction interaction = ReviewReservationInteraction.create(
                 teamId,
                 projectId,
-                pullRequestId,
+                githubPullRequestId,
                 reviewerSlackId
         );
         interaction.recordReviewTimeSelectedAt(reviewTimeSelectedAt);
@@ -72,7 +72,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
             updateReviewTimeSelectedAt(
                     teamId,
                     projectId,
-                    pullRequestId,
+                    githubPullRequestId,
                     reviewerSlackId,
                     reviewTimeSelectedAt
             );
@@ -84,17 +84,17 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
     public void recordScheduleChanged(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId
     ) {
-        if (increaseScheduleChangeCount(teamId, projectId, pullRequestId, reviewerSlackId)) {
+        if (increaseScheduleChangeCount(teamId, projectId, githubPullRequestId, reviewerSlackId)) {
             return;
         }
 
         ReviewReservationInteraction interaction = ReviewReservationInteraction.create(
                 teamId,
                 projectId,
-                pullRequestId,
+                githubPullRequestId,
                 reviewerSlackId
         );
         interaction.increaseScheduleChangeCount();
@@ -108,7 +108,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
             increaseScheduleChangeCount(
                     teamId,
                     projectId,
-                    pullRequestId,
+                    githubPullRequestId,
                     reviewerSlackId
             );
         }
@@ -119,17 +119,17 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
     public void recordScheduleCanceled(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId
     ) {
-        if (increaseScheduleCancelCount(teamId, projectId, pullRequestId, reviewerSlackId)) {
+        if (increaseScheduleCancelCount(teamId, projectId, githubPullRequestId, reviewerSlackId)) {
             return;
         }
 
         ReviewReservationInteraction interaction = ReviewReservationInteraction.create(
                 teamId,
                 projectId,
-                pullRequestId,
+                githubPullRequestId,
                 reviewerSlackId
         );
         interaction.increaseScheduleCancelCount();
@@ -143,7 +143,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
             increaseScheduleCancelCount(
                     teamId,
                     projectId,
-                    pullRequestId,
+                    githubPullRequestId,
                     reviewerSlackId
             );
         }
@@ -154,7 +154,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
     public void recordReviewScheduled(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId,
             Instant reviewScheduledAt,
             Instant pullRequestNotifiedAt
@@ -162,7 +162,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
         if (updateReviewScheduledAtAndPullRequestNotifiedAt(
                 teamId,
                 projectId,
-                pullRequestId,
+                githubPullRequestId,
                 reviewerSlackId,
                 reviewScheduledAt,
                 pullRequestNotifiedAt
@@ -173,7 +173,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
         ReviewReservationInteraction interaction = ReviewReservationInteraction.create(
                 teamId,
                 projectId,
-                pullRequestId,
+                githubPullRequestId,
                 reviewerSlackId
         );
         interaction.recordReviewScheduledAt(reviewScheduledAt);
@@ -188,7 +188,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
             updateReviewScheduledAtAndPullRequestNotifiedAt(
                     teamId,
                     projectId,
-                    pullRequestId,
+                    githubPullRequestId,
                     reviewerSlackId,
                     reviewScheduledAt,
                     pullRequestNotifiedAt
@@ -201,14 +201,14 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
     public void recordReviewFulfilled(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId,
             Instant pullRequestNotifiedAt
     ) {
         if (markReviewFulfilledAndUpdatePullRequestNotifiedAt(
                 teamId,
                 projectId,
-                pullRequestId,
+                githubPullRequestId,
                 reviewerSlackId,
                 pullRequestNotifiedAt
         )) {
@@ -218,7 +218,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
         ReviewReservationInteraction interaction = ReviewReservationInteraction.create(
                 teamId,
                 projectId,
-                pullRequestId,
+                githubPullRequestId,
                 reviewerSlackId
         );
         interaction.markReviewFulfilled();
@@ -233,7 +233,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
             markReviewFulfilledAndUpdatePullRequestNotifiedAt(
                     teamId,
                     projectId,
-                    pullRequestId,
+                    githubPullRequestId,
                     reviewerSlackId,
                     pullRequestNotifiedAt
             );
@@ -243,7 +243,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
     private boolean updateReviewTimeSelectedAt(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId,
             Instant reviewTimeSelectedAt
     ) {
@@ -253,7 +253,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
                 .where(
                         reviewReservationInteraction.teamId.eq(teamId),
                         reviewReservationInteraction.projectId.eq(projectId),
-                        reviewReservationInteraction.pullRequestId.eq(pullRequestId),
+                        reviewReservationInteraction.githubPullRequestId.eq(githubPullRequestId),
                         reviewReservationInteraction.reviewerSlackId.eq(reviewerSlackId)
                 )
                 .execute();
@@ -264,7 +264,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
     private boolean increaseScheduleChangeCount(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId
     ) {
         long updatedCount = queryFactory
@@ -276,7 +276,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
                 .where(
                         reviewReservationInteraction.teamId.eq(teamId),
                         reviewReservationInteraction.projectId.eq(projectId),
-                        reviewReservationInteraction.pullRequestId.eq(pullRequestId),
+                        reviewReservationInteraction.githubPullRequestId.eq(githubPullRequestId),
                         reviewReservationInteraction.reviewerSlackId.eq(reviewerSlackId)
                 )
                 .execute();
@@ -287,7 +287,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
     private boolean increaseScheduleCancelCount(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId
     ) {
         long updatedCount = queryFactory
@@ -299,7 +299,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
                 .where(
                         reviewReservationInteraction.teamId.eq(teamId),
                         reviewReservationInteraction.projectId.eq(projectId),
-                        reviewReservationInteraction.pullRequestId.eq(pullRequestId),
+                        reviewReservationInteraction.githubPullRequestId.eq(githubPullRequestId),
                         reviewReservationInteraction.reviewerSlackId.eq(reviewerSlackId)
                 )
                 .execute();
@@ -310,7 +310,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
     private boolean updateReviewScheduledAtAndPullRequestNotifiedAt(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId,
             Instant reviewScheduledAt,
             Instant pullRequestNotifiedAt
@@ -322,7 +322,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
                 .where(
                         reviewReservationInteraction.teamId.eq(teamId),
                         reviewReservationInteraction.projectId.eq(projectId),
-                        reviewReservationInteraction.pullRequestId.eq(pullRequestId),
+                        reviewReservationInteraction.githubPullRequestId.eq(githubPullRequestId),
                         reviewReservationInteraction.reviewerSlackId.eq(reviewerSlackId)
                 )
                 .execute();
@@ -333,7 +333,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
     private boolean markReviewFulfilledAndUpdatePullRequestNotifiedAt(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId,
             Instant pullRequestNotifiedAt
     ) {
@@ -344,7 +344,7 @@ public class ReviewReservationInteractionRepositoryAdapter implements ReviewRese
                 .where(
                         reviewReservationInteraction.teamId.eq(teamId),
                         reviewReservationInteraction.projectId.eq(projectId),
-                        reviewReservationInteraction.pullRequestId.eq(pullRequestId),
+                        reviewReservationInteraction.githubPullRequestId.eq(githubPullRequestId),
                         reviewReservationInteraction.reviewerSlackId.eq(reviewerSlackId)
                 )
                 .execute();

@@ -37,8 +37,11 @@ public class ReservationPullRequest {
     }
 
     private static void validateGithubPullRequestId(Long githubPullRequestId) {
-        if (githubPullRequestId == null || githubPullRequestId <= 0) {
-            throw new IllegalArgumentException("Pull Request ID는 0보다 커야 합니다.");
+        if (githubPullRequestId == null) {
+            throw new IllegalArgumentException("GitHub Pull Request ID는 null일 수 없습니다.");
+        }
+        if (githubPullRequestId <= 0) {
+            throw new IllegalArgumentException("GitHub Pull Request ID는 0보다 커야 합니다.");
         }
     }
 

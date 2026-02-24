@@ -48,7 +48,7 @@ class ReservationPullRequestTest {
                         .pullRequestUrl("https://github.com/org/repo/pull/123")
                         .build()
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("Pull Request ID는 0보다 커야 합니다.");
+         .hasMessageContaining("GitHub Pull Request ID는 0보다 커야 합니다.");
     }
 
     @ParameterizedTest
@@ -77,7 +77,7 @@ class ReservationPullRequestTest {
                                             .pullRequestUrl("https://github.com/org/repo/pull/123")
                                             .build()
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("Pull Request ID는 0보다 커야 합니다.");
+         .hasMessageContaining("GitHub Pull Request ID는 null일 수 없습니다.");
     }
 
     @ParameterizedTest

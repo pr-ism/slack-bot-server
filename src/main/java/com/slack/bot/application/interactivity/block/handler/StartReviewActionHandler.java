@@ -205,9 +205,9 @@ public class StartReviewActionHandler implements BlockActionHandler {
             projectId = "";
         }
 
-        String pullRequestId = "";
+        String githubPullRequestId = "";
         if (meta.githubPullRequestId() != null) {
-            pullRequestId = String.valueOf(meta.githubPullRequestId());
+            githubPullRequestId = String.valueOf(meta.githubPullRequestId());
         }
 
         String reviewerId = reviewerSlackUserId;
@@ -215,7 +215,7 @@ public class StartReviewActionHandler implements BlockActionHandler {
             reviewerId = "";
         }
 
-        return teamId + ":" + projectId + ":" + pullRequestId + ":" + reviewerId;
+        return teamId + ":" + projectId + ":" + githubPullRequestId + ":" + reviewerId;
     }
 
     private boolean tryMarkStarted(String key) {

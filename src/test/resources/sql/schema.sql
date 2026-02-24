@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS review_reservation_interactions (
     updated_at TIMESTAMP(6) NOT NULL,
     team_id VARCHAR(255) NOT NULL,
     project_id BIGINT NOT NULL,
-    pull_request_id BIGINT NOT NULL,
+    github_pull_request_id BIGINT NOT NULL,
     reviewer_slack_id VARCHAR(255) NOT NULL,
     review_scheduled_at TIMESTAMP(6),
     review_time_selected_at TIMESTAMP(6),
@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS review_reservation_interactions (
     CONSTRAINT uk_review_reservation_interactions_review_key UNIQUE (
         team_id,
         project_id,
-        pull_request_id,
+        github_pull_request_id,
         reviewer_slack_id
     )
 );

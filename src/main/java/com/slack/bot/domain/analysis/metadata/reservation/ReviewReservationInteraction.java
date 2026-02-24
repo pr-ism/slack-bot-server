@@ -21,7 +21,7 @@ public class ReviewReservationInteraction extends BaseTimeEntity {
 
     private Long projectId;
 
-    private Long pullRequestId;
+    private Long githubPullRequestId;
 
     private String reviewerSlackId;
 
@@ -36,15 +36,15 @@ public class ReviewReservationInteraction extends BaseTimeEntity {
     public static ReviewReservationInteraction create(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId
     ) {
-        validate(teamId, projectId, pullRequestId, reviewerSlackId);
+        validate(teamId, projectId, githubPullRequestId, reviewerSlackId);
 
         return new ReviewReservationInteraction(
                 teamId,
                 projectId,
-                pullRequestId,
+                githubPullRequestId,
                 reviewerSlackId,
                 ReviewReservationInteractionTimeline.defaults(),
                 ReviewReservationInteractionCount.defaults(),
@@ -55,12 +55,12 @@ public class ReviewReservationInteraction extends BaseTimeEntity {
     private static void validate(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId
     ) {
         validateTeamId(teamId);
         validateProjectId(projectId);
-        validatePullRequestId(pullRequestId);
+        validateGithubPullRequestId(githubPullRequestId);
         validateReviewerSlackId(reviewerSlackId);
     }
 
@@ -76,9 +76,9 @@ public class ReviewReservationInteraction extends BaseTimeEntity {
         }
     }
 
-    private static void validatePullRequestId(Long pullRequestId) {
-        if (pullRequestId == null) {
-            throw new IllegalArgumentException("pullRequestId는 비어 있을 수 없습니다.");
+    private static void validateGithubPullRequestId(Long githubPullRequestId) {
+        if (githubPullRequestId == null) {
+            throw new IllegalArgumentException("githubPullRequestId는 비어 있을 수 없습니다.");
         }
     }
 
@@ -91,7 +91,7 @@ public class ReviewReservationInteraction extends BaseTimeEntity {
     private ReviewReservationInteraction(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId,
             ReviewReservationInteractionTimeline interactionTimeline,
             ReviewReservationInteractionCount interactionCount,
@@ -99,7 +99,7 @@ public class ReviewReservationInteraction extends BaseTimeEntity {
     ) {
         this.teamId = teamId;
         this.projectId = projectId;
-        this.pullRequestId = pullRequestId;
+        this.githubPullRequestId = githubPullRequestId;
         this.reviewerSlackId = reviewerSlackId;
         this.interactionTimeline = interactionTimeline;
         this.interactionCount = interactionCount;

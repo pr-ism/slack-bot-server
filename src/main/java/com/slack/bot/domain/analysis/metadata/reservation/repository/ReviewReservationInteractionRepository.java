@@ -9,14 +9,14 @@ public interface ReviewReservationInteractionRepository {
     Optional<ReviewReservationInteraction> findByReviewKey(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId
     );
 
     void recordReviewTimeSelected(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId,
             Instant reviewTimeSelectedAt
     );
@@ -24,21 +24,21 @@ public interface ReviewReservationInteractionRepository {
     void recordScheduleChanged(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId
     );
 
     void recordScheduleCanceled(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId
     );
 
     void recordReviewScheduled(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId,
             Instant reviewScheduledAt,
             Instant pullRequestNotifiedAt
@@ -47,7 +47,7 @@ public interface ReviewReservationInteractionRepository {
     void recordReviewFulfilled(
             String teamId,
             Long projectId,
-            Long pullRequestId,
+            Long githubPullRequestId,
             String reviewerSlackId,
             Instant pullRequestNotifiedAt
     );
