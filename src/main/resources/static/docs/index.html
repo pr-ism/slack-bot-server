@@ -914,6 +914,7 @@ Content-Type: application/json;charset=UTF-8
   "projectMemberId" : 1,
   "reservationConfirmedSpace" : "DIRECT_MESSAGE",
   "reservationCanceledConfirmationEnabled" : true,
+  "reservationChannelEphemeralEnabled" : true,
   "reviewReminderEnabled" : true,
   "prMentionEnabled" : true,
   "reviewCompletedEnabled" : true
@@ -953,6 +954,11 @@ Content-Type: application/json;charset=UTF-8
 <td class="tableblock halign-left valign-top"><p class="tableblock">리뷰 예약 취소 확인 알림 활성화 여부</p></td>
 </tr>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>reservationChannelEphemeralEnabled</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>Boolean</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">리뷰 예약 채널 에페메랄 알림 활성화 여부</p></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><code>reviewReminderEnabled</code></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><code>Boolean</code></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">리뷰 리마인드 알림 활성화 여부</p></td>
@@ -984,6 +990,7 @@ Accept: application/json
 {
   "reservationConfirmedSpace" : "TRIGGER_CHANNEL",
   "reservationCanceledConfirmationEnabled" : false,
+  "reservationChannelEphemeralEnabled" : true,
   "reviewReminderEnabled" : true,
   "prMentionEnabled" : false,
   "reviewCompletedEnabled" : true
@@ -1053,6 +1060,13 @@ Accept: application/json
 <td class="tableblock halign-left valign-top"><p class="tableblock">리뷰 예약 취소 확인 알림 활성화 여부</p></td>
 </tr>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>reservationChannelEphemeralEnabled</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>Boolean</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">리뷰 예약 채널 에페메랄 알림 활성화 여부</p></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><code>reviewReminderEnabled</code></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><code>Boolean</code></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
@@ -1087,6 +1101,7 @@ Content-Type: application/json;charset=UTF-8
   "projectMemberId" : 2,
   "reservationConfirmedSpace" : "TRIGGER_CHANNEL",
   "reservationCanceledConfirmationEnabled" : false,
+  "reservationChannelEphemeralEnabled" : true,
   "reviewReminderEnabled" : true,
   "prMentionEnabled" : false,
   "reviewCompletedEnabled" : true
@@ -1126,6 +1141,11 @@ Content-Type: application/json;charset=UTF-8
 <td class="tableblock halign-left valign-top"><p class="tableblock">리뷰 예약 취소 확인 알림 활성화 여부</p></td>
 </tr>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>reservationChannelEphemeralEnabled</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>Boolean</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">리뷰 예약 채널 에페메랄 알림 활성화 여부</p></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><code>reviewReminderEnabled</code></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><code>Boolean</code></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">리뷰 리마인드 알림 활성화 여부</p></td>
@@ -1161,7 +1181,7 @@ X-API-Key: test-api-key
 
 {
   "repositoryName" : "my-repo",
-  "pullRequestId" : "PR-1",
+  "githubPullRequestId" : 101,
   "pullRequestNumber" : 42,
   "pullRequestTitle" : "Fix bug",
   "pullRequestUrl" : "https://github.com/pr/1",
@@ -1224,11 +1244,11 @@ X-API-Key: test-api-key
 <td class="tableblock halign-left valign-top"><p class="tableblock">GitHub 레포지토리 이름</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><code>pullRequestId</code></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><code>String</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>githubPullRequestId</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>Number</code></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Pull Request 식별자</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GitHub Pull Request 식별자</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><code>pullRequestNumber</code></p></td>
@@ -1371,7 +1391,7 @@ Content-Type: application/json;charset=UTF-8
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-02-11 18:48:27 +0900
+Last updated 2026-02-12 00:23:18 +0900
 </div>
 </div>
 </body>

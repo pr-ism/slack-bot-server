@@ -61,7 +61,7 @@ public class InMemoryReviewEventBatch implements ReviewEventBatch {
         notificationService.sendSimpleNotification(pendingEvent.apiKey(), pendingEvent.request());
     }
 
-    private record BatchKey(String apiKey, String githubPullRequestId) {
+    private record BatchKey(String apiKey, Long githubPullRequestId) {
     }
 
     private record PendingEvent(String apiKey, ReviewAssignmentRequest request) {

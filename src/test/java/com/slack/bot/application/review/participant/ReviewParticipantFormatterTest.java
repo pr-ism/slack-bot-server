@@ -27,7 +27,7 @@ class ReviewParticipantFormatterTest {
         // given
         ReviewAssignmentRequest request = new ReviewAssignmentRequest(
                 "repo",
-                "PR-1",
+                1L,
                 1,
                 "title",
                 "url",
@@ -53,7 +53,7 @@ class ReviewParticipantFormatterTest {
         // given
         ReviewAssignmentRequest request = new ReviewAssignmentRequest(
                 "repo",
-                "PR-1",
+                1L,
                 1,
                 "title",
                 "url",
@@ -77,7 +77,7 @@ class ReviewParticipantFormatterTest {
         // given
         ReviewAssignmentRequest request = new ReviewAssignmentRequest(
                 "repo",
-                "PR-1",
+                1L,
                 1,
                 "title",
                 "url",

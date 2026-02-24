@@ -24,11 +24,12 @@ public class ReviewActionMetaBuilder {
                                           .orElseThrow(() -> new ProjectNotFoundException(apiKey));
 
         ObjectNode meta = objectMapper.createObjectNode();
+        Long githubPullRequestId = requireGithubPullRequestId(report.githubPullRequestId());
 
         meta.put("team_id", teamId);
         meta.put("channel_id", channelId);
         meta.put("project_id", projectId);
-        meta.put("github_pull_request_id", parseGithubPullRequestId(report.githubPullRequestId()));
+        meta.put("github_pull_request_id", githubPullRequestId);
         meta.put("pull_request_url", report.pullRequestUrl());
         meta.put("pull_request_title", report.pullRequestTitle());
         meta.put("repo", report.repositoryName());
@@ -49,14 +50,13 @@ public class ReviewActionMetaBuilder {
         }
     }
 
-    private long parseGithubPullRequestId(String rawGithubPullRequestId) {
-        try {
-            return Long.parseLong(rawGithubPullRequestId);
-        } catch (NumberFormatException | NullPointerException e) {
+    private Long requireGithubPullRequestId(Long githubPullRequestId) {
+        if (githubPullRequestId == null || githubPullRequestId <= 0) {
             throw new ReviewActionMetaException(
-                    "리뷰 스케줄러 메타데이터 생성 실패: github_pull_request_id는 유효한 정수여야 합니다.",
-                    e
+                    "리뷰 스케줄러 메타데이터 생성 실패: github_pull_request_id는 1 이상의 정수여야 합니다.",
+                    new IllegalArgumentException("githubPullRequestId invalid")
             );
         }
+        return githubPullRequestId;
     }
 }

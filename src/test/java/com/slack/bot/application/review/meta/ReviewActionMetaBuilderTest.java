@@ -37,7 +37,7 @@ class ReviewActionMetaBuilderTest {
         // given
         ReviewAssignmentRequest request = new ReviewAssignmentRequest(
                 "my-repo",
-                "101",
+                101L,
                 42,
                 "Fix bug",
                 "https://github.com/pr/1",
@@ -70,7 +70,7 @@ class ReviewActionMetaBuilderTest {
         // given
         ReviewAssignmentRequest request = new ReviewAssignmentRequest(
                 "my-repo",
-                "PR-1",
+                1L,
                 1,
                 "Title",
                 "https://github.com/pr/1",
@@ -89,11 +89,11 @@ class ReviewActionMetaBuilderTest {
     @Sql(scripts = {
             "classpath:sql/fixtures/review/project_t1.sql"
     })
-    void pull_request_ID가_숫자가_아니면_예외가_발생한다() {
+    void pull_request_ID가_0_이하이면_예외가_발생한다() {
         // given
         ReviewAssignmentRequest request = new ReviewAssignmentRequest(
                 "my-repo",
-                "PR-1",
+                0L,
                 1,
                 "Title",
                 "https://github.com/pr/1",
@@ -105,6 +105,6 @@ class ReviewActionMetaBuilderTest {
         // when & then
         assertThatThrownBy(() -> metaBuilder.build("T1", "C1", "test-api-key", request))
                 .isInstanceOf(ReviewActionMetaException.class)
-                .hasMessageContaining("github_pull_request_id는 유효한 정수여야 합니다.");
+                .hasMessageContaining("github_pull_request_id는 1 이상의 정수여야 합니다.");
     }
 }

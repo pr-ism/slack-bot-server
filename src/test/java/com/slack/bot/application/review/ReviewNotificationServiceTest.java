@@ -30,7 +30,7 @@ class ReviewNotificationServiceTest {
         // given
         ReviewAssignmentRequest request = new ReviewAssignmentRequest(
                 "my-repo",
-                "101",
+                101L,
                 42,
                 "Fix bug",
                 "https://github.com/pr/1",

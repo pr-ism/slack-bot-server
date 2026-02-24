@@ -61,7 +61,7 @@ class InMemoryReviewEventBatchTest {
 
         ReviewAssignmentRequest requestA = new ReviewAssignmentRequest(
                 "my-repo",
-                "1001",
+                1001L,
                 1,
                 "Title A",
                 "https://github.com/pr/a",
@@ -71,7 +71,7 @@ class InMemoryReviewEventBatchTest {
         );
         ReviewAssignmentRequest requestB = new ReviewAssignmentRequest(
                 "my-repo",
-                "1002",
+                1002L,
                 2,
                 "Title B",
                 "https://github.com/pr/b",
@@ -92,7 +92,7 @@ class InMemoryReviewEventBatchTest {
     private ReviewAssignmentRequest createRequest(List<String> reviewers) {
         return new ReviewAssignmentRequest(
                 "my-repo",
-                "1000",
+                1000L,
                 42,
                 "Fix bug",
                 "https://github.com/pr/1",
