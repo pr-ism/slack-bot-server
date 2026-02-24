@@ -167,6 +167,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
             String requestJson,
             Instant availableAt
     ) {
+        // PROCESSING / PROCESSED / FAILED는 현재 워커 전이를 보호하기 위해 재큐잉으로 덮어쓰지 않음
         return queryFactory.update(reviewRequestInbox)
                            .set(reviewRequestInbox.apiKey, apiKey)
                            .set(reviewRequestInbox.githubPullRequestId, githubPullRequestId)
@@ -185,7 +186,10 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                                    reviewRequestInbox.failureType,
                                    Expressions.nullExpression(ReviewRequestInboxFailureType.class)
                            )
-                           .where(reviewRequestInbox.coalescingKey.eq(coalescingKey))
+                           .where(
+                                   reviewRequestInbox.coalescingKey.eq(coalescingKey),
+                                   reviewRequestInbox.status.in(CLAIMABLE_STATUSES)
+                           )
                            .execute();
     }
 
