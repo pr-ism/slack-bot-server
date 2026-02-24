@@ -67,7 +67,7 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
                         ),
                         requestFields(
                                 fieldWithPath("repositoryName").type(JsonFieldType.STRING).description("GitHub 레포지토리 이름"),
-                                fieldWithPath("pullRequestId").type(JsonFieldType.STRING).description("Pull Request 식별자"),
+                                fieldWithPath("githubPullRequestId").type(JsonFieldType.STRING).description("GitHub Pull Request 식별자"),
                                 fieldWithPath("pullRequestNumber").type(JsonFieldType.NUMBER).description("Pull Request 번호"),
                                 fieldWithPath("pullRequestTitle").type(JsonFieldType.STRING).description("Pull Request 제목"),
                                 fieldWithPath("pullRequestUrl").type(JsonFieldType.STRING).description("Pull Request URL"),

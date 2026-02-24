@@ -46,7 +46,7 @@ class ReviewReservationCoordinatorTest {
     void 활성_예약을_조회한다() {
         // given
         ReservationPullRequest pullRequest = ReservationPullRequest.builder()
-                .pullRequestId(1L)
+                .githubPullRequestId(1L)
                 .pullRequestNumber(1)
                 .pullRequestTitle("Test")
                 .pullRequestUrl("https://github.com/org/repo/pull/1")
@@ -88,7 +88,7 @@ class ReviewReservationCoordinatorTest {
     void ID로_예약을_조회한다() {
         // given
         ReservationPullRequest pullRequest = ReservationPullRequest.builder()
-                .pullRequestId(1L)
+                .githubPullRequestId(1L)
                 .pullRequestNumber(1)
                 .pullRequestTitle("Test")
                 .pullRequestUrl("https://github.com/org/repo/pull/1")
@@ -130,7 +130,7 @@ class ReviewReservationCoordinatorTest {
     void 새로운_예약을_생성한다() {
         // given
         ReservationPullRequest pullRequest = ReservationPullRequest.builder()
-                .pullRequestId(1L)
+                .githubPullRequestId(1L)
                 .pullRequestNumber(42)
                 .pullRequestTitle("Fix bug")
                 .pullRequestUrl("https://github.com/org/repo/pull/42")
@@ -166,7 +166,7 @@ class ReviewReservationCoordinatorTest {
     void 이미_활성화된_예약이_있으면_예외가_발생한다() {
         // given
         ReservationPullRequest pullRequest = ReservationPullRequest.builder()
-                .pullRequestId(1L)
+                .githubPullRequestId(1L)
                 .pullRequestNumber(1)
                 .pullRequestTitle("First")
                 .pullRequestUrl("https://github.com/org/repo/pull/1")
@@ -185,7 +185,7 @@ class ReviewReservationCoordinatorTest {
         coordinator.create(firstCommand);
 
         ReservationPullRequest secondPullRequest = ReservationPullRequest.builder()
-                .pullRequestId(2L)
+                .githubPullRequestId(2L)
                 .pullRequestNumber(2)
                 .pullRequestTitle("Second")
                 .pullRequestUrl("https://github.com/org/repo/pull/2")
@@ -211,7 +211,7 @@ class ReviewReservationCoordinatorTest {
     void 예약_시간이_현재보다_이전이면_생성에_실패한다() {
         // given
         ReservationPullRequest pullRequest = ReservationPullRequest.builder()
-                .pullRequestId(1L)
+                .githubPullRequestId(1L)
                 .pullRequestNumber(1)
                 .pullRequestTitle("Past")
                 .pullRequestUrl("https://github.com/org/repo/pull/1")
@@ -237,7 +237,7 @@ class ReviewReservationCoordinatorTest {
     void 예약을_재스케줄한다() {
         // given
         ReservationPullRequest pullRequest = ReservationPullRequest.builder()
-                .pullRequestId(1L)
+                .githubPullRequestId(1L)
                 .pullRequestNumber(1)
                 .pullRequestTitle("Original")
                 .pullRequestUrl("https://github.com/org/repo/pull/1")
@@ -258,7 +258,7 @@ class ReviewReservationCoordinatorTest {
         coordinator.cancel(original.getId());
 
         ReservationPullRequest newPullRequest = ReservationPullRequest.builder()
-                .pullRequestId(1L)
+                .githubPullRequestId(1L)
                 .pullRequestNumber(1)
                 .pullRequestTitle("Updated")
                 .pullRequestUrl("https://github.com/org/repo/pull/1")
@@ -298,7 +298,7 @@ class ReviewReservationCoordinatorTest {
     void 활성_예약이_동일_ID면_일정과_리마인더가_갱신된다() {
         // given
         ReservationPullRequest pullRequest = ReservationPullRequest.builder()
-                .pullRequestId(1L)
+                .githubPullRequestId(1L)
                 .pullRequestNumber(1)
                 .pullRequestTitle("Original")
                 .pullRequestUrl("https://github.com/org/repo/pull/1")
@@ -347,7 +347,7 @@ class ReviewReservationCoordinatorTest {
     void 다른_ID의_활성_예약이_있으면_예외가_발생한다() {
         // given
         ReservationPullRequest pullRequest = ReservationPullRequest.builder()
-                .pullRequestId(1L)
+                .githubPullRequestId(1L)
                 .pullRequestNumber(1)
                 .pullRequestTitle("Original")
                 .pullRequestUrl("https://github.com/org/repo/pull/1")
@@ -407,7 +407,7 @@ class ReviewReservationCoordinatorTest {
     void 존재하지_않는_예약을_재스케줄하면_예외가_발생한다() {
         // given
         ReservationPullRequest pullRequest = ReservationPullRequest.builder()
-                .pullRequestId(1L)
+                .githubPullRequestId(1L)
                 .pullRequestNumber(1)
                 .pullRequestTitle("Test")
                 .pullRequestUrl("https://github.com/org/repo/pull/1")
@@ -434,7 +434,7 @@ class ReviewReservationCoordinatorTest {
     void 예약_시간이_현재보다_이전이면_재스케줄에_실패한다() {
         // given
         ReservationPullRequest pullRequest = ReservationPullRequest.builder()
-                .pullRequestId(1L)
+                .githubPullRequestId(1L)
                 .pullRequestNumber(1)
                 .pullRequestTitle("Original")
                 .pullRequestUrl("https://github.com/org/repo/pull/1")
@@ -474,7 +474,7 @@ class ReviewReservationCoordinatorTest {
     void 다른_프로젝트의_예약을_재스케줄하면_예외가_발생한다() {
         // given
         ReservationPullRequest pullRequest = ReservationPullRequest.builder()
-                .pullRequestId(1L)
+                .githubPullRequestId(1L)
                 .pullRequestNumber(1)
                 .pullRequestTitle("Test")
                 .pullRequestUrl("https://github.com/org/repo/pull/1")
@@ -514,7 +514,7 @@ class ReviewReservationCoordinatorTest {
     void 예약을_취소한다() {
         // given
         ReservationPullRequest pullRequest = ReservationPullRequest.builder()
-                .pullRequestId(1L)
+                .githubPullRequestId(1L)
                 .pullRequestNumber(1)
                 .pullRequestTitle("Test")
                 .pullRequestUrl("https://github.com/org/repo/pull/1")
@@ -555,7 +555,7 @@ class ReviewReservationCoordinatorTest {
     void 이미_취소된_예약을_다시_취소해도_상태가_유지된다() {
         // given
         ReservationPullRequest pullRequest = ReservationPullRequest.builder()
-                .pullRequestId(1L)
+                .githubPullRequestId(1L)
                 .pullRequestNumber(1)
                 .pullRequestTitle("Test")
                 .pullRequestUrl("https://github.com/org/repo/pull/1")

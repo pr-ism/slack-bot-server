@@ -83,7 +83,7 @@ class ReviewReservationBlocksViewFactoryTest {
 
     private ReviewReservation createReservation() {
         ReservationPullRequest pr = ReservationPullRequest.builder()
-                .pullRequestId(1L)
+                .githubPullRequestId(1L)
                 .pullRequestNumber(1)
                 .pullRequestTitle("PR 제목")
                 .pullRequestUrl("https://github.com/repo/pull/1")

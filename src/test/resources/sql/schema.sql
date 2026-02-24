@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS review_reservations (
     team_id VARCHAR(255) NOT NULL,
     channel_id VARCHAR(255) NOT NULL,
     project_id BIGINT NOT NULL,
-    pull_request_id BIGINT NOT NULL,
+    github_pull_request_id BIGINT NOT NULL,
     pull_request_number INT NOT NULL,
     pull_request_title VARCHAR(500) NOT NULL,
     pull_request_url VARCHAR(500) NOT NULL,

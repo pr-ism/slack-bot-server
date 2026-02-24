@@ -100,7 +100,7 @@ class ReviewTimeSubmissionProcessorTest {
                                 () -> assertThat(event.channelId()).isEqualTo("C1"),
                                 () -> assertThat(event.slackUserId()).isEqualTo("U1"),
                                 () -> assertThat(event.projectId()).isEqualTo(123L),
-                                () -> assertThat(event.pullRequestId()).isEqualTo(10L)
+                                () -> assertThat(event.githubPullRequestId()).isEqualTo(10L)
                         ))
         );
     }
@@ -171,7 +171,7 @@ class ReviewTimeSubmissionProcessorTest {
         return ReviewScheduleMetaDto.builder()
                                     .teamId("T1")
                                     .channelId("C1")
-                                    .pullRequestId(10L)
+                                    .githubPullRequestId(10L)
                                     .pullRequestNumber(10)
                                     .pullRequestTitle("PR 제목")
                                     .pullRequestUrl("https://github.com/org/repo/pull/10")
@@ -186,7 +186,7 @@ class ReviewTimeSubmissionProcessorTest {
         ObjectNode meta = objectMapper.createObjectNode()
                                       .put("team_id", "T1")
                                       .put("channel_id", "C1")
-                                      .put("pull_request_id", 10L)
+                                      .put("github_pull_request_id", 10L)
                                       .put("pull_request_number", 10)
                                       .put("pull_request_title", "PR 제목")
                                       .put("pull_request_url", "https://github.com/org/repo/pull/10")

@@ -39,7 +39,7 @@ class ReservationMetaResolverTest {
                   "team_id": "T1",
                   "channel_id": "C1",
                   "project_id": "123",
-                  "pull_request_id": 10,
+                  "github_pull_request_id": 10,
                   "pull_request_number": 10,
                   "pull_request_title": "PR 제목",
                   "pull_request_url": "https://github.com/org/repo/pull/10",
@@ -57,7 +57,7 @@ class ReservationMetaResolverTest {
                 () -> assertThat(actual.teamId()).isEqualTo("T1"),
                 () -> assertThat(actual.channelId()).isEqualTo("C1"),
                 () -> assertThat(actual.projectId()).isEqualTo("123"),
-                () -> assertThat(actual.pullRequestId()).isEqualTo(10L),
+                () -> assertThat(actual.githubPullRequestId()).isEqualTo(10L),
                 () -> assertThat(actual.pullRequestNumber()).isEqualTo(10),
                 () -> assertThat(actual.pullRequestTitle()).isEqualTo("PR 제목"),
                 () -> assertThat(actual.pullRequestUrl()).isEqualTo("https://github.com/org/repo/pull/10"),
@@ -72,7 +72,7 @@ class ReservationMetaResolverTest {
                 Arguments.of("team_id", (Consumer<ObjectNode>) node -> node.remove("team_id")),
                 Arguments.of("channel_id", (Consumer<ObjectNode>) node -> node.remove("channel_id")),
                 Arguments.of("project_id", (Consumer<ObjectNode>) node -> node.remove("project_id")),
-                Arguments.of("pull_request_id", (Consumer<ObjectNode>) node -> node.remove("pull_request_id")),
+                Arguments.of("github_pull_request_id", (Consumer<ObjectNode>) node -> node.remove("github_pull_request_id")),
                 Arguments.of("pull_request_number", (Consumer<ObjectNode>) node -> node.remove("pull_request_number")),
                 Arguments.of("pull_request_title", (Consumer<ObjectNode>) node -> node.remove("pull_request_title")),
                 Arguments.of("pull_request_url", (Consumer<ObjectNode>) node -> node.remove("pull_request_url")),
@@ -119,7 +119,7 @@ class ReservationMetaResolverTest {
 
     private static Stream<Arguments> nonNumericFieldMetas() {
         return Stream.of(
-                Arguments.of("pull_request_id", (Consumer<ObjectNode>) node -> node.put("pull_request_id", "abc")),
+                Arguments.of("github_pull_request_id", (Consumer<ObjectNode>) node -> node.put("github_pull_request_id", "abc")),
                 Arguments.of("pull_request_number", (Consumer<ObjectNode>) node -> node.put("pull_request_number", "abc")),
                 Arguments.of("pull_request_number", (Consumer<ObjectNode>) node -> node.put("pull_request_number", "not-a-number"))
         );
@@ -190,7 +190,7 @@ class ReservationMetaResolverTest {
         node.put("team_id", "T1");
         node.put("channel_id", "C1");
         node.put("project_id", "123");
-        node.put("pull_request_id", 10);
+        node.put("github_pull_request_id", 10);
         node.put("pull_request_number", 10);
         node.put("pull_request_title", "PR 제목");
         node.put("pull_request_url", "https://github.com/org/repo/pull/10");

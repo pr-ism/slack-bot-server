@@ -8,7 +8,7 @@ public record ReviewReservationScheduledEvent(
         String slackUserId,
         Long reservationId,
         Long projectId,
-        Long pullRequestId,
+        Long githubPullRequestId,
         Instant reviewScheduledAt,
         Instant pullRequestNotifiedAt
 ) implements ReviewInteractionEvent {

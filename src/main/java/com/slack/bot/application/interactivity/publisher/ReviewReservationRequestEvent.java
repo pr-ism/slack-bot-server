@@ -5,7 +5,7 @@ public record ReviewReservationRequestEvent(
         String channelId,
         String slackUserId,
         Long projectId,
-        Long pullRequestId,
+        Long githubPullRequestId,
         String metaJson
 ) implements ReviewInteractionEvent {
 }

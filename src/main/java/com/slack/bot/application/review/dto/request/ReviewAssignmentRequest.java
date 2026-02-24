@@ -10,8 +10,8 @@ public record ReviewAssignmentRequest(
         @NotBlank(message = "repositoryName은 필수입니다.")
         String repositoryName,
 
-        @NotBlank(message = "pullRequestId는 필수입니다.")
-        String pullRequestId,
+        @NotBlank(message = "githubPullRequestId는 필수입니다.")
+        String githubPullRequestId,
 
         @Positive(message = "pullRequestNumber는 1 이상이어야 합니다.")
         int pullRequestNumber,

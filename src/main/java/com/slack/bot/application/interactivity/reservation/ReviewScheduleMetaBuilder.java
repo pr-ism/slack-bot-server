@@ -26,7 +26,7 @@ public class ReviewScheduleMetaBuilder {
         meta.put("team_id", reservation.getTeamId());
         meta.put("channel_id", reservation.getChannelId());
         meta.put("project_id", reservation.getProjectId());
-        meta.put("pull_request_id", reservationPullRequest.getPullRequestId());
+        meta.put("github_pull_request_id", reservationPullRequest.getGithubPullRequestId());
         meta.put("pull_request_number", reservationPullRequest.getPullRequestNumber());
         meta.put("pull_request_title", reservationPullRequest.getPullRequestTitle());
         meta.put("pull_request_url", reservationPullRequest.getPullRequestUrl());

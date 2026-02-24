@@ -335,7 +335,7 @@ class ReviewReservationTest {
 
     private ReservationPullRequest createValidPullRequest() {
         return ReservationPullRequest.builder()
-                .pullRequestId(1L)
+                .githubPullRequestId(1L)
                 .pullRequestNumber(123)
                 .pullRequestTitle("feat: 기능 추가")
                 .pullRequestUrl("https://github.com/org/repo/pull/123")

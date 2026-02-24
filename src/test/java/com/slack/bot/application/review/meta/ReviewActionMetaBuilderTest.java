@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
 import com.slack.bot.application.review.meta.exception.ProjectNotFoundException;
+import com.slack.bot.application.review.meta.exception.ReviewActionMetaException;
 import java.util.List;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -36,7 +37,7 @@ class ReviewActionMetaBuilderTest {
         // given
         ReviewAssignmentRequest request = new ReviewAssignmentRequest(
                 "my-repo",
-                "PR-1",
+                "101",
                 42,
                 "Fix bug",
                 "https://github.com/pr/1",
@@ -55,6 +56,7 @@ class ReviewActionMetaBuilderTest {
                 () -> assertThat(node.get("team_id").asText()).isEqualTo("T1"),
                 () -> assertThat(node.get("channel_id").asText()).isEqualTo("C1"),
                 () -> assertThat(node.get("project_id").asLong()).isEqualTo(1L),
+                () -> assertThat(node.get("github_pull_request_id").asLong()).isEqualTo(101L),
                 () -> assertThat(node.get("pull_request_url").asText()).isEqualTo("https://github.com/pr/1"),
                 () -> assertThat(node.get("repo").asText()).isEqualTo("my-repo"),
                 () -> assertThat(node.get("author_github_id").asText()).isEqualTo("author-gh"),
@@ -81,5 +83,28 @@ class ReviewActionMetaBuilderTest {
         assertThatThrownBy(() -> metaBuilder.build("T1", "C1", "unknown-key", request))
                 .isInstanceOf(ProjectNotFoundException.class)
                 .hasMessageContaining("unknown-key");
+    }
+
+    @Test
+    @Sql(scripts = {
+            "classpath:sql/fixtures/review/project_t1.sql"
+    })
+    void pull_request_ID가_숫자가_아니면_예외가_발생한다() {
+        // given
+        ReviewAssignmentRequest request = new ReviewAssignmentRequest(
+                "my-repo",
+                "PR-1",
+                1,
+                "Title",
+                "https://github.com/pr/1",
+                "author-gh",
+                List.of(),
+                List.of()
+        );
+
+        // when & then
+        assertThatThrownBy(() -> metaBuilder.build("T1", "C1", "test-api-key", request))
+                .isInstanceOf(ReviewActionMetaException.class)
+                .hasMessageContaining("github_pull_request_id는 유효한 정수여야 합니다.");
     }
 }

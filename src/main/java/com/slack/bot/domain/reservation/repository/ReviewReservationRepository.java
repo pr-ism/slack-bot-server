@@ -15,6 +15,6 @@ public interface ReviewReservationRepository {
             String teamId,
             Long projectId,
             String reviewerSlackId,
-            Long pullRequestId
+            Long githubPullRequestId
     );
 }

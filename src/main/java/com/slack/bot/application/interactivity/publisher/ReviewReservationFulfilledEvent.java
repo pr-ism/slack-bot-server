@@ -6,7 +6,7 @@ public record ReviewReservationFulfilledEvent(
         String teamId,
         Long projectId,
         String slackUserId,
-        Long pullRequestId,
+        Long githubPullRequestId,
         Instant pullRequestNotifiedAt
 ) implements ReviewInteractionEvent {
 }

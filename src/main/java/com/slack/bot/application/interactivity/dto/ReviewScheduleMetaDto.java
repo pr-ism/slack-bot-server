@@ -6,7 +6,7 @@ import lombok.Builder;
 public record ReviewScheduleMetaDto(
         String teamId,
         String channelId,
-        Long pullRequestId,
+        Long githubPullRequestId,
         int pullRequestNumber,
         String pullRequestTitle,
         String pullRequestUrl,

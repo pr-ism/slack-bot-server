@@ -28,6 +28,7 @@ public class ReviewActionMetaBuilder {
         meta.put("team_id", teamId);
         meta.put("channel_id", channelId);
         meta.put("project_id", projectId);
+        meta.put("github_pull_request_id", parseGithubPullRequestId(report.githubPullRequestId()));
         meta.put("pull_request_url", report.pullRequestUrl());
         meta.put("pull_request_title", report.pullRequestTitle());
         meta.put("repo", report.repositoryName());
@@ -45,6 +46,17 @@ public class ReviewActionMetaBuilder {
             return objectMapper.writeValueAsString(meta);
         } catch (JsonProcessingException e) {
             throw new ReviewActionMetaException("리뷰 스케줄러 메타데이터 직렬화 실패", e);
+        }
+    }
+
+    private long parseGithubPullRequestId(String rawGithubPullRequestId) {
+        try {
+            return Long.parseLong(rawGithubPullRequestId);
+        } catch (NumberFormatException | NullPointerException e) {
+            throw new ReviewActionMetaException(
+                    "리뷰 스케줄러 메타데이터 생성 실패: github_pull_request_id는 유효한 정수여야 합니다.",
+                    e
+            );
         }
     }
 }
