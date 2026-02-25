@@ -1,5 +1,6 @@
 package com.slack.bot.application;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.event.handler.SlackEventHandlerRegistry;
 import com.slack.bot.application.interactivity.box.in.SlackInteractionInboxProcessor;
 import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventPublisher;
@@ -8,6 +9,8 @@ import com.slack.bot.context.CleanupExecutionListener;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.domain.auth.TokenDecoder;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
+import com.slack.bot.infrastructure.review.batch.SpyReviewNotificationService;
+import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -38,7 +41,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
         Clock.class,
         ReviewInteractionEventPublisher.class,
         ReviewReservationCoordinator.class,
-        SlackInteractionInboxProcessor.class
+        SlackInteractionInboxProcessor.class,
+        ReviewRequestInboxRepository.class,
+        SpyReviewNotificationService.class,
+        ObjectMapper.class
 })
 @TestExecutionListeners(listeners = CleanupExecutionListener.class, mergeMode = TestExecutionListeners.MergeMode.MERGE_WITH_DEFAULTS)
 public @interface IntegrationTest {
