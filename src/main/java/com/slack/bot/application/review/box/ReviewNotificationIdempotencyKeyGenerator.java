@@ -3,19 +3,24 @@ package com.slack.bot.application.review.box;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import lombok.SneakyThrows;
 import org.springframework.stereotype.Component;
 
 @Component
 public class ReviewNotificationIdempotencyKeyGenerator {
 
-    @SneakyThrows(NoSuchAlgorithmException.class)
     public String generate(ReviewNotificationIdempotencyScope scope, String payloadJson) {
-        String source = scopeValue(scope) + ":" + nullToEmpty(payloadJson);
-        byte[] digest = MessageDigest.getInstance("SHA-256")
-                                     .digest(source.getBytes(StandardCharsets.UTF_8));
+        try {
+            String source = scopeValue(scope) + ":" + nullToEmpty(payloadJson);
+            byte[] digest = messageDigest().digest(source.getBytes(StandardCharsets.UTF_8));
 
-        return toHex(digest);
+            return toHex(digest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 알고리즘을 사용할 수 없습니다.", e);
+        }
+    }
+
+    MessageDigest messageDigest() throws NoSuchAlgorithmException {
+        return MessageDigest.getInstance("SHA-256");
     }
 
     private String toHex(byte[] value) {
