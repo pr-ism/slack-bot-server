@@ -77,12 +77,24 @@ public class ReviewNotificationOutboxProcessor {
 
         reviewNotificationOutboxRepository.findById(outboxId)
                                          .ifPresentOrElse(
-                                                 this::processClaimedOutbox,
+                                                 outbox -> processClaimedOutboxSafely(outbox, outboxId),
                                                  () -> log.warn(
                                                          "PROCESSING으로 전이된 review_notification outbox를 조회하지 못했습니다. outboxId={}",
                                                          outboxId
                                                  )
                                          );
+    }
+
+    private void processClaimedOutboxSafely(ReviewNotificationOutbox outbox, Long outboxId) {
+        try {
+            processClaimedOutbox(outbox);
+        } catch (Exception unexpected) {
+            log.error(
+                    "review_notification outbox 처리 중 예기치 못한 예외가 발생했습니다. outboxId={}",
+                    outboxId,
+                    unexpected
+            );
+        }
     }
 
     private void processClaimedOutbox(ReviewNotificationOutbox outbox) {

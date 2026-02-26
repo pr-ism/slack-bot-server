@@ -288,6 +288,50 @@ class ReviewNotificationOutboxProcessorTest {
     }
 
     @Test
+    void 예상치못한_예외가_발생해도_다음_outbox_처리를_계속한다() {
+        // given
+        ReviewNotificationOutbox firstPending = mockPending(10L);
+        ReviewNotificationOutbox secondPending = mockPending(20L);
+        ReviewNotificationOutbox firstClaimed = mockClaimed(10L, 1);
+        ReviewNotificationOutbox secondClaimed = mockClaimed(20L, 1);
+        given(firstClaimed.getChannelId()).willReturn("C1");
+        given(secondClaimed.getChannelId()).willReturn("C2");
+
+        given(reviewNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(firstPending, secondPending));
+        given(reviewNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
+        given(reviewNotificationOutboxRepository.markProcessingIfClaimable(eq(20L), any())).willReturn(true);
+        given(reviewNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(firstClaimed));
+        given(reviewNotificationOutboxRepository.findById(20L)).willReturn(Optional.of(secondClaimed));
+
+        Workspace workspace = mock(Workspace.class);
+        given(workspace.getAccessToken()).willReturn("xoxb-test-token");
+        given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.of(workspace));
+
+        doThrow(new IllegalStateException("invalid status"))
+                .when(firstClaimed)
+                .markSent(any());
+
+        // when & then
+        assertThatCode(() -> processor.processPending(10, 60_000L)).doesNotThrowAnyException();
+
+        verify(notificationTransportApiClient).sendBlockMessage(
+                eq("xoxb-test-token"),
+                eq("C1"),
+                any(JsonNode.class),
+                eq("fallback")
+        );
+        verify(notificationTransportApiClient).sendBlockMessage(
+                eq("xoxb-test-token"),
+                eq("C2"),
+                any(JsonNode.class),
+                eq("fallback")
+        );
+        verify(reviewNotificationOutboxRepository, never()).save(firstClaimed);
+        verify(secondClaimed).markSent(any());
+        verify(reviewNotificationOutboxRepository).save(secondClaimed);
+    }
+
+    @Test
     void 재시도_가능_예외이고_시도횟수가_남아있으면_RETRY_PENDING으로_저장한다() {
         // given
         ReviewNotificationOutbox pending = mockPending(10L);
