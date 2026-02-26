@@ -1,5 +1,6 @@
 package com.slack.bot.application.review.box.out;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -9,6 +10,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -247,6 +249,42 @@ class ReviewNotificationOutboxProcessorTest {
         // then
         verify(claimed).markFailed(any(), anyString(), eq(SlackInteractivityFailureType.BUSINESS_INVARIANT));
         verify(reviewNotificationOutboxRepository).save(claimed);
+    }
+
+    @Test
+    void 실패상태_저장에_실패해도_다음_outbox_처리를_계속한다() {
+        // given
+        ReviewNotificationOutbox firstPending = mockPending(10L);
+        ReviewNotificationOutbox secondPending = mockPending(20L);
+        ReviewNotificationOutbox firstClaimed = mockClaimed(10L, 1);
+        ReviewNotificationOutbox secondClaimed = mockClaimed(20L, 1);
+        given(firstClaimed.getChannelId()).willReturn("C1");
+        given(secondClaimed.getChannelId()).willReturn("C2");
+
+        given(reviewNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(firstPending, secondPending));
+        given(reviewNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
+        given(reviewNotificationOutboxRepository.markProcessingIfClaimable(eq(20L), any())).willReturn(true);
+        given(reviewNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(firstClaimed));
+        given(reviewNotificationOutboxRepository.findById(20L)).willReturn(Optional.of(secondClaimed));
+
+        Workspace workspace = mock(Workspace.class);
+        given(workspace.getAccessToken()).willReturn("xoxb-test-token");
+        given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.of(workspace));
+
+        doThrow(new ResourceAccessException("io failure"))
+                .when(notificationTransportApiClient)
+                .sendBlockMessage(eq("xoxb-test-token"), eq("C1"), any(JsonNode.class), eq("fallback"));
+        doThrow(new RuntimeException("db failure"))
+                .when(reviewNotificationOutboxRepository)
+                .save(firstClaimed);
+
+        // when & then
+        assertThatCode(() -> processor.processPending(10, 60_000L)).doesNotThrowAnyException();
+
+        verify(firstClaimed).markRetryPending(any(), anyString());
+        verify(secondClaimed).markSent(any());
+        verify(reviewNotificationOutboxRepository).save(secondClaimed);
+        verify(reviewNotificationOutboxRepository, times(2)).save(any(ReviewNotificationOutbox.class));
     }
 
     @Test
