@@ -48,11 +48,6 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
         validateRequestJson(requestJson);
         validateAvailableAt(availableAt);
 
-        long updatedCount = updatePending(coalescingKey, apiKey, githubPullRequestId, requestJson, availableAt);
-        if (updatedCount > 0) {
-            return;
-        }
-
         ReviewRequestInbox inbox = ReviewRequestInbox.pending(
                 coalescingKey,
                 apiKey,
