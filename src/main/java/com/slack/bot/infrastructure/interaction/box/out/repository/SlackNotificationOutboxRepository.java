@@ -17,5 +17,10 @@ public interface SlackNotificationOutboxRepository {
 
     boolean markProcessingIfClaimable(Long outboxId, Instant processingStartedAt);
 
-    int recoverTimeoutProcessing(Instant processingStartedBefore, Instant failedAt, String failureReason);
+    int recoverTimeoutProcessing(
+            Instant processingStartedBefore,
+            Instant failedAt,
+            String failureReason,
+            int maxAttempts
+    );
 }

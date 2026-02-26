@@ -2,6 +2,7 @@ package com.slack.bot.infrastructure.review.persistence.box.in;
 
 import static com.slack.bot.infrastructure.review.box.in.QReviewRequestInbox.reviewRequestInbox;
 
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
@@ -127,31 +128,61 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
 
     @Override
     @Transactional
-    public int recoverTimeoutProcessing(Instant processingStartedBefore, Instant failedAt, String failureReason) {
+    public int recoverTimeoutProcessing(
+            Instant processingStartedBefore,
+            Instant failedAt,
+            String failureReason,
+            int maxAttempts
+    ) {
         validateProcessingStartedBefore(processingStartedBefore);
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
+        validateMaxAttempts(maxAttempts);
 
-        return Math.toIntExact(queryFactory.update(reviewRequestInbox)
-                                         .set(reviewRequestInbox.status, ReviewRequestInboxStatus.RETRY_PENDING)
-                                         .set(
-                                                 reviewRequestInbox.processingStartedAt,
-                                                 Expressions.nullExpression(Instant.class)
-                                         )
-                                         .set(reviewRequestInbox.failedAt, failedAt)
-                                         .set(reviewRequestInbox.failureReason, failureReason)
-                                         .set(
-                                                 reviewRequestInbox.failureType,
-                                                 Expressions.nullExpression(ReviewRequestInboxFailureType.class)
-                                         )
-                                         .where(
-                                                 reviewRequestInbox.status.eq(ReviewRequestInboxStatus.PROCESSING),
-                                                 reviewRequestInbox.processingStartedAt.isNull()
-                                                                                      .or(reviewRequestInbox.processingStartedAt.lt(
-                                                                                              processingStartedBefore
-                                                                                      ))
-                                         )
-                                         .execute());
+        BooleanExpression timeoutCondition = reviewRequestInbox.processingStartedAt.isNull()
+                                                                                     .or(reviewRequestInbox.processingStartedAt.lt(
+                                                                                             processingStartedBefore
+                                                                                     ));
+
+        long exhaustedCount = queryFactory.update(reviewRequestInbox)
+                                          .set(reviewRequestInbox.status, ReviewRequestInboxStatus.FAILED)
+                                          .set(
+                                                  reviewRequestInbox.processingStartedAt,
+                                                  Expressions.nullExpression(Instant.class)
+                                          )
+                                          .set(reviewRequestInbox.failedAt, failedAt)
+                                          .set(reviewRequestInbox.failureReason, failureReason)
+                                          .set(
+                                                  reviewRequestInbox.failureType,
+                                                  ReviewRequestInboxFailureType.RETRY_EXHAUSTED
+                                          )
+                                          .where(
+                                                  reviewRequestInbox.status.eq(ReviewRequestInboxStatus.PROCESSING),
+                                                  timeoutCondition,
+                                                  reviewRequestInbox.processingAttempt.goe(maxAttempts)
+                                          )
+                                          .execute();
+
+        long recoveredCount = queryFactory.update(reviewRequestInbox)
+                                          .set(reviewRequestInbox.status, ReviewRequestInboxStatus.RETRY_PENDING)
+                                          .set(
+                                                  reviewRequestInbox.processingStartedAt,
+                                                  Expressions.nullExpression(Instant.class)
+                                          )
+                                          .set(reviewRequestInbox.failedAt, failedAt)
+                                          .set(reviewRequestInbox.failureReason, failureReason)
+                                          .set(
+                                                  reviewRequestInbox.failureType,
+                                                  Expressions.nullExpression(ReviewRequestInboxFailureType.class)
+                                          )
+                                          .where(
+                                                  reviewRequestInbox.status.eq(ReviewRequestInboxStatus.PROCESSING),
+                                                  timeoutCondition,
+                                                  reviewRequestInbox.processingAttempt.lt(maxAttempts)
+                                          )
+                                          .execute();
+
+        return Math.toIntExact(exhaustedCount + recoveredCount);
     }
 
     @Override
@@ -250,6 +281,12 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
     private void validateFailureReason(String failureReason) {
         if (failureReason == null || failureReason.isBlank()) {
             throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateMaxAttempts(int maxAttempts) {
+        if (maxAttempts <= 0) {
+            throw new IllegalArgumentException("maxAttempts는 0보다 커야 합니다.");
         }
     }
 }

@@ -2,6 +2,7 @@ package com.slack.bot.infrastructure.interaction.box.persistence.in;
 
 import static com.slack.bot.infrastructure.interaction.box.in.QSlackInteractionInbox.slackInteractionInbox;
 
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
@@ -105,11 +106,32 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
             SlackInteractionInboxType interactionType,
             Instant processingStartedBefore,
             Instant failedAt,
-            String failureReason
+            String failureReason,
+            int maxAttempts
     ) {
-        validateRecoverTimeoutProcessingArguments(processingStartedBefore, failedAt, failureReason);
+        validateRecoverTimeoutProcessingArguments(processingStartedBefore, failedAt, failureReason, maxAttempts);
 
-        return Math.toIntExact(queryFactory
+        BooleanExpression timeoutCondition = slackInteractionInbox.processingStartedAt.isNull()
+                                                                                      .or(slackInteractionInbox.processingStartedAt.lt(
+                                                                                              processingStartedBefore
+                                                                                      ));
+
+        long exhaustedCount = queryFactory
+                .update(slackInteractionInbox)
+                .set(slackInteractionInbox.status, SlackInteractionInboxStatus.FAILED)
+                .set(slackInteractionInbox.processingStartedAt, Expressions.nullExpression(Instant.class))
+                .set(slackInteractionInbox.failedAt, failedAt)
+                .set(slackInteractionInbox.failureReason, failureReason)
+                .set(slackInteractionInbox.failureType, SlackInteractivityFailureType.RETRY_EXHAUSTED)
+                .where(
+                        slackInteractionInbox.interactionType.eq(interactionType),
+                        slackInteractionInbox.status.eq(SlackInteractionInboxStatus.PROCESSING),
+                        timeoutCondition,
+                        slackInteractionInbox.processingAttempt.goe(maxAttempts)
+                )
+                .execute();
+
+        long recoveredCount = queryFactory
                 .update(slackInteractionInbox)
                 .set(slackInteractionInbox.status, SlackInteractionInboxStatus.RETRY_PENDING)
                 .set(slackInteractionInbox.processingStartedAt, Expressions.nullExpression(Instant.class))
@@ -119,22 +141,24 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                 .where(
                         slackInteractionInbox.interactionType.eq(interactionType),
                         slackInteractionInbox.status.eq(SlackInteractionInboxStatus.PROCESSING),
-                        slackInteractionInbox.processingStartedAt.isNull()
-                                                             .or(slackInteractionInbox.processingStartedAt.lt(
-                                                                     processingStartedBefore
-                                                             ))
+                        timeoutCondition,
+                        slackInteractionInbox.processingAttempt.lt(maxAttempts)
                 )
-                .execute());
+                .execute();
+
+        return Math.toIntExact(exhaustedCount + recoveredCount);
     }
 
     private void validateRecoverTimeoutProcessingArguments(
             Instant processingStartedBefore,
             Instant failedAt,
-            String failureReason
+            String failureReason,
+            int maxAttempts
     ) {
         validateProcessingStartedBefore(processingStartedBefore);
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
+        validateMaxAttempts(maxAttempts);
     }
 
     private void validateInboxId(Long inboxId) {
@@ -164,6 +188,12 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
     private void validateFailureReason(String failureReason) {
         if (failureReason == null || failureReason.isBlank()) {
             throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateMaxAttempts(int maxAttempts) {
+        if (maxAttempts <= 0) {
+            throw new IllegalArgumentException("maxAttempts는 0보다 커야 합니다.");
         }
     }
 

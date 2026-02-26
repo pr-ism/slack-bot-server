@@ -4,6 +4,7 @@ import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyKe
 import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyScope;
 import com.slack.bot.application.interactivity.box.aop.InteractivityImmediateTriggerTarget;
 import com.slack.bot.application.interactivity.box.aop.TriggerInteractivityImmediateProcessing;
+import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.global.config.properties.InteractionWorkerProperties;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
@@ -22,9 +23,10 @@ import org.springframework.stereotype.Component;
 public class SlackInteractionInboxProcessor {
 
     private static final String PROCESSING_TIMEOUT_FAILURE_REASON =
-            "PROCESSING 타임아웃으로 재시도 대기 상태로 복구되었습니다.";
+            "PROCESSING 타임아웃으로 복구 처리되었습니다.";
 
     private final Clock clock;
+    private final InteractionRetryProperties interactionRetryProperties;
     private final InteractionWorkerProperties interactionWorkerProperties;
     private final SlackInteractionInboxRepository slackInteractionInboxRepository;
     private final SlackInteractionIdempotencyKeyGenerator idempotencyKeyGenerator;
@@ -106,7 +108,8 @@ public class SlackInteractionInboxProcessor {
                 interactionType,
                 now.minusMillis(processingTimeoutMs),
                 now,
-                PROCESSING_TIMEOUT_FAILURE_REASON
+                PROCESSING_TIMEOUT_FAILURE_REASON,
+                interactionRetryProperties.inbox().maxAttempts()
         );
 
         if (recoveredCount > 0) {
