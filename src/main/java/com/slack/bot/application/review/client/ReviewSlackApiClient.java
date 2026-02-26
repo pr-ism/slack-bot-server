@@ -2,6 +2,7 @@ package com.slack.bot.application.review.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.slack.bot.application.review.box.aop.EnqueueReviewNotificationOutbox;
 import com.slack.bot.application.review.client.exception.ReviewSlackApiException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -22,6 +23,7 @@ public class ReviewSlackApiClient {
     private final RestClient slackClient;
     private final ObjectMapper objectMapper;
 
+    @EnqueueReviewNotificationOutbox
     public void sendBlockMessage(
             String token,
             String channelId,
@@ -52,8 +54,8 @@ public class ReviewSlackApiClient {
                                          .contentType(MediaType.APPLICATION_JSON)
                                          .body(body)
                                          .retrieve()
-                                         .onStatus(status ->
-                                                 status.isError(),
+                                         .onStatus(
+                                                 status -> status.isError(),
                                                  this.slackApiErrorHandler("chat.postMessage")
                                          )
                                          .body(String.class);
