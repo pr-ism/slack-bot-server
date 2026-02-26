@@ -1,5 +1,6 @@
 package com.slack.bot.application.review;
 
+import com.slack.bot.application.review.box.aop.BindReviewNotificationSourceKey;
 import com.slack.bot.application.review.channel.ReviewSlackChannelResolver;
 import com.slack.bot.application.review.channel.dto.SlackChannelDto;
 import com.slack.bot.application.review.client.ReviewSlackApiClient;
@@ -18,6 +19,7 @@ public class ReviewNotificationService {
     private final ReviewActionMetaBuilder actionMetaBuilder;
     private final ReviewSlackChannelResolver channelResolver;
 
+    @BindReviewNotificationSourceKey
     public void sendSimpleNotification(String apiKey, ReviewAssignmentRequest request) {
         SlackChannelDto channel = channelResolver.resolve(apiKey);
         String actionMeta = actionMetaBuilder.build(
