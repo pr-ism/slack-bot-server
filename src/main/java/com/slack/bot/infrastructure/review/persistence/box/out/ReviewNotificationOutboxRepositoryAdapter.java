@@ -2,6 +2,7 @@ package com.slack.bot.infrastructure.review.persistence.box.out;
 
 import static com.slack.bot.infrastructure.review.box.out.QReviewNotificationOutbox.reviewNotificationOutbox;
 
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
@@ -105,31 +106,61 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
 
     @Override
     @Transactional
-    public int recoverTimeoutProcessing(Instant processingStartedBefore, Instant failedAt, String failureReason) {
+    public int recoverTimeoutProcessing(
+            Instant processingStartedBefore,
+            Instant failedAt,
+            String failureReason,
+            int maxAttempts
+    ) {
         validateProcessingStartedBefore(processingStartedBefore);
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
+        validateMaxAttempts(maxAttempts);
 
-        return Math.toIntExact(queryFactory.update(reviewNotificationOutbox)
-                                         .set(reviewNotificationOutbox.status, ReviewNotificationOutboxStatus.RETRY_PENDING)
-                                         .set(
-                                                 reviewNotificationOutbox.processingStartedAt,
-                                                 Expressions.nullExpression(Instant.class)
-                                         )
-                                         .set(reviewNotificationOutbox.failedAt, failedAt)
-                                         .set(reviewNotificationOutbox.failureReason, failureReason)
-                                         .set(
-                                                 reviewNotificationOutbox.failureType,
-                                                 Expressions.nullExpression(SlackInteractivityFailureType.class)
-                                         )
-                                         .where(
-                                                 reviewNotificationOutbox.status.eq(ReviewNotificationOutboxStatus.PROCESSING),
-                                                 reviewNotificationOutbox.processingStartedAt.isNull()
-                                                                                           .or(reviewNotificationOutbox.processingStartedAt.lt(
-                                                                                                   processingStartedBefore
-                                                                                           ))
-                                         )
-                                         .execute());
+        BooleanExpression timeoutCondition = reviewNotificationOutbox.processingStartedAt.isNull()
+                                                                                          .or(reviewNotificationOutbox.processingStartedAt.lt(
+                                                                                                  processingStartedBefore
+                                                                                          ));
+
+        long exhaustedCount = queryFactory.update(reviewNotificationOutbox)
+                                          .set(reviewNotificationOutbox.status, ReviewNotificationOutboxStatus.FAILED)
+                                          .set(
+                                                  reviewNotificationOutbox.processingStartedAt,
+                                                  Expressions.nullExpression(Instant.class)
+                                          )
+                                          .set(reviewNotificationOutbox.failedAt, failedAt)
+                                          .set(reviewNotificationOutbox.failureReason, failureReason)
+                                          .set(
+                                                  reviewNotificationOutbox.failureType,
+                                                  SlackInteractivityFailureType.RETRY_EXHAUSTED
+                                          )
+                                          .where(
+                                                  reviewNotificationOutbox.status.eq(ReviewNotificationOutboxStatus.PROCESSING),
+                                                  timeoutCondition,
+                                                  reviewNotificationOutbox.processingAttempt.goe(maxAttempts)
+                                          )
+                                          .execute();
+
+        long recoveredCount = queryFactory.update(reviewNotificationOutbox)
+                                          .set(reviewNotificationOutbox.status, ReviewNotificationOutboxStatus.RETRY_PENDING)
+                                          .set(
+                                                  reviewNotificationOutbox.processingStartedAt,
+                                                  Expressions.nullExpression(Instant.class)
+                                          )
+                                          .set(reviewNotificationOutbox.failedAt, failedAt)
+                                          .set(reviewNotificationOutbox.failureReason, failureReason)
+                                          .set(
+                                                  reviewNotificationOutbox.failureType,
+                                                  Expressions.nullExpression(SlackInteractivityFailureType.class)
+                                          )
+                                          .where(
+                                                  reviewNotificationOutbox.status.eq(ReviewNotificationOutboxStatus.PROCESSING),
+                                                  timeoutCondition,
+                                                  reviewNotificationOutbox.processingAttempt.lt(maxAttempts)
+                                          )
+                                          .execute();
+
+        return Math.toIntExact(exhaustedCount + recoveredCount);
     }
 
     private void validateOutboxId(Long outboxId) {
@@ -159,6 +190,12 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
     private void validateFailureReason(String failureReason) {
         if (failureReason == null || failureReason.isBlank()) {
             throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateMaxAttempts(int maxAttempts) {
+        if (maxAttempts <= 0) {
+            throw new IllegalArgumentException("maxAttempts는 0보다 커야 합니다.");
         }
     }
 }

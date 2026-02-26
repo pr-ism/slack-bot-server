@@ -23,6 +23,7 @@ import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStat
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import com.slack.bot.infrastructure.interaction.box.persistence.in.JpaSlackInteractionInboxRepository;
+import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -120,6 +121,33 @@ class SlackInteractionInboxProcessorTest {
                         .get()
                         .extracting(reservation -> reservation.getStatus())
                         .isEqualTo(ReservationStatus.CANCELLED)
+        );
+    }
+
+    @Test
+    void PROCESSING_타임아웃_block_actions_inbox가_최대시도에_도달하면_FAILED_RETRY_EXHAUSTED로_격리된다() {
+        // given
+        SlackInteractionInbox timeoutInbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "BLOCK-ACTION-TIMEOUT-POISON-PILL",
+                "{\"team\":{\"id\":\"T1\"},\"channel\":{\"id\":\"C1\"},\"user\":{\"id\":\"U1\"},\"actions\":[{\"action_id\":\"cancel_review_reservation\",\"value\":\"100\"}]}"
+        );
+        timeoutInbox.markProcessing(Instant.now().minusSeconds(120));
+        timeoutInbox.markRetryPending(Instant.now().minusSeconds(110), "first failure");
+        timeoutInbox.markProcessing(Instant.now().minusSeconds(100));
+        SlackInteractionInbox saved = jpaSlackInteractionInboxRepository.save(timeoutInbox);
+
+        // when
+        slackInteractionInboxProcessor.processPendingBlockActions(10);
+
+        // then
+        SlackInteractionInbox failedInbox = jpaSlackInteractionInboxRepository.findById(saved.getId()).orElseThrow();
+
+        assertAll(
+                () -> assertThat(failedInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
+                () -> assertThat(failedInbox.getProcessingAttempt()).isEqualTo(2),
+                () -> assertThat(failedInbox.getFailureType()).isEqualTo(SlackInteractivityFailureType.RETRY_EXHAUSTED),
+                () -> assertThat(failedInbox.getFailureReason()).isNotBlank()
         );
     }
 

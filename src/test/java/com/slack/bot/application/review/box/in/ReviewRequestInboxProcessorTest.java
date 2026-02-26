@@ -180,6 +180,36 @@ class ReviewRequestInboxProcessorTest {
     }
 
     @Test
+    void PROCESSING_타임아웃_건이_최대시도에_도달하면_FAILED_RETRY_EXHAUSTED로_격리된다() throws Exception {
+        // given
+        ReviewAssignmentRequest request = request(405L, "Timeout poison pill");
+        ReviewRequestInbox inbox = ReviewRequestInbox.pending(
+                "test-api-key:405",
+                "test-api-key",
+                405L,
+                objectMapper.writeValueAsString(request),
+                Instant.now().minusSeconds(120)
+        );
+        inbox.markProcessing(Instant.now().minusSeconds(120));
+        inbox.markRetryPending(Instant.now().minusSeconds(110), "first timeout failure");
+        inbox.markProcessing(Instant.now().minusSeconds(100));
+        ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
+
+        // when
+        reviewRequestInboxProcessor.processPending(10, 1_000);
+
+        // then
+        ReviewRequestInbox failed = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
+        assertAll(
+                () -> assertThat(spyReviewNotificationService.getSendCount()).isZero(),
+                () -> assertThat(failed.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
+                () -> assertThat(failed.getProcessingAttempt()).isEqualTo(2),
+                () -> assertThat(failed.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.RETRY_EXHAUSTED),
+                () -> assertThat(failed.getFailureReason()).isNotBlank()
+        );
+    }
+
+    @Test
     void batchWindowMillis가_음수이면_enqueue는_예외를_던진다() {
         // given
         ReviewAssignmentRequest request = request(501L, "batch-window");

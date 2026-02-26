@@ -26,7 +26,7 @@ import org.springframework.stereotype.Component;
 public class ReviewNotificationOutboxProcessor {
 
     private static final String PROCESSING_TIMEOUT_FAILURE_REASON =
-            "PROCESSING 타임아웃으로 재시도 대기 상태로 복구되었습니다.";
+            "PROCESSING 타임아웃으로 복구 처리되었습니다.";
     private static final String UNKNOWN_FAILURE_REASON = "unknown failure";
 
     private final Clock clock;
@@ -56,7 +56,8 @@ public class ReviewNotificationOutboxProcessor {
         int recoveredCount = reviewNotificationOutboxRepository.recoverTimeoutProcessing(
                 now.minusMillis(processingTimeoutMs),
                 now,
-                PROCESSING_TIMEOUT_FAILURE_REASON
+                PROCESSING_TIMEOUT_FAILURE_REASON,
+                interactionRetryProperties.outbox().maxAttempts()
         );
 
         if (recoveredCount > 0) {

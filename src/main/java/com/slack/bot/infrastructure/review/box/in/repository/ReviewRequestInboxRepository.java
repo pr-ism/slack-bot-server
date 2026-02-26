@@ -21,7 +21,12 @@ public interface ReviewRequestInboxRepository {
 
     boolean markProcessingIfClaimable(Long inboxId, Instant processingStartedAt, Instant availableBeforeOrAt);
 
-    int recoverTimeoutProcessing(Instant processingStartedBefore, Instant failedAt, String failureReason);
+    int recoverTimeoutProcessing(
+            Instant processingStartedBefore,
+            Instant failedAt,
+            String failureReason,
+            int maxAttempts
+    );
 
     ReviewRequestInbox save(ReviewRequestInbox inbox);
 }

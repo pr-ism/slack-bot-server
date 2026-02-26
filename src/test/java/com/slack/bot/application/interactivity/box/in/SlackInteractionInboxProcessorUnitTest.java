@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyKeyGenerator;
+import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.global.config.properties.InteractionWorkerProperties;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
@@ -44,6 +45,10 @@ class SlackInteractionInboxProcessorUnitTest {
     @BeforeEach
     void setUp() {
         Clock clock = Clock.fixed(Instant.parse("2026-02-18T00:00:00Z"), ZoneOffset.UTC);
+        InteractionRetryProperties interactionRetryProperties = new InteractionRetryProperties(
+                new InteractionRetryProperties.Retry(2, 100L, 2.0, 1_000L),
+                new InteractionRetryProperties.Retry(2, 100L, 2.0, 1_000L)
+        );
         InteractionWorkerProperties interactionWorkerProperties = new InteractionWorkerProperties(
                 new InteractionWorkerProperties.Inbox(
                         new InteractionWorkerProperties.BlockActions(true, 200L, 60000L),
@@ -54,6 +59,7 @@ class SlackInteractionInboxProcessorUnitTest {
 
         slackInteractionInboxProcessor = new SlackInteractionInboxProcessor(
                 clock,
+                interactionRetryProperties,
                 interactionWorkerProperties,
                 slackInteractionInboxRepository,
                 idempotencyKeyGenerator,

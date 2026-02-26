@@ -2,6 +2,7 @@ package com.slack.bot.infrastructure.interaction.box.persistence.out;
 
 import static com.slack.bot.infrastructure.interaction.box.out.QSlackNotificationOutbox.slackNotificationOutbox;
 
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
@@ -101,10 +102,34 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
 
     @Override
     @Transactional
-    public int recoverTimeoutProcessing(Instant processingStartedBefore, Instant failedAt, String failureReason) {
-        validateRecoverTimeoutProcessingArguments(processingStartedBefore, failedAt, failureReason);
+    public int recoverTimeoutProcessing(
+            Instant processingStartedBefore,
+            Instant failedAt,
+            String failureReason,
+            int maxAttempts
+    ) {
+        validateRecoverTimeoutProcessingArguments(processingStartedBefore, failedAt, failureReason, maxAttempts);
 
-        return Math.toIntExact(queryFactory
+        BooleanExpression timeoutCondition = slackNotificationOutbox.processingStartedAt.isNull()
+                                                                                          .or(slackNotificationOutbox.processingStartedAt.lt(
+                                                                                                  processingStartedBefore
+                                                                                          ));
+
+        long exhaustedCount = queryFactory
+                .update(slackNotificationOutbox)
+                .set(slackNotificationOutbox.status, SlackNotificationOutboxStatus.FAILED)
+                .set(slackNotificationOutbox.processingStartedAt, Expressions.nullExpression(Instant.class))
+                .set(slackNotificationOutbox.failedAt, failedAt)
+                .set(slackNotificationOutbox.failureReason, failureReason)
+                .set(slackNotificationOutbox.failureType, SlackInteractivityFailureType.RETRY_EXHAUSTED)
+                .where(
+                        slackNotificationOutbox.status.eq(SlackNotificationOutboxStatus.PROCESSING),
+                        timeoutCondition,
+                        slackNotificationOutbox.processingAttempt.goe(maxAttempts)
+                )
+                .execute();
+
+        long recoveredCount = queryFactory
                 .update(slackNotificationOutbox)
                 .set(slackNotificationOutbox.status, SlackNotificationOutboxStatus.RETRY_PENDING)
                 .set(slackNotificationOutbox.processingStartedAt, Expressions.nullExpression(Instant.class))
@@ -113,22 +138,24 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                 .set(slackNotificationOutbox.failureType, Expressions.nullExpression(SlackInteractivityFailureType.class))
                 .where(
                         slackNotificationOutbox.status.eq(SlackNotificationOutboxStatus.PROCESSING),
-                        slackNotificationOutbox.processingStartedAt.isNull()
-                                                                  .or(slackNotificationOutbox.processingStartedAt.lt(
-                                                                          processingStartedBefore
-                                                                  ))
+                        timeoutCondition,
+                        slackNotificationOutbox.processingAttempt.lt(maxAttempts)
                 )
-                .execute());
+                .execute();
+
+        return Math.toIntExact(exhaustedCount + recoveredCount);
     }
 
     private void validateRecoverTimeoutProcessingArguments(
             Instant processingStartedBefore,
             Instant failedAt,
-            String failureReason
+            String failureReason,
+            int maxAttempts
     ) {
         validateProcessingStartedBefore(processingStartedBefore);
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
+        validateMaxAttempts(maxAttempts);
     }
 
     private void validateOutboxId(Long outboxId) {
@@ -158,6 +185,12 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
     private void validateFailureReason(String failureReason) {
         if (failureReason == null || failureReason.isBlank()) {
             throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateMaxAttempts(int maxAttempts) {
+        if (maxAttempts <= 0) {
+            throw new IllegalArgumentException("maxAttempts는 0보다 커야 합니다.");
         }
     }
 }

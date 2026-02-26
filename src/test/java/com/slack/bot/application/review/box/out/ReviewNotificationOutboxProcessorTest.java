@@ -112,6 +112,23 @@ class ReviewNotificationOutboxProcessorTest {
     }
 
     @Test
+    void processing_timeout_복구시_maxAttempts를_전달한다() {
+        // given
+        given(reviewNotificationOutboxRepository.findClaimable(10)).willReturn(List.of());
+
+        // when
+        processor.processPending(10, 60_000L);
+
+        // then
+        verify(reviewNotificationOutboxRepository).recoverTimeoutProcessing(
+                any(),
+                any(),
+                anyString(),
+                eq(2)
+        );
+    }
+
+    @Test
     void 선점에_실패하면_처리를_진행하지_않는다() {
         // given
         ReviewNotificationOutbox pending = mock(ReviewNotificationOutbox.class);

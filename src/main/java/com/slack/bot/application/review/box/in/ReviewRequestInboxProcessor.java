@@ -25,7 +25,7 @@ import org.springframework.stereotype.Component;
 public class ReviewRequestInboxProcessor {
 
     private static final String PROCESSING_TIMEOUT_FAILURE_REASON =
-            "PROCESSING 타임아웃으로 재시도 대기 상태로 복구되었습니다.";
+            "PROCESSING 타임아웃으로 복구 처리되었습니다.";
     private static final String UNKNOWN_FAILURE_REASON = "unknown failure";
     private static final String REVIEW_REQUEST_INBOX_SOURCE_PREFIX = "REVIEW_REQUEST_INBOX";
 
@@ -75,7 +75,8 @@ public class ReviewRequestInboxProcessor {
         int recoveredCount = reviewRequestInboxRepository.recoverTimeoutProcessing(
                 now.minusMillis(processingTimeoutMs),
                 now,
-                PROCESSING_TIMEOUT_FAILURE_REASON
+                PROCESSING_TIMEOUT_FAILURE_REASON,
+                interactionRetryProperties.inbox().maxAttempts()
         );
 
         if (recoveredCount > 0) {

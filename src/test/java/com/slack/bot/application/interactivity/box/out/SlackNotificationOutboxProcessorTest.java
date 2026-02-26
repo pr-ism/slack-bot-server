@@ -19,6 +19,7 @@ import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxS
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.workspace.persistence.JpaWorkspaceRepository;
+import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -138,6 +139,35 @@ class SlackNotificationOutboxProcessorTest {
                 () -> verify(notificationTransportApiClient).sendMessage("xoxb-test-token", "C1", "hello-timeout-200"),
                 () -> assertThat(processed.getStatus()).isEqualTo(SlackNotificationOutboxStatus.SENT),
                 () -> assertThat(processed.getProcessingAttempt()).isEqualTo(2)
+        );
+    }
+
+    @Test
+    void PROCESSING_타임아웃_outbox가_최대시도에_도달하면_FAILED_RETRY_EXHAUSTED로_격리된다() {
+        // given
+        SlackNotificationOutbox timeoutOutbox = SlackNotificationOutbox.builder()
+                                                                       .messageType(SlackNotificationOutboxMessageType.CHANNEL_TEXT)
+                                                                       .idempotencyKey("OUTBOX-TIMEOUT-POISON-PILL")
+                                                                       .teamId("T1")
+                                                                       .channelId("C1")
+                                                                       .text("hello-timeout-poison-pill")
+                                                                       .build();
+        timeoutOutbox.markProcessing(Instant.now().minusSeconds(120));
+        timeoutOutbox.markRetryPending(Instant.now().minusSeconds(110), "first failure");
+        timeoutOutbox.markProcessing(Instant.now().minusSeconds(100));
+        SlackNotificationOutbox saved = slackNotificationOutboxRepository.save(timeoutOutbox);
+
+        // when
+        slackNotificationOutboxProcessor.processPending(10);
+
+        // then
+        SlackNotificationOutbox failed = slackNotificationOutboxRepository.findById(saved.getId())
+                                                                          .orElseThrow();
+        assertAll(
+                () -> assertThat(failed.getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED),
+                () -> assertThat(failed.getProcessingAttempt()).isEqualTo(2),
+                () -> assertThat(failed.getFailureType()).isEqualTo(SlackInteractivityFailureType.RETRY_EXHAUSTED),
+                () -> assertThat(failed.getFailureReason()).isNotBlank()
         );
     }
 
