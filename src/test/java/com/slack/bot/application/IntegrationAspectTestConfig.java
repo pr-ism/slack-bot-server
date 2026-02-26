@@ -3,6 +3,8 @@ package com.slack.bot.application;
 import com.slack.bot.application.interactivity.box.ProcessingSourceContext;
 import com.slack.bot.application.interactivity.box.aop.aspect.support.AspectIntegrationProbes;
 import com.slack.bot.application.interactivity.box.out.OutboxIdempotencySourceContext;
+import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
+import com.slack.bot.application.review.box.aop.aspect.support.ReviewAspectIntegrationProbes;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 
@@ -33,5 +35,19 @@ public class IntegrationAspectTestConfig {
     @Bean
     public AspectIntegrationProbes.OutboxSourceResolverProbe outboxSourceResolverProbe() {
         return new AspectIntegrationProbes.OutboxSourceResolverProbe();
+    }
+
+    @Bean
+    public ReviewAspectIntegrationProbes.ReviewNotificationOutboxEnqueueProbe reviewNotificationOutboxEnqueueProbe() {
+        return new ReviewAspectIntegrationProbes.ReviewNotificationOutboxEnqueueProbe();
+    }
+
+    @Bean
+    public ReviewAspectIntegrationProbes.ReviewNotificationSourceBindingProbe reviewNotificationSourceBindingProbe(
+            ReviewNotificationSourceContext reviewNotificationSourceContext
+    ) {
+        return new ReviewAspectIntegrationProbes.ReviewNotificationSourceBindingProbe(
+                reviewNotificationSourceContext
+        );
     }
 }

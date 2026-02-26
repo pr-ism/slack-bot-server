@@ -8,7 +8,7 @@
   <include resource="log/file-error-logging.xml"/>
   <include resource="log/file-warn-logging.xml"/>
 
-  <springProfile name="local">
+  <springProfile name="local | console-logging">
     <root level="INFO">
       <appender-ref ref="CONSOLE"/>
     </root>
