@@ -17,7 +17,7 @@ public class ReviewNotificationSourceBindingAspect {
 
     private final ReviewNotificationSourceContext reviewNotificationSourceContext;
 
-    @Around("@annotation(com.slack.bot.application.review.aop.BindReviewNotificationSourceKey) && args(apiKey, request)")
+    @Around("@annotation(com.slack.bot.application.review.box.aop.BindReviewNotificationSourceKey) && args(apiKey, request)")
     public Object bindSourceKey(
             ProceedingJoinPoint joinPoint,
             String apiKey,
