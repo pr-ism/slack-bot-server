@@ -24,7 +24,7 @@ public class ReviewNotificationOutboxEnqueueAspect {
     private final ReviewNotificationSourceContext reviewNotificationSourceContext;
 
     @Around(
-            "@annotation(com.slack.bot.application.review.aop.EnqueueReviewNotificationOutbox)"
+            "@annotation(com.slack.bot.application.review.box.aop.EnqueueReviewNotificationOutbox)"
                     + " && args(token, channelId, blocks, attachments, fallbackText)"
     )
     public Object enqueue(
