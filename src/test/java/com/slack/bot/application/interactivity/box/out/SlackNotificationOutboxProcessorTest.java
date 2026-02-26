@@ -147,6 +147,7 @@ class SlackNotificationOutboxProcessorTest {
     }
 
     @Test
+    @Sql(scripts = "/sql/fixtures/notification/workspace_t1.sql")
     void PROCESSING_타임아웃_outbox가_최대시도에_도달하면_FAILED_RETRY_EXHAUSTED로_격리된다() {
         // given
         SlackNotificationOutbox timeoutOutbox = SlackNotificationOutbox.builder()
