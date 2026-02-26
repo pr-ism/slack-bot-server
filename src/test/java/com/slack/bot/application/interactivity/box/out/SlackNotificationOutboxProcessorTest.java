@@ -19,6 +19,7 @@ import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxS
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.workspace.persistence.JpaWorkspaceRepository;
+import java.time.Clock;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -42,6 +43,9 @@ class SlackNotificationOutboxProcessorTest {
 
     @Autowired
     JpaWorkspaceRepository jpaWorkspaceRepository;
+
+    @Autowired
+    Clock clock;
 
     @Test
     @Sql(scripts = "/sql/fixtures/box/out/pending_outbox.sql")
@@ -152,9 +156,10 @@ class SlackNotificationOutboxProcessorTest {
                                                                        .channelId("C1")
                                                                        .text("hello-timeout-poison-pill")
                                                                        .build();
-        timeoutOutbox.markProcessing(Instant.now().minusSeconds(120));
-        timeoutOutbox.markRetryPending(Instant.now().minusSeconds(110), "first failure");
-        timeoutOutbox.markProcessing(Instant.now().minusSeconds(100));
+        Instant base = clock.instant();
+        timeoutOutbox.markProcessing(base.minusSeconds(120));
+        timeoutOutbox.markRetryPending(base.minusSeconds(110), "first failure");
+        timeoutOutbox.markProcessing(base.minusSeconds(100));
         SlackNotificationOutbox saved = slackNotificationOutboxRepository.save(timeoutOutbox);
 
         // when

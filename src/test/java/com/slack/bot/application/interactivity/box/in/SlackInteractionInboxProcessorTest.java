@@ -23,6 +23,7 @@ import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStat
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import com.slack.bot.infrastructure.interaction.box.persistence.in.JpaSlackInteractionInboxRepository;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -53,6 +54,9 @@ class SlackInteractionInboxProcessorTest {
 
     @Autowired
     SlackInteractionInboxRepository slackInteractionInboxRepository;
+
+    @Autowired
+    Clock clock;
 
     @Test
     @Sql(scripts = {
@@ -132,9 +136,10 @@ class SlackInteractionInboxProcessorTest {
                 "BLOCK-ACTION-TIMEOUT-POISON-PILL",
                 "{\"team\":{\"id\":\"T1\"},\"channel\":{\"id\":\"C1\"},\"user\":{\"id\":\"U1\"},\"actions\":[{\"action_id\":\"cancel_review_reservation\",\"value\":\"100\"}]}"
         );
-        timeoutInbox.markProcessing(Instant.now().minusSeconds(120));
-        timeoutInbox.markRetryPending(Instant.now().minusSeconds(110), "first failure");
-        timeoutInbox.markProcessing(Instant.now().minusSeconds(100));
+        Instant base = clock.instant();
+        timeoutInbox.markProcessing(base.minusSeconds(120));
+        timeoutInbox.markRetryPending(base.minusSeconds(110), "first failure");
+        timeoutInbox.markProcessing(base.minusSeconds(100));
         SlackInteractionInbox saved = jpaSlackInteractionInboxRepository.save(timeoutInbox);
 
         // when
