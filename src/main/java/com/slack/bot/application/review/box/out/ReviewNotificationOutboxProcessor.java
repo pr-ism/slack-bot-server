@@ -91,14 +91,23 @@ public class ReviewNotificationOutboxProcessor {
                 dispatch(outbox);
                 return null;
             });
-
-            outbox.markSent(clock.instant());
-            reviewNotificationOutboxRepository.save(outbox);
         } catch (Exception exception) {
             log.warn("review_notification outbox 처리에 실패했습니다. outboxId={}", outbox.getId(), exception);
 
             markFailureStatus(outbox, exception);
             reviewNotificationOutboxRepository.save(outbox);
+            return;
+        }
+
+        outbox.markSent(clock.instant());
+        try {
+            reviewNotificationOutboxRepository.save(outbox);
+        } catch (Exception exception) {
+            log.error(
+                    "review_notification outbox 전송은 성공했지만 SENT 상태 저장에 실패했습니다. outboxId={}",
+                    outbox.getId(),
+                    exception
+            );
         }
     }
 

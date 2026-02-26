@@ -187,6 +187,38 @@ class ReviewNotificationOutboxProcessorTest {
     }
 
     @Test
+    void 전송_성공후_SENT_저장_실패는_실패상태로_재마킹하지_않는다() {
+        // given
+        ReviewNotificationOutbox pending = mockPending(10L);
+        ReviewNotificationOutbox claimed = mockClaimed(10L, 1);
+        given(reviewNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(pending));
+        given(reviewNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
+        given(reviewNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(claimed));
+
+        Workspace workspace = mock(Workspace.class);
+        given(workspace.getAccessToken()).willReturn("xoxb-test-token");
+        given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.of(workspace));
+
+        doThrow(new RuntimeException("db failure"))
+                .when(reviewNotificationOutboxRepository)
+                .save(claimed);
+
+        // when
+        processor.processPending(10, 60_000L);
+
+        // then
+        verify(notificationTransportApiClient).sendBlockMessage(
+                eq("xoxb-test-token"),
+                eq("C1"),
+                any(JsonNode.class),
+                eq("fallback")
+        );
+        verify(claimed).markSent(any());
+        verify(claimed, never()).markRetryPending(any(), anyString());
+        verify(claimed, never()).markFailed(any(), anyString(), any());
+    }
+
+    @Test
     void 비재시도_예외면_FAILED_BUSINESS_INVARIANT로_저장한다() {
         // given
         ReviewNotificationOutbox pending = mockPending(10L);
