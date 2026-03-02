@@ -36,8 +36,8 @@ class InMemoryReviewEventBatchTest {
         // given
         spyNotificationService.resetCount();
 
-        ReviewAssignmentRequest request1 = createRequest(List.of("reviewer-gh-1"));
-        ReviewAssignmentRequest request2 = createRequest(List.of("reviewer-gh-1", "unknown-reviewer"));
+        ReviewAssignmentRequest request1 = createRequest("commit-hash-1", List.of("reviewer-gh-1"));
+        ReviewAssignmentRequest request2 = createRequest("commit-hash-1", List.of("reviewer-gh-1", "unknown-reviewer"));
 
         // when
         eventBatch.buffer("test-api-key", request1);
@@ -66,6 +66,7 @@ class InMemoryReviewEventBatchTest {
                 "Title A",
                 "https://github.com/pr/a",
                 "author-gh",
+                "commit-hash-a",
                 List.of("reviewer-gh-1"),
                 List.of()
         );
@@ -76,6 +77,7 @@ class InMemoryReviewEventBatchTest {
                 "Title B",
                 "https://github.com/pr/b",
                 "author-gh",
+                "commit-hash-b",
                 List.of("reviewer-gh-1"),
                 List.of()
         );
@@ -89,7 +91,43 @@ class InMemoryReviewEventBatchTest {
                .untilAsserted(() -> assertThat(spyNotificationService.getSendCount()).isEqualTo(2));
     }
 
-    private ReviewAssignmentRequest createRequest(List<String> reviewers) {
+    @Test
+    @Sql(scripts = {
+            "classpath:sql/fixtures/review/project_t1.sql",
+            "classpath:sql/fixtures/review/workspace_t1.sql",
+            "classpath:sql/fixtures/review/channel_t1.sql",
+            "classpath:sql/fixtures/review/project_member_t1_mapped.sql"
+    })
+    void 여러_라운드가_열려도_이전_라운드에서_미리뷰인_동일_리뷰어는_재발송되지_않는다() {
+        // given
+        spyNotificationService.resetCount();
+
+        ReviewAssignmentRequest roundOne = createRequest("commit-hash-round-1", List.of("reviewer-gh-1"));
+        ReviewAssignmentRequest roundTwo = createRequest("commit-hash-round-2", List.of("reviewer-gh-1"));
+
+        // when
+        eventBatch.buffer("test-api-key", roundOne);
+        eventBatch.buffer("test-api-key", roundOne);
+        await().atMost(3, SECONDS)
+               .untilAsserted(() -> assertThat(spyNotificationService.getSendCount()).isEqualTo(1));
+
+        eventBatch.buffer("test-api-key", roundTwo);
+        eventBatch.buffer("test-api-key", roundTwo);
+
+        // then
+        await().atMost(3, SECONDS)
+               .untilAsserted(() -> assertThat(spyNotificationService.getSendCount()).isEqualTo(1));
+    }
+
+    private ReviewAssignmentRequest createRequest(String startCommitHash, List<String> reviewers) {
+        return createRequest(startCommitHash, reviewers, List.of());
+    }
+
+    private ReviewAssignmentRequest createRequest(
+            String startCommitHash,
+            List<String> pendingReviewers,
+            List<String> reviewedReviewers
+    ) {
         return new ReviewAssignmentRequest(
                 "my-repo",
                 1000L,
@@ -97,8 +135,9 @@ class InMemoryReviewEventBatchTest {
                 "Fix bug",
                 "https://github.com/pr/1",
                 "author-gh",
-                reviewers,
-                List.of()
+                startCommitHash,
+                pendingReviewers,
+                reviewedReviewers
         );
     }
 }

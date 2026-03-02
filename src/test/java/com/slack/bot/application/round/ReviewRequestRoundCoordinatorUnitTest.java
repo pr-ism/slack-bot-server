@@ -2,7 +2,6 @@ package com.slack.bot.application.round;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -14,7 +13,6 @@ import com.slack.bot.domain.round.PullRequestRound;
 import com.slack.bot.domain.round.RoundReviewer;
 import com.slack.bot.domain.round.repository.PullRequestRoundRepository;
 import com.slack.bot.domain.round.repository.RoundReviewerRepository;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -38,13 +36,11 @@ class ReviewRequestRoundCoordinatorUnitTest {
 
     @Test
     void apiKey가_비어있으면_register는_예외를_던진다() {
-        // given
         ReviewRequestRoundCoordinator coordinator = new ReviewRequestRoundCoordinator(
                 pullRequestRoundRepository,
                 roundReviewerRepository
         );
 
-        // when & then
         assertThatThrownBy(() -> coordinator.register(" ", validRequest()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("apiKey는 비어 있을 수 없습니다.");
@@ -52,13 +48,11 @@ class ReviewRequestRoundCoordinatorUnitTest {
 
     @Test
     void request가_null이면_register는_예외를_던진다() {
-        // given
         ReviewRequestRoundCoordinator coordinator = new ReviewRequestRoundCoordinator(
                 pullRequestRoundRepository,
                 roundReviewerRepository
         );
 
-        // when & then
         assertThatThrownBy(() -> coordinator.register("api-key", null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("request는 비어 있을 수 없습니다.");
@@ -66,7 +60,6 @@ class ReviewRequestRoundCoordinatorUnitTest {
 
     @Test
     void githubPullRequestId가_유효하지_않으면_register는_예외를_던진다() {
-        // given
         ReviewRequestRoundCoordinator coordinator = new ReviewRequestRoundCoordinator(
                 pullRequestRoundRepository,
                 roundReviewerRepository
@@ -84,7 +77,6 @@ class ReviewRequestRoundCoordinatorUnitTest {
                 List.of()
         );
 
-        // when & then
         assertThatThrownBy(() -> coordinator.register("api-key", invalid))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("githubPullRequestId는 비어 있을 수 없습니다.");
@@ -92,7 +84,6 @@ class ReviewRequestRoundCoordinatorUnitTest {
 
     @Test
     void startCommitHash가_유효하지_않으면_register는_예외를_던진다() {
-        // given
         ReviewRequestRoundCoordinator coordinator = new ReviewRequestRoundCoordinator(
                 pullRequestRoundRepository,
                 roundReviewerRepository
@@ -110,7 +101,6 @@ class ReviewRequestRoundCoordinatorUnitTest {
                 List.of()
         );
 
-        // when & then
         assertThatThrownBy(() -> coordinator.register("api-key", invalid))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("startCommitHash는 비어 있을 수 없습니다.");
@@ -118,7 +108,6 @@ class ReviewRequestRoundCoordinatorUnitTest {
 
     @Test
     void 라운드_생성시_중복키_예외가_나면_기존_라운드를_조회해_복구한다() {
-        // given
         ReviewRequestRoundCoordinator coordinator = new ReviewRequestRoundCoordinator(
                 pullRequestRoundRepository,
                 roundReviewerRepository
@@ -145,15 +134,11 @@ class ReviewRequestRoundCoordinatorUnitTest {
         when(pullRequestRoundRepository.findRoundByStartCommitHash("api-key", 11L, "hash-1"))
                 .thenReturn(Optional.of(existingRound));
 
-        // when
         ReviewRoundRegistrationResultDto result = coordinator.register("api-key", request);
 
-        // then
-        assertAll(
-                () -> assertThat(result.coalescingKey()).isEqualTo("api-key:11:1"),
-                () -> assertThat(result.shouldNotify()).isFalse()
-        );
 
+        assertThat(result.coalescingKey()).isEqualTo("api-key:11:1");
+        assertThat(result.shouldNotify()).isFalse();
         verify(pullRequestRoundRepository).findRoundByStartCommitHash(
                 "api-key",
                 11L,
@@ -163,7 +148,6 @@ class ReviewRequestRoundCoordinatorUnitTest {
 
     @Test
     void 라운드_복구조회도_없으면_중복키_예외를_그대로_전파한다() {
-        // given
         ReviewRequestRoundCoordinator coordinator = new ReviewRequestRoundCoordinator(
                 pullRequestRoundRepository,
                 roundReviewerRepository
@@ -190,7 +174,6 @@ class ReviewRequestRoundCoordinatorUnitTest {
         when(pullRequestRoundRepository.findRoundByStartCommitHash("api-key", 22L, "hash-2"))
                 .thenReturn(Optional.empty());
 
-        // when & then
         assertThatThrownBy(() -> coordinator.register("api-key", request))
                 .isSameAs(duplicateKeyException);
     }
@@ -224,17 +207,16 @@ class ReviewRequestRoundCoordinatorUnitTest {
                 .thenReturn(Optional.of(reviewedReviewer));
 
         // when
-        ReviewRoundRegistrationResultDto actual = coordinator.register("api-key", request);
+        ReviewRoundRegistrationResultDto result = coordinator.register("api-key", request);
 
         // then
-        assertThat(actual.reviewersToMention()).containsExactly("reviewer-1");
+        assertThat(result.reviewersToMention()).containsExactly("reviewer-1");
 
         verify(roundReviewerRepository).save(reviewedReviewer);
     }
 
     @Test
     void pendingReviewers의_null_공백은_제외되고_trim된_아이디만_처리된다() {
-        // given
         ReviewRequestRoundCoordinator coordinator = new ReviewRequestRoundCoordinator(
                 pullRequestRoundRepository,
                 roundReviewerRepository
@@ -249,21 +231,19 @@ class ReviewRequestRoundCoordinatorUnitTest {
                 "url",
                 "author",
                 "hash-4",
-                Arrays.asList(null, " ", " reviewer-1 ", "reviewer-1"),
+                java.util.Arrays.asList(null, " ", " reviewer-1 ", "reviewer-1"),
                 List.of()
         );
-        RoundReviewer requestedReviewer = RoundReviewer.requested(1L, "reviewer-1");
 
         when(pullRequestRoundRepository.findLatestRound("api-key", 44L))
                 .thenReturn(Optional.of(currentRound));
+        RoundReviewer requestedReviewer = RoundReviewer.requested(1L, "reviewer-1");
         when(roundReviewerRepository.findReviewerInRound(null, "reviewer-1"))
                 .thenReturn(Optional.of(requestedReviewer));
 
-        // when
-        ReviewRoundRegistrationResultDto actual = coordinator.register("api-key", request);
+        ReviewRoundRegistrationResultDto result = coordinator.register("api-key", request);
 
-        // then
-        assertThat(actual.reviewersToMention()).isEmpty();
+        assertThat(result.reviewersToMention()).isEmpty();
     }
 
     private ReviewAssignmentRequest validRequest() {

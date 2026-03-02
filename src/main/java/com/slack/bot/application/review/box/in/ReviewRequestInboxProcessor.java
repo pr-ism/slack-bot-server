@@ -6,7 +6,7 @@ import com.slack.bot.application.interactivity.box.BoxFailureReasonTruncator;
 import com.slack.bot.application.interactivity.box.retry.InteractionRetryExceptionClassifier;
 import com.slack.bot.application.review.ReviewNotificationService;
 import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
-import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
+import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
@@ -38,13 +38,23 @@ public class ReviewRequestInboxProcessor {
     private final ReviewRequestInboxRepository reviewRequestInboxRepository;
     private final InteractionRetryExceptionClassifier retryExceptionClassifier;
 
-    public void enqueue(String apiKey, ReviewAssignmentRequest request, long batchWindowMillis) {
+    public void enqueue(String apiKey, ReviewNotificationPayload request, long batchWindowMillis) {
+        String coalescingKey = buildCoalescingKey(apiKey, request);
+        enqueue(apiKey, request, batchWindowMillis, coalescingKey);
+    }
+
+    public void enqueue(
+            String apiKey,
+            ReviewNotificationPayload request,
+            long batchWindowMillis,
+            String coalescingKey
+    ) {
         validateBatchWindowMillis(batchWindowMillis);
         if (request == null) {
             throw new IllegalArgumentException("request는 비어 있을 수 없습니다.");
         }
 
-        String coalescingKey = buildCoalescingKey(apiKey, request.githubPullRequestId());
+        validateCoalescingKey(coalescingKey);
         String requestJson = serializeRequest(request);
         Instant availableAt = clock.instant().plusMillis(batchWindowMillis);
 
@@ -107,9 +117,9 @@ public class ReviewRequestInboxProcessor {
 
     private void processClaimedInbox(ReviewRequestInbox inbox) {
         try {
-            ReviewAssignmentRequest request = objectMapper.readValue(
+            ReviewNotificationPayload request = objectMapper.readValue(
                     inbox.getRequestJson(),
-                    ReviewAssignmentRequest.class
+                    ReviewNotificationPayload.class
             );
 
             String sourceKey = resolveSourceKey(inbox);
@@ -153,7 +163,13 @@ public class ReviewRequestInboxProcessor {
         inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.RETRY_EXHAUSTED);
     }
 
-    private String buildCoalescingKey(String apiKey, Long githubPullRequestId) {
+    private String buildCoalescingKey(String apiKey, ReviewNotificationPayload request) {
+        if (request == null) {
+            throw new IllegalArgumentException("request는 비어 있을 수 없습니다.");
+        }
+
+        Long githubPullRequestId = request.githubPullRequestId();
+
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalArgumentException("apiKey는 비어 있을 수 없습니다.");
         }
@@ -164,7 +180,13 @@ public class ReviewRequestInboxProcessor {
         return apiKey + ":" + githubPullRequestId;
     }
 
-    private String serializeRequest(ReviewAssignmentRequest request) {
+    private void validateCoalescingKey(String coalescingKey) {
+        if (coalescingKey == null || coalescingKey.isBlank()) {
+            throw new IllegalArgumentException("coalescingKey는 비어 있을 수 없습니다.");
+        }
+    }
+
+    private String serializeRequest(ReviewNotificationPayload request) {
         try {
             return objectMapper.writeValueAsString(request);
         } catch (JsonProcessingException e) {
