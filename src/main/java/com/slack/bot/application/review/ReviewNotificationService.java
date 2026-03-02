@@ -4,8 +4,8 @@ import com.slack.bot.application.review.box.aop.BindReviewNotificationSourceKey;
 import com.slack.bot.application.review.channel.ReviewSlackChannelResolver;
 import com.slack.bot.application.review.channel.dto.SlackChannelDto;
 import com.slack.bot.application.review.client.ReviewSlackApiClient;
+import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.application.review.dto.ReviewMessageDto;
-import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
 import com.slack.bot.application.review.meta.ReviewActionMetaBuilder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,7 +20,7 @@ public class ReviewNotificationService {
     private final ReviewSlackChannelResolver channelResolver;
 
     @BindReviewNotificationSourceKey
-    public void sendSimpleNotification(String apiKey, ReviewAssignmentRequest request) {
+    public void sendSimpleNotification(String apiKey, ReviewNotificationPayload request) {
         SlackChannelDto channel = channelResolver.resolve(apiKey);
         String actionMeta = actionMetaBuilder.build(
                 channel.teamId(),

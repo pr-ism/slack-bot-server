@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
 import com.slack.bot.application.review.box.aop.aspect.support.ReviewAspectIntegrationProbes.ReviewNotificationSourceBindingProbe;
-import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
+import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -62,8 +62,29 @@ class ReviewNotificationSourceBindingAspectIntegrationTest {
         );
     }
 
-    private ReviewAssignmentRequest request(Long githubPullRequestId) {
-        return new ReviewAssignmentRequest(
+    @Test
+    void 인박스에서_전달된_라운드_source_key를_그대로_유지한다() {
+        // given
+        String inboxRoundSourceKey = "REVIEW_REQUEST_INBOX:api-key:202:2:1700000000000";
+
+        // when
+        String actual = reviewNotificationSourceContext.withSourceKey(
+                inboxRoundSourceKey,
+                () -> reviewNotificationSourceBindingProbe.bind("api-key", request(202L))
+        );
+
+        // then
+        assertAll(
+                () -> assertThat(actual).isEqualTo(inboxRoundSourceKey),
+                () -> assertThat(reviewNotificationSourceBindingProbe.proceedCount()).isEqualTo(1),
+                () -> assertThat(reviewNotificationSourceBindingProbe.observedSourceKey())
+                        .hasValue(inboxRoundSourceKey),
+                () -> assertThat(reviewNotificationSourceContext.currentSourceKey()).isEmpty()
+        );
+    }
+
+    private ReviewNotificationPayload request(Long githubPullRequestId) {
+        return new ReviewNotificationPayload(
                 "repo-name",
                 githubPullRequestId,
                 1,
@@ -71,7 +92,7 @@ class ReviewNotificationSourceBindingAspectIntegrationTest {
                 "https://github.com/org/repo/pull/1",
                 "author-id",
                 List.of("reviewer-a"),
-                List.of("reviewer-b")
+                List.of("reviewer-a")
         );
     }
 }

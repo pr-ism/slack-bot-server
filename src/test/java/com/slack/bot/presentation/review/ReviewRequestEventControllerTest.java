@@ -42,6 +42,7 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
                 "Fix bug",
                 "https://github.com/pr/1",
                 "author-gh",
+                "abc123",
                 List.of("reviewer-gh-1"),
                 List.of()
         );
@@ -50,11 +51,11 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
 
         // when & then
         ResultActions resultActions = mockMvc.perform(
-                        post("/events/review-request")
-                                .header("X-API-Key", "test-api-key")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(body))
-                ).andExpect(status().isOk());
+                post("/events/review-request")
+                        .header("X-API-Key", "test-api-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body))
+        ).andExpect(status().isOk());
 
         리뷰_요청_이벤트_수신_문서화(resultActions);
     }
@@ -72,6 +73,7 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
                                 fieldWithPath("pullRequestTitle").type(JsonFieldType.STRING).description("Pull Request 제목"),
                                 fieldWithPath("pullRequestUrl").type(JsonFieldType.STRING).description("Pull Request URL"),
                                 fieldWithPath("authorGithubId").type(JsonFieldType.STRING).description("PR 작성자 GitHub ID"),
+                                fieldWithPath("startCommitHash").type(JsonFieldType.STRING).description("리뷰 라운드 시작 커밋 해시"),
                                 fieldWithPath("pendingReviewers").type(JsonFieldType.ARRAY).description("리뷰 대기 중인 리뷰어 GitHub ID 목록").optional(),
                                 fieldWithPath("reviewedReviewers").type(JsonFieldType.ARRAY).description("리뷰 완료한 리뷰어 GitHub ID 목록").optional()
                         )
@@ -108,14 +110,14 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
 
         // when & then
         mockMvc.perform(
-                        post("/events/review-request")
-                                .header("X-API-Key", "test-api-key")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(body))
-                )
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("R00"))
-                .andExpect(jsonPath("$.message").value("리뷰 채널 정보를 찾을 수 없습니다."));
+                       post("/events/review-request")
+                               .header("X-API-Key", "test-api-key")
+                               .contentType(MediaType.APPLICATION_JSON)
+                               .content(objectMapper.writeValueAsString(body))
+               )
+               .andExpect(status().isBadRequest())
+               .andExpect(jsonPath("$.errorCode").value("R00"))
+               .andExpect(jsonPath("$.message").value("리뷰 채널 정보를 찾을 수 없습니다."));
     }
 
     @Test
@@ -129,14 +131,14 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
 
         // when & then
         mockMvc.perform(
-                        post("/events/review-request")
-                                .header("X-API-Key", "test-api-key")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(body))
-                )
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.errorCode").value("R03"))
-                .andExpect(jsonPath("$.message").value("리뷰 알림 Slack API 요청 실패"));
+                       post("/events/review-request")
+                               .header("X-API-Key", "test-api-key")
+                               .contentType(MediaType.APPLICATION_JSON)
+                               .content(objectMapper.writeValueAsString(body))
+               )
+               .andExpect(status().isInternalServerError())
+               .andExpect(jsonPath("$.errorCode").value("R03"))
+               .andExpect(jsonPath("$.message").value("리뷰 알림 Slack API 요청 실패"));
     }
 
     private ReviewAssignmentRequest defaultBody() {
@@ -147,6 +149,7 @@ class ReviewRequestEventControllerTest extends CommonControllerSliceTestSupport 
                 "Fix bug",
                 "https://github.com/pr/1",
                 "author-gh",
+                "abc123",
                 List.of("reviewer-gh-1"),
                 List.of()
         );

@@ -2,10 +2,14 @@ package com.slack.bot.infrastructure.review.batch;
 
 import com.slack.bot.application.review.ReviewEventBatch;
 import com.slack.bot.application.review.box.in.ReviewRequestInboxProcessor;
+import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
+import com.slack.bot.application.round.ReviewRequestRoundCoordinator;
+import com.slack.bot.application.round.dto.ReviewRoundRegistrationResultDto;
 import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.atomic.AtomicLong;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.TaskScheduler;
@@ -21,7 +25,10 @@ public class InMemoryReviewEventBatch implements ReviewEventBatch {
 
     private final TaskScheduler taskScheduler;
     private final ReviewRequestInboxProcessor reviewRequestInboxProcessor;
+    private final ReviewRequestRoundCoordinator reviewRequestRoundCoordinator;
     private final ConcurrentHashMap<String, ScheduledFuture<?>> scheduledTasks = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Long> scheduledVersions = new ConcurrentHashMap<>();
+    private final AtomicLong scheduleVersionSequence = new AtomicLong();
 
     @Value("${review.notification.batch.window-millis:" + DEFAULT_BATCH_WINDOW_MILLIS + "}")
     private long batchWindowMillis;
@@ -34,24 +41,47 @@ public class InMemoryReviewEventBatch implements ReviewEventBatch {
 
     @Override
     public void buffer(String apiKey, ReviewAssignmentRequest request) {
-        reviewRequestInboxProcessor.enqueue(apiKey, request, batchWindowMillis);
-        scheduleFlush(apiKey, request.githubPullRequestId());
-    }
+        ReviewRoundRegistrationResultDto roundResult = reviewRequestRoundCoordinator.register(apiKey, request);
+        if (!roundResult.shouldNotify()) {
+            return;
+        }
 
-    private void scheduleFlush(String apiKey, Long githubPullRequestId) {
-        String coalescingKey = apiKey + ":" + githubPullRequestId;
-
-        scheduledTasks.computeIfAbsent(
-                coalescingKey,
-                key -> taskScheduler.schedule(() -> flush(key), Instant.now().plusMillis(batchWindowMillis))
+        ReviewNotificationPayload requestForNotification = ReviewNotificationPayload.of(
+                request,
+                roundResult.reviewersToMention()
         );
+        reviewRequestInboxProcessor.enqueue(
+                apiKey,
+                requestForNotification,
+                batchWindowMillis,
+                roundResult.coalescingKey()
+        );
+        scheduleFlush(roundResult.coalescingKey());
     }
 
-    private void flush(String coalescingKey) {
+    private void scheduleFlush(String coalescingKey) {
+        long version = scheduleVersionSequence.incrementAndGet();
+        scheduledVersions.put(coalescingKey, version);
+
+        ScheduledFuture<?> nextFuture = taskScheduler.schedule(
+                () -> flush(coalescingKey, version),
+                Instant.now().plusMillis(batchWindowMillis)
+        );
+        ScheduledFuture<?> previousFuture = scheduledTasks.put(coalescingKey, nextFuture);
+        if (previousFuture != null) {
+            previousFuture.cancel(false);
+        }
+    }
+
+    private void flush(String coalescingKey, long version) {
         try {
             reviewRequestInboxProcessor.processPending(batchSize, processingTimeoutMs);
         } finally {
-            scheduledTasks.remove(coalescingKey);
+            Long currentVersion = scheduledVersions.get(coalescingKey);
+            if (currentVersion != null && currentVersion == version) {
+                scheduledVersions.remove(coalescingKey);
+                scheduledTasks.remove(coalescingKey);
+            }
         }
     }
 }

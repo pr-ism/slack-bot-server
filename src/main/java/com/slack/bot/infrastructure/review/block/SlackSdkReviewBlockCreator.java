@@ -14,9 +14,9 @@ import com.slack.api.model.block.element.BlockElement;
 import com.slack.api.model.block.element.ButtonElement;
 import com.slack.api.util.json.GsonFactory;
 import com.slack.bot.application.review.ReviewBlockCreator;
+import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.application.review.dto.ReviewMessageDto;
 import com.slack.bot.application.review.participant.ReviewParticipantFormatter;
-import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
 import com.slack.bot.application.review.participant.dto.ReviewParticipantsDto;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,7 +37,7 @@ public class SlackSdkReviewBlockCreator implements ReviewBlockCreator {
     private final ReviewParticipantFormatter mentionFormatter;
 
     @Override
-    public ReviewMessageDto create(String teamId, ReviewAssignmentRequest event, String actionMetaJson) {
+    public ReviewMessageDto create(String teamId, ReviewNotificationPayload event, String actionMetaJson) {
         ReviewParticipantsDto participants = mentionFormatter.format(teamId, event);
         List<LayoutBlock> topBlocks = buildTopBlocks(event);
         Attachment attachment = buildAttachment(event, actionMetaJson, participants);
@@ -50,7 +50,7 @@ public class SlackSdkReviewBlockCreator implements ReviewBlockCreator {
         );
     }
 
-    private SectionBlock buildTitleBlock(ReviewAssignmentRequest event) {
+    private SectionBlock buildTitleBlock(ReviewNotificationPayload event) {
         return SectionBlock.builder()
                            .text(MarkdownTextObject.builder()
                                                    .text(formatTitleMarkdown(event))
@@ -58,7 +58,7 @@ public class SlackSdkReviewBlockCreator implements ReviewBlockCreator {
                            .build();
     }
 
-    private String formatTitleMarkdown(ReviewAssignmentRequest event) {
+    private String formatTitleMarkdown(ReviewNotificationPayload event) {
         return "🚀 *New PR:* <%s|%s (#%d)>".formatted(
                 event.pullRequestUrl(),
                 event.pullRequestTitle(),
@@ -66,7 +66,7 @@ public class SlackSdkReviewBlockCreator implements ReviewBlockCreator {
         );
     }
 
-    private List<LayoutBlock> buildTopBlocks(ReviewAssignmentRequest event) {
+    private List<LayoutBlock> buildTopBlocks(ReviewNotificationPayload event) {
         List<LayoutBlock> blocks = new ArrayList<>();
 
         blocks.add(buildTitleBlock(event));
@@ -74,7 +74,7 @@ public class SlackSdkReviewBlockCreator implements ReviewBlockCreator {
     }
 
     private Attachment buildAttachment(
-            ReviewAssignmentRequest event,
+            ReviewNotificationPayload event,
             String actionMetaJson,
             ReviewParticipantsDto participants
     ) {
@@ -89,35 +89,35 @@ public class SlackSdkReviewBlockCreator implements ReviewBlockCreator {
         }
 
         return Attachment.builder()
-                .color(ATTACHMENT_COLOR)
-                .blocks(attachmentBlocks)
-                .build();
+                         .color(ATTACHMENT_COLOR)
+                         .blocks(attachmentBlocks)
+                         .build();
     }
 
     private SectionBlock buildIntroBlock() {
         return SectionBlock.builder()
-                .text(MarkdownTextObject.builder()
-                        .text("새로운 PR이 도착했습니다!")
-                        .build())
-                .build();
+                           .text(MarkdownTextObject.builder()
+                                                   .text("새로운 PR이 도착했습니다!")
+                                                   .build())
+                           .build();
     }
 
     private SectionBlock buildDetailsBlock(ReviewParticipantsDto participants) {
         List<TextObject> fields = new ArrayList<>();
 
         fields.add(MarkdownTextObject.builder()
-                .text("*리뷰이*\n" + participants.authorText())
-                .build());
+                                     .text("*리뷰이*\n" + participants.authorText())
+                                     .build());
         fields.add(MarkdownTextObject.builder()
-                .text("*리뷰어*\n" + participants.pendingReviewersText())
-                .build());
+                                     .text("*리뷰어*\n" + participants.pendingReviewersText())
+                                     .build());
 
         return SectionBlock.builder()
                            .fields(fields)
                            .build();
     }
 
-    private ActionsBlock buildActionButtons(ReviewAssignmentRequest report, String actionMetaJson) {
+    private ActionsBlock buildActionButtons(ReviewNotificationPayload report, String actionMetaJson) {
         List<BlockElement> elements = new ArrayList<>();
 
         if (actionMetaJson != null && !actionMetaJson.isBlank()) {
@@ -128,11 +128,11 @@ public class SlackSdkReviewBlockCreator implements ReviewBlockCreator {
                                       .build());
         }
         elements.add(ButtonElement.builder()
-                .text(PlainTextObject.builder().text("리뷰 바로 시작").build())
-                .style("primary")
-                .actionId(START_REVIEW_ACTION_ID)
-                .url(report.pullRequestUrl())
-                .build());
+                                  .text(PlainTextObject.builder().text("리뷰 바로 시작").build())
+                                  .style("primary")
+                                  .actionId(START_REVIEW_ACTION_ID)
+                                  .url(report.pullRequestUrl())
+                                  .build());
         return ActionsBlock.builder()
                            .elements(elements)
                            .build();
@@ -140,23 +140,23 @@ public class SlackSdkReviewBlockCreator implements ReviewBlockCreator {
 
     private ActionsBlock buildClaimButtons(List<String> unmappedGithubIds) {
         List<BlockElement> elements = unmappedGithubIds.stream()
-                .map(githubId -> (BlockElement) ButtonElement.builder()
-                        .text(PlainTextObject
-                                .builder()
-                                .text("\uD83D\uDE4B\u200D️ " + githubId + "는 저예요")
-                                .build()
-                        )
-                        .value(githubId)
-                        .actionId(CLAIM_ACTION_PREFIX + githubId)
-                        .build())
-                .toList();
+                                                       .map(githubId -> (BlockElement) ButtonElement.builder()
+                                                                                                    .text(PlainTextObject
+                                                                                                            .builder()
+                                                                                                            .text("\uD83D\uDE4B\u200D️ " + githubId + "는 저예요")
+                                                                                                            .build()
+                                                                                                    )
+                                                                                                    .value(githubId)
+                                                                                                    .actionId(CLAIM_ACTION_PREFIX + githubId)
+                                                                                                    .build())
+                                                       .toList();
 
         return ActionsBlock.builder()
                            .elements(elements)
                            .build();
     }
 
-    private String buildFallbackText(ReviewAssignmentRequest event) {
+    private String buildFallbackText(ReviewNotificationPayload event) {
         return "🚀 New PR: " + event.pullRequestTitle() + " (#" + event.pullRequestNumber() + ")";
     }
 

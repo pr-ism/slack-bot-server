@@ -3,7 +3,7 @@ package com.slack.bot.application.review;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 import com.slack.bot.application.IntegrationTest;
-import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
+import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import java.util.List;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -28,7 +28,7 @@ class ReviewNotificationServiceTest {
     })
     void 리뷰_요청_알림을_정상적으로_발송한다() {
         // given
-        ReviewAssignmentRequest request = new ReviewAssignmentRequest(
+        ReviewNotificationPayload request = new ReviewNotificationPayload(
                 "my-repo",
                 101L,
                 42,
@@ -36,7 +36,7 @@ class ReviewNotificationServiceTest {
                 "https://github.com/pr/1",
                 "author-gh",
                 List.of("reviewer-gh-1"),
-                List.of()
+                List.of("reviewer-gh-1")
         );
 
         // when & then

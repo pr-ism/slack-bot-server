@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
 import com.slack.bot.application.review.box.aop.BindReviewNotificationSourceKey;
 import com.slack.bot.application.review.box.aop.EnqueueReviewNotificationOutbox;
-import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
+import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -48,7 +48,7 @@ public class ReviewAspectIntegrationProbes {
         }
 
         @BindReviewNotificationSourceKey
-        public String bind(String apiKey, ReviewAssignmentRequest request) {
+        public String bind(String apiKey, ReviewNotificationPayload request) {
             proceedCount.incrementAndGet();
             observedSourceKey = reviewNotificationSourceContext.requireSourceKey();
             return observedSourceKey;
