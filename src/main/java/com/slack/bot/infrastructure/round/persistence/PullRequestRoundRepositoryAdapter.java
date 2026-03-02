@@ -48,7 +48,8 @@ public class PullRequestRoundRepositoryAdapter implements PullRequestRoundReposi
                                                       pullRequestRound.githubPullRequestId.eq(githubPullRequestId),
                                                       pullRequestRound.startCommitHash.eq(startCommitHash)
                                               )
-                                              .fetchOne();
+                                              .orderBy(pullRequestRound.roundNumber.desc())
+                                              .fetchFirst();
 
         return Optional.ofNullable(result);
     }
