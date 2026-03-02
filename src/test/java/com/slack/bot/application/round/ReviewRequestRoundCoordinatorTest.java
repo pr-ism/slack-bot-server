@@ -91,7 +91,12 @@ class ReviewRequestRoundCoordinatorTest {
         coordinator.register("api-key", initial);
         coordinator.register("api-key", reviewed);
         ReviewRoundRegistrationResultDto result = coordinator.register("api-key", requestedAgain);
-        RoundReviewer reviewer = roundReviewerRepository.findAll().getFirst();
+        PullRequestRound latestRound = pullRequestRoundRepository
+                .findLatestRound("api-key", 3000L)
+                .orElseThrow();
+        RoundReviewer reviewer = roundReviewerRepository
+                .findReviewerInRound(latestRound.getId(), "reviewer-gh-1")
+                .orElseThrow();
 
         // then
         assertAll(
