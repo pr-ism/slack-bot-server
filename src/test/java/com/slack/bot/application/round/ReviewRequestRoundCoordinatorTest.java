@@ -101,6 +101,22 @@ class ReviewRequestRoundCoordinatorTest {
         );
     }
 
+    @Test
+    void 동일_startCommitHash가_여러_라운드에_있어도_최신_라운드를_조회한다() {
+        // given
+        coordinator.register("api-key", request(4000L, "commit-hash-1", List.of("reviewer-gh-1")));
+        coordinator.register("api-key", request(4000L, "commit-hash-2", List.of("reviewer-gh-1")));
+        coordinator.register("api-key", request(4000L, "commit-hash-1", List.of("reviewer-gh-1")));
+
+        // when
+        PullRequestRound round = pullRequestRoundRepository
+                .findRoundByStartCommitHash("api-key", 4000L, "commit-hash-1")
+                .orElseThrow();
+
+        // then
+        assertThat(round.getRoundNumber()).isEqualTo(3);
+    }
+
     private ReviewAssignmentRequest request(
             Long githubPullRequestId,
             String startCommitHash,

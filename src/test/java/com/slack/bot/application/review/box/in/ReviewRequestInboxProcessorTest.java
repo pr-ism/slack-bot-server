@@ -282,6 +282,42 @@ class ReviewRequestInboxProcessorTest {
     }
 
     @Test
+    void apiKey가_공백이면_overload_enqueue는_예외를_던진다() {
+        // given
+        ReviewNotificationPayload request = request(802L, "overload-blank-api-key");
+
+        // when & then
+        assertThatThrownBy(() -> reviewRequestInboxProcessor.enqueue(" ", request, 0, "manual:802"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("apiKey는 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void githubPullRequestId가_0이면_overload_enqueue는_예외를_던진다() {
+        // given
+        ReviewNotificationPayload invalidRequest = new ReviewNotificationPayload(
+                "my-repo",
+                0L,
+                0,
+                "invalid-pr-overload",
+                "https://github.com/pr/0",
+                "author-gh",
+                List.of("reviewer-gh-1"),
+                List.of("reviewer-gh-1")
+        );
+
+        // when & then
+        assertThatThrownBy(() -> reviewRequestInboxProcessor.enqueue(
+                "test-api-key",
+                invalidRequest,
+                0,
+                "manual:0"
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("githubPullRequestId는 비어 있을 수 없습니다.");
+    }
+
+    @Test
     void request_직렬화에_실패하면_enqueue는_예외를_던진다() throws Exception {
         // given
         ReviewNotificationPayload request = request(503L, "serialization-fail");

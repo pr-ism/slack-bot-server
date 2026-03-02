@@ -54,6 +54,7 @@ public class ReviewRequestInboxProcessor {
             throw new IllegalArgumentException("request는 비어 있을 수 없습니다.");
         }
 
+        validateApiKeyAndGithubPullRequestId(apiKey, request.githubPullRequestId());
         validateCoalescingKey(coalescingKey);
         String requestJson = serializeRequest(request);
         Instant availableAt = clock.instant().plusMillis(batchWindowMillis);
@@ -169,15 +170,18 @@ public class ReviewRequestInboxProcessor {
         }
 
         Long githubPullRequestId = request.githubPullRequestId();
+        validateApiKeyAndGithubPullRequestId(apiKey, githubPullRequestId);
 
+        return apiKey + ":" + githubPullRequestId;
+    }
+
+    private void validateApiKeyAndGithubPullRequestId(String apiKey, Long githubPullRequestId) {
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalArgumentException("apiKey는 비어 있을 수 없습니다.");
         }
         if (githubPullRequestId == null || githubPullRequestId <= 0) {
             throw new IllegalArgumentException("githubPullRequestId는 비어 있을 수 없습니다.");
         }
-
-        return apiKey + ":" + githubPullRequestId;
     }
 
     private void validateCoalescingKey(String coalescingKey) {
