@@ -128,7 +128,7 @@ public class ReviewRequestRoundCoordinator {
     private void markReviewedReviewers(PullRequestRound round, List<String> reviewedReviewers) {
         for (String reviewerGithubId : normalizeReviewerGithubIds(reviewedReviewers)) {
             roundReviewerRepository.findReviewerInRound(round.getId(), reviewerGithubId)
-                                   .filter(RoundReviewer::isRequested)
+                                   .filter(roundReviewer1 -> roundReviewer1.isRequested())
                                    .ifPresent(roundReviewer -> {
                                        roundReviewer.markReviewed();
                                        roundReviewerRepository.save(roundReviewer);
@@ -142,7 +142,7 @@ public class ReviewRequestRoundCoordinator {
             String reviewerGithubId
     ) {
         return roundReviewerRepository.findReviewerInRound(round.getId(), reviewerGithubId)
-                                      .map(this::markRequestedIfReviewed)
+                                      .map(roundReviewer -> markRequestedIfReviewed(roundReviewer))
                                       .orElseGet(() -> createReviewer(round, previousRound, reviewerGithubId));
     }
 
