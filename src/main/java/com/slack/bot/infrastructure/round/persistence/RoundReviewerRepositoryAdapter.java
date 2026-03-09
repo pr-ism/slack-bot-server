@@ -32,6 +32,14 @@ public class RoundReviewerRepositoryAdapter implements RoundReviewerRepository {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<RoundReviewer> findAllInRound(Long pullRequestRoundId) {
+        return queryFactory.selectFrom(roundReviewer)
+                           .where(roundReviewer.pullRequestRoundId.eq(pullRequestRoundId))
+                           .fetch();
+    }
+
+    @Override
     @Transactional
     public RoundReviewer save(RoundReviewer roundReviewer) {
         return jpaRoundReviewerRepository.save(roundReviewer);

@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
@@ -35,10 +36,14 @@ public class ReviewRequestRoundCoordinator {
             markReviewedReviewers(resolution.previousRound(), request.reviewedReviewers());
         }
 
+        List<String> pendingReviewers = mergePendingWithCarryoverReviewedReviewers(
+                request.pendingReviewers(),
+                resolution.previousRound()
+        );
         Set<String> reviewersToMention = upsertPendingReviewers(
                 round,
                 resolution.previousRound(),
-                request.pendingReviewers()
+                pendingReviewers
         );
 
         if (resolution.previousRound() == null) {
@@ -128,12 +133,41 @@ public class ReviewRequestRoundCoordinator {
     private void markReviewedReviewers(PullRequestRound round, List<String> reviewedReviewers) {
         for (String reviewerGithubId : normalizeReviewerGithubIds(reviewedReviewers)) {
             roundReviewerRepository.findReviewerInRound(round.getId(), reviewerGithubId)
-                                   .filter(roundReviewer1 -> roundReviewer1.isRequested())
-                                   .ifPresent(roundReviewer -> {
-                                       roundReviewer.markReviewed();
-                                       roundReviewerRepository.save(roundReviewer);
-                                   });
+                                   .ifPresentOrElse(
+                                           roundReviewer -> {
+                                               if (roundReviewer.isReviewed()) {
+                                                   return;
+                                               }
+
+                                               roundReviewer.markReviewed();
+                                               roundReviewerRepository.save(roundReviewer);
+                                           },
+                                           () -> roundReviewerRepository.save(
+                                                   RoundReviewer.reviewed(round.getId(), reviewerGithubId)
+                                           )
+                                   );
         }
+    }
+
+    private List<String> mergePendingWithCarryoverReviewedReviewers(
+            List<String> pendingReviewers,
+            PullRequestRound previousRound
+    ) {
+        LinkedHashSet<String> merged = new LinkedHashSet<>(normalizeReviewerGithubIds(pendingReviewers));
+        merged.addAll(loadCarryoverReviewedReviewerGithubIds(previousRound));
+        return new ArrayList<>(merged);
+    }
+
+    private Set<String> loadCarryoverReviewedReviewerGithubIds(PullRequestRound previousRound) {
+        if (previousRound == null || previousRound.getId() == null) {
+            return Set.of();
+        }
+
+        return roundReviewerRepository.findAllInRound(previousRound.getId())
+                                      .stream()
+                                      .filter(roundReviewer -> roundReviewer.isReviewed())
+                                      .map(roundReviewer -> roundReviewer.getReviewerGithubId())
+                                      .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private boolean upsertReviewer(

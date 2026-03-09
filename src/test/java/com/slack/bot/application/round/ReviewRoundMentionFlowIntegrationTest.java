@@ -313,6 +313,48 @@ class ReviewRoundMentionFlowIntegrationTest {
         );
     }
 
+    @Test
+    @Sql(scripts = "classpath:sql/fixtures/review/project_member_t1_mapped_three_reviewers.sql")
+    void 요청_리뷰어가_아닌_팀장이_리뷰했어도_새_라운드에서는_함께_멘션된다() {
+        // given
+        String apiKey = "test-api-key";
+
+        ReviewAssignmentRequest firstReviewRequested = request(
+                "commit-hash-1",
+                List.of("reviewer-gh-1", "reviewer-gh-2"),
+                List.of()
+        );
+        ReviewAssignmentRequest managerReviewed = request(
+                "commit-hash-1",
+                List.of("reviewer-gh-1", "reviewer-gh-2"),
+                List.of("manager-gh")
+        );
+        ReviewAssignmentRequest requestedAgainOnNewCommit = request(
+                "commit-hash-2",
+                List.of("reviewer-gh-1", "reviewer-gh-2"),
+                List.of()
+        );
+
+        // when
+        ReviewRoundRegistrationResultDto firstResult = coordinator.register(apiKey, firstReviewRequested);
+        ReviewRoundRegistrationResultDto reviewedResult = coordinator.register(apiKey, managerReviewed);
+        ReviewRoundRegistrationResultDto secondResult = coordinator.register(apiKey, requestedAgainOnNewCommit);
+        ReviewParticipantsDto secondParticipants = reviewParticipantFormatter.format(
+                "T1",
+                ReviewNotificationPayload.of(requestedAgainOnNewCommit, secondResult.reviewersToMention())
+        );
+
+        // then
+        assertAll(
+                () -> assertThat(firstResult.reviewersToMention())
+                        .containsExactly("reviewer-gh-1", "reviewer-gh-2"),
+                () -> assertThat(reviewedResult.shouldNotify()).isFalse(),
+                () -> assertThat(secondResult.shouldNotify()).isTrue(),
+                () -> assertThat(secondResult.reviewersToMention()).containsExactly("manager-gh"),
+                () -> assertThat(secondParticipants.pendingReviewersText()).isEqualTo("리뷰어1, 리뷰어2, <@U4>")
+        );
+    }
+
     private ReviewAssignmentRequest request(
             String startCommitHash,
             List<String> pendingReviewers,

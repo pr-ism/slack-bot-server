@@ -8,6 +8,8 @@ public interface RoundReviewerRepository {
 
     Optional<RoundReviewer> findReviewerInRound(Long pullRequestRoundId, String reviewerGithubId);
 
+    List<RoundReviewer> findAllInRound(Long pullRequestRoundId);
+
     RoundReviewer save(RoundReviewer roundReviewer);
 
     List<RoundReviewer> findAll();

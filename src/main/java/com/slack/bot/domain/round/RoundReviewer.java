@@ -29,6 +29,13 @@ public class RoundReviewer extends CreatedAtEntity {
         return new RoundReviewer(pullRequestRoundId, reviewerGithubId, RoundReviewerState.REQUESTED);
     }
 
+    public static RoundReviewer reviewed(Long pullRequestRoundId, String reviewerGithubId) {
+        validatePullRequestRoundId(pullRequestRoundId);
+        validateReviewerGithubId(reviewerGithubId);
+
+        return new RoundReviewer(pullRequestRoundId, reviewerGithubId, RoundReviewerState.REVIEWED);
+    }
+
     private static void validatePullRequestRoundId(Long pullRequestRoundId) {
         if (pullRequestRoundId == null || pullRequestRoundId <= 0) {
             throw new IllegalArgumentException("pullRequestRoundId는 비어 있을 수 없습니다.");
@@ -49,6 +56,10 @@ public class RoundReviewer extends CreatedAtEntity {
 
     public boolean isRequested() {
         return state.isRequested();
+    }
+
+    public boolean isReviewed() {
+        return state.isReviewed();
     }
 
     public void markRequested() {
