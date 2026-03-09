@@ -355,6 +355,24 @@ class ReviewRoundMentionFlowIntegrationTest {
         );
     }
 
+    @Test
+    @Sql(scripts = "classpath:sql/fixtures/review/project_member_t1_mapped_two_reviewers.sql")
+    void pendingReviewers가_비어있으면_멘션_대상도_비어있다() {
+        // given
+        String apiKey = "test-api-key";
+        ReviewAssignmentRequest emptyPendingRequest = request(
+                "commit-hash-1",
+                List.of(),
+                List.of("reviewer-gh-1")
+        );
+
+        // when
+        ReviewRoundRegistrationResultDto result = coordinator.register(apiKey, emptyPendingRequest);
+
+        // then
+        assertThat(result.shouldNotify()).isFalse();
+    }
+
     private ReviewAssignmentRequest request(
             String startCommitHash,
             List<String> pendingReviewers,
