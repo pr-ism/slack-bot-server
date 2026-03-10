@@ -115,6 +115,56 @@ class SlackInteractionInboxIdempotencyPayloadEncoderTest {
     }
 
     @Test
+    void block_action_actions가_null이면_action_필드를_fallback으로_사용한다() throws Exception {
+        // given
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.set("team", objectMapper.createObjectNode().put("id", "T1"));
+        payload.set("channel", objectMapper.createObjectNode().put("id", "C1"));
+        payload.set("user", objectMapper.createObjectNode().put("id", "U1"));
+        payload.putNull("actions");
+        payload.set("action", objectMapper.createObjectNode()
+                .put("action_id", "fallback-action")
+                .put("value", "fallback-value")
+                .put("action_ts", "fallback-ts"));
+
+        // when
+        String source = encoder.encodeBlockAction(payload.toString());
+
+        // then
+        JsonNode sourceNode = objectMapper.readTree(source);
+        assertAll(
+                () -> assertThat(sourceNode.path("actionId").asText()).isEqualTo("fallback-action"),
+                () -> assertThat(sourceNode.path("actionValue").asText()).isEqualTo("fallback-value"),
+                () -> assertThat(sourceNode.path("actionTimestamp").asText()).isEqualTo("fallback-ts")
+        );
+    }
+
+    @Test
+    void block_action_actions가_객체이면_action_필드를_fallback으로_사용한다() throws Exception {
+        // given
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.set("team", objectMapper.createObjectNode().put("id", "T1"));
+        payload.set("channel", objectMapper.createObjectNode().put("id", "C1"));
+        payload.set("user", objectMapper.createObjectNode().put("id", "U1"));
+        payload.set("actions", objectMapper.createObjectNode().put("unexpected", true));
+        payload.set("action", objectMapper.createObjectNode()
+                .put("action_id", "fallback-action")
+                .put("value", "fallback-value")
+                .put("action_ts", "fallback-ts"));
+
+        // when
+        String source = encoder.encodeBlockAction(payload.toString());
+
+        // then
+        JsonNode sourceNode = objectMapper.readTree(source);
+        assertAll(
+                () -> assertThat(sourceNode.path("actionId").asText()).isEqualTo("fallback-action"),
+                () -> assertThat(sourceNode.path("actionValue").asText()).isEqualTo("fallback-value"),
+                () -> assertThat(sourceNode.path("actionTimestamp").asText()).isEqualTo("fallback-ts")
+        );
+    }
+
+    @Test
     void block_action_actions가_비어있고_action도_없으면_빈값으로_인코딩된다() throws Exception {
         // given
         ObjectNode payload = objectMapper.createObjectNode();
