@@ -4,8 +4,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class SlackInteractionInboxIdempotencyPayloadEncoder {
@@ -64,6 +66,11 @@ public class SlackInteractionInboxIdempotencyPayloadEncoder {
         try {
             return objectMapper.readTree(payloadJson);
         } catch (JsonProcessingException exception) {
+            log.warn(
+                    "Slack 인터랙션 payload 파싱에 실패했습니다. payloadLength={}",
+                    payloadJson.length(),
+                    exception
+            );
             return null;
         }
     }
