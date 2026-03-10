@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interactivity.box.out.exception.OutboxMessageTypeRequiredException;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
+import com.slack.bot.support.jackson.FailingObjectMapper;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -66,5 +67,22 @@ class OutboxIdempotencyPayloadEncoderTest {
                         .isInstanceOf(IllegalArgumentException.class)
                         .hasMessage("messageType은 비어 있을 수 없습니다.")
         );
+    }
+
+    @Test
+    void 직렬화_실패_시_IllegalStateException을_던진다() {
+        // given
+        OutboxIdempotencyPayloadEncoder encoder = new OutboxIdempotencyPayloadEncoder(new FailingObjectMapper());
+
+        // when & then
+        assertThatThrownBy(() -> encoder.encode(
+                "SRC",
+                SlackNotificationOutboxMessageType.CHANNEL_BLOCKS,
+                "T1",
+                "C1",
+                "U1"
+        ))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("직렬화에 실패");
     }
 }
