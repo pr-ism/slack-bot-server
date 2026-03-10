@@ -1,6 +1,8 @@
 package com.slack.bot.application.interactivity.box.in;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
@@ -8,6 +10,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyKeyGenerator;
+import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyScope;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.global.config.properties.InteractionWorkerProperties;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
@@ -38,6 +41,9 @@ class SlackInteractionInboxProcessorUnitTest {
     SlackInteractionIdempotencyKeyGenerator idempotencyKeyGenerator;
 
     @Mock
+    SlackInteractionInboxIdempotencyPayloadEncoder idempotencyPayloadEncoder;
+
+    @Mock
     SlackInteractionInboxEntryProcessor slackInteractionInboxEntryProcessor;
 
     SlackInteractionInboxProcessor slackInteractionInboxProcessor;
@@ -62,6 +68,7 @@ class SlackInteractionInboxProcessorUnitTest {
                 interactionRetryProperties,
                 interactionWorkerProperties,
                 slackInteractionInboxRepository,
+                idempotencyPayloadEncoder,
                 idempotencyKeyGenerator,
                 slackInteractionInboxEntryProcessor
         );
@@ -80,16 +87,47 @@ class SlackInteractionInboxProcessorUnitTest {
                 .given(slackInteractionInboxEntryProcessor)
                 .processBlockAction(first);
 
+        InOrder inOrder = inOrder(slackInteractionInboxEntryProcessor);
+
         // when & then
         assertThatCode(() -> slackInteractionInboxProcessor.processPendingBlockActions(3))
                 .doesNotThrowAnyException();
-
-        InOrder inOrder = inOrder(slackInteractionInboxEntryProcessor);
         inOrder.verify(slackInteractionInboxEntryProcessor).processBlockAction(first);
         inOrder.verify(slackInteractionInboxEntryProcessor).processBlockAction(second);
         inOrder.verify(slackInteractionInboxEntryProcessor).processBlockAction(third);
-
         verify(slackInteractionInboxRepository).findClaimable(SlackInteractionInboxType.BLOCK_ACTIONS, 3);
+    }
+
+    @Test
+    void enqueueBlockAction_시_인코더가_호출되어_idempotency_key를_생성한다() {
+        // given
+        String payloadJson = "{\"actions\":[]}";
+        String encodedPayload = "{\"encoded\":true}";
+        given(idempotencyPayloadEncoder.encodeBlockAction(payloadJson))
+                .willReturn(encodedPayload);
+        given(idempotencyKeyGenerator.generate(SlackInteractionIdempotencyScope.BLOCK_ACTIONS, encodedPayload))
+                .willReturn("idempotent-key-123");
+        given(slackInteractionInboxRepository.enqueue(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "idempotent-key-123",
+                payloadJson
+        )).willReturn(true);
+
+        // when
+        boolean result = slackInteractionInboxProcessor.enqueueBlockAction(payloadJson);
+
+        // then
+        assertAll(
+                () -> assertThat(result).isTrue(),
+                () -> verify(idempotencyPayloadEncoder).encodeBlockAction(payloadJson),
+                () -> verify(idempotencyKeyGenerator)
+                        .generate(SlackInteractionIdempotencyScope.BLOCK_ACTIONS, encodedPayload),
+                () -> verify(slackInteractionInboxRepository).enqueue(
+                        SlackInteractionInboxType.BLOCK_ACTIONS,
+                        "idempotent-key-123",
+                        payloadJson
+                )
+        );
     }
 
     @Test
@@ -104,14 +142,45 @@ class SlackInteractionInboxProcessorUnitTest {
                 .given(slackInteractionInboxEntryProcessor)
                 .processViewSubmission(first);
 
+        InOrder inOrder = inOrder(slackInteractionInboxEntryProcessor);
+
         // when & then
         assertThatCode(() -> slackInteractionInboxProcessor.processPendingViewSubmissions(2))
                 .doesNotThrowAnyException();
-
-        InOrder inOrder = inOrder(slackInteractionInboxEntryProcessor);
         inOrder.verify(slackInteractionInboxEntryProcessor).processViewSubmission(first);
         inOrder.verify(slackInteractionInboxEntryProcessor).processViewSubmission(second);
-
         verify(slackInteractionInboxRepository).findClaimable(SlackInteractionInboxType.VIEW_SUBMISSION, 2);
+    }
+
+    @Test
+    void enqueueViewSubmission_시_인코더가_호출되어_idempotency_key를_생성한다() {
+        // given
+        String payloadJson = "{\"view\":{\"id\":\"V123\"}}";
+        String encodedPayload = "{\"encoded\":true}";
+        given(idempotencyPayloadEncoder.encodeViewSubmission(payloadJson))
+                .willReturn(encodedPayload);
+        given(idempotencyKeyGenerator.generate(SlackInteractionIdempotencyScope.VIEW_SUBMISSION, encodedPayload))
+                .willReturn("idempotent-key-456");
+        given(slackInteractionInboxRepository.enqueue(
+                SlackInteractionInboxType.VIEW_SUBMISSION,
+                "idempotent-key-456",
+                payloadJson
+        )).willReturn(true);
+
+        // when
+        boolean result = slackInteractionInboxProcessor.enqueueViewSubmission(payloadJson);
+
+        // then
+        assertAll(
+                () -> assertThat(result).isTrue(),
+                () -> verify(idempotencyPayloadEncoder).encodeViewSubmission(payloadJson),
+                () -> verify(idempotencyKeyGenerator)
+                        .generate(SlackInteractionIdempotencyScope.VIEW_SUBMISSION, encodedPayload),
+                () -> verify(slackInteractionInboxRepository).enqueue(
+                        SlackInteractionInboxType.VIEW_SUBMISSION,
+                        "idempotent-key-456",
+                        payloadJson
+                )
+        );
     }
 }

@@ -1,11 +1,17 @@
 package com.slack.bot.application.interactivity.box.out;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interactivity.box.out.exception.OutboxMessageTypeRequiredException;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class OutboxIdempotencyPayloadEncoder {
+
+    private final ObjectMapper objectMapper;
 
     public String encode(
             String sourceKey,
@@ -18,19 +24,19 @@ public class OutboxIdempotencyPayloadEncoder {
             throw new OutboxMessageTypeRequiredException();
         }
 
-        String messageTypeName = messageType.name();
+        OutboxIdempotencySource source = new OutboxIdempotencySource(
+                nullToEmpty(sourceKey),
+                messageType.name(),
+                nullToEmpty(teamId),
+                nullToEmpty(channelId),
+                nullToEmpty(userId)
+        );
 
-        return "source=" + encodeComponent(sourceKey)
-                + "|messageType=" + encodeComponent(messageTypeName)
-                + "|teamId=" + encodeComponent(teamId)
-                + "|channelId=" + encodeComponent(channelId)
-                + "|userId=" + encodeComponent(userId);
-    }
-
-    private String encodeComponent(String value) {
-        String normalized = nullToEmpty(value);
-
-        return normalized.length() + "#" + normalized;
+        try {
+            return objectMapper.writeValueAsString(source);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("outbox 멱등성 payload 직렬화에 실패했습니다.", exception);
+        }
     }
 
     private String nullToEmpty(String value) {
@@ -39,5 +45,14 @@ public class OutboxIdempotencyPayloadEncoder {
         }
 
         return value;
+    }
+
+    private record OutboxIdempotencySource(
+            String sourceKey,
+            String messageType,
+            String teamId,
+            String channelId,
+            String userId
+    ) {
     }
 }

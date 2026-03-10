@@ -29,6 +29,7 @@ public class SlackInteractionInboxProcessor {
     private final InteractionRetryProperties interactionRetryProperties;
     private final InteractionWorkerProperties interactionWorkerProperties;
     private final SlackInteractionInboxRepository slackInteractionInboxRepository;
+    private final SlackInteractionInboxIdempotencyPayloadEncoder idempotencyPayloadEncoder;
     private final SlackInteractionIdempotencyKeyGenerator idempotencyKeyGenerator;
     private final SlackInteractionInboxEntryProcessor slackInteractionInboxEntryProcessor;
 
@@ -37,9 +38,11 @@ public class SlackInteractionInboxProcessor {
             onlyWhenEnqueued = true
     )
     public boolean enqueueBlockAction(String payloadJson) {
+        String idempotencyPayload = idempotencyPayloadEncoder.encodeBlockAction(payloadJson);
+
         String idempotencyKey = idempotencyKeyGenerator.generate(
                 SlackInteractionIdempotencyScope.BLOCK_ACTIONS,
-                payloadJson
+                idempotencyPayload
         );
 
         return slackInteractionInboxRepository.enqueue(
@@ -63,9 +66,11 @@ public class SlackInteractionInboxProcessor {
             onlyWhenEnqueued = true
     )
     public boolean enqueueViewSubmission(String payloadJson) {
+        String idempotencyPayload = idempotencyPayloadEncoder.encodeViewSubmission(payloadJson);
+
         String idempotencyKey = idempotencyKeyGenerator.generate(
                 SlackInteractionIdempotencyScope.VIEW_SUBMISSION,
-                payloadJson
+                idempotencyPayload
         );
 
         return slackInteractionInboxRepository.enqueue(
