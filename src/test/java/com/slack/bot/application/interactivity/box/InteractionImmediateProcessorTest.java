@@ -31,7 +31,7 @@ class InteractionImmediateProcessorTest {
     void setUp() {
         slackInteractionInboxProcessor = mock(SlackInteractionInboxProcessor.class);
         slackNotificationOutboxProcessor = mock(SlackNotificationOutboxProcessor.class);
-        interactionImmediateExecutor = Runnable::run;
+        interactionImmediateExecutor = runnable -> runnable.run();
         interactionImmediateProcessor = new InteractionImmediateProcessor(
                 interactionImmediateExecutor,
                 slackInteractionInboxProcessor,

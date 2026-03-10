@@ -39,7 +39,7 @@ public abstract class CommonExceptionControllerTest extends CommonControllerSlic
                                                                                                       field("status", String.valueOf(exceptionValue.getValue().httpStatus().value())),
                                                                                                       field("message", exceptionValue.getValue().message())
                                                                                               )
-                              ).toArray(FieldDescriptor[]::new);
+                              ).toArray(value -> new FieldDescriptor[value]);
     }
 
     protected <T> T findExceptionData(MvcResult result, Class<T> responseType) throws IOException {

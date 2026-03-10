@@ -16,7 +16,7 @@ class OptionalNotificationsTest {
     @Test
     void 선택_알림_설정을_기본값으로_생성하면_모든_선택_알림이_활성화된다() {
         // when & then
-        OptionalNotifications actual = assertDoesNotThrow(OptionalNotifications::defaults);
+        OptionalNotifications actual = assertDoesNotThrow(() -> OptionalNotifications.defaults());
 
         assertAll(
                 () -> assertThat(actual.isReservationCanceledConfirmationEnabled()).isTrue(),

@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.IntegrationTest;
-import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
+import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.application.review.meta.exception.ProjectNotFoundException;
 import com.slack.bot.application.review.meta.exception.ReviewActionMetaException;
 import java.util.List;
@@ -35,7 +35,7 @@ class ReviewActionMetaBuilderTest {
     })
     void 메타데이터_JSON에_필수_필드가_포함된다() throws Exception {
         // given
-        ReviewAssignmentRequest request = new ReviewAssignmentRequest(
+        ReviewNotificationPayload request = new ReviewNotificationPayload(
                 "my-repo",
                 101L,
                 42,
@@ -43,7 +43,7 @@ class ReviewActionMetaBuilderTest {
                 "https://github.com/pr/1",
                 "author-gh",
                 List.of("reviewer-gh-1"),
-                List.of()
+                List.of("reviewer-gh-1")
         );
 
         // when
@@ -68,7 +68,7 @@ class ReviewActionMetaBuilderTest {
     @Test
     void 프로젝트가_없으면_예외가_발생한다() {
         // given
-        ReviewAssignmentRequest request = new ReviewAssignmentRequest(
+        ReviewNotificationPayload request = new ReviewNotificationPayload(
                 "my-repo",
                 1L,
                 1,
@@ -91,7 +91,7 @@ class ReviewActionMetaBuilderTest {
     })
     void pull_request_ID가_0_이하이면_예외가_발생한다() {
         // given
-        ReviewAssignmentRequest request = new ReviewAssignmentRequest(
+        ReviewNotificationPayload request = new ReviewNotificationPayload(
                 "my-repo",
                 0L,
                 1,

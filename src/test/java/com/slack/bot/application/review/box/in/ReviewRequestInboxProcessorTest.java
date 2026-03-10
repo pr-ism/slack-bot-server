@@ -14,7 +14,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
-import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
+import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.infrastructure.review.batch.SpyReviewNotificationService;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
@@ -72,7 +72,7 @@ class ReviewRequestInboxProcessorTest {
     })
     void enqueue후_processPending을_호출하면_인박스가_PROCESSED로_마킹되고_알림이_전송된다() {
         // given
-        ReviewAssignmentRequest request = request(101L, "Fix bug");
+        ReviewNotificationPayload request = request(101L, "Fix bug");
 
         // when
         reviewRequestInboxProcessor.enqueue("test-api-key", request, 0);
@@ -100,8 +100,8 @@ class ReviewRequestInboxProcessorTest {
     })
     void 동일_coalescing_key로_중복_enqueue하면_1건만_처리되고_최신_요청으로_업데이트된다() {
         // given
-        ReviewAssignmentRequest first = request(202L, "Old title");
-        ReviewAssignmentRequest second = request(202L, "New title");
+        ReviewNotificationPayload first = request(202L, "Old title");
+        ReviewNotificationPayload second = request(202L, "New title");
 
         // when
         reviewRequestInboxProcessor.enqueue("test-api-key", first, 0);
@@ -155,7 +155,7 @@ class ReviewRequestInboxProcessorTest {
     })
     void PROCESSING_타임아웃_건은_RETRY_PENDING_복구후_재처리되어_PROCESSED가_된다() throws Exception {
         // given
-        ReviewAssignmentRequest request = request(404L, "Timeout case");
+        ReviewNotificationPayload request = request(404L, "Timeout case");
         ReviewRequestInbox inbox = ReviewRequestInbox.pending(
                 "test-api-key:404",
                 "test-api-key",
@@ -182,7 +182,7 @@ class ReviewRequestInboxProcessorTest {
     @Test
     void PROCESSING_타임아웃_건이_최대시도에_도달하면_FAILED_RETRY_EXHAUSTED로_격리된다() throws Exception {
         // given
-        ReviewAssignmentRequest request = request(405L, "Timeout poison pill");
+        ReviewNotificationPayload request = request(405L, "Timeout poison pill");
         ReviewRequestInbox inbox = ReviewRequestInbox.pending(
                 "test-api-key:405",
                 "test-api-key",
@@ -212,7 +212,7 @@ class ReviewRequestInboxProcessorTest {
     @Test
     void batchWindowMillis가_음수이면_enqueue는_예외를_던진다() {
         // given
-        ReviewAssignmentRequest request = request(501L, "batch-window");
+        ReviewNotificationPayload request = request(501L, "batch-window");
 
         // when & then
         assertThatThrownBy(() -> reviewRequestInboxProcessor.enqueue("test-api-key", request, -1))
@@ -223,7 +223,7 @@ class ReviewRequestInboxProcessorTest {
     @Test
     void apiKey가_공백이면_enqueue는_예외를_던진다() {
         // given
-        ReviewAssignmentRequest request = request(502L, "blank-api-key");
+        ReviewNotificationPayload request = request(502L, "blank-api-key");
 
         // when & then
         assertThatThrownBy(() -> reviewRequestInboxProcessor.enqueue(" ", request, 0))
@@ -242,7 +242,7 @@ class ReviewRequestInboxProcessorTest {
     @Test
     void githubPullRequestId가_0이면_enqueue는_예외를_던진다() {
         // given
-        ReviewAssignmentRequest invalidRequest = new ReviewAssignmentRequest(
+        ReviewNotificationPayload invalidRequest = new ReviewNotificationPayload(
                 "my-repo",
                 0L,
                 0,
@@ -250,7 +250,7 @@ class ReviewRequestInboxProcessorTest {
                 "https://github.com/pr/0",
                 "author-gh",
                 List.of("reviewer-gh-1"),
-                List.of()
+                List.of("reviewer-gh-1")
         );
 
         // when & then
@@ -260,9 +260,67 @@ class ReviewRequestInboxProcessorTest {
     }
 
     @Test
+    void coalescingKey가_null이면_overload_enqueue는_예외를_던진다() {
+        // given
+        ReviewNotificationPayload request = request(800L, "coalescing-key-null");
+
+        // when & then
+        assertThatThrownBy(() -> reviewRequestInboxProcessor.enqueue("test-api-key", request, 0, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("coalescingKey는 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void coalescingKey가_공백이면_overload_enqueue는_예외를_던진다() {
+        // given
+        ReviewNotificationPayload request = request(801L, "coalescing-key-blank");
+
+        // when & then
+        assertThatThrownBy(() -> reviewRequestInboxProcessor.enqueue("test-api-key", request, 0, " "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("coalescingKey는 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void apiKey가_공백이면_overload_enqueue는_예외를_던진다() {
+        // given
+        ReviewNotificationPayload request = request(802L, "overload-blank-api-key");
+
+        // when & then
+        assertThatThrownBy(() -> reviewRequestInboxProcessor.enqueue(" ", request, 0, "manual:802"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("apiKey는 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void githubPullRequestId가_0이면_overload_enqueue는_예외를_던진다() {
+        // given
+        ReviewNotificationPayload invalidRequest = new ReviewNotificationPayload(
+                "my-repo",
+                0L,
+                0,
+                "invalid-pr-overload",
+                "https://github.com/pr/0",
+                "author-gh",
+                List.of("reviewer-gh-1"),
+                List.of("reviewer-gh-1")
+        );
+
+        // when & then
+        assertThatThrownBy(() -> reviewRequestInboxProcessor.enqueue(
+                "test-api-key",
+                invalidRequest,
+                0,
+                "manual:0"
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("githubPullRequestId는 비어 있을 수 없습니다.");
+    }
+
+    @Test
     void request_직렬화에_실패하면_enqueue는_예외를_던진다() throws Exception {
         // given
-        ReviewAssignmentRequest request = request(503L, "serialization-fail");
+        ReviewNotificationPayload request = request(503L, "serialization-fail");
         doThrow(new JsonProcessingException("serialize fail") {
         }).when(objectMapper).writeValueAsString(any());
 
@@ -283,11 +341,11 @@ class ReviewRequestInboxProcessorTest {
     @Test
     void retryable_예외가_발생하고_최대시도_미만이면_RETRY_PENDING으로_마킹된다() {
         // given
-        ReviewAssignmentRequest request = request(601L, "retry-pending");
+        ReviewNotificationPayload request = request(601L, "retry-pending");
         reviewRequestInboxProcessor.enqueue("test-api-key", request, 0);
         doThrow(new ResourceAccessException("temporary network issue"))
                 .when(spyReviewNotificationService)
-                .sendSimpleNotification(any(), any(ReviewAssignmentRequest.class));
+                .sendSimpleNotification(any(), any(ReviewNotificationPayload.class));
 
         // when
         reviewRequestInboxProcessor.processPending(10, 1_000);
@@ -305,7 +363,7 @@ class ReviewRequestInboxProcessorTest {
     @Test
     void retryable_예외가_최대시도에_도달하면_FAILED_RETRY_EXHAUSTED로_마킹된다() throws Exception {
         // given
-        ReviewAssignmentRequest request = request(602L, "retry-exhausted");
+        ReviewNotificationPayload request = request(602L, "retry-exhausted");
         ReviewRequestInbox inbox = ReviewRequestInbox.pending(
                 "test-api-key:602",
                 "test-api-key",
@@ -319,7 +377,7 @@ class ReviewRequestInboxProcessorTest {
 
         doThrow(new ResourceAccessException("temporary network issue"))
                 .when(spyReviewNotificationService)
-                .sendSimpleNotification(any(), any(ReviewAssignmentRequest.class));
+                .sendSimpleNotification(any(), any(ReviewNotificationPayload.class));
 
         // when
         reviewRequestInboxProcessor.processPending(10, 1_000);
@@ -343,7 +401,7 @@ class ReviewRequestInboxProcessorTest {
     })
     void PROCESSED_저장실패후_재시도경로에서도_상태전이예외없이_저장된다() {
         // given
-        ReviewAssignmentRequest request = request(703L, "processed-save-fail");
+        ReviewNotificationPayload request = request(703L, "processed-save-fail");
         reviewRequestInboxProcessor.enqueue("test-api-key", request, 0);
 
         AtomicInteger saveCallCount = new AtomicInteger();
@@ -370,7 +428,7 @@ class ReviewRequestInboxProcessorTest {
     @Test
     void PROCESSING으로_전이된_inbox를_findById로_조회못하면_예외없이_다음으로_진행한다() {
         // given
-        ReviewAssignmentRequest request = request(701L, "missing-claimed");
+        ReviewNotificationPayload request = request(701L, "missing-claimed");
         reviewRequestInboxProcessor.enqueue("test-api-key", request, 0);
         ReviewRequestInbox saved = jpaReviewRequestInboxRepository.findAll().getFirst();
 
@@ -388,8 +446,8 @@ class ReviewRequestInboxProcessorTest {
         );
     }
 
-    private ReviewAssignmentRequest request(Long githubPullRequestId, String pullRequestTitle) {
-        return new ReviewAssignmentRequest(
+    private ReviewNotificationPayload request(Long githubPullRequestId, String pullRequestTitle) {
+        return new ReviewNotificationPayload(
                 "my-repo",
                 githubPullRequestId,
                 Math.toIntExact(githubPullRequestId),
@@ -397,7 +455,7 @@ class ReviewRequestInboxProcessorTest {
                 "https://github.com/pr/" + githubPullRequestId,
                 "author-gh",
                 List.of("reviewer-gh-1"),
-                List.of()
+                List.of("reviewer-gh-1")
         );
     }
 

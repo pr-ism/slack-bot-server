@@ -63,7 +63,7 @@ public class ReviewReminderDispatcher {
 
     private boolean isNotReviewReminderNotificationActive(String teamId, String reviewerSlackId) {
         return !notificationSettingsRepository.findBySlackUser(teamId, reviewerSlackId)
-                                              .map(NotificationSettings::getOptionalNotifications)
+                                              .map(notificationSettings -> notificationSettings.getOptionalNotifications())
                                               .map(notifications -> notifications.isReviewReminderEnabled())
                                               .orElse(true);
     }

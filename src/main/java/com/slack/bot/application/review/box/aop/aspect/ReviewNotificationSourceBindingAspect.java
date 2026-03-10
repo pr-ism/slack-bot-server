@@ -1,7 +1,7 @@
 package com.slack.bot.application.review.box.aop.aspect;
 
 import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
-import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
+import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import lombok.RequiredArgsConstructor;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -21,7 +21,7 @@ public class ReviewNotificationSourceBindingAspect {
     public Object bindSourceKey(
             ProceedingJoinPoint joinPoint,
             String apiKey,
-            ReviewAssignmentRequest request
+            ReviewNotificationPayload request
     ) throws Throwable {
         if (reviewNotificationSourceContext.currentSourceKey().isPresent()) {
             return joinPoint.proceed();
@@ -35,7 +35,7 @@ public class ReviewNotificationSourceBindingAspect {
         }
     }
 
-    private String buildDefaultSourceKey(String apiKey, ReviewAssignmentRequest request) {
+    private String buildDefaultSourceKey(String apiKey, ReviewNotificationPayload request) {
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalArgumentException("apiKey는 비어 있을 수 없습니다.");
         }

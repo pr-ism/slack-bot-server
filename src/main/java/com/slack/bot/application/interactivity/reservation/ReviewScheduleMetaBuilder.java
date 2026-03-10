@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.slack.bot.application.interactivity.reservation.exception.ReviewScheduleMetaException;
-import com.slack.bot.domain.member.ProjectMember;
 import com.slack.bot.domain.member.repository.ProjectMemberRepository;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.vo.ReservationPullRequest;
@@ -46,7 +45,7 @@ public class ReviewScheduleMetaBuilder {
         String authorSlackId = reservation.getAuthorSlackId();
 
         return projectMemberRepository.findBySlackUser(teamId, authorSlackId)
-                                      .map(ProjectMember::getGithubId)
+                                      .map(projectMember -> projectMember.getGithubId())
                                       .map(githubId -> githubId.getValue())
                                       .filter(value -> value != null && !value.isBlank())
                                       .orElseThrow(() -> new ReviewScheduleMetaException(

@@ -16,7 +16,7 @@ class ReservationConfirmedTest {
     @Test
     void 리뷰_예약_완료_확인_메시지_전달_공간은_기본적으로_DM이다() {
         // when & then
-        ReservationConfirmed reservationConfirmed = assertDoesNotThrow(ReservationConfirmed::defaults);
+        ReservationConfirmed reservationConfirmed = assertDoesNotThrow(() -> ReservationConfirmed.defaults());
 
         assertThat(reservationConfirmed.getDeliverySpace()).isEqualTo(DeliverySpace.DIRECT_MESSAGE);
     }
