@@ -30,7 +30,6 @@ public class SlackInteractionInboxIdempotencyPayloadEncoder {
                         payload.path("user").path("id").asText(""),
                         action.path("action_id").asText(""),
                         action.path("value").asText(""),
-                        readActionTimestamp(payload, action),
                         payload.path("view").path("id").asText("")
                 ),
                 payloadJson
@@ -85,15 +84,6 @@ public class SlackInteractionInboxIdempotencyPayloadEncoder {
         return actions.get(0);
     }
 
-    private String readActionTimestamp(JsonNode payload, JsonNode action) {
-        String payloadActionTimestamp = payload.path("action_ts").asText("");
-        if (!payloadActionTimestamp.isBlank()) {
-            return payloadActionTimestamp;
-        }
-
-        return action.path("action_ts").asText("");
-    }
-
     private String resolveTeamId(JsonNode payload) {
         String teamId = payload.path("team_id").asText("");
         if (!teamId.isBlank()) {
@@ -127,7 +117,6 @@ public class SlackInteractionInboxIdempotencyPayloadEncoder {
             String userId,
             String actionId,
             String actionValue,
-            String actionTimestamp,
             String viewId
     ) {
     }

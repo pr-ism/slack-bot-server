@@ -37,7 +37,6 @@ class SlackInteractionInboxIdempotencyPayloadEncoderTest {
                 () -> assertThat(sourceNode.path("userId").asText()).isEqualTo("U1"),
                 () -> assertThat(sourceNode.path("actionId").asText()).isEqualTo("cancel_review_reservation"),
                 () -> assertThat(sourceNode.path("actionValue").asText()).isEqualTo("100"),
-                () -> assertThat(sourceNode.path("actionTimestamp").asText()).isEqualTo("1700000.1111"),
                 () -> assertThat(sourceNode.path("viewId").asText()).isEmpty()
         );
     }
@@ -75,21 +74,6 @@ class SlackInteractionInboxIdempotencyPayloadEncoderTest {
     }
 
     @Test
-    void block_action_최상위_action_ts가_없으면_action_내부_action_ts를_사용한다() throws Exception {
-        // given
-        ObjectNode payload = payloadForBlockAction("T1", "C1", "U1", "action", "val", "");
-        payload.remove("action_ts");
-        ((ObjectNode) ((ArrayNode) payload.path("actions")).get(0)).put("action_ts", "action_level_ts");
-
-        // when
-        String source = encoder.encodeBlockAction(payload.toString());
-
-        // then
-        JsonNode sourceNode = objectMapper.readTree(source);
-        assertThat(sourceNode.path("actionTimestamp").asText()).isEqualTo("action_level_ts");
-    }
-
-    @Test
     void block_action_actions가_비어있으면_action_필드를_fallback으로_사용한다() throws Exception {
         // given
         ObjectNode payload = objectMapper.createObjectNode();
@@ -109,8 +93,7 @@ class SlackInteractionInboxIdempotencyPayloadEncoderTest {
         JsonNode sourceNode = objectMapper.readTree(source);
         assertAll(
                 () -> assertThat(sourceNode.path("actionId").asText()).isEqualTo("fallback-action"),
-                () -> assertThat(sourceNode.path("actionValue").asText()).isEqualTo("fallback-value"),
-                () -> assertThat(sourceNode.path("actionTimestamp").asText()).isEqualTo("fallback-ts")
+                () -> assertThat(sourceNode.path("actionValue").asText()).isEqualTo("fallback-value")
         );
     }
 
@@ -134,8 +117,7 @@ class SlackInteractionInboxIdempotencyPayloadEncoderTest {
         JsonNode sourceNode = objectMapper.readTree(source);
         assertAll(
                 () -> assertThat(sourceNode.path("actionId").asText()).isEqualTo("fallback-action"),
-                () -> assertThat(sourceNode.path("actionValue").asText()).isEqualTo("fallback-value"),
-                () -> assertThat(sourceNode.path("actionTimestamp").asText()).isEqualTo("fallback-ts")
+                () -> assertThat(sourceNode.path("actionValue").asText()).isEqualTo("fallback-value")
         );
     }
 
@@ -159,8 +141,7 @@ class SlackInteractionInboxIdempotencyPayloadEncoderTest {
         JsonNode sourceNode = objectMapper.readTree(source);
         assertAll(
                 () -> assertThat(sourceNode.path("actionId").asText()).isEqualTo("fallback-action"),
-                () -> assertThat(sourceNode.path("actionValue").asText()).isEqualTo("fallback-value"),
-                () -> assertThat(sourceNode.path("actionTimestamp").asText()).isEqualTo("fallback-ts")
+                () -> assertThat(sourceNode.path("actionValue").asText()).isEqualTo("fallback-value")
         );
     }
 
@@ -184,7 +165,6 @@ class SlackInteractionInboxIdempotencyPayloadEncoderTest {
                 () -> assertThat(sourceNode.path("userId").asText()).isEqualTo("U1"),
                 () -> assertThat(sourceNode.path("actionId").asText()).isEmpty(),
                 () -> assertThat(sourceNode.path("actionValue").asText()).isEmpty(),
-                () -> assertThat(sourceNode.path("actionTimestamp").asText()).isEmpty(),
                 () -> assertThat(sourceNode.path("viewId").asText()).isEmpty()
         );
     }
