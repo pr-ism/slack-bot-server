@@ -112,6 +112,11 @@ public class SlackInteractionInboxIdempotencyPayloadEncoder {
         try {
             return objectMapper.writeValueAsString(source);
         } catch (JsonProcessingException exception) {
+            log.warn(
+                    "Slack 인터랙션 멱등성 payload 직렬화에 실패했습니다. sourceType={}",
+                    source.getClass().getSimpleName(),
+                    exception
+            );
             return fallbackJson;
         }
     }
