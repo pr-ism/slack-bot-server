@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interactivity.box.out.exception.OutboxMessageTypeRequiredException;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -14,19 +16,23 @@ import org.junit.jupiter.api.Test;
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class OutboxIdempotencyPayloadEncoderTest {
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     @Test
     void 인코더_인스턴스_생성이_가능하다() {
         // when
-        OutboxIdempotencyPayloadEncoder encoder = new OutboxIdempotencyPayloadEncoder();
+        OutboxIdempotencyPayloadEncoder encoder = new OutboxIdempotencyPayloadEncoder(objectMapper);
 
         // then
-        assertThat(encoder).isNotNull();
+        assertAll(
+                () -> assertThat(encoder).isNotNull()
+        );
     }
 
     @Test
-    void 입력_값을_길이_접두_포맷으로_인코딩한다() {
+    void 입력_값을_DTO_JSON으로_인코딩한다() throws Exception {
         // given
-        OutboxIdempotencyPayloadEncoder encoder = new OutboxIdempotencyPayloadEncoder();
+        OutboxIdempotencyPayloadEncoder encoder = new OutboxIdempotencyPayloadEncoder(objectMapper);
 
         // when
         String actual = encoder.encode(
@@ -38,24 +44,27 @@ class OutboxIdempotencyPayloadEncoderTest {
         );
 
         // then
+        JsonNode sourceNode = objectMapper.readTree(actual);
         assertAll(
-                () -> assertThat(actual).contains("source=3#SRC"),
-                () -> assertThat(actual).contains("messageType=14#CHANNEL_BLOCKS"),
-                () -> assertThat(actual).contains("teamId=2#T1"),
-                () -> assertThat(actual).contains("channelId=2#C1"),
-                () -> assertThat(actual).contains("userId=0#")
+                () -> assertThat(sourceNode.path("sourceKey").asText()).isEqualTo("SRC"),
+                () -> assertThat(sourceNode.path("messageType").asText()).isEqualTo("CHANNEL_BLOCKS"),
+                () -> assertThat(sourceNode.path("teamId").asText()).isEqualTo("T1"),
+                () -> assertThat(sourceNode.path("channelId").asText()).isEqualTo("C1"),
+                () -> assertThat(sourceNode.path("userId").asText()).isEmpty()
         );
     }
 
     @Test
     void message_type이_null이면_custom_exception을_던진다() {
         // given
-        OutboxIdempotencyPayloadEncoder encoder = new OutboxIdempotencyPayloadEncoder();
+        OutboxIdempotencyPayloadEncoder encoder = new OutboxIdempotencyPayloadEncoder(objectMapper);
 
         // when & then
-        assertThatThrownBy(() -> encoder.encode("SRC", null, "T1", "C1", "U1"))
-                .isInstanceOf(OutboxMessageTypeRequiredException.class)
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("messageType은 비어 있을 수 없습니다.");
+        assertAll(
+                () -> assertThatThrownBy(() -> encoder.encode("SRC", null, "T1", "C1", "U1"))
+                        .isInstanceOf(OutboxMessageTypeRequiredException.class)
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessage("messageType은 비어 있을 수 없습니다.")
+        );
     }
 }
