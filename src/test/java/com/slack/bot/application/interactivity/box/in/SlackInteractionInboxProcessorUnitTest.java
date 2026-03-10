@@ -1,6 +1,7 @@
 package com.slack.bot.application.interactivity.box.in;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
@@ -38,6 +39,9 @@ class SlackInteractionInboxProcessorUnitTest {
     SlackInteractionIdempotencyKeyGenerator idempotencyKeyGenerator;
 
     @Mock
+    SlackInteractionInboxIdempotencyPayloadEncoder idempotencyPayloadEncoder;
+
+    @Mock
     SlackInteractionInboxEntryProcessor slackInteractionInboxEntryProcessor;
 
     SlackInteractionInboxProcessor slackInteractionInboxProcessor;
@@ -62,6 +66,7 @@ class SlackInteractionInboxProcessorUnitTest {
                 interactionRetryProperties,
                 interactionWorkerProperties,
                 slackInteractionInboxRepository,
+                idempotencyPayloadEncoder,
                 idempotencyKeyGenerator,
                 slackInteractionInboxEntryProcessor
         );
@@ -80,16 +85,17 @@ class SlackInteractionInboxProcessorUnitTest {
                 .given(slackInteractionInboxEntryProcessor)
                 .processBlockAction(first);
 
-        // when & then
-        assertThatCode(() -> slackInteractionInboxProcessor.processPendingBlockActions(3))
-                .doesNotThrowAnyException();
-
         InOrder inOrder = inOrder(slackInteractionInboxEntryProcessor);
-        inOrder.verify(slackInteractionInboxEntryProcessor).processBlockAction(first);
-        inOrder.verify(slackInteractionInboxEntryProcessor).processBlockAction(second);
-        inOrder.verify(slackInteractionInboxEntryProcessor).processBlockAction(third);
 
-        verify(slackInteractionInboxRepository).findClaimable(SlackInteractionInboxType.BLOCK_ACTIONS, 3);
+        // when & then
+        assertAll(
+                () -> assertThatCode(() -> slackInteractionInboxProcessor.processPendingBlockActions(3))
+                        .doesNotThrowAnyException(),
+                () -> inOrder.verify(slackInteractionInboxEntryProcessor).processBlockAction(first),
+                () -> inOrder.verify(slackInteractionInboxEntryProcessor).processBlockAction(second),
+                () -> inOrder.verify(slackInteractionInboxEntryProcessor).processBlockAction(third),
+                () -> verify(slackInteractionInboxRepository).findClaimable(SlackInteractionInboxType.BLOCK_ACTIONS, 3)
+        );
     }
 
     @Test
@@ -104,14 +110,15 @@ class SlackInteractionInboxProcessorUnitTest {
                 .given(slackInteractionInboxEntryProcessor)
                 .processViewSubmission(first);
 
-        // when & then
-        assertThatCode(() -> slackInteractionInboxProcessor.processPendingViewSubmissions(2))
-                .doesNotThrowAnyException();
-
         InOrder inOrder = inOrder(slackInteractionInboxEntryProcessor);
-        inOrder.verify(slackInteractionInboxEntryProcessor).processViewSubmission(first);
-        inOrder.verify(slackInteractionInboxEntryProcessor).processViewSubmission(second);
 
-        verify(slackInteractionInboxRepository).findClaimable(SlackInteractionInboxType.VIEW_SUBMISSION, 2);
+        // when & then
+        assertAll(
+                () -> assertThatCode(() -> slackInteractionInboxProcessor.processPendingViewSubmissions(2))
+                        .doesNotThrowAnyException(),
+                () -> inOrder.verify(slackInteractionInboxEntryProcessor).processViewSubmission(first),
+                () -> inOrder.verify(slackInteractionInboxEntryProcessor).processViewSubmission(second),
+                () -> verify(slackInteractionInboxRepository).findClaimable(SlackInteractionInboxType.VIEW_SUBMISSION, 2)
+        );
     }
 }
