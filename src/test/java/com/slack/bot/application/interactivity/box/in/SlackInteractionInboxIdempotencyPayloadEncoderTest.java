@@ -209,6 +209,36 @@ class SlackInteractionInboxIdempotencyPayloadEncoderTest {
     }
 
     @Test
+    void view_submission_팀ID가_최상위_team_id에서도_읽힌다() throws Exception {
+        // given
+        ObjectNode payload = payloadForViewSubmission("T1", "U1", "V1", "callback", "{}");
+        payload.remove("team");
+        payload.put("team_id", "T_TOP_LEVEL");
+
+        // when
+        String source = encoder.encodeViewSubmission(payload.toString());
+
+        // then
+        JsonNode sourceNode = objectMapper.readTree(source);
+        assertThat(sourceNode.path("teamId").asText()).isEqualTo("T_TOP_LEVEL");
+    }
+
+    @Test
+    void view_submission_team과_team_id가_없으면_user_team_id를_사용한다() throws Exception {
+        // given
+        ObjectNode payload = payloadForViewSubmission("IGNORED", "U1", "V1", "callback", "{}");
+        payload.remove("team");
+        ((ObjectNode) payload.path("user")).put("team_id", "T_FROM_USER");
+
+        // when
+        String source = encoder.encodeViewSubmission(payload.toString());
+
+        // then
+        JsonNode sourceNode = objectMapper.readTree(source);
+        assertThat(sourceNode.path("teamId").asText()).isEqualTo("T_FROM_USER");
+    }
+
+    @Test
     void null_입력_시_원본을_반환한다() {
         assertAll(
                 () -> assertThat(encoder.encodeBlockAction(null)).isNull(),
