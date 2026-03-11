@@ -1,6 +1,5 @@
 package com.slack.bot.application.interactivity.notification;
 
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -84,10 +83,8 @@ class ReviewReservationNotifierTest {
         reviewReservationNotifier.sendReservationBlock(token, teamId, channelId, slackUserId, reservation, headerText);
 
         // then
-        assertAll(
-                () -> verify(reservationBlockCreator).create(reservation, headerText, ReviewReservationBlockType.RESERVATION),
-                () -> verify(notificationDispatcher).sendBlock(teamId, token, channelId, slackUserId, blocks, fallbackText)
-        );
+        verify(reservationBlockCreator).create(reservation, headerText, ReviewReservationBlockType.RESERVATION);
+        verify(notificationDispatcher).sendBlock(teamId, token, channelId, slackUserId, blocks, fallbackText);
     }
 
     @Test
@@ -113,17 +110,15 @@ class ReviewReservationNotifierTest {
         reviewReservationNotifier.sendCancellationMessage(token, channelId, slackUserId, reservation);
 
         // then
-        assertAll(
-                () -> verify(reservationBlockCreator).create(reservation, "*리뷰 예약을 취소했습니다.*", ReviewReservationBlockType.CANCELLATION),
-                () -> verify(notificationDispatcher).sendBlock(
+        verify(reservationBlockCreator).create(reservation, "*리뷰 예약을 취소했습니다.*", ReviewReservationBlockType.CANCELLATION);
+        verify(notificationDispatcher).sendBlock(
                         reservation.getTeamId(),
                         token,
                         channelId,
                         slackUserId,
                         blocks,
                         fallbackText
-                )
-        );
+                );
     }
 
     @Test
@@ -142,17 +137,15 @@ class ReviewReservationNotifierTest {
         reviewReservationNotifier.notifyStartNow(meta, reviewerId, token, authorSlackId);
 
         // then
-        assertAll(
-                () -> verify(messageFormatter).buildStartNowText(authorSlackId, reviewerId, meta),
-                () -> verify(notificationDispatcher, times(2)).sendDirectMessageIfEnabled(
+        verify(messageFormatter).buildStartNowText(authorSlackId, reviewerId, meta);
+        verify(notificationDispatcher, times(2)).sendDirectMessageIfEnabled(
                         eq(meta.teamId()),
                         eq(token),
                         anyString(),
                         eq(formattedText)
-                ),
-                () -> verify(notificationDispatcher).sendDirectMessageIfEnabled(meta.teamId(), token, authorSlackId, formattedText),
-                () -> verify(notificationDispatcher).sendDirectMessageIfEnabled(meta.teamId(), token, reviewerId, formattedText)
-        );
+                );
+        verify(notificationDispatcher).sendDirectMessageIfEnabled(meta.teamId(), token, authorSlackId, formattedText);
+        verify(notificationDispatcher).sendDirectMessageIfEnabled(meta.teamId(), token, reviewerId, formattedText);
     }
 
     @Test
@@ -166,10 +159,8 @@ class ReviewReservationNotifierTest {
         reviewReservationNotifier.notifyStartNow(null, reviewerId, token, authorSlackId);
 
         // then
-        assertAll(
-                () -> verify(messageFormatter, never()).buildStartNowText(anyString(), anyString(), any()),
-                () -> verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString())
-        );
+        verify(messageFormatter, never()).buildStartNowText(anyString(), anyString(), any());
+        verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -183,10 +174,8 @@ class ReviewReservationNotifierTest {
         reviewReservationNotifier.notifyStartNow(meta, reviewerId, token, null);
 
         // then
-        assertAll(
-                () -> verify(messageFormatter, never()).buildStartNowText(anyString(), anyString(), any()),
-                () -> verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString())
-        );
+        verify(messageFormatter, never()).buildStartNowText(anyString(), anyString(), any());
+        verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -200,10 +189,8 @@ class ReviewReservationNotifierTest {
         reviewReservationNotifier.notifyStartNow(meta, reviewerId, token, "");
 
         // then
-        assertAll(
-                () -> verify(messageFormatter, never()).buildStartNowText(anyString(), anyString(), any()),
-                () -> verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString())
-        );
+        verify(messageFormatter, never()).buildStartNowText(anyString(), anyString(), any());
+        verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -217,10 +204,8 @@ class ReviewReservationNotifierTest {
         reviewReservationNotifier.notifyStartNow(meta, null, token, authorSlackId);
 
         // then
-        assertAll(
-                () -> verify(messageFormatter, never()).buildStartNowText(anyString(), anyString(), any()),
-                () -> verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString())
-        );
+        verify(messageFormatter, never()).buildStartNowText(anyString(), anyString(), any());
+        verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -234,10 +219,8 @@ class ReviewReservationNotifierTest {
         reviewReservationNotifier.notifyStartNow(meta, "", token, authorSlackId);
 
         // then
-        assertAll(
-                () -> verify(messageFormatter, never()).buildStartNowText(anyString(), anyString(), any()),
-                () -> verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString())
-        );
+        verify(messageFormatter, never()).buildStartNowText(anyString(), anyString(), any());
+        verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -262,23 +245,21 @@ class ReviewReservationNotifierTest {
         reviewReservationNotifier.notifyScheduled(meta, reviewerId, scheduledAt, token, authorSlackId);
 
         // then
-        assertAll(
-                () -> verify(messageFormatter).buildScheduledText(
+        verify(messageFormatter).buildScheduledText(
                         eq(authorSlackId),
                         eq(reviewerId),
                         any(),
                         any(),
                         eq(meta)
-                ),
-                () -> verify(notificationDispatcher, times(2)).sendDirectMessageIfEnabled(
+                );
+        verify(notificationDispatcher, times(2)).sendDirectMessageIfEnabled(
                         eq(meta.teamId()),
                         eq(token),
                         anyString(),
                         eq(formattedText)
-                ),
-                () -> verify(notificationDispatcher).sendDirectMessageIfEnabled(meta.teamId(), token, authorSlackId, formattedText),
-                () -> verify(notificationDispatcher).sendDirectMessageIfEnabled(meta.teamId(), token, reviewerId, formattedText)
-        );
+                );
+        verify(notificationDispatcher).sendDirectMessageIfEnabled(meta.teamId(), token, authorSlackId, formattedText);
+        verify(notificationDispatcher).sendDirectMessageIfEnabled(meta.teamId(), token, reviewerId, formattedText);
     }
 
     @Test
@@ -293,10 +274,8 @@ class ReviewReservationNotifierTest {
         reviewReservationNotifier.notifyScheduled(null, reviewerId, scheduledAt, token, authorSlackId);
 
         // then
-        assertAll(
-                () -> verify(messageFormatter, never()).buildScheduledText(anyString(), anyString(), any(), any(), any()),
-                () -> verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString())
-        );
+        verify(messageFormatter, never()).buildScheduledText(anyString(), anyString(), any(), any(), any());
+        verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -311,10 +290,8 @@ class ReviewReservationNotifierTest {
         reviewReservationNotifier.notifyScheduled(meta, reviewerId, scheduledAt, token, null);
 
         // then
-        assertAll(
-                () -> verify(messageFormatter, never()).buildScheduledText(anyString(), anyString(), any(), any(), any()),
-                () -> verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString())
-        );
+        verify(messageFormatter, never()).buildScheduledText(anyString(), anyString(), any(), any(), any());
+        verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -329,10 +306,8 @@ class ReviewReservationNotifierTest {
         reviewReservationNotifier.notifyScheduled(meta, reviewerId, scheduledAt, token, "");
 
         // then
-        assertAll(
-                () -> verify(messageFormatter, never()).buildScheduledText(anyString(), anyString(), any(), any(), any()),
-                () -> verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString())
-        );
+        verify(messageFormatter, never()).buildScheduledText(anyString(), anyString(), any(), any(), any());
+        verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -347,10 +322,8 @@ class ReviewReservationNotifierTest {
         reviewReservationNotifier.notifyScheduled(meta, null, scheduledAt, token, authorSlackId);
 
         // then
-        assertAll(
-                () -> verify(messageFormatter, never()).buildScheduledText(anyString(), anyString(), any(), any(), any()),
-                () -> verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString())
-        );
+        verify(messageFormatter, never()).buildScheduledText(anyString(), anyString(), any(), any(), any());
+        verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -365,10 +338,8 @@ class ReviewReservationNotifierTest {
         reviewReservationNotifier.notifyScheduled(meta, "", scheduledAt, token, authorSlackId);
 
         // then
-        assertAll(
-                () -> verify(messageFormatter, never()).buildScheduledText(anyString(), anyString(), any(), any(), any()),
-                () -> verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString())
-        );
+        verify(messageFormatter, never()).buildScheduledText(anyString(), anyString(), any(), any(), any());
+        verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -383,10 +354,8 @@ class ReviewReservationNotifierTest {
         reviewReservationNotifier.notifyScheduled(meta, reviewerId, null, token, authorSlackId);
 
         // then
-        assertAll(
-                () -> verify(messageFormatter, never()).buildScheduledText(anyString(), anyString(), any(), any(), any()),
-                () -> verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString())
-        );
+        verify(messageFormatter, never()).buildScheduledText(anyString(), anyString(), any(), any(), any());
+        verify(notificationDispatcher, never()).sendDirectMessageIfEnabled(anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -421,9 +390,8 @@ class ReviewReservationNotifierTest {
         );
 
         // then
-        assertAll(
-                () -> verify(reservationBlockCreator).create(reservation, headerText, ReviewReservationBlockType.RESERVATION),
-                () -> verify(notificationDispatcher).sendReservationBlockBySettingOrDefault(
+        verify(reservationBlockCreator).create(reservation, headerText, ReviewReservationBlockType.RESERVATION);
+        verify(notificationDispatcher).sendReservationBlockBySettingOrDefault(
                         eq(token),
                         eq(teamId),
                         eq(channelId),
@@ -431,8 +399,7 @@ class ReviewReservationNotifierTest {
                         eq(blocks),
                         eq(fallbackText),
                         eq("리뷰 예약 완료\nFix bug\n리뷰 시작 시간: 2024년 1월 1일 11시 00분")
-                )
-        );
+                );
     }
 
     @Test
@@ -458,10 +425,8 @@ class ReviewReservationNotifierTest {
         reviewReservationNotifier.sendReservationBlockToDirectMessageOnly(token, slackUserId, reservation, headerText);
 
         // then
-        assertAll(
-                () -> verify(reservationBlockCreator).create(reservation, headerText, ReviewReservationBlockType.RESERVATION),
-                () -> verify(notificationDispatcher).sendBlockToDirectMessageOnly(token, slackUserId, blocks, fallbackText)
-        );
+        verify(reservationBlockCreator).create(reservation, headerText, ReviewReservationBlockType.RESERVATION);
+        verify(notificationDispatcher).sendBlockToDirectMessageOnly(token, slackUserId, blocks, fallbackText);
     }
 
     @Test
@@ -492,20 +457,18 @@ class ReviewReservationNotifierTest {
         );
 
         // then
-        assertAll(
-                () -> verify(notificationDispatcher).sendEphemeral(
+        verify(notificationDispatcher).sendEphemeral(
                         token,
                         channelId,
                         slackUserId,
                         "이미 이 PR 리뷰를 예약했습니다."
-                ),
-                () -> verify(notificationDispatcher).sendBlockToDirectMessageOnly(
+                );
+        verify(notificationDispatcher).sendBlockToDirectMessageOnly(
                         token,
                         slackUserId,
                         blocks,
                         fallbackText
-                )
-        );
+                );
     }
 
     @Test

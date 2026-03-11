@@ -109,10 +109,10 @@ class ReviewReminderDispatcherTest {
         dispatcher.send(reminder);
 
         // then
-        ArgumentCaptor<ReviewReminder> savedReminderCaptor = ArgumentCaptor.forClass(ReviewReminder.class);
-        verify(reviewReminderRepository).save(savedReminderCaptor.capture());
+        ArgumentCaptor<ReviewReminder> actual = ArgumentCaptor.forClass(ReviewReminder.class);
+        verify(reviewReminderRepository).save(actual.capture());
 
-        assertThat(savedReminderCaptor.getValue().isFired()).isTrue();
+        assertThat(actual.getValue().isFired()).isTrue();
         verify(reviewReminderSlackDirectMessageClient, never()).send(any(), any(), any());
     }
 
@@ -126,10 +126,10 @@ class ReviewReminderDispatcherTest {
         dispatcher.send(reminder);
 
         // then
-        ArgumentCaptor<ReviewReminder> savedReminderCaptor = ArgumentCaptor.forClass(ReviewReminder.class);
+        ArgumentCaptor<ReviewReminder> actual = ArgumentCaptor.forClass(ReviewReminder.class);
+        verify(reviewReminderRepository).save(actual.capture());
         assertAll(
-                () -> verify(reviewReminderRepository).save(savedReminderCaptor.capture()),
-                () -> assertThat(savedReminderCaptor.getValue().isFired()).isTrue(),
+                () -> assertThat(actual.getValue().isFired()).isTrue(),
                 () -> verifyNoInteractions(notificationSettingsRepository, reviewReminderSlackDirectMessageClient)
         );
     }
@@ -157,13 +157,11 @@ class ReviewReminderDispatcherTest {
         String expectedAuthorMessage = "리뷰어 <@U-REVIEWER> <https://github.com/org/repo/pull/1|Great PR>";
         String expectedReviewerMessage = "PR: Great PR (https://github.com/org/repo/pull/1)";
 
-        ArgumentCaptor<ReviewReminder> savedReminderCaptor = ArgumentCaptor.forClass(ReviewReminder.class);
-        assertAll(
-                () -> verify(reviewReminderSlackDirectMessageClient).send(TOKEN, AUTHOR_ID, expectedAuthorMessage),
-                () -> verify(reviewReminderSlackDirectMessageClient).send(TOKEN, REVIEWER_ID, expectedReviewerMessage),
-                () -> verify(reviewReminderRepository).save(savedReminderCaptor.capture()),
-                () -> assertThat(savedReminderCaptor.getValue().isFired()).isTrue()
-        );
+        ArgumentCaptor<ReviewReminder> actual = ArgumentCaptor.forClass(ReviewReminder.class);
+        verify(reviewReminderSlackDirectMessageClient).send(TOKEN, AUTHOR_ID, expectedAuthorMessage);
+        verify(reviewReminderSlackDirectMessageClient).send(TOKEN, REVIEWER_ID, expectedReviewerMessage);
+        verify(reviewReminderRepository).save(actual.capture());
+        assertThat(actual.getValue().isFired()).isTrue();
     }
 
     @Test
@@ -186,14 +184,12 @@ class ReviewReminderDispatcherTest {
         dispatcher.send(reminder);
 
         // then
-        assertAll(
-                () -> verify(reviewReminderSlackDirectMessageClient, never()).send(eq(TOKEN), eq(""), anyString()),
-                () -> verify(reviewReminderSlackDirectMessageClient).send(
+        verify(reviewReminderSlackDirectMessageClient, never()).send(eq(TOKEN), eq(""), anyString());
+        verify(reviewReminderSlackDirectMessageClient).send(
                         TOKEN,
                         REVIEWER_ID,
                         "PR: Great PR (https://github.com/org/repo/pull/1)"
-                )
-        );
+                );
     }
 
     @Test
@@ -401,12 +397,10 @@ class ReviewReminderDispatcherTest {
         dispatcher.send(reminder);
 
         // then
-        ArgumentCaptor<ReviewReminder> savedReminderCaptor = ArgumentCaptor.forClass(ReviewReminder.class);
+        ArgumentCaptor<ReviewReminder> actual = ArgumentCaptor.forClass(ReviewReminder.class);
 
-        assertAll(
-                () -> verify(reviewReminderRepository).save(savedReminderCaptor.capture()),
-                () -> assertThat(savedReminderCaptor.getValue().isFired()).isTrue()
-        );
+        verify(reviewReminderRepository).save(actual.capture());
+        assertThat(actual.getValue().isFired()).isTrue();
     }
 
     private ReviewReminder createReminder(String authorId, String reviewerId) {

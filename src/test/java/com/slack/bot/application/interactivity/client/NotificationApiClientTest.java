@@ -2,7 +2,6 @@ package com.slack.bot.application.interactivity.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -200,13 +199,11 @@ class NotificationApiClientTest {
                 .willReturn("D123");
 
         // when
-        String channelId = notificationApiClient.openDirectMessageChannel("token", "U1");
+        String actual = notificationApiClient.openDirectMessageChannel("token", "U1");
 
         // then
-        assertAll(
-                () -> assertThat(channelId).isEqualTo("D123"),
-                () -> verify(notificationTransportApiClient).openDirectMessageChannel("token", "U1")
-        );
+        assertThat(actual).isEqualTo("D123");
+        verify(notificationTransportApiClient).openDirectMessageChannel("token", "U1");
     }
 
     @Test
@@ -219,9 +216,7 @@ class NotificationApiClientTest {
         String actual = notificationApiClient.withBusinessEventSource("EVENT-1", () -> "ignored");
 
         // then
-        assertAll(
-                () -> assertThat(actual).isEqualTo("done"),
-                () -> verify(outboxIdempotencySourceContext).withBusinessEventSource(eq("EVENT-1"), any())
-        );
+        assertThat(actual).isEqualTo("done");
+        verify(outboxIdempotencySourceContext).withBusinessEventSource(eq("EVENT-1"), any());
     }
 }

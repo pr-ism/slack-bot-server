@@ -1,7 +1,6 @@
 package com.slack.bot.application.interactivity.reminder;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
@@ -58,10 +57,10 @@ class ReviewReminderSchedulerTest {
         ReviewReminder reminder = command.toReminder();
 
         ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
-        ArgumentCaptor<Instant> instantCaptor = ArgumentCaptor.forClass(Instant.class);
+        ArgumentCaptor<Instant> actual = ArgumentCaptor.forClass(Instant.class);
 
         given(reviewReminderRepository.save(any())).willReturn(reminder);
-        given(taskScheduler.schedule(runnableCaptor.capture(), instantCaptor.capture()))
+        given(taskScheduler.schedule(runnableCaptor.capture(), actual.capture()))
                 .willReturn(null);
         given(reviewReminderRepository.findByReservationId(10L)).willReturn(Optional.of(reminder));
 
@@ -69,10 +68,9 @@ class ReviewReminderSchedulerTest {
         scheduler.schedule(command);
 
         // then
-        assertAll(
-                () -> verify(reviewReminderRepository).save(any()),
-                () -> assertThat(instantCaptor.getValue()).isEqualTo(command.scheduledAt())
-        );
+        verify(reviewReminderRepository).save(any());
+        assertThat(actual.getValue()).isEqualTo(command.scheduledAt());
+
 
         runnableCaptor.getValue().run();
         verify(reviewReminderDispatcher).send(reminder);
