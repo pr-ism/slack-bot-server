@@ -2,7 +2,6 @@ package com.slack.bot.application.event.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.springframework.http.HttpMethod.GET;
 import static org.springframework.http.HttpMethod.POST;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
@@ -67,13 +66,11 @@ class SlackEventApiClientTest {
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when
-        ChannelNameWrapper result = slackEventApiClient.fetchChannelInfo(token, channelId);
+        ChannelNameWrapper actual = slackEventApiClient.fetchChannelInfo(token, channelId);
 
         // then
-        assertAll(
-                () -> assertThat(result.name()).isEqualTo(channelName),
-                () -> mockServer.verify()
-        );
+        mockServer.verify();
+        assertThat(actual.name()).isEqualTo(channelName);
     }
 
     @Test
@@ -94,12 +91,10 @@ class SlackEventApiClientTest {
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> slackEventApiClient.fetchChannelInfo(token, channelId))
+        assertThatThrownBy(() -> slackEventApiClient.fetchChannelInfo(token, channelId))
                         .isInstanceOf(SlackChatRequestException.class)
-                        .hasMessageContaining("channel_not_found"),
-                () -> mockServer.verify()
-        );
+                        .hasMessageContaining("channel_not_found");
+        mockServer.verify();
     }
 
     @Test
@@ -114,12 +109,10 @@ class SlackEventApiClientTest {
                   .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> slackEventApiClient.fetchChannelInfo(token, channelId))
+        assertThatThrownBy(() -> slackEventApiClient.fetchChannelInfo(token, channelId))
                         .isInstanceOf(SlackChatRequestException.class)
-                        .hasMessageContaining("HTTP 요청 실패"),
-                () -> mockServer.verify()
-        );
+                        .hasMessageContaining("HTTP 요청 실패");
+        mockServer.verify();
     }
 
     @Test
@@ -199,12 +192,10 @@ class SlackEventApiClientTest {
                   .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> slackEventApiClient.sendMessage(token, channelId, text))
+        assertThatThrownBy(() -> slackEventApiClient.sendMessage(token, channelId, text))
                         .isInstanceOf(SlackChatRequestException.class)
-                        .hasMessageContaining("HTTP 요청 실패"),
-                () -> mockServer.verify()
-        );
+                        .hasMessageContaining("HTTP 요청 실패");
+        mockServer.verify();
     }
 
     @Test
@@ -226,12 +217,10 @@ class SlackEventApiClientTest {
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> slackEventApiClient.sendMessage(token, channelId, text))
+        assertThatThrownBy(() -> slackEventApiClient.sendMessage(token, channelId, text))
                         .isInstanceOf(SlackChatRequestException.class)
-                        .hasMessageContaining("channel_not_found"),
-                () -> mockServer.verify()
-        );
+                        .hasMessageContaining("channel_not_found");
+        mockServer.verify();
     }
 
     @Test
@@ -252,12 +241,10 @@ class SlackEventApiClientTest {
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> slackEventApiClient.sendMessage(token, channelId, text))
+        assertThatThrownBy(() -> slackEventApiClient.sendMessage(token, channelId, text))
                         .isInstanceOf(SlackChatRequestException.class)
-                        .hasMessageContaining("Slack API 요청 처리 실패"),
-                () -> mockServer.verify()
-        );
+                        .hasMessageContaining("Slack API 요청 처리 실패");
+        mockServer.verify();
     }
 
     @Test
@@ -273,11 +260,9 @@ class SlackEventApiClientTest {
                   .andRespond(withSuccess());
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> slackEventApiClient.sendMessage(token, channelId, text))
+        assertThatThrownBy(() -> slackEventApiClient.sendMessage(token, channelId, text))
                         .isInstanceOf(SlackChatRequestException.class)
-                        .hasMessageContaining("Slack API 요청 처리 실패"),
-                () -> mockServer.verify()
-        );
+                        .hasMessageContaining("Slack API 요청 처리 실패");
+        mockServer.verify();
     }
 }
