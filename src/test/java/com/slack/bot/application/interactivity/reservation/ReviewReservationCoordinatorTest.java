@@ -393,10 +393,12 @@ class ReviewReservationCoordinatorTest {
                 .build();
 
         // when & then
-        Optional<ReviewReservation> actual = reservationRepository.findById(second.getId());
         assertThatThrownBy(() -> coordinator.reschedule(rescheduleCommand))
                         .isInstanceOf(ActiveReservationAlreadyExistsException.class)
                         .hasMessageContaining("이미 활성화된 리뷰 예약이 있습니다");
+
+        Optional<ReviewReservation> actual = reservationRepository.findById(second.getId());
+
         assertAll(
                 () -> assertThat(actual).isPresent(),
                 () -> assertThat(actual.get().getStatus()).isEqualTo(ReservationStatus.ACTIVE)
