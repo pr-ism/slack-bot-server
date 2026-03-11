@@ -57,26 +57,26 @@ class ClaimMappingActionHandlerTest {
         BlockActionOutcomeDto actual = claimMappingActionHandler.handle(command);
 
         // then
-        Optional<ProjectMember> mapped = projectMemberRepository.findBySlackUser("T1", "U1");
+        Optional<ProjectMember> actualMapped = projectMemberRepository.findBySlackUser("T1", "U1");
 
         assertAll(
                 () -> assertThat(actual.duplicateReservation()).isNull(),
                 () -> assertThat(actual.cancelledReservation()).isNull(),
-                () -> assertThat(mapped).isPresent(),
-                () -> assertThat(mapped.get().getGithubId().getValue()).isEqualTo("new-github-id"),
-                () -> verify(notificationApiClient).sendEphemeralMessage(
+                () -> assertThat(actualMapped).isPresent(),
+                () -> assertThat(actualMapped.get().getGithubId().getValue()).isEqualTo("new-github-id")
+        );
+        verify(notificationApiClient).sendEphemeralMessage(
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U1"),
                         argThat(message -> message.contains("new-github-id"))
-                ),
-                () -> verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1"),
-                () -> verify(notificationApiClient).sendMessage(
+                );
+        verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1");
+        verify(notificationApiClient).sendMessage(
                         eq("xoxb-test-token"),
                         eq("D1"),
                         argThat(message -> message.contains("new-github-id"))
-                )
-        );
+                );
     }
 
     @Test
@@ -93,21 +93,21 @@ class ClaimMappingActionHandlerTest {
         BlockActionOutcomeDto actual = claimMappingActionHandler.handle(command);
 
         // then
-        Optional<ProjectMember> mapped = projectMemberRepository.findBySlackUser("T1", "U2");
+        Optional<ProjectMember> actualMapped = projectMemberRepository.findBySlackUser("T1", "U2");
 
         assertAll(
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
-                () -> assertThat(mapped).isPresent(),
-                () -> assertThat(mapped.get().getGithubId().getValue()).isEqualTo("updated-u2-github"),
-                () -> verify(notificationApiClient).sendEphemeralMessage(
+                () -> assertThat(actualMapped).isPresent(),
+                () -> assertThat(actualMapped.get().getGithubId().getValue()).isEqualTo("updated-u2-github")
+        );
+        verify(notificationApiClient).sendEphemeralMessage(
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U2"),
                         argThat(message -> message.contains("updated-u2-github"))
-                ),
-                () -> verify(notificationApiClient, never()).openDirectMessageChannel(any(), any()),
-                () -> verify(notificationApiClient, never()).sendMessage(any(), any(), any())
-        );
+                );
+        verify(notificationApiClient, never()).openDirectMessageChannel(any(), any());
+        verify(notificationApiClient, never()).sendMessage(any(), any(), any());
     }
 
     @Test
@@ -120,21 +120,21 @@ class ClaimMappingActionHandlerTest {
         BlockActionOutcomeDto actual = claimMappingActionHandler.handle(command);
 
         // then
-        Optional<ProjectMember> mapped = projectMemberRepository.findBySlackUser("T1", "U3");
+        Optional<ProjectMember> actualMapped = projectMemberRepository.findBySlackUser("T1", "U3");
 
         assertAll(
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
-                () -> assertThat(mapped).isPresent(),
-                () -> assertThat(mapped.get().getGithubId().getValue()).isEqualTo("new-user-github"),
-                () -> verify(notificationApiClient).sendEphemeralMessage(
+                () -> assertThat(actualMapped).isPresent(),
+                () -> assertThat(actualMapped.get().getGithubId().getValue()).isEqualTo("new-user-github")
+        );
+        verify(notificationApiClient).sendEphemeralMessage(
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U3"),
                         argThat(message -> message.contains("new-user-github"))
-                ),
-                () -> verify(notificationApiClient, never()).openDirectMessageChannel(any(), any()),
-                () -> verify(notificationApiClient, never()).sendMessage(any(), any(), any())
-        );
+                );
+        verify(notificationApiClient, never()).openDirectMessageChannel(any(), any());
+        verify(notificationApiClient, never()).sendMessage(any(), any(), any());
     }
 
     private BlockActionCommandDto claimCommandWithGithubId(String githubId, String slackUserId) {

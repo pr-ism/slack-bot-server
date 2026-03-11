@@ -1,7 +1,6 @@
 package com.slack.bot.application.interactivity;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -35,7 +34,7 @@ class BlockActionInteractionServiceTest {
     NotificationApiClient notificationApiClient;
 
     @Autowired
-    ReviewReservationRepository reviewReservationRepository;
+    ReviewReservationRepository actualReviewReservationRepository;
 
     @Autowired
     ObjectMapper objectMapper;
@@ -59,20 +58,19 @@ class BlockActionInteractionServiceTest {
         processingSourceContext.withInboxProcessing(() -> blockActionInteractionService.handle(payload));
 
         // then
-        assertAll(
-                () -> verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1"),
-                () -> verify(notificationApiClient).sendBlockMessage(
+        verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1");
+        verify(notificationApiClient).sendBlockMessage(
                         eq("xoxb-test-token"),
                         eq("D-REVIEWER"),
                         any(),
                         any()
-                ),
-                () -> assertThat(reviewReservationRepository.findById(100L))
+                );
+        var actual = actualReviewReservationRepository.findById(100L);
+        assertThat(actual)
                         .isPresent()
                         .get()
                         .extracting(reservation -> reservation.getStatus())
-                        .isEqualTo(ReservationStatus.ACTIVE)
-        );
+                        .isEqualTo(ReservationStatus.ACTIVE);
     }
 
     @Test
@@ -90,20 +88,19 @@ class BlockActionInteractionServiceTest {
         processingSourceContext.withInboxProcessing(() -> blockActionInteractionService.handle(payload));
 
         // then
-        assertAll(
-                () -> verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1"),
-                () -> verify(notificationApiClient).sendBlockMessage(
+        verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1");
+        verify(notificationApiClient).sendBlockMessage(
                         eq("xoxb-test-token"),
                         eq("D-REVIEWER"),
                         any(),
                         any()
-                ),
-                () -> assertThat(reviewReservationRepository.findById(100L))
+                );
+        var actual = actualReviewReservationRepository.findById(100L);
+        assertThat(actual)
                         .isPresent()
                         .get()
                         .extracting(reservation -> reservation.getStatus())
-                        .isEqualTo(ReservationStatus.CANCELLED)
-        );
+                        .isEqualTo(ReservationStatus.CANCELLED);
     }
 
     private JsonNode openReviewSchedulerPayload(String metaJson) {

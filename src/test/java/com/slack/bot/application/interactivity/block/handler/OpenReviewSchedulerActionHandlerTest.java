@@ -44,7 +44,7 @@ class OpenReviewSchedulerActionHandlerTest {
             "classpath:sql/fixtures/reservation/project_123.sql",
             "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
     })
-    void 활성_리뷰_예약이_이미_있으면_중복_예약으로_응답하고_모달은_열지_않는다(ApplicationEvents applicationEvents) {
+    void 활성_리뷰_예약이_이미_있으면_중복_예약으로_응답하고_모달은_열지_않는다(ApplicationEvents actualApplicationEvents) {
         // given
         BlockActionCommandDto command = commandWithMeta(metaJsonWithProjectId("123"), "TRIGGER_1");
 
@@ -56,20 +56,20 @@ class OpenReviewSchedulerActionHandlerTest {
                 () -> assertThat(actual.duplicateReservation()).isNotNull(),
                 () -> assertThat(actual.duplicateReservation().getId()).isEqualTo(100L),
                 () -> assertThat(actual.cancelledReservation()).isNull(),
-                () -> assertThat(applicationEvents.stream(ReviewReservationRequestEvent.class).toList())
-                        .singleElement()
-                        .satisfies(event -> assertAll(
-                                () -> assertThat(event.teamId()).isEqualTo("T1"),
-                                () -> assertThat(event.channelId()).isEqualTo("C1"),
-                                () -> assertThat(event.slackUserId()).isEqualTo("U1")
-                        )),
-                () -> verify(notificationApiClient, never()).openModal(any(), any(), any(View.class))
+                () -> assertThat(actualApplicationEvents.stream(ReviewReservationRequestEvent.class).toList())
+                                        .singleElement()
+                                        .satisfies(actualEvent -> assertAll(
+                                                () -> assertThat(actualEvent.teamId()).isEqualTo("T1"),
+                                                () -> assertThat(actualEvent.channelId()).isEqualTo("C1"),
+                                                () -> assertThat(actualEvent.slackUserId()).isEqualTo("U1")
+                                        ))
         );
+        verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
     }
 
     @Test
     @Sql("classpath:sql/fixtures/reservation/project_123.sql")
-    void 활성_예약이_없으면_예약_시간_선택_모달을_열고_빈_결과를_응답한다(ApplicationEvents applicationEvents) {
+    void 활성_예약이_없으면_예약_시간_선택_모달을_열고_빈_결과를_응답한다(ApplicationEvents actualApplicationEvents) {
         // given
         BlockActionCommandDto command = commandWithMeta(metaJsonWithProjectId("123"), "TRIGGER_1");
 
@@ -80,19 +80,19 @@ class OpenReviewSchedulerActionHandlerTest {
         assertAll(
                 () -> assertThat(actual.duplicateReservation()).isNull(),
                 () -> assertThat(actual.cancelledReservation()).isNull(),
-                () -> assertThat(applicationEvents.stream(ReviewReservationRequestEvent.class).toList())
-                        .singleElement()
-                        .satisfies(event -> assertAll(
-                                () -> assertThat(event.teamId()).isEqualTo("T1"),
-                                () -> assertThat(event.channelId()).isEqualTo("C1"),
-                                () -> assertThat(event.slackUserId()).isEqualTo("U1")
-                        )),
-                () -> verify(notificationApiClient).openModal(
+                () -> assertThat(actualApplicationEvents.stream(ReviewReservationRequestEvent.class).toList())
+                                        .singleElement()
+                                        .satisfies(actualEvent -> assertAll(
+                                                () -> assertThat(actualEvent.teamId()).isEqualTo("T1"),
+                                                () -> assertThat(actualEvent.channelId()).isEqualTo("C1"),
+                                                () -> assertThat(actualEvent.slackUserId()).isEqualTo("U1")
+                                        ))
+        );
+        verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
                         any(View.class)
-                )
-        );
+                );
     }
 
     private BlockActionCommandDto commandWithMeta(String metaJson, String triggerId) {

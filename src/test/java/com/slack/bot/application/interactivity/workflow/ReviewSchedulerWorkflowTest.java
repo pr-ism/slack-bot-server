@@ -46,7 +46,7 @@ class ReviewSchedulerWorkflowTest {
     ReviewInteractionEventPublisher reviewInteractionEventPublisher;
 
     @Test
-    void 예약_메타가_없으면_오류_알림을_보내고_빈_값을_반환한다(ApplicationEvents applicationEvents) {
+    void 예약_메타가_없으면_오류_알림을_보내고_빈_값을_반환한다(ApplicationEvents actualApplicationEvents) {
         // given
         JsonNode payload = payloadWithTriggerId("TRIGGER_1");
         JsonNode action = actionWithMetaJson("");
@@ -62,21 +62,21 @@ class ReviewSchedulerWorkflowTest {
         );
 
         // then
-        assertAll(
-                () -> verify(notificationApiClient).sendEphemeralMessage(
+        verify(notificationApiClient).sendEphemeralMessage(
                         "xoxb-test-token",
                         "C1",
                         "U1",
                         InteractivityErrorType.INVALID_META.message()
-                ),
-                () -> verify(notificationApiClient, never()).openModal(any(), any(), any(View.class)),
+                );
+        verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
+        assertAll(
                 () -> assertThat(actual).isEmpty(),
-                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
+                () -> assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 
     @Test
-    void 예약_메타가_잘못되면_오류_알림을_보내고_빈_값을_반환한다(ApplicationEvents applicationEvents) {
+    void 예약_메타가_잘못되면_오류_알림을_보내고_빈_값을_반환한다(ApplicationEvents actualApplicationEvents) {
         // given
         JsonNode payload = payloadWithTriggerId("TRIGGER_1");
         JsonNode action = actionWithMetaJson("{invalid-json");
@@ -92,21 +92,21 @@ class ReviewSchedulerWorkflowTest {
         );
 
         // then
-        assertAll(
-                () -> verify(notificationApiClient).sendEphemeralMessage(
+        verify(notificationApiClient).sendEphemeralMessage(
                         "xoxb-test-token",
                         "C1",
                         "U1",
                         InteractivityErrorType.INVALID_META.message()
-                ),
-                () -> verify(notificationApiClient, never()).openModal(any(), any(), any(View.class)),
+                );
+        verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
+        assertAll(
                 () -> assertThat(actual).isEmpty(),
-                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
+                () -> assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 
     @Test
-    void 트리거_ID가_없으면_오류_알림을_보내고_빈_값을_반환한다(ApplicationEvents applicationEvents) {
+    void 트리거_ID가_없으면_오류_알림을_보내고_빈_값을_반환한다(ApplicationEvents actualApplicationEvents) {
         // given
         JsonNode payload = objectMapper.createObjectNode();
         JsonNode action = actionWithMetaJson(metaJsonWithProjectId("123"));
@@ -122,16 +122,16 @@ class ReviewSchedulerWorkflowTest {
         );
 
         // then
-        assertAll(
-                () -> verify(notificationApiClient).sendEphemeralMessage(
+        verify(notificationApiClient).sendEphemeralMessage(
                         "xoxb-test-token",
                         "C1",
                         "U1",
                         InteractivityErrorType.INVALID_META.message()
-                ),
-                () -> verify(notificationApiClient, never()).openModal(any(), any(), any(View.class)),
+                );
+        verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
+        assertAll(
                 () -> assertThat(actual).isEmpty(),
-                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
+                () -> assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 
@@ -140,7 +140,7 @@ class ReviewSchedulerWorkflowTest {
             "classpath:sql/fixtures/reservation/project_123.sql",
             "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
     })
-    void 활성_예약이_있으면_모달을_열지_않고_기존_예약을_반환한다(ApplicationEvents applicationEvents) {
+    void 활성_예약이_있으면_모달을_열지_않고_기존_예약을_반환한다(ApplicationEvents actualApplicationEvents) {
         // given
         String metaJson = metaJsonWithProjectId("123");
         JsonNode payload = payloadWithTriggerId("TRIGGER_1");
@@ -157,16 +157,16 @@ class ReviewSchedulerWorkflowTest {
         );
 
         // then
-        assertAll(
-                () -> assertThat(applicationEvents.stream(ReviewReservationRequestEvent.class).toList())
+        assertThat(actualApplicationEvents.stream(ReviewReservationRequestEvent.class).toList())
                         .singleElement()
-                        .satisfies(event -> assertAll(
-                                () -> assertThat(event.teamId()).isEqualTo("T1"),
-                                () -> assertThat(event.channelId()).isEqualTo("C1"),
-                                () -> assertThat(event.slackUserId()).isEqualTo("U1"),
-                                () -> assertThat(event.metaJson()).isEqualTo(metaJson)
-                        )),
-                () -> verify(notificationApiClient, never()).openModal(any(), any(), any(View.class)),
+                        .satisfies(actualEvent -> assertAll(
+                                () -> assertThat(actualEvent.teamId()).isEqualTo("T1"),
+                                () -> assertThat(actualEvent.channelId()).isEqualTo("C1"),
+                                () -> assertThat(actualEvent.slackUserId()).isEqualTo("U1"),
+                                () -> assertThat(actualEvent.metaJson()).isEqualTo(metaJson)
+                        ));
+        verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
+        assertAll(
                 () -> assertThat(actual).isPresent(),
                 () -> assertThat(actual.get().getId()).isEqualTo(100L)
         );
@@ -174,7 +174,7 @@ class ReviewSchedulerWorkflowTest {
 
     @Test
     @Sql("classpath:sql/fixtures/reservation/project_123.sql")
-    void 처리_중_오류가_발생하면_오류_알림을_보내고_빈_값을_반환한다(ApplicationEvents applicationEvents) {
+    void 처리_중_오류가_발생하면_오류_알림을_보내고_빈_값을_반환한다(ApplicationEvents actualApplicationEvents) {
         // given
         String metaJson = metaJsonWithProjectId("123");
         JsonNode payload = payloadWithTriggerId("TRIGGER_1");
@@ -195,22 +195,22 @@ class ReviewSchedulerWorkflowTest {
         );
 
         // then
-        assertAll(
-                () -> verify(notificationApiClient).sendEphemeralMessage(
+        verify(notificationApiClient).sendEphemeralMessage(
                         "xoxb-test-token",
                         "C1",
                         "U1",
                         InteractivityErrorType.RESERVATION_LOAD_FAILURE.message()
-                ),
-                () -> verify(notificationApiClient, never()).openModal(any(), any(), any(View.class)),
+                );
+        verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
+        assertAll(
                 () -> assertThat(actual).isEmpty(),
-                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
+                () -> assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 
     @Test
     @Sql("classpath:sql/fixtures/reservation/project_123.sql")
-    void 활성_예약이_없으면_모달을_열고_빈_값을_반환한다(ApplicationEvents applicationEvents) {
+    void 활성_예약이_없으면_모달을_열고_빈_값을_반환한다(ApplicationEvents actualApplicationEvents) {
         // given
         String metaJson = metaJsonWithProjectId("123");
         JsonNode payload = payloadWithTriggerId("TRIGGER_1");
@@ -227,22 +227,20 @@ class ReviewSchedulerWorkflowTest {
         );
 
         // then
-        assertAll(
-                () -> assertThat(applicationEvents.stream(ReviewReservationRequestEvent.class).toList())
+        assertThat(actualApplicationEvents.stream(ReviewReservationRequestEvent.class).toList())
                         .singleElement()
-                        .satisfies(event -> assertAll(
-                                () -> assertThat(event.teamId()).isEqualTo("T1"),
-                                () -> assertThat(event.channelId()).isEqualTo("C1"),
-                                () -> assertThat(event.slackUserId()).isEqualTo("U1"),
-                                () -> assertThat(event.metaJson()).isEqualTo(metaJson)
-                        )),
-                () -> verify(notificationApiClient).openModal(
+                        .satisfies(actualEvent -> assertAll(
+                                () -> assertThat(actualEvent.teamId()).isEqualTo("T1"),
+                                () -> assertThat(actualEvent.channelId()).isEqualTo("C1"),
+                                () -> assertThat(actualEvent.slackUserId()).isEqualTo("U1"),
+                                () -> assertThat(actualEvent.metaJson()).isEqualTo(metaJson)
+                        ));
+        verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
                         any(View.class)
-                ),
-                () -> assertThat(actual).isEmpty()
-        );
+                );
+        assertThat(actual).isEmpty();
     }
 
     @Test
@@ -250,7 +248,7 @@ class ReviewSchedulerWorkflowTest {
             "classpath:sql/fixtures/reservation/project_123.sql",
             "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
     })
-    void 같은_리뷰어의_다른_PR이면_중복으로_보지_않고_모달을_연다(ApplicationEvents applicationEvents) {
+    void 같은_리뷰어의_다른_PR이면_중복으로_보지_않고_모달을_연다(ApplicationEvents actualApplicationEvents) {
         // given
         String metaJson = metaJsonWithProjectIdAndGithubPullRequest("123", 11L, 11);
         JsonNode payload = payloadWithTriggerId("TRIGGER_1");
@@ -269,23 +267,23 @@ class ReviewSchedulerWorkflowTest {
         // then
         assertAll(
                 () -> assertThat(actual).isEmpty(),
-                () -> assertThat(applicationEvents.stream(ReviewReservationRequestEvent.class).toList())
-                        .singleElement()
-                        .satisfies(event -> assertAll(
-                                () -> assertThat(event.teamId()).isEqualTo("T1"),
-                                () -> assertThat(event.githubPullRequestId()).isEqualTo(11L),
-                                () -> assertThat(event.metaJson()).isEqualTo(metaJson)
-                        )),
-                () -> verify(notificationApiClient).openModal(
+                () -> assertThat(actualApplicationEvents.stream(ReviewReservationRequestEvent.class).toList())
+                                        .singleElement()
+                                        .satisfies(actualEvent -> assertAll(
+                                                () -> assertThat(actualEvent.teamId()).isEqualTo("T1"),
+                                                () -> assertThat(actualEvent.githubPullRequestId()).isEqualTo(11L),
+                                                () -> assertThat(actualEvent.metaJson()).isEqualTo(metaJson)
+                                        ))
+        );
+        verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
                         any(View.class)
-                )
-        );
+                );
     }
 
     @Test
-    void 리뷰이가_리뷰_예약을_누르면_예약_불가_알림을_보내고_모달을_열지_않는다(ApplicationEvents applicationEvents) {
+    void 리뷰이가_리뷰_예약을_누르면_예약_불가_알림을_보내고_모달을_열지_않는다(ApplicationEvents actualApplicationEvents) {
         // given
         JsonNode payload = payloadWithTriggerId("TRIGGER_1");
         String metaJson = objectMapper.createObjectNode()
@@ -313,22 +311,20 @@ class ReviewSchedulerWorkflowTest {
         );
 
         // then
-        assertAll(
-                () -> assertThat(actual).isEmpty(),
-                () -> verify(notificationApiClient).sendEphemeralMessage(
+        assertThat(actual).isEmpty();
+        verify(notificationApiClient).sendEphemeralMessage(
                         "xoxb-test-token",
                         "C1",
                         "U1",
                         InteractivityErrorType.REVIEWEE_CANNOT_RESERVE.message()
-                ),
-                () -> verify(notificationApiClient, never()).openModal(any(), any(), any(View.class)),
-                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
-        );
+                );
+        verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
+        assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }
 
     @Test
     @Sql("classpath:sql/fixtures/reservation/project_123.sql")
-    void 요청자_Slack_ID가_공백이면_리뷰이로_판단하지_않고_모달을_연다(ApplicationEvents applicationEvents) {
+    void 요청자_Slack_ID가_공백이면_리뷰이로_판단하지_않고_모달을_연다(ApplicationEvents actualApplicationEvents) {
         // given
         String metaJson = metaJsonWithProjectId("123");
         JsonNode payload = payloadWithTriggerId("TRIGGER_1");
@@ -347,25 +343,25 @@ class ReviewSchedulerWorkflowTest {
         // then
         assertAll(
                 () -> assertThat(actual).isEmpty(),
-                () -> assertThat(applicationEvents.stream(ReviewReservationRequestEvent.class).toList())
-                        .singleElement()
-                        .satisfies(event -> assertAll(
-                                () -> assertThat(event.teamId()).isEqualTo("T1"),
-                                () -> assertThat(event.slackUserId()).isEqualTo(" "),
-                                () -> assertThat(event.metaJson()).isEqualTo(metaJson)
-                        )),
-                () -> verify(notificationApiClient).openModal(
+                () -> assertThat(actualApplicationEvents.stream(ReviewReservationRequestEvent.class).toList())
+                                        .singleElement()
+                                        .satisfies(actualEvent -> assertAll(
+                                                () -> assertThat(actualEvent.teamId()).isEqualTo("T1"),
+                                                () -> assertThat(actualEvent.slackUserId()).isEqualTo(" "),
+                                                () -> assertThat(actualEvent.metaJson()).isEqualTo(metaJson)
+                                        ))
+        );
+        verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
                         any(View.class)
-                ),
-                () -> verify(notificationApiClient, never()).sendEphemeralMessage(
+                );
+        verify(notificationApiClient, never()).sendEphemeralMessage(
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq(" "),
                         eq(InteractivityErrorType.REVIEWEE_CANNOT_RESERVE.message())
-                )
-        );
+                );
     }
 
     private JsonNode payloadWithTriggerId(String triggerId) {

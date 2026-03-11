@@ -49,7 +49,7 @@ class CancelReviewReservationActionHandlerTest {
 
     @Test
     @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
-    void 리뷰_예약_취소_요청이면_예약을_취소하고_취소_예약을_응답한다(ApplicationEvents applicationEvents) {
+    void 리뷰_예약_취소_요청이면_예약을_취소하고_취소_예약을_응답한다(ApplicationEvents actualApplicationEvents) {
         // given
         BlockActionCommandDto command = commandWithReservationId("100", "U1");
 
@@ -57,28 +57,28 @@ class CancelReviewReservationActionHandlerTest {
         BlockActionOutcomeDto actual = cancelReviewReservationActionHandler.handle(command);
 
         // then
-        Optional<ReviewReservation> cancelled = reviewReservationRepository.findById(100L);
+        Optional<ReviewReservation> actualCancelled = reviewReservationRepository.findById(100L);
 
         assertAll(
                 () -> assertThat(actual.duplicateReservation()).isNull(),
                 () -> assertThat(actual.cancelledReservation()).isNotNull(),
                 () -> assertThat(actual.cancelledReservation().getId()).isEqualTo(100L),
-                () -> assertThat(cancelled).isPresent(),
-                () -> assertThat(cancelled.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED),
-                () -> assertThat(applicationEvents.stream(ReviewReservationCancelEvent.class).toList())
-                        .singleElement()
-                        .satisfies(event -> assertAll(
-                                () -> assertThat(event.teamId()).isEqualTo("T1"),
-                                () -> assertThat(event.channelId()).isEqualTo("C1"),
-                                () -> assertThat(event.slackUserId()).isEqualTo("U1"),
-                                () -> assertThat(event.reservationId()).isEqualTo(100L)
-                        )),
-                () -> verify(notificationApiClient, never()).sendEphemeralMessage(any(), any(), any(), any())
+                () -> assertThat(actualCancelled).isPresent(),
+                () -> assertThat(actualCancelled.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED),
+                () -> assertThat(actualApplicationEvents.stream(ReviewReservationCancelEvent.class).toList())
+                                        .singleElement()
+                                        .satisfies(actualEvent -> assertAll(
+                                                () -> assertThat(actualEvent.teamId()).isEqualTo("T1"),
+                                                () -> assertThat(actualEvent.channelId()).isEqualTo("C1"),
+                                                () -> assertThat(actualEvent.slackUserId()).isEqualTo("U1"),
+                                                () -> assertThat(actualEvent.reservationId()).isEqualTo(100L)
+                                        ))
         );
+        verify(notificationApiClient, never()).sendEphemeralMessage(any(), any(), any(), any());
     }
 
     @Test
-    void 존재하지_않는_예약_취소_요청이면_예약_없음_알림을_보내고_빈_응답을_반환한다(ApplicationEvents applicationEvents) {
+    void 존재하지_않는_예약_취소_요청이면_예약_없음_알림을_보내고_빈_응답을_반환한다(ApplicationEvents actualApplicationEvents) {
         // given
         BlockActionCommandDto command = commandWithReservationId("999", "U1");
 
@@ -88,20 +88,20 @@ class CancelReviewReservationActionHandlerTest {
         // then
         assertAll(
                 () -> assertThat(actual.duplicateReservation()).isNull(),
-                () -> assertThat(actual.cancelledReservation()).isNull(),
-                () -> verify(notificationApiClient).sendEphemeralMessage(
+                () -> assertThat(actual.cancelledReservation()).isNull()
+        );
+        verify(notificationApiClient).sendEphemeralMessage(
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U1"),
                         eq(InteractivityErrorType.RESERVATION_NOT_FOUND.message())
-                ),
-                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
-        );
+                );
+        assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }
 
     @Test
     @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
-    void 비소유자의_취소_요청이면_권한_없음_알림을_보내고_빈_응답을_반환한다(ApplicationEvents applicationEvents) {
+    void 비소유자의_취소_요청이면_권한_없음_알림을_보내고_빈_응답을_반환한다(ApplicationEvents actualApplicationEvents) {
         // given
         BlockActionCommandDto command = commandWithReservationId("100", "U2");
 
@@ -111,15 +111,15 @@ class CancelReviewReservationActionHandlerTest {
         // then
         assertAll(
                 () -> assertThat(actual.duplicateReservation()).isNull(),
-                () -> assertThat(actual.cancelledReservation()).isNull(),
-                () -> verify(notificationApiClient).sendEphemeralMessage(
+                () -> assertThat(actual.cancelledReservation()).isNull()
+        );
+        verify(notificationApiClient).sendEphemeralMessage(
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U2"),
                         eq(InteractivityErrorType.NOT_OWNER_CANCEL.message())
-                ),
-                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
-        );
+                );
+        assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }
 
     private BlockActionCommandDto commandWithReservationId(String reservationId, String slackUserId) {
