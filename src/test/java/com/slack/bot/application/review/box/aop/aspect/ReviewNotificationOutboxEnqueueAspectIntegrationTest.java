@@ -46,11 +46,11 @@ class ReviewNotificationOutboxEnqueueAspectIntegrationTest {
     ReviewNotificationSourceContext reviewNotificationSourceContext;
 
     @Autowired
-    ReviewNotificationOutboxEnqueueProbe reviewNotificationOutboxEnqueueProbe;
+    ReviewNotificationOutboxEnqueueProbe actualReviewNotificationOutboxEnqueueProbe;
 
     @BeforeEach
     void setUp() {
-        reviewNotificationOutboxEnqueueProbe.reset();
+        actualReviewNotificationOutboxEnqueueProbe.reset();
     }
 
     @Test
@@ -73,7 +73,7 @@ class ReviewNotificationOutboxEnqueueAspectIntegrationTest {
         // when
         Object actual = reviewNotificationSourceContext.withSourceKey(
                 sourceKey,
-                () -> reviewNotificationOutboxEnqueueProbe.send(
+                () -> actualReviewNotificationOutboxEnqueueProbe.send(
                         token, channelId, blocks, attachments, fallbackText
                 )
         );
@@ -87,15 +87,15 @@ class ReviewNotificationOutboxEnqueueAspectIntegrationTest {
         );
 
         // then
-        JsonNode mergedBlocks = blocksCaptor.getValue();
+        JsonNode actualMergedBlocks = blocksCaptor.getValue();
         assertAll(
                 () -> assertThat(actual).isNull(),
-                () -> assertThat(reviewNotificationOutboxEnqueueProbe.proceedCount()).isZero(),
-                () -> assertThat(mergedBlocks.isArray()).isTrue(),
-                () -> assertThat(mergedBlocks.size()).isEqualTo(3),
-                () -> assertThat(mergedBlocks.get(0).path("type").asText()).isEqualTo("section"),
-                () -> assertThat(mergedBlocks.get(1).path("type").asText()).isEqualTo("actions"),
-                () -> assertThat(mergedBlocks.get(2).path("type").asText()).isEqualTo("context")
+                () -> assertThat(actualReviewNotificationOutboxEnqueueProbe.proceedCount()).isZero(),
+                () -> assertThat(actualMergedBlocks.isArray()).isTrue(),
+                () -> assertThat(actualMergedBlocks.size()).isEqualTo(3),
+                () -> assertThat(actualMergedBlocks.get(0).path("type").asText()).isEqualTo("section"),
+                () -> assertThat(actualMergedBlocks.get(1).path("type").asText()).isEqualTo("actions"),
+                () -> assertThat(actualMergedBlocks.get(2).path("type").asText()).isEqualTo("context")
         );
     }
 
@@ -112,7 +112,7 @@ class ReviewNotificationOutboxEnqueueAspectIntegrationTest {
                                           .build());
 
         // when & then
-        assertThatThrownBy(() -> reviewNotificationOutboxEnqueueProbe.send(
+        assertThatThrownBy(() -> actualReviewNotificationOutboxEnqueueProbe.send(
                 token,
                 "C123",
                 topLevelBlocks(),
@@ -122,16 +122,15 @@ class ReviewNotificationOutboxEnqueueAspectIntegrationTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("sourceKey가 필요합니다");
 
-        assertAll(
-                () -> assertThat(reviewNotificationOutboxEnqueueProbe.proceedCount()).isZero(),
-                () -> verify(reviewNotificationOutboxEnqueuer, never()).enqueueChannelBlocks(
+        int actual = actualReviewNotificationOutboxEnqueueProbe.proceedCount();
+        assertThat(actual).isZero();
+        verify(reviewNotificationOutboxEnqueuer, never()).enqueueChannelBlocks(
                         anyString(),
                         anyString(),
                         anyString(),
                         any(JsonNode.class),
                         any()
-                )
-        );
+                );
     }
 
     private JsonNode topLevelBlocks() {
