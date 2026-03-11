@@ -61,15 +61,15 @@ class OauthServiceTest {
                   .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
 
         // when
-        SlackTokenResponse response = oauthService.exchangeCodeForToken("auth-code");
+        SlackTokenResponse actual = oauthService.exchangeCodeForToken("auth-code");
 
         // then
+        mockServer.verify();
         assertAll(
-                () -> assertThat(response).isNotNull(),
-                () -> assertThat(response.ok()).isTrue(),
-                () -> assertThat(response.accessToken()).isEqualTo("xoxb-test-token"),
-                () -> assertThat(response.team().id()).isEqualTo("T123"),
-                () -> mockServer.verify()
+                () -> assertThat(actual).isNotNull(),
+                () -> assertThat(actual.ok()).isTrue(),
+                () -> assertThat(actual.accessToken()).isEqualTo("xoxb-test-token"),
+                () -> assertThat(actual.team().id()).isEqualTo("T123")
         );
     }
 
@@ -87,12 +87,10 @@ class OauthServiceTest {
                   .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> oauthService.exchangeCodeForToken("auth-code"))
+        assertThatThrownBy(() -> oauthService.exchangeCodeForToken("auth-code"))
                         .isInstanceOf(SlackOauthErrorResponseException.class)
-                        .hasMessageContaining("요청에 실패했습니다."),
-                () -> mockServer.verify()
-        );
+                        .hasMessageContaining("요청에 실패했습니다.");
+        mockServer.verify();
     }
 
     @Test
@@ -103,12 +101,10 @@ class OauthServiceTest {
                   .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> oauthService.exchangeCodeForToken("auth-code"))
+        assertThatThrownBy(() -> oauthService.exchangeCodeForToken("auth-code"))
                         .isInstanceOf(SlackOauthErrorResponseException.class)
-                        .hasMessageContaining("HTTP 응답 : 429 Too Many Requests"),
-                () -> mockServer.verify()
-        );
+                        .hasMessageContaining("HTTP 응답 : 429 Too Many Requests");
+        mockServer.verify();
     }
 
     @Test
@@ -119,12 +115,10 @@ class OauthServiceTest {
                   .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> oauthService.exchangeCodeForToken("auth-code"))
+        assertThatThrownBy(() -> oauthService.exchangeCodeForToken("auth-code"))
                         .isInstanceOf(SlackOauthErrorResponseException.class)
-                        .hasMessageContaining("500 Internal Server Error"),
-                () -> mockServer.verify()
-        );
+                        .hasMessageContaining("500 Internal Server Error");
+        mockServer.verify();
     }
 
     @Test
@@ -137,13 +131,11 @@ class OauthServiceTest {
                   });
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> oauthService.exchangeCodeForToken("auth-code"))
+        assertThatThrownBy(() -> oauthService.exchangeCodeForToken("auth-code"))
                         .isInstanceOf(SlackOauthErrorResponseException.class)
                         .hasMessageContaining("네트워크 오류")
-                        .hasRootCauseInstanceOf(ResourceAccessException.class),
-                () -> mockServer.verify()
-        );
+                        .hasRootCauseInstanceOf(ResourceAccessException.class);
+        mockServer.verify();
     }
 
     @Test
@@ -154,11 +146,9 @@ class OauthServiceTest {
                   .andRespond(withSuccess("null", MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> oauthService.exchangeCodeForToken("auth-code"))
+        assertThatThrownBy(() -> oauthService.exchangeCodeForToken("auth-code"))
                         .isInstanceOf(SlackOauthEmptyResponseException.class)
-                        .hasMessageContaining("응답이 비어 있습니다."),
-                () -> mockServer.verify()
-        );
+                        .hasMessageContaining("응답이 비어 있습니다.");
+        mockServer.verify();
     }
 }
