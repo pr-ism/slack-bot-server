@@ -1,7 +1,6 @@
 package com.slack.bot.application.interactivity.reminder;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -128,10 +127,8 @@ class ReviewReminderDispatcherTest {
         // then
         ArgumentCaptor<ReviewReminder> actual = ArgumentCaptor.forClass(ReviewReminder.class);
         verify(reviewReminderRepository).save(actual.capture());
-        assertAll(
-                () -> assertThat(actual.getValue().isFired()).isTrue(),
-                () -> verifyNoInteractions(notificationSettingsRepository, reviewReminderSlackDirectMessageClient)
-        );
+        verifyNoInteractions(notificationSettingsRepository, reviewReminderSlackDirectMessageClient);
+        assertThat(actual.getValue().isFired()).isTrue();
     }
 
     @Test
