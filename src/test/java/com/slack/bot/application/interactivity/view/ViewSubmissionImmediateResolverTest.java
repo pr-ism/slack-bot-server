@@ -76,12 +76,12 @@ class ViewSubmissionImmediateResolverTest {
         // then
         assertAll(
                 () -> assertThat(actual.response()).isEqualTo(push),
-                () -> assertThat(actual.shouldEnqueue()).isFalse(),
-                () -> verify(reviewScheduleModalPublisher).pushCustomDatetimeModal(
+                () -> assertThat(actual.shouldEnqueue()).isFalse()
+        );
+        verify(reviewScheduleModalPublisher).pushCustomDatetimeModal(
                         "meta-json",
                         "2026-02-15"
-                )
-        );
+                );
     }
 
     @Test

@@ -1,7 +1,6 @@
 package com.slack.bot.application.interactivity.workflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -82,11 +81,9 @@ class ReservationCommandWorkflowUnitTest {
         );
 
         // then
-        assertAll(
-                () -> assertThat(actual).contains(reservation),
-                () -> verify(reviewInteractionEventPublisher).publish(any(ReviewReservationCancelEvent.class)),
-                () -> verify(errorNotifier, never()).notify(any(), any(), any(), any())
-        );
+        assertThat(actual).contains(reservation);
+        verify(reviewInteractionEventPublisher).publish(any(ReviewReservationCancelEvent.class));
+        verify(errorNotifier, never()).notify(any(), any(), any(), any());
     }
 
     @Test
@@ -118,11 +115,9 @@ class ReservationCommandWorkflowUnitTest {
         );
 
         // then
-        assertAll(
-                () -> assertThat(actual).contains(reservation),
-                () -> verify(reviewInteractionEventPublisher, never()).publish(any(ReviewReservationCancelEvent.class)),
-                () -> verify(errorNotifier, never()).notify(any(), any(), any(), any())
-        );
+        assertThat(actual).contains(reservation);
+        verify(reviewInteractionEventPublisher, never()).publish(any(ReviewReservationCancelEvent.class));
+        verify(errorNotifier, never()).notify(any(), any(), any(), any());
     }
 
     private JsonNode actionWithReservationId(String reservationId) {

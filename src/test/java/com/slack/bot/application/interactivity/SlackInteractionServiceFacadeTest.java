@@ -1,7 +1,6 @@
 package com.slack.bot.application.interactivity;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -38,7 +37,7 @@ class SlackInteractionServiceFacadeTest {
     NotificationApiClient notificationApiClient;
 
     @Autowired
-    ReviewReservationRepository reviewReservationRepository;
+    ReviewReservationRepository actualReviewReservationRepository;
 
     @Autowired
     ObjectMapper objectMapper;
@@ -66,21 +65,19 @@ class SlackInteractionServiceFacadeTest {
         );
 
         // then
-        assertAll(
-                () -> assertThat(actual).isEqualTo(SlackActionResponse.empty()),
-                () -> verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1"),
-                () -> verify(notificationApiClient).sendBlockMessage(
+        assertThat(actual).isEqualTo(SlackActionResponse.empty());
+        verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1");
+        verify(notificationApiClient).sendBlockMessage(
                         eq("xoxb-test-token"),
                         eq("D-REVIEWER"),
                         any(),
                         any()
-                ),
-                () -> assertThat(reviewReservationRepository.findById(100L))
+                );
+        assertThat(actualReviewReservationRepository.findById(100L))
                         .isPresent()
                         .get()
                         .extracting(reservation -> reservation.getStatus())
-                        .isEqualTo(ReservationStatus.CANCELLED)
-        );
+                        .isEqualTo(ReservationStatus.CANCELLED);
     }
 
     @Test
@@ -96,15 +93,13 @@ class SlackInteractionServiceFacadeTest {
         SlackActionResponse actual = slackInteractionServiceFacade.handle(payloadJson);
 
         // then
-        assertAll(
-                () -> assertThat(actual).isEqualTo(SlackActionResponse.empty()),
-                () -> verify(notificationApiClient, never()).openDirectMessageChannel(any(), any()),
-                () -> assertThat(reviewReservationRepository.findById(100L))
+        assertThat(actual).isEqualTo(SlackActionResponse.empty());
+        verify(notificationApiClient, never()).openDirectMessageChannel(any(), any());
+        assertThat(actualReviewReservationRepository.findById(100L))
                         .isPresent()
                         .get()
                         .extracting(reservation -> reservation.getStatus())
-                        .isEqualTo(ReservationStatus.ACTIVE)
-        );
+                        .isEqualTo(ReservationStatus.ACTIVE);
     }
 
     @Test
@@ -116,10 +111,8 @@ class SlackInteractionServiceFacadeTest {
         SlackActionResponse actual = slackInteractionServiceFacade.handle(payloadJson);
 
         // then
-        assertAll(
-                () -> assertThat(actual).isEqualTo(SlackActionResponse.clear()),
-                () -> verify(slackInteractionInboxProcessor).enqueueViewSubmission(anyString())
-        );
+        assertThat(actual).isEqualTo(SlackActionResponse.clear());
+        verify(slackInteractionInboxProcessor).enqueueViewSubmission(anyString());
     }
 
     @Test

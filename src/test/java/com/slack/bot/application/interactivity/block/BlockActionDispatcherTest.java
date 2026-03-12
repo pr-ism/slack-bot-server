@@ -75,29 +75,29 @@ class BlockActionDispatcherTest {
         BlockActionOutcomeDto actual = blockActionDispatcher.dispatch(command);
 
         // then
-        Optional<ProjectMember> mapped = projectMemberRepository.findBySlackUser("T1", "U1");
+        Optional<ProjectMember> actualMapped = projectMemberRepository.findBySlackUser("T1", "U1");
 
         assertAll(
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
-                () -> assertThat(mapped).isPresent(),
-                () -> assertThat(mapped.get().getGithubId().getValue()).isEqualTo("new-github-id"),
-                () -> verify(notificationApiClient).sendEphemeralMessage(
+                () -> assertThat(actualMapped).isPresent(),
+                () -> assertThat(actualMapped.get().getGithubId().getValue()).isEqualTo("new-github-id")
+        );
+        verify(notificationApiClient).sendEphemeralMessage(
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U1"),
                         argThat(message -> message.contains("new-github-id"))
-                ),
-                () -> verify(notificationApiClient).sendMessage(
+                );
+        verify(notificationApiClient).sendMessage(
                         eq("xoxb-test-token"),
                         eq("D1"),
                         argThat(message -> message.contains("new-github-id"))
-                )
-        );
+                );
     }
 
     @Test
     @Sql("classpath:sql/fixtures/reservation/project_123.sql")
-    void 예약_생성_모달_열기_액션이면_예약_요청_이벤트를_발행하고_모달을_연다(ApplicationEvents applicationEvents) {
+    void 예약_생성_모달_열기_액션이면_예약_요청_이벤트를_발행하고_모달을_연다(ApplicationEvents actualApplicationEvents) {
         // given
         BlockActionCommandDto command = command(
                 objectMapper.createObjectNode().put("trigger_id", "TRIGGER_1"),
@@ -113,24 +113,24 @@ class BlockActionDispatcherTest {
         // then
         assertAll(
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
-                () -> assertThat(applicationEvents.stream(ReviewReservationRequestEvent.class).toList())
-                        .singleElement()
-                        .satisfies(event -> assertAll(
-                                () -> assertThat(event.teamId()).isEqualTo("T1"),
-                                () -> assertThat(event.channelId()).isEqualTo("C1"),
-                                () -> assertThat(event.slackUserId()).isEqualTo("U1")
-                        )),
-                () -> verify(notificationApiClient).openModal(
+                () -> assertThat(actualApplicationEvents.stream(ReviewReservationRequestEvent.class).toList())
+                                        .singleElement()
+                                        .satisfies(actualEvent -> assertAll(
+                                                () -> assertThat(actualEvent.teamId()).isEqualTo("T1"),
+                                                () -> assertThat(actualEvent.channelId()).isEqualTo("C1"),
+                                                () -> assertThat(actualEvent.slackUserId()).isEqualTo("U1")
+                                        ))
+        );
+        verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
                         any(View.class)
-                )
-        );
+                );
     }
 
     @Test
     @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
-    void 예약_변경_액션이면_변경_모달을_열고_변경_이벤트를_발행한다(ApplicationEvents applicationEvents) {
+    void 예약_변경_액션이면_변경_모달을_열고_변경_이벤트를_발행한다(ApplicationEvents actualApplicationEvents) {
         // given
         BlockActionCommandDto command = command(
                 objectMapper.createObjectNode().put("trigger_id", "TRIGGER_1"),
@@ -146,20 +146,20 @@ class BlockActionDispatcherTest {
         // then
         assertAll(
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
-                () -> assertThat(applicationEvents.stream(ReviewReservationChangeEvent.class).toList())
-                        .singleElement()
-                        .satisfies(event -> assertAll(
-                                () -> assertThat(event.teamId()).isEqualTo("T1"),
-                                () -> assertThat(event.channelId()).isEqualTo("C1"),
-                                () -> assertThat(event.slackUserId()).isEqualTo("U1"),
-                                () -> assertThat(event.reservationId()).isEqualTo(100L)
-                        )),
-                () -> verify(notificationApiClient).openModal(
+                () -> assertThat(actualApplicationEvents.stream(ReviewReservationChangeEvent.class).toList())
+                                        .singleElement()
+                                        .satisfies(actualEvent -> assertAll(
+                                                () -> assertThat(actualEvent.teamId()).isEqualTo("T1"),
+                                                () -> assertThat(actualEvent.channelId()).isEqualTo("C1"),
+                                                () -> assertThat(actualEvent.slackUserId()).isEqualTo("U1"),
+                                                () -> assertThat(actualEvent.reservationId()).isEqualTo(100L)
+                                        ))
+        );
+        verify(notificationApiClient).openModal(
                         eq("xoxb-test-token"),
                         eq("TRIGGER_1"),
                         any(View.class)
-                )
-        );
+                );
     }
 
     @Test
@@ -178,19 +178,19 @@ class BlockActionDispatcherTest {
         BlockActionOutcomeDto actual = blockActionDispatcher.dispatch(command);
 
         // then
-        Optional<ReviewReservation> cancelled = reviewReservationRepository.findById(100L);
+        Optional<ReviewReservation> actualCancelled = reviewReservationRepository.findById(100L);
 
         assertAll(
                 () -> assertThat(actual.duplicateReservation()).isNull(),
                 () -> assertThat(actual.cancelledReservation()).isNotNull(),
                 () -> assertThat(actual.cancelledReservation().getId()).isEqualTo(100L),
-                () -> assertThat(cancelled).isPresent(),
-                () -> assertThat(cancelled.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED)
+                () -> assertThat(actualCancelled).isPresent(),
+                () -> assertThat(actualCancelled.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED)
         );
     }
 
     @Test
-    void 알수없는_액션_타입이면_아무것도_수행하지_않고_빈_결과를_반환한다(ApplicationEvents applicationEvents) {
+    void 알수없는_액션_타입이면_아무것도_수행하지_않고_빈_결과를_반환한다(ApplicationEvents actualApplicationEvents) {
         // given
         BlockActionCommandDto command = command(
                 objectMapper.createObjectNode().put("trigger_id", "TRIGGER_1"),
@@ -206,10 +206,10 @@ class BlockActionDispatcherTest {
         // then
         assertAll(
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
-                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty(),
-                () -> verify(notificationApiClient, never()).openModal(any(), any(), any(View.class)),
-                () -> verify(notificationApiClient, never()).sendEphemeralMessage(any(), any(), any(), any())
+                () -> assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
+        verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
+        verify(notificationApiClient, never()).sendEphemeralMessage(any(), any(), any(), any());
     }
 
     private BlockActionCommandDto command(

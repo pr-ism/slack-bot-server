@@ -2,7 +2,6 @@ package com.slack.bot.application.interactivity.box.in;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
@@ -114,20 +113,18 @@ class SlackInteractionInboxProcessorUnitTest {
         )).willReturn(true);
 
         // when
-        boolean result = slackInteractionInboxProcessor.enqueueBlockAction(payloadJson);
+        boolean actual = slackInteractionInboxProcessor.enqueueBlockAction(payloadJson);
 
         // then
-        assertAll(
-                () -> assertThat(result).isTrue(),
-                () -> verify(idempotencyPayloadEncoder).encodeBlockAction(payloadJson),
-                () -> verify(idempotencyKeyGenerator)
-                        .generate(SlackInteractionIdempotencyScope.BLOCK_ACTIONS, encodedPayload),
-                () -> verify(slackInteractionInboxRepository).enqueue(
+        assertThat(actual).isTrue();
+        verify(idempotencyPayloadEncoder).encodeBlockAction(payloadJson);
+        verify(idempotencyKeyGenerator)
+                        .generate(SlackInteractionIdempotencyScope.BLOCK_ACTIONS, encodedPayload);
+        verify(slackInteractionInboxRepository).enqueue(
                         SlackInteractionInboxType.BLOCK_ACTIONS,
                         "idempotent-key-123",
                         payloadJson
-                )
-        );
+                );
     }
 
     @Test
@@ -168,19 +165,17 @@ class SlackInteractionInboxProcessorUnitTest {
         )).willReturn(true);
 
         // when
-        boolean result = slackInteractionInboxProcessor.enqueueViewSubmission(payloadJson);
+        boolean actual = slackInteractionInboxProcessor.enqueueViewSubmission(payloadJson);
 
         // then
-        assertAll(
-                () -> assertThat(result).isTrue(),
-                () -> verify(idempotencyPayloadEncoder).encodeViewSubmission(payloadJson),
-                () -> verify(idempotencyKeyGenerator)
-                        .generate(SlackInteractionIdempotencyScope.VIEW_SUBMISSION, encodedPayload),
-                () -> verify(slackInteractionInboxRepository).enqueue(
+        assertThat(actual).isTrue();
+        verify(idempotencyPayloadEncoder).encodeViewSubmission(payloadJson);
+        verify(idempotencyKeyGenerator)
+                        .generate(SlackInteractionIdempotencyScope.VIEW_SUBMISSION, encodedPayload);
+        verify(slackInteractionInboxRepository).enqueue(
                         SlackInteractionInboxType.VIEW_SUBMISSION,
                         "idempotent-key-456",
                         payloadJson
-                )
-        );
+                );
     }
 }

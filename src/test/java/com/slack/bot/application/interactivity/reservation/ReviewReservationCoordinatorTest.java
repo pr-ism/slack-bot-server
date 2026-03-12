@@ -287,10 +287,10 @@ class ReviewReservationCoordinatorTest {
         );
 
         // 원래 예약은 취소됨
-        Optional<ReviewReservation> originalReservation = reservationRepository.findById(original.getId());
+        Optional<ReviewReservation> actualOriginalReservation = reservationRepository.findById(original.getId());
         assertAll(
-                () -> assertThat(originalReservation).isPresent(),
-                () -> assertThat(originalReservation.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED)
+                () -> assertThat(actualOriginalReservation).isPresent(),
+                () -> assertThat(actualOriginalReservation.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED)
         );
     }
 
@@ -333,13 +333,13 @@ class ReviewReservationCoordinatorTest {
         ReviewReservation actual = coordinator.reschedule(rescheduleCommand);
 
         // then
-        Optional<ReviewReminder> reminder = reminderRepository.findByReservationId(original.getId());
+        Optional<ReviewReminder> actualReminder = reminderRepository.findByReservationId(original.getId());
         assertAll(
                 () -> assertThat(actual.getId()).isEqualTo(original.getId()),
                 () -> assertThat(actual.getScheduledAt()).isEqualTo(rescheduledAt),
                 () -> assertThat(actual.getStatus()).isEqualTo(ReservationStatus.ACTIVE),
-                () -> assertThat(reminder).isPresent(),
-                () -> assertThat(reminder.get().getScheduledAt()).isEqualTo(rescheduledAt)
+                () -> assertThat(actualReminder).isPresent(),
+                () -> assertThat(actualReminder.get().getScheduledAt()).isEqualTo(rescheduledAt)
         );
     }
 
@@ -393,13 +393,15 @@ class ReviewReservationCoordinatorTest {
                 .build();
 
         // when & then
-        Optional<ReviewReservation> activeReservation = reservationRepository.findById(second.getId());
-        assertAll(
-                () -> assertThatThrownBy(() -> coordinator.reschedule(rescheduleCommand))
+        assertThatThrownBy(() -> coordinator.reschedule(rescheduleCommand))
                         .isInstanceOf(ActiveReservationAlreadyExistsException.class)
-                        .hasMessageContaining("이미 활성화된 리뷰 예약이 있습니다"),
-                () -> assertThat(activeReservation).isPresent(),
-                () -> assertThat(activeReservation.get().getStatus()).isEqualTo(ReservationStatus.ACTIVE)
+                        .hasMessageContaining("이미 활성화된 리뷰 예약이 있습니다");
+
+        Optional<ReviewReservation> actual = reservationRepository.findById(second.getId());
+
+        assertAll(
+                () -> assertThat(actual).isPresent(),
+                () -> assertThat(actual.get().getStatus()).isEqualTo(ReservationStatus.ACTIVE)
         );
     }
 

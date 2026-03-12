@@ -1,7 +1,6 @@
 package com.slack.bot.application.interactivity.client;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.springframework.http.HttpMethod.POST;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
@@ -107,12 +106,10 @@ class ReviewReminderSlackDirectMessageClientTest {
                   .andRespond(withSuccess(openResponseBody, MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> slackDirectMessageClient.send(token, userId, "message"))
+        assertThatThrownBy(() -> slackDirectMessageClient.send(token, userId, "message"))
                         .isInstanceOf(SlackDmException.class)
-                        .hasMessageContaining("channel_not_found"),
-                () -> mockServer.verify()
-        );
+                        .hasMessageContaining("channel_not_found");
+        mockServer.verify();
     }
 
     @Test
@@ -147,12 +144,10 @@ class ReviewReminderSlackDirectMessageClientTest {
                   .andRespond(withSuccess(postResponseBody, MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> slackDirectMessageClient.send(token, userId, "message"))
+        assertThatThrownBy(() -> slackDirectMessageClient.send(token, userId, "message"))
                         .isInstanceOf(SlackDmException.class)
-                        .hasMessageContaining("not_in_channel"),
-                () -> mockServer.verify()
-        );
+                        .hasMessageContaining("not_in_channel");
+        mockServer.verify();
     }
 
     @Test
@@ -186,12 +181,10 @@ class ReviewReminderSlackDirectMessageClientTest {
                   .andRespond(withSuccess(postResponseBody, MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> slackDirectMessageClient.send(token, userId, "message"))
+        assertThatThrownBy(() -> slackDirectMessageClient.send(token, userId, "message"))
                         .isInstanceOf(SlackDmException.class)
-                        .hasMessageContaining("알 수 없는 오류"),
-                () -> mockServer.verify()
-        );
+                        .hasMessageContaining("알 수 없는 오류");
+        mockServer.verify();
     }
 
     @Test
@@ -223,13 +216,11 @@ class ReviewReminderSlackDirectMessageClientTest {
                           .body(longBody));
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> slackDirectMessageClient.send(token, userId, "message"))
+        assertThatThrownBy(() -> slackDirectMessageClient.send(token, userId, "message"))
                         .isInstanceOf(SlackDmException.class)
                         .hasMessageContaining("status=500")
-                        .hasMessageContaining("...(truncated)"),
-                () -> mockServer.verify()
-        );
+                        .hasMessageContaining("...(truncated)");
+        mockServer.verify();
     }
 
     @Test

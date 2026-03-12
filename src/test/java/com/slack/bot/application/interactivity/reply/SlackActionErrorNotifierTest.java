@@ -1,7 +1,6 @@
 package com.slack.bot.application.interactivity.reply;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.Mockito.verify;
 
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
@@ -44,17 +43,15 @@ class SlackActionErrorNotifierTest {
         SlackActionErrorNotifier notifier = new SlackActionErrorNotifier(notificationApiClient);
 
         // when
-        SlackActionResponse response = notifier.respond("xoxb", "C1", "U1", InteractivityErrorType.RESERVATION_NOT_FOUND);
+        SlackActionResponse actual = notifier.respond("xoxb", "C1", "U1", InteractivityErrorType.RESERVATION_NOT_FOUND);
 
         // then
-        assertAll(
-                () -> verify(notificationApiClient).sendEphemeralMessage(
+        verify(notificationApiClient).sendEphemeralMessage(
                         "xoxb",
                         "C1",
                         "U1",
                         InteractivityErrorType.RESERVATION_NOT_FOUND.message()
-                ),
-                () -> assertThat(response).isEqualTo(SlackActionResponse.empty())
-        );
+                );
+        assertThat(actual).isEqualTo(SlackActionResponse.empty());
     }
 }

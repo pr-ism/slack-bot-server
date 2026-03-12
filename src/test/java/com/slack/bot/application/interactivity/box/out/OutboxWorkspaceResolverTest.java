@@ -2,7 +2,6 @@ package com.slack.bot.application.interactivity.box.out;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -41,10 +40,8 @@ class OutboxWorkspaceResolverTest {
         String actual = resolver.resolve("token");
 
         // then
-        assertAll(
-                () -> assertThat(actual).isEqualTo("T1"),
-                () -> verify(workspaceRepository).findByAccessToken("token")
-        );
+        assertThat(actual).isEqualTo("T1");
+        verify(workspaceRepository).findByAccessToken("token");
     }
 
     @Test

@@ -59,7 +59,7 @@ class ReviewReservationWorkflowTest {
 
     @Test
     @Sql("classpath:sql/fixtures/interactivity/project_123.sql")
-    void 신규_예약을_생성하면_clear_응답을_반환한다(ApplicationEvents applicationEvents) {
+    void 신규_예약을_생성하면_clear_응답을_반환한다(ApplicationEvents actualApplicationEvents) {
         // given
         ReviewScheduleMetaDto meta = meta("123", null);
         Instant scheduledAt = Instant.now().plusSeconds(3600);
@@ -68,21 +68,21 @@ class ReviewReservationWorkflowTest {
         SlackActionResponse actual = reviewReservationWorkflow.reserveReview(meta, "U1", "xoxb-test-token", scheduledAt);
 
         // then
-        Optional<ReviewReservation> saved = reviewReservationRepository.findActive("T1", 123L, "U1");
+        Optional<ReviewReservation> actualSaved = reviewReservationRepository.findActive("T1", 123L, "U1");
 
         assertAll(
                 () -> assertThat(actual).isEqualTo(SlackActionResponse.clear()),
-                () -> assertThat(saved).isPresent(),
-                () -> assertThat(saved.get().getReservationPullRequest().getGithubPullRequestId()).isEqualTo(10L),
-                () -> assertThat(saved.get().getReservationPullRequest().getPullRequestTitle()).isEqualTo("PR 제목"),
-                () -> assertThat(applicationEvents.stream(ReviewReservationScheduledEvent.class).toList())
+                () -> assertThat(actualSaved).isPresent(),
+                () -> assertThat(actualSaved.get().getReservationPullRequest().getGithubPullRequestId()).isEqualTo(10L),
+                () -> assertThat(actualSaved.get().getReservationPullRequest().getPullRequestTitle()).isEqualTo("PR 제목"),
+                () -> assertThat(actualApplicationEvents.stream(ReviewReservationScheduledEvent.class).toList())
                         .singleElement()
-                        .satisfies(event -> assertAll(
-                                () -> assertThat(event.teamId()).isEqualTo("T1"),
-                                () -> assertThat(event.channelId()).isEqualTo("C1"),
-                                () -> assertThat(event.slackUserId()).isEqualTo("U1"),
-                                () -> assertThat(event.projectId()).isEqualTo(123L),
-                                () -> assertThat(event.githubPullRequestId()).isEqualTo(10L)
+                        .satisfies(actualEvent -> assertAll(
+                                () -> assertThat(actualEvent.teamId()).isEqualTo("T1"),
+                                () -> assertThat(actualEvent.channelId()).isEqualTo("C1"),
+                                () -> assertThat(actualEvent.slackUserId()).isEqualTo("U1"),
+                                () -> assertThat(actualEvent.projectId()).isEqualTo(123L),
+                                () -> assertThat(actualEvent.githubPullRequestId()).isEqualTo(10L)
                         ))
         );
     }
@@ -92,7 +92,7 @@ class ReviewReservationWorkflowTest {
             "classpath:sql/fixtures/interactivity/project_123.sql",
             "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
     })
-    void 중복된_신규_예약이면_빈_응답을_반환한다(ApplicationEvents applicationEvents) {
+    void 중복된_신규_예약이면_빈_응답을_반환한다(ApplicationEvents actualApplicationEvents) {
         // given
         ReviewScheduleMetaDto meta = meta("123", null);
         Instant scheduledAt = Instant.now().plusSeconds(3600);
@@ -101,18 +101,18 @@ class ReviewReservationWorkflowTest {
         SlackActionResponse actual = reviewReservationWorkflow.reserveReview(meta, "U1", "xoxb-test-token", scheduledAt);
 
         // then
-        Optional<ReviewReservation> active = reviewReservationRepository.findById(100L);
+        Optional<ReviewReservation> actualActive = reviewReservationRepository.findById(100L);
 
         assertAll(
                 () -> assertThat(actual).isEqualTo(SlackActionResponse.empty()),
-                () -> assertThat(active).isPresent(),
-                () -> assertThat(active.get().getId()).isEqualTo(100L),
-                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
+                () -> assertThat(actualActive).isPresent(),
+                () -> assertThat(actualActive.get().getId()).isEqualTo(100L),
+                () -> assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 
     @Test
-    void 예약_처리에_실패하면_에러_알림을_보내고_빈_응답을_반환한다(ApplicationEvents applicationEvents) {
+    void 예약_처리에_실패하면_에러_알림을_보내고_빈_응답을_반환한다(ApplicationEvents actualApplicationEvents) {
         // given
         ReviewScheduleMetaDto meta = meta("999", null);
         Instant scheduledAt = Instant.now().plusSeconds(3600);
@@ -121,21 +121,19 @@ class ReviewReservationWorkflowTest {
         SlackActionResponse actual = reviewReservationWorkflow.reserveReview(meta, "U1", "xoxb-test-token", scheduledAt);
 
         // then
-        assertAll(
-                () -> assertThat(actual).isEqualTo(SlackActionResponse.empty()),
-                () -> verify(notificationApiClient).sendEphemeralMessage(
+        assertThat(actual).isEqualTo(SlackActionResponse.empty());
+        verify(notificationApiClient).sendEphemeralMessage(
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U1"),
                         eq(InteractivityErrorType.RESERVATION_FAILURE.message())
-                ),
-                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
-        );
+                );
+        assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }
 
     @Test
     @Sql("classpath:sql/fixtures/interactivity/project_123.sql")
-    void reservation_ID가_숫자가_아니면_신규_예약으로_처리한다(ApplicationEvents applicationEvents) {
+    void reservation_ID가_숫자가_아니면_신규_예약으로_처리한다(ApplicationEvents actualApplicationEvents) {
         // given
         ReviewScheduleMetaDto meta = meta("123", "abc");
         Instant scheduledAt = Instant.now().plusSeconds(3600);
@@ -144,20 +142,20 @@ class ReviewReservationWorkflowTest {
         SlackActionResponse actual = reviewReservationWorkflow.reserveReview(meta, "U1", "xoxb-test-token", scheduledAt);
 
         // then
-        Optional<ReviewReservation> saved = reviewReservationRepository.findActive("T1", 123L, "U1");
+        Optional<ReviewReservation> actualSaved = reviewReservationRepository.findActive("T1", 123L, "U1");
 
         assertAll(
                 () -> assertThat(actual).isEqualTo(SlackActionResponse.clear()),
-                () -> assertThat(saved).isPresent(),
-                () -> assertThat(saved.get().getId()).isNotNull(),
-                () -> assertThat(applicationEvents.stream(ReviewReservationScheduledEvent.class).toList())
+                () -> assertThat(actualSaved).isPresent(),
+                () -> assertThat(actualSaved.get().getId()).isNotNull(),
+                () -> assertThat(actualApplicationEvents.stream(ReviewReservationScheduledEvent.class).toList())
                         .singleElement()
-                        .satisfies(event -> assertAll(
-                                () -> assertThat(event.teamId()).isEqualTo("T1"),
-                                () -> assertThat(event.channelId()).isEqualTo("C1"),
-                                () -> assertThat(event.slackUserId()).isEqualTo("U1"),
-                                () -> assertThat(event.projectId()).isEqualTo(123L),
-                                () -> assertThat(event.githubPullRequestId()).isEqualTo(10L)
+                        .satisfies(actualEvent -> assertAll(
+                                () -> assertThat(actualEvent.teamId()).isEqualTo("T1"),
+                                () -> assertThat(actualEvent.channelId()).isEqualTo("C1"),
+                                () -> assertThat(actualEvent.slackUserId()).isEqualTo("U1"),
+                                () -> assertThat(actualEvent.projectId()).isEqualTo(123L),
+                                () -> assertThat(actualEvent.githubPullRequestId()).isEqualTo(10L)
                         ))
         );
     }
@@ -167,7 +165,7 @@ class ReviewReservationWorkflowTest {
             "classpath:sql/fixtures/interactivity/project_123.sql",
             "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
     })
-    void 예약_ID가_있으면_기존_예약을_변경한다(ApplicationEvents applicationEvents) {
+    void 예약_ID가_있으면_기존_예약을_변경한다(ApplicationEvents actualApplicationEvents) {
         // given
         ReviewScheduleMetaDto meta = meta("123", "100");
         Instant scheduledAt = Instant.parse("2099-01-01T10:00:00Z");
@@ -176,25 +174,25 @@ class ReviewReservationWorkflowTest {
         SlackActionResponse actual = reviewReservationWorkflow.reserveReview(meta, "U1", "xoxb-test-token", scheduledAt);
 
         // then
-        Optional<ReviewReservation> changed = reviewReservationRepository.findById(100L);
+        Optional<ReviewReservation> actualChanged = reviewReservationRepository.findById(100L);
 
         assertAll(
                 () -> assertThat(actual).isEqualTo(SlackActionResponse.clear()),
-                () -> assertThat(changed).isPresent(),
-                () -> assertThat(changed.get().getScheduledAt()).isEqualTo(scheduledAt),
-                () -> verify(notificationApiClient, never()).sendEphemeralMessage(any(), any(), any(), any()),
-                () -> verify(notificationApiClient, never()).sendEphemeralBlockMessage(any(), any(), any(), any(), any()),
-                () -> assertThat(applicationEvents.stream(ReviewReservationScheduledEvent.class).toList())
-                        .singleElement()
-                        .satisfies(event -> assertAll(
-                                () -> assertThat(event.teamId()).isEqualTo("T1"),
-                                () -> assertThat(event.channelId()).isEqualTo("C1"),
-                                () -> assertThat(event.slackUserId()).isEqualTo("U1"),
-                                () -> assertThat(event.reservationId()).isEqualTo(100L),
-                                () -> assertThat(event.projectId()).isEqualTo(123L),
-                                () -> assertThat(event.githubPullRequestId()).isEqualTo(10L)
-                        ))
+                () -> assertThat(actualChanged).isPresent(),
+                () -> assertThat(actualChanged.get().getScheduledAt()).isEqualTo(scheduledAt)
         );
+        verify(notificationApiClient, never()).sendEphemeralMessage(any(), any(), any(), any());
+        verify(notificationApiClient, never()).sendEphemeralBlockMessage(any(), any(), any(), any(), any());
+        assertThat(actualApplicationEvents.stream(ReviewReservationScheduledEvent.class).toList())
+                        .singleElement()
+                        .satisfies(actualEvent -> assertAll(
+                                () -> assertThat(actualEvent.teamId()).isEqualTo("T1"),
+                                () -> assertThat(actualEvent.channelId()).isEqualTo("C1"),
+                                () -> assertThat(actualEvent.slackUserId()).isEqualTo("U1"),
+                                () -> assertThat(actualEvent.reservationId()).isEqualTo(100L),
+                                () -> assertThat(actualEvent.projectId()).isEqualTo(123L),
+                                () -> assertThat(actualEvent.githubPullRequestId()).isEqualTo(10L)
+                        ));
     }
 
     @Test
@@ -202,7 +200,7 @@ class ReviewReservationWorkflowTest {
             "classpath:sql/fixtures/interactivity/project_123.sql",
             "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
     })
-    void 동시성_중복_예외가_발생하면_활성_예약을_조회해_중복_안내를_수행한다(ApplicationEvents applicationEvents) {
+    void 동시성_중복_예외가_발생하면_활성_예약을_조회해_중복_안내를_수행한다(ApplicationEvents actualApplicationEvents) {
         // given
         ReviewScheduleMetaDto meta = meta("123", null);
         ReservationPullRequest reservationPullRequest = ReservationPullRequest.builder()
@@ -238,13 +236,13 @@ class ReviewReservationWorkflowTest {
         // then
         assertAll(
                 () -> assertThat(actual).isEqualTo(SlackActionResponse.empty()),
-                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
+                () -> assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 
     @Test
     @Sql("classpath:sql/fixtures/interactivity/project_123.sql")
-    void 즉시_알림_분기를_통과한다(ApplicationEvents applicationEvents) {
+    void 즉시_알림_분기를_통과한다(ApplicationEvents actualApplicationEvents) {
         // given
         Instant nowForValidation = Instant.parse("2099-01-01T00:00:00Z");
         Instant scheduledAt = Instant.parse("2099-01-01T00:00:10Z");
@@ -258,21 +256,21 @@ class ReviewReservationWorkflowTest {
         // then
         assertAll(
                 () -> assertThat(actual).isEqualTo(SlackActionResponse.clear()),
-                () -> assertThat(applicationEvents.stream(ReviewReservationScheduledEvent.class).toList())
+                () -> assertThat(actualApplicationEvents.stream(ReviewReservationScheduledEvent.class).toList())
                         .singleElement()
-                        .satisfies(event -> assertAll(
-                                () -> assertThat(event.teamId()).isEqualTo("T1"),
-                                () -> assertThat(event.channelId()).isEqualTo("C1"),
-                                () -> assertThat(event.slackUserId()).isEqualTo("U1"),
-                                () -> assertThat(event.projectId()).isEqualTo(123L),
-                                () -> assertThat(event.githubPullRequestId()).isEqualTo(10L)
+                        .satisfies(actualEvent -> assertAll(
+                                () -> assertThat(actualEvent.teamId()).isEqualTo("T1"),
+                                () -> assertThat(actualEvent.channelId()).isEqualTo("C1"),
+                                () -> assertThat(actualEvent.slackUserId()).isEqualTo("U1"),
+                                () -> assertThat(actualEvent.projectId()).isEqualTo(123L),
+                                () -> assertThat(actualEvent.githubPullRequestId()).isEqualTo(10L)
                         ))
         );
     }
 
     @Test
     @Sql("classpath:sql/fixtures/interactivity/project_123.sql")
-    void 예약_시간이_과거로_판정되면_모달_에러로_메시지를_반환한다(ApplicationEvents applicationEvents) {
+    void 예약_시간이_과거로_판정되면_모달_에러로_메시지를_반환한다(ApplicationEvents actualApplicationEvents) {
         // given
         ReviewScheduleMetaDto meta = meta("123", null);
         Instant scheduledAt = Instant.now(clock).plusSeconds(3600);
@@ -292,7 +290,7 @@ class ReviewReservationWorkflowTest {
         assertAll(
                 () -> assertThat(actual.responseAction()).isEqualTo("errors"),
                 () -> assertThat(actual.errors()).containsEntry("time_block", "리뷰 예약 시간은 현재보다 이후여야 합니다."),
-                () -> assertThat(applicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
+                () -> assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
 

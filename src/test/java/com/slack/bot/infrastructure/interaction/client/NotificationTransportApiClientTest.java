@@ -2,7 +2,6 @@ package com.slack.bot.infrastructure.interaction.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.springframework.http.HttpMethod.POST;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
@@ -81,10 +80,8 @@ class NotificationTransportApiClientTest {
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertDoesNotThrow(() -> notificationApiClient.sendEphemeralMessage(token, channelId, targetUserId, text)),
-                () -> mockServer.verify()
-        );
+        assertDoesNotThrow(() -> notificationApiClient.sendEphemeralMessage(token, channelId, targetUserId, text));
+        mockServer.verify();
     }
 
     @Test
@@ -146,10 +143,8 @@ class NotificationTransportApiClientTest {
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertDoesNotThrow(() -> notificationApiClient.sendEphemeralBlockMessage(token, channelId, targetUserId, blocks, text)),
-                () -> mockServer.verify()
-        );
+        assertDoesNotThrow(() -> notificationApiClient.sendEphemeralBlockMessage(token, channelId, targetUserId, blocks, text));
+        mockServer.verify();
     }
 
     @Test
@@ -184,10 +179,8 @@ class NotificationTransportApiClientTest {
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertDoesNotThrow(() -> notificationApiClient.sendEphemeralBlockMessage(token, channelId, targetUserId, blocks, null)),
-                () -> mockServer.verify()
-        );
+        assertDoesNotThrow(() -> notificationApiClient.sendEphemeralBlockMessage(token, channelId, targetUserId, blocks, null));
+        mockServer.verify();
     }
 
     @Test
@@ -216,10 +209,8 @@ class NotificationTransportApiClientTest {
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertDoesNotThrow(() -> notificationApiClient.sendMessage(token, channelId, text)),
-                () -> mockServer.verify()
-        );
+        assertDoesNotThrow(() -> notificationApiClient.sendMessage(token, channelId, text));
+        mockServer.verify();
     }
 
     @Test
@@ -302,7 +293,7 @@ class NotificationTransportApiClientTest {
         assertThatThrownBy(() -> notificationApiClient.sendMessage(token, channelId, text))
                 .isInstanceOf(SlackBotMessageDispatchException.class)
                 .hasMessageContaining("invalid_arguments")
-                .satisfies(e -> assertThat(e.getMessage()).doesNotContain("messages="));
+                .satisfies(actual -> assertThat(actual.getMessage()).doesNotContain("messages="));
     }
 
     @Test
@@ -337,10 +328,8 @@ class NotificationTransportApiClientTest {
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertDoesNotThrow(() -> notificationApiClient.sendBlockMessage(token, channelId, blocks, text)),
-                () -> mockServer.verify()
-        );
+        assertDoesNotThrow(() -> notificationApiClient.sendBlockMessage(token, channelId, blocks, text));
+        mockServer.verify();
     }
 
     @Test
@@ -373,10 +362,8 @@ class NotificationTransportApiClientTest {
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertDoesNotThrow(() -> notificationApiClient.sendBlockMessage(token, channelId, blocks, null)),
-                () -> mockServer.verify()
-        );
+        assertDoesNotThrow(() -> notificationApiClient.sendBlockMessage(token, channelId, blocks, null));
+        mockServer.verify();
     }
 
     @Test
@@ -406,13 +393,11 @@ class NotificationTransportApiClientTest {
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when
-        String actualChannelId = notificationApiClient.openDirectMessageChannel(token, userId);
+        String actual = notificationApiClient.openDirectMessageChannel(token, userId);
 
         // then
-        assertAll(
-                () -> assertThat(actualChannelId).isEqualTo("D234"),
-                () -> mockServer.verify()
-        );
+        mockServer.verify();
+        assertThat(actual).isEqualTo("D234");
     }
 
     @Test
@@ -515,10 +500,8 @@ class NotificationTransportApiClientTest {
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertDoesNotThrow(() -> notificationApiClient.openModal(token, triggerId, view)),
-                () -> mockServer.verify()
-        );
+        assertDoesNotThrow(() -> notificationApiClient.openModal(token, triggerId, view));
+        mockServer.verify();
     }
 
     @Test
@@ -583,10 +566,8 @@ class NotificationTransportApiClientTest {
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertDoesNotThrow(() -> notificationApiClient.openModal(token, triggerId, view)),
-                () -> mockServer.verify()
-        );
+        assertDoesNotThrow(() -> notificationApiClient.openModal(token, triggerId, view));
+        mockServer.verify();
     }
 
     @Test
@@ -624,10 +605,8 @@ class NotificationTransportApiClientTest {
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertDoesNotThrow(() -> notificationApiClient.openModal(token, triggerId, view)),
-                () -> mockServer.verify()
-        );
+        assertDoesNotThrow(() -> notificationApiClient.openModal(token, triggerId, view));
+        mockServer.verify();
     }
 
     @Test
@@ -741,7 +720,7 @@ class NotificationTransportApiClientTest {
         assertThatThrownBy(() -> notificationApiClient.sendMessage(token, channelId, text))
                 .isInstanceOf(SlackBotMessageDispatchException.class)
                 .hasMessageContaining("short error message")
-                .satisfies(e -> assertThat(e.getMessage()).doesNotContain("(truncated)"));
+                .satisfies(actual -> assertThat(actual.getMessage()).doesNotContain("(truncated)"));
     }
 
     @Test

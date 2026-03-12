@@ -35,14 +35,14 @@ class ReviewReservationTimeViewFactoryTest {
         );
 
         // when
-        View view = factory.reviewTimeSubmitModal("{\"teamId\":\"T1\"}");
+        View actualView = factory.reviewTimeSubmitModal("{\"teamId\":\"T1\"}");
 
         // then
-        List<LayoutBlock> blocks = view.getBlocks();
+        List<LayoutBlock> actualBlocks = actualView.getBlocks();
         assertAll(
-                () -> assertThat(view.getCallbackId()).isEqualTo(ViewCallbackId.REVIEW_TIME_SUBMIT.value()),
-                () -> assertThat(view.getTitle().getText()).isEqualTo("리뷰 시간 설정"),
-                () -> assertThat(blocks).hasSize(1)
+                () -> assertThat(actualView.getCallbackId()).isEqualTo(ViewCallbackId.REVIEW_TIME_SUBMIT.value()),
+                () -> assertThat(actualView.getTitle().getText()).isEqualTo("리뷰 시간 설정"),
+                () -> assertThat(actualBlocks).hasSize(1)
         );
     }
 
@@ -63,9 +63,7 @@ class ReviewReservationTimeViewFactoryTest {
         View actual = factory.customDatetimeModal(metaJson, initialDate);
 
         // then
-        assertAll(
-                () -> verify(customFactory).create(metaJson, initialDate),
-                () -> assertThat(actual).isSameAs(modal)
-        );
+        verify(customFactory).create(metaJson, initialDate);
+        assertThat(actual).isSameAs(modal);
     }
 }

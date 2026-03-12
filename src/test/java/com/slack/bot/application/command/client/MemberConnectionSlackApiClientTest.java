@@ -2,7 +2,6 @@ package com.slack.bot.application.command.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.springframework.http.HttpMethod.GET;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
@@ -61,13 +60,11 @@ class MemberConnectionSlackApiClientTest {
                   .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
 
         // when
-        String displayName = memberConnectionSlackApiClient.resolveUserName("xoxb-token", "U1");
+        String actual = memberConnectionSlackApiClient.resolveUserName("xoxb-token", "U1");
 
         // then
-        assertAll(
-                () -> assertThat(displayName).isEqualTo("hong"),
-                () -> mockServer.verify()
-        );
+        mockServer.verify();
+        assertThat(actual).isEqualTo("hong");
     }
 
     @Test
@@ -90,13 +87,11 @@ class MemberConnectionSlackApiClientTest {
                   .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
 
         // when
-        String displayName = memberConnectionSlackApiClient.resolveUserName("xoxb-token", "U2");
+        String actual = memberConnectionSlackApiClient.resolveUserName("xoxb-token", "U2");
 
         // then
-        assertAll(
-                () -> assertThat(displayName).isEqualTo("홍길동"),
-                () -> mockServer.verify()
-        );
+        mockServer.verify();
+        assertThat(actual).isEqualTo("홍길동");
     }
 
     @Test
@@ -113,13 +108,11 @@ class MemberConnectionSlackApiClientTest {
                   .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
 
         // when
-        String displayName = memberConnectionSlackApiClient.resolveUserName("xoxb-token", "U3");
+        String actual = memberConnectionSlackApiClient.resolveUserName("xoxb-token", "U3");
 
         // then
-        assertAll(
-                () -> assertThat(displayName).isEqualTo("U3"),
-                () -> mockServer.verify()
-        );
+        mockServer.verify();
+        assertThat(actual).isEqualTo("U3");
     }
 
     @Test
@@ -131,10 +124,9 @@ class MemberConnectionSlackApiClientTest {
                   .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> memberConnectionSlackApiClient.resolveUserName("xoxb-token", "U4"))
-                        .isInstanceOf(SlackUserInfoRequestException.class),
-                () -> mockServer.verify()
-        );
+        assertThatThrownBy(() -> memberConnectionSlackApiClient.resolveUserName("xoxb-token", "U4"))
+                        .isInstanceOf(SlackUserInfoRequestException.class);
+
+        mockServer.verify();
     }
 }

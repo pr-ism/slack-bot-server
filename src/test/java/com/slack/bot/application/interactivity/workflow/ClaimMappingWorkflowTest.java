@@ -50,19 +50,19 @@ class ClaimMappingWorkflowTest {
 
         assertAll(
                 () -> assertThat(actual).isPresent(),
-                () -> assertThat(actual.get().getGithubId().getValue()).isEqualTo("new-github-id"),
-                () -> verify(notificationApiClient).sendEphemeralMessage(
+                () -> assertThat(actual.get().getGithubId().getValue()).isEqualTo("new-github-id")
+        );
+        verify(notificationApiClient).sendEphemeralMessage(
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U1"),
                         argThat(message -> message.contains("new-github-id"))
-                ),
-                () -> verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1"),
-                () -> verify(notificationApiClient).sendMessage(
+                );
+        verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1");
+        verify(notificationApiClient).sendMessage(
                         eq("xoxb-test-token"),
                         eq("D1"),
                         argThat(message -> message.contains("new-github-id"))
-                )
-        );
+                );
     }
 }

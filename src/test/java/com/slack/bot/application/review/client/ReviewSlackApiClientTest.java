@@ -1,7 +1,6 @@
 package com.slack.bot.application.review.client;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.springframework.http.HttpMethod.POST;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
@@ -63,10 +62,8 @@ class ReviewSlackApiClientTest {
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertDoesNotThrow(() -> reviewSlackApiClient.sendBlockMessage(token, channelId, blocks, attachments, fallbackText)),
-                () -> mockServer.verify()
-        );
+        assertDoesNotThrow(() -> reviewSlackApiClient.sendBlockMessage(token, channelId, blocks, attachments, fallbackText));
+        mockServer.verify();
     }
 
     @Test
@@ -84,10 +81,8 @@ class ReviewSlackApiClientTest {
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertDoesNotThrow(() -> reviewSlackApiClient.sendBlockMessage(token, channelId, blocks, null, null)),
-                () -> mockServer.verify()
-        );
+        assertDoesNotThrow(() -> reviewSlackApiClient.sendBlockMessage(token, channelId, blocks, null, null));
+        mockServer.verify();
     }
 
     @Test
@@ -105,12 +100,10 @@ class ReviewSlackApiClientTest {
                   .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> reviewSlackApiClient.sendBlockMessage(token, channelId, blocks, null, null))
+        assertThatThrownBy(() -> reviewSlackApiClient.sendBlockMessage(token, channelId, blocks, null, null))
                         .isInstanceOf(ReviewSlackApiException.class)
-                        .hasMessageContaining("invalid_blocks"),
-                () -> mockServer.verify()
-        );
+                        .hasMessageContaining("invalid_blocks");
+        mockServer.verify();
     }
 
     @Test
@@ -127,12 +120,10 @@ class ReviewSlackApiClientTest {
                           .contentType(MediaType.TEXT_PLAIN));
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> reviewSlackApiClient.sendBlockMessage(token, channelId, blocks, null, null))
+        assertThatThrownBy(() -> reviewSlackApiClient.sendBlockMessage(token, channelId, blocks, null, null))
                         .isInstanceOf(ReviewSlackApiException.class)
-                        .hasMessageContaining("chat.postMessage"),
-                () -> mockServer.verify()
-        );
+                        .hasMessageContaining("chat.postMessage");
+        mockServer.verify();
     }
 
     @Test
@@ -147,12 +138,10 @@ class ReviewSlackApiClientTest {
                   .andRespond(withSuccess());
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> reviewSlackApiClient.sendBlockMessage(token, channelId, blocks, null, null))
+        assertThatThrownBy(() -> reviewSlackApiClient.sendBlockMessage(token, channelId, blocks, null, null))
                         .isInstanceOf(ReviewSlackApiException.class)
-                        .hasMessageContaining("응답이 비어 있습니다"),
-                () -> mockServer.verify()
-        );
+                        .hasMessageContaining("응답이 비어 있습니다");
+        mockServer.verify();
     }
 
     @Test
@@ -168,12 +157,10 @@ class ReviewSlackApiClientTest {
                   .andRespond(withSuccess(invalidJson, MediaType.APPLICATION_JSON));
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> reviewSlackApiClient.sendBlockMessage(token, channelId, blocks, null, null))
+        assertThatThrownBy(() -> reviewSlackApiClient.sendBlockMessage(token, channelId, blocks, null, null))
                         .isInstanceOf(ReviewSlackApiException.class)
-                        .hasMessageContaining("파싱 실패"),
-                () -> mockServer.verify()
-        );
+                        .hasMessageContaining("파싱 실패");
+        mockServer.verify();
     }
 
     @Test
@@ -190,12 +177,10 @@ class ReviewSlackApiClientTest {
                           .contentType(MediaType.TEXT_PLAIN));
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> reviewSlackApiClient.sendBlockMessage(token, channelId, blocks, null, null))
+        assertThatThrownBy(() -> reviewSlackApiClient.sendBlockMessage(token, channelId, blocks, null, null))
                         .isInstanceOf(ReviewSlackApiException.class)
-                        .hasMessageContaining("chat.postMessage"),
-                () -> mockServer.verify()
-        );
+                        .hasMessageContaining("chat.postMessage");
+        mockServer.verify();
     }
 
     @Test
@@ -213,11 +198,9 @@ class ReviewSlackApiClientTest {
                           .contentType(MediaType.TEXT_PLAIN));
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> reviewSlackApiClient.sendBlockMessage(token, channelId, blocks, null, null))
+        assertThatThrownBy(() -> reviewSlackApiClient.sendBlockMessage(token, channelId, blocks, null, null))
                         .isInstanceOf(ReviewSlackApiException.class)
-                        .hasMessageContaining("truncated"),
-                () -> mockServer.verify()
-        );
+                        .hasMessageContaining("truncated");
+        mockServer.verify();
     }
 }

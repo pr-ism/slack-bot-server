@@ -2,7 +2,6 @@ package com.slack.bot.application.interactivity.block.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
@@ -105,14 +104,12 @@ class StartReviewActionHandlerUnitTest {
                 .willThrow(new RuntimeException("cancel failed"));
 
         // when & then
-        assertAll(
-                () -> assertThatThrownBy(() -> handler.handle(command))
+        assertThatThrownBy(() -> handler.handle(command))
                         .isInstanceOf(RuntimeException.class)
-                        .hasMessage("cancel failed"),
-                () -> verify(startReviewMarkStore).remove("T1:123:10:U2"),
-                () -> verify(reviewReservationNotifier, never()).notifyStartNowToParticipants(any(), any(), any()),
-                () -> verify(notificationDispatcher, never()).sendEphemeral(any(), any(), any(), any())
-        );
+                        .hasMessage("cancel failed");
+        verify(startReviewMarkStore).remove("T1:123:10:U2");
+        verify(reviewReservationNotifier, never()).notifyStartNowToParticipants(any(), any(), any());
+        verify(notificationDispatcher, never()).sendEphemeral(any(), any(), any(), any());
     }
 
     @Test
@@ -146,12 +143,10 @@ class StartReviewActionHandlerUnitTest {
         BlockActionOutcomeDto actual = handler.handle(command);
 
         // then
-        assertAll(
-                () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
-                () -> verify(notificationDispatcher, never()).sendEphemeral(any(), any(), any(), any()),
-                () -> verify(reviewInteractionEventPublisher, never()).publish(any()),
-                () -> verify(startReviewMarkStore, never()).remove("T1:123:10:U2")
-        );
+        assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty());
+        verify(notificationDispatcher, never()).sendEphemeral(any(), any(), any(), any());
+        verify(reviewInteractionEventPublisher, never()).publish(any());
+        verify(startReviewMarkStore, never()).remove("T1:123:10:U2");
     }
 
     @Test
@@ -185,12 +180,10 @@ class StartReviewActionHandlerUnitTest {
         BlockActionOutcomeDto actual = handler.handle(command);
 
         // then
-        assertAll(
-                () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
-                () -> verify(notificationDispatcher, never()).sendEphemeral(any(), any(), any(), any()),
-                () -> verify(reviewInteractionEventPublisher, never()).publish(any()),
-                () -> verify(startReviewMarkStore, never()).remove("T1:123:10:U2")
-        );
+        assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty());
+        verify(notificationDispatcher, never()).sendEphemeral(any(), any(), any(), any());
+        verify(reviewInteractionEventPublisher, never()).publish(any());
+        verify(startReviewMarkStore, never()).remove("T1:123:10:U2");
     }
 
     @Test
@@ -224,12 +217,10 @@ class StartReviewActionHandlerUnitTest {
         BlockActionOutcomeDto actual = handler.handle(command);
 
         // then
-        assertAll(
-                () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
-                () -> verify(reviewReservationNotifier).notifyStartNowToParticipants(meta, "U2", "xoxb-test-token"),
-                () -> verify(reviewInteractionEventPublisher).publish(any(ReviewReservationFulfilledEvent.class)),
-                () -> verify(startReviewMarkStore, never()).remove("T1:123:10:U2")
-        );
+        assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty());
+        verify(reviewReservationNotifier).notifyStartNowToParticipants(meta, "U2", "xoxb-test-token");
+        verify(reviewInteractionEventPublisher).publish(any(ReviewReservationFulfilledEvent.class));
+        verify(startReviewMarkStore, never()).remove("T1:123:10:U2");
     }
 
     @Test
@@ -263,14 +254,12 @@ class StartReviewActionHandlerUnitTest {
         BlockActionOutcomeDto actual = handler.handle(command);
 
         // then
-        assertAll(
-                () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
-                () -> verify(reviewReservationNotifier).notifyStartNowToParticipants(meta, "U2", "xoxb-test-token"),
-                () -> verify(reviewInteractionEventPublisher).publish(any(ReviewReservationFulfilledEvent.class)),
-                () -> verify(notificationDispatcher)
-                        .sendEphemeral("xoxb-test-token", "C1", "U2", "리뷰 시작 알림을 전송했습니다."),
-                () -> verify(startReviewMarkStore, never()).remove("T1:123:10:U2")
-        );
+        assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty());
+        verify(reviewReservationNotifier).notifyStartNowToParticipants(meta, "U2", "xoxb-test-token");
+        verify(reviewInteractionEventPublisher).publish(any(ReviewReservationFulfilledEvent.class));
+        verify(notificationDispatcher)
+                        .sendEphemeral("xoxb-test-token", "C1", "U2", "리뷰 시작 알림을 전송했습니다.");
+        verify(startReviewMarkStore, never()).remove("T1:123:10:U2");
     }
 
     private ReviewScheduleMetaDto validMeta() {

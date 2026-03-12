@@ -75,15 +75,15 @@ class SlackInteractionInboxEntryProcessorTest {
                 () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
                 () -> assertThat(actualInbox.getProcessingAttempt()).isEqualTo(1),
                 () -> assertThat(actualReservation).isPresent(),
-                () -> assertThat(actualReservation.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED),
-                () -> verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1"),
-                () -> verify(notificationApiClient).sendBlockMessage(
+                () -> assertThat(actualReservation.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED)
+        );
+        verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1");
+        verify(notificationApiClient).sendBlockMessage(
                         eq("xoxb-test-token"),
                         eq("D-REVIEWER"),
                         any(),
                         any()
-                )
-        );
+                );
     }
 
     @Test
@@ -110,15 +110,15 @@ class SlackInteractionInboxEntryProcessorTest {
                 () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
                 () -> assertThat(actualInbox.getProcessingAttempt()).isEqualTo(1),
                 () -> assertThat(actualReservation).isPresent(),
-                () -> assertThat(actualReservation.get().getStatus()).isEqualTo(ReservationStatus.ACTIVE),
-                () -> verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1"),
-                () -> verify(notificationApiClient).sendBlockMessage(
+                () -> assertThat(actualReservation.get().getStatus()).isEqualTo(ReservationStatus.ACTIVE)
+        );
+        verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1");
+        verify(notificationApiClient).sendBlockMessage(
                         eq("xoxb-test-token"),
                         eq("D-REVIEWER"),
                         any(),
                         any()
-                )
-        );
+                );
     }
 
     @Test
@@ -155,13 +155,13 @@ class SlackInteractionInboxEntryProcessorTest {
         slackInteractionInboxEntryProcessor.processBlockAction(inbox);
 
         // then
-        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
+        SlackInteractionInbox actual = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
 
         assertAll(
-                () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
-                () -> assertThat(actualInbox.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actualInbox.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT),
-                () -> assertThat(actualInbox.getFailureReason()).isNotBlank()
+                () -> assertThat(actual.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
+                () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
+                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT),
+                () -> assertThat(actual.getFailureReason()).isNotBlank()
         );
     }
 

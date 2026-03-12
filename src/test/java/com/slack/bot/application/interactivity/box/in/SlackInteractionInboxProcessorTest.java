@@ -44,7 +44,7 @@ class SlackInteractionInboxProcessorTest {
     NotificationApiClient notificationApiClient;
 
     @Autowired
-    ReviewReservationRepository reviewReservationRepository;
+    ReviewReservationRepository actualReviewReservationRepository;
 
     @Autowired
     ObjectMapper objectMapper;
@@ -53,7 +53,7 @@ class SlackInteractionInboxProcessorTest {
     JpaSlackInteractionInboxRepository jpaSlackInteractionInboxRepository;
 
     @Autowired
-    SlackInteractionInboxRepository slackInteractionInboxRepository;
+    SlackInteractionInboxRepository actualSlackInteractionInboxRepository;
 
     @Autowired
     Clock clock;
@@ -77,20 +77,20 @@ class SlackInteractionInboxProcessorTest {
         // then
         assertAll(
                 () -> assertThat(actual).isTrue(),
-                () -> assertThat(slackInteractionInboxRepository.findClaimable(SlackInteractionInboxType.BLOCK_ACTIONS, 10)).isEmpty(),
-                () -> verify(notificationApiClient, times(1)).openDirectMessageChannel("xoxb-test-token", "U1"),
-                () -> verify(notificationApiClient, times(1)).sendBlockMessage(
+                () -> assertThat(actualSlackInteractionInboxRepository.findClaimable(SlackInteractionInboxType.BLOCK_ACTIONS, 10)).isEmpty()
+        );
+        verify(notificationApiClient, times(1)).openDirectMessageChannel("xoxb-test-token", "U1");
+        verify(notificationApiClient, times(1)).sendBlockMessage(
                         eq("xoxb-test-token"),
                         eq("D-REVIEWER"),
                         any(),
                         any()
-                ),
-                () -> assertThat(reviewReservationRepository.findById(100L))
+                );
+        assertThat(actualReviewReservationRepository.findById(100L))
                         .isPresent()
                         .get()
                         .extracting(reservation -> reservation.getStatus())
-                        .isEqualTo(ReservationStatus.CANCELLED)
-        );
+                        .isEqualTo(ReservationStatus.CANCELLED);
     }
 
     @Test
@@ -108,24 +108,24 @@ class SlackInteractionInboxProcessorTest {
         slackInteractionInboxProcessor.processPendingBlockActions(10);
 
         // then
-        SlackInteractionInbox processedInbox = jpaSlackInteractionInboxRepository.findById(200L).orElseThrow();
+        SlackInteractionInbox actualProcessedInbox = jpaSlackInteractionInboxRepository.findById(200L).orElseThrow();
 
         assertAll(
-                () -> assertThat(processedInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
-                () -> assertThat(processedInbox.getProcessingAttempt()).isEqualTo(2),
-                () -> verify(notificationApiClient, times(1)).openDirectMessageChannel("xoxb-test-token", "U1"),
-                () -> verify(notificationApiClient, times(1)).sendBlockMessage(
+                () -> assertThat(actualProcessedInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
+                () -> assertThat(actualProcessedInbox.getProcessingAttempt()).isEqualTo(2)
+        );
+        verify(notificationApiClient, times(1)).openDirectMessageChannel("xoxb-test-token", "U1");
+        verify(notificationApiClient, times(1)).sendBlockMessage(
                         eq("xoxb-test-token"),
                         eq("D-REVIEWER"),
                         any(),
                         any()
-                ),
-                () -> assertThat(reviewReservationRepository.findById(100L))
+                );
+        assertThat(actualReviewReservationRepository.findById(100L))
                         .isPresent()
                         .get()
                         .extracting(reservation -> reservation.getStatus())
-                        .isEqualTo(ReservationStatus.CANCELLED)
-        );
+                        .isEqualTo(ReservationStatus.CANCELLED);
     }
 
     @Test
@@ -138,21 +138,21 @@ class SlackInteractionInboxProcessorTest {
         );
         Instant base = clock.instant();
         timeoutInbox.markProcessing(base.minusSeconds(120));
-        timeoutInbox.markRetryPending(base.minusSeconds(110), "first failure");
+        timeoutInbox.markRetryPending(base.minusSeconds(110), "actualFirst failure");
         timeoutInbox.markProcessing(base.minusSeconds(100));
-        SlackInteractionInbox saved = jpaSlackInteractionInboxRepository.save(timeoutInbox);
+        SlackInteractionInbox actualSaved = jpaSlackInteractionInboxRepository.save(timeoutInbox);
 
         // when
         slackInteractionInboxProcessor.processPendingBlockActions(10);
 
         // then
-        SlackInteractionInbox failedInbox = jpaSlackInteractionInboxRepository.findById(saved.getId()).orElseThrow();
+        SlackInteractionInbox actual = jpaSlackInteractionInboxRepository.findById(actualSaved.getId()).orElseThrow();
 
         assertAll(
-                () -> assertThat(failedInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
-                () -> assertThat(failedInbox.getProcessingAttempt()).isEqualTo(2),
-                () -> assertThat(failedInbox.getFailureType()).isEqualTo(SlackInteractivityFailureType.RETRY_EXHAUSTED),
-                () -> assertThat(failedInbox.getFailureReason()).isNotBlank()
+                () -> assertThat(actual.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
+                () -> assertThat(actual.getProcessingAttempt()).isEqualTo(2),
+                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractivityFailureType.RETRY_EXHAUSTED),
+                () -> assertThat(actual.getFailureReason()).isNotBlank()
         );
     }
 
@@ -168,16 +168,16 @@ class SlackInteractionInboxProcessorTest {
         String payloadJson = objectMapper.writeValueAsString(cancelReservationPayload("100"));
 
         // when
-        boolean first = slackInteractionInboxProcessor.enqueueBlockAction(payloadJson);
-        boolean second = slackInteractionInboxProcessor.enqueueBlockAction(payloadJson);
+        boolean actualFirst = slackInteractionInboxProcessor.enqueueBlockAction(payloadJson);
+        boolean actualSecond = slackInteractionInboxProcessor.enqueueBlockAction(payloadJson);
         slackInteractionInboxProcessor.processPendingBlockActions(10);
 
         // then
         assertAll(
-                () -> assertThat(first).isTrue(),
-                () -> assertThat(second).isFalse(),
-                () -> verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1")
+                () -> assertThat(actualFirst).isTrue(),
+                () -> assertThat(actualSecond).isFalse()
         );
+        verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1");
     }
 
     @Test
@@ -190,16 +190,16 @@ class SlackInteractionInboxProcessorTest {
         String payloadJson = objectMapper.writeValueAsString(viewSubmissionPayload("30"));
 
         // when
-        boolean enqueued = slackInteractionInboxProcessor.enqueueViewSubmission(payloadJson);
+        boolean actualEnqueued = slackInteractionInboxProcessor.enqueueViewSubmission(payloadJson);
         slackInteractionInboxProcessor.processPendingViewSubmissions(10);
 
         // then
-        Optional<ReviewReservation> saved = reviewReservationRepository.findActive("T1", 123L, "U1");
+        Optional<ReviewReservation> actualSaved = actualReviewReservationRepository.findActive("T1", 123L, "U1");
 
         assertAll(
-                () -> assertThat(enqueued).isTrue(),
-                () -> assertThat(saved).isPresent(),
-                () -> assertThat(saved.get().getReservationPullRequest().getGithubPullRequestId()).isEqualTo(10L)
+                () -> assertThat(actualEnqueued).isTrue(),
+                () -> assertThat(actualSaved).isPresent(),
+                () -> assertThat(actualSaved.get().getReservationPullRequest().getGithubPullRequestId()).isEqualTo(10L)
         );
     }
 
@@ -212,14 +212,14 @@ class SlackInteractionInboxProcessorTest {
         boolean actual = slackInteractionInboxProcessor.enqueueBlockAction(invalidPayload);
         slackInteractionInboxProcessor.processPendingBlockActions(10);
         SlackInteractionInbox inbox = jpaSlackInteractionInboxRepository.findAll().getFirst();
-        SlackInteractionInbox afterFirst = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
+        SlackInteractionInbox actualAfterFirst = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
 
         // then
         assertAll(
                 () -> assertThat(actual).isTrue(),
-                () -> assertThat(afterFirst.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
-                () -> assertThat(afterFirst.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(afterFirst.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT)
+                () -> assertThat(actualAfterFirst.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
+                () -> assertThat(actualAfterFirst.getProcessingAttempt()).isEqualTo(1),
+                () -> assertThat(actualAfterFirst.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT)
         );
     }
 
@@ -284,5 +284,4 @@ class SlackInteractionInboxProcessorTest {
 
         return meta.toString();
     }
-
 }
