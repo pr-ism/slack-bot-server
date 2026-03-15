@@ -17,7 +17,7 @@ import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.domain.reservation.ReservationStatus;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.repository.ReviewReservationRepository;
-import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
+import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStatus;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
@@ -151,7 +151,7 @@ class SlackInteractionInboxProcessorTest {
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(2),
-                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractivityFailureType.RETRY_EXHAUSTED),
+                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
                 () -> assertThat(actual.getFailureReason()).isNotBlank()
         );
     }
@@ -219,7 +219,7 @@ class SlackInteractionInboxProcessorTest {
                 () -> assertThat(actual).isTrue(),
                 () -> assertThat(actualAfterFirst.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
                 () -> assertThat(actualAfterFirst.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actualAfterFirst.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT)
+                () -> assertThat(actualAfterFirst.getFailureType()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT)
         );
     }
 

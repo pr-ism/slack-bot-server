@@ -17,7 +17,7 @@ import com.slack.bot.application.interactivity.block.dto.BlockActionOutcomeDto;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.application.interactivity.publisher.ReviewInteractionEvent;
 import com.slack.bot.application.interactivity.publisher.ReviewReservationChangeEvent;
-import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
+import com.slack.bot.application.interactivity.reply.InteractionErrorType;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -88,7 +88,7 @@ class ChangeReviewReservationActionHandlerTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U2"),
-                        eq(InteractivityErrorType.NOT_OWNER_CHANGE.message())
+                        eq(InteractionErrorType.NOT_OWNER_CHANGE.message())
                 );
         verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
         assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();

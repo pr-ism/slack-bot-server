@@ -16,7 +16,7 @@ import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.application.interactivity.publisher.ReviewInteractionEvent;
 import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventPublisher;
 import com.slack.bot.application.interactivity.publisher.ReviewReservationRequestEvent;
-import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
+import com.slack.bot.application.interactivity.reply.InteractionErrorType;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -66,7 +66,7 @@ class ReviewSchedulerWorkflowTest {
                         "xoxb-test-token",
                         "C1",
                         "U1",
-                        InteractivityErrorType.INVALID_META.message()
+                        InteractionErrorType.INVALID_META.message()
                 );
         verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
         assertAll(
@@ -96,7 +96,7 @@ class ReviewSchedulerWorkflowTest {
                         "xoxb-test-token",
                         "C1",
                         "U1",
-                        InteractivityErrorType.INVALID_META.message()
+                        InteractionErrorType.INVALID_META.message()
                 );
         verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
         assertAll(
@@ -126,7 +126,7 @@ class ReviewSchedulerWorkflowTest {
                         "xoxb-test-token",
                         "C1",
                         "U1",
-                        InteractivityErrorType.INVALID_META.message()
+                        InteractionErrorType.INVALID_META.message()
                 );
         verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
         assertAll(
@@ -199,7 +199,7 @@ class ReviewSchedulerWorkflowTest {
                         "xoxb-test-token",
                         "C1",
                         "U1",
-                        InteractivityErrorType.RESERVATION_LOAD_FAILURE.message()
+                        InteractionErrorType.RESERVATION_LOAD_FAILURE.message()
                 );
         verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
         assertAll(
@@ -316,7 +316,7 @@ class ReviewSchedulerWorkflowTest {
                         "xoxb-test-token",
                         "C1",
                         "U1",
-                        InteractivityErrorType.REVIEWEE_CANNOT_RESERVE.message()
+                        InteractionErrorType.REVIEWEE_CANNOT_RESERVE.message()
                 );
         verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
         assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();
@@ -360,7 +360,7 @@ class ReviewSchedulerWorkflowTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq(" "),
-                        eq(InteractivityErrorType.REVIEWEE_CANNOT_RESERVE.message())
+                        eq(InteractionErrorType.REVIEWEE_CANNOT_RESERVE.message())
                 );
     }
 

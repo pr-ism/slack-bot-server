@@ -6,7 +6,7 @@ import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
-import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
+import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxStatus;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
@@ -93,7 +93,7 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                                         )
                                         .set(
                                                 reviewNotificationOutbox.failureType,
-                                                Expressions.nullExpression(SlackInteractivityFailureType.class)
+                                                Expressions.nullExpression(SlackInteractionFailureType.class)
                                         )
                                         .where(
                                                 reviewNotificationOutbox.id.eq(outboxId),
@@ -132,7 +132,7 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                                           .set(reviewNotificationOutbox.failureReason, failureReason)
                                           .set(
                                                   reviewNotificationOutbox.failureType,
-                                                  SlackInteractivityFailureType.RETRY_EXHAUSTED
+                                                  SlackInteractionFailureType.RETRY_EXHAUSTED
                                           )
                                           .where(
                                                   reviewNotificationOutbox.status.eq(ReviewNotificationOutboxStatus.PROCESSING),
@@ -151,7 +151,7 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                                           .set(reviewNotificationOutbox.failureReason, failureReason)
                                           .set(
                                                   reviewNotificationOutbox.failureType,
-                                                  Expressions.nullExpression(SlackInteractivityFailureType.class)
+                                                  Expressions.nullExpression(SlackInteractionFailureType.class)
                                           )
                                           .where(
                                                   reviewNotificationOutbox.status.eq(ReviewNotificationOutboxStatus.PROCESSING),

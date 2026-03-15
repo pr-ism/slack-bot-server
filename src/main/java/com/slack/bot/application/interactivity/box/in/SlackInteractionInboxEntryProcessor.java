@@ -8,7 +8,7 @@ import com.slack.bot.application.interactivity.view.ViewSubmissionInteractionCoo
 import com.slack.bot.application.interactivity.box.BoxFailureReasonTruncator;
 import com.slack.bot.application.interactivity.box.retry.InteractionRetryExceptionClassifier;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
-import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
+import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
@@ -116,7 +116,7 @@ public class SlackInteractionInboxEntryProcessor {
         String reason = resolveFailureReason(exception);
 
         if (!retryExceptionClassifier.isRetryable(exception)) {
-            inbox.markFailed(clock.instant(), reason, SlackInteractivityFailureType.BUSINESS_INVARIANT);
+            inbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.BUSINESS_INVARIANT);
             return;
         }
 
@@ -125,7 +125,7 @@ public class SlackInteractionInboxEntryProcessor {
             return;
         }
 
-        inbox.markFailed(clock.instant(), reason, SlackInteractivityFailureType.RETRY_EXHAUSTED);
+        inbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.RETRY_EXHAUSTED);
     }
 
     private String resolveFailureReason(Exception exception) {

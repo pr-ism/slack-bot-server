@@ -16,7 +16,7 @@ import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.application.interactivity.dto.ReviewScheduleMetaDto;
 import com.slack.bot.application.interactivity.publisher.ReviewInteractionEvent;
 import com.slack.bot.application.interactivity.publisher.ReviewReservationScheduledEvent;
-import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
+import com.slack.bot.application.interactivity.reply.InteractionErrorType;
 import com.slack.bot.application.interactivity.reply.dto.response.SlackActionResponse;
 import com.slack.bot.application.interactivity.reservation.ReviewReservationCoordinator;
 import com.slack.bot.application.interactivity.reservation.exception.ActiveReservationAlreadyExistsException;
@@ -126,7 +126,7 @@ class ReviewReservationWorkflowTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U1"),
-                        eq(InteractivityErrorType.RESERVATION_FAILURE.message())
+                        eq(InteractionErrorType.RESERVATION_FAILURE.message())
                 );
         assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }

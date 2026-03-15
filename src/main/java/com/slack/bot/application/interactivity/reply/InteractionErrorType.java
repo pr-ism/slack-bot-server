@@ -1,6 +1,6 @@
 package com.slack.bot.application.interactivity.reply;
 
-public enum InteractivityErrorType {
+public enum InteractionErrorType {
     INVALID_META("리뷰 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요."),
     REVIEWEE_CANNOT_RESERVE("리뷰이는 해당 PR에 대한 리뷰를 할 수 없습니다."),
     RESERVATION_LOAD_FAILURE("예약 정보를 불러올 수 없습니다. 잠시 후 다시 시도해주세요."),
@@ -14,7 +14,7 @@ public enum InteractivityErrorType {
 
     private final String message;
 
-    InteractivityErrorType(String message) {
+    InteractionErrorType(String message) {
         this.message = message;
     }
 

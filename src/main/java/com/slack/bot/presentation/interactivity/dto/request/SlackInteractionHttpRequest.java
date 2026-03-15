@@ -1,6 +1,6 @@
 package com.slack.bot.presentation.interactivity.dto.request;
 
-public record SlackInteractivityHttpRequest(
+public record SlackInteractionHttpRequest(
         String timestamp,
         String signature,
         String rawBody,

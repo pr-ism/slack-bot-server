@@ -3,7 +3,7 @@ package com.slack.bot.presentation.interactivity;
 import com.slack.bot.application.interactivity.SlackInteractionServiceFacade;
 import com.slack.bot.application.interactivity.reply.dto.response.SlackActionResponse;
 import com.slack.bot.global.security.SlackSignatureVerifier;
-import com.slack.bot.presentation.interactivity.dto.request.SlackInteractivityHttpRequest;
+import com.slack.bot.presentation.interactivity.dto.request.SlackInteractionHttpRequest;
 import com.slack.bot.presentation.interactivity.exception.SlackSignatureVerificationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -15,13 +15,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/slack/interactive")
 @RequiredArgsConstructor
-public class SlackInteractivityController {
+public class SlackInteractionController {
 
     private final SlackSignatureVerifier slackSignatureVerifier;
     private final SlackInteractionServiceFacade slackInteractionServiceFacade;
 
     @PostMapping(consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-    public ResponseEntity<SlackActionResponse> handleInteractivity(SlackInteractivityHttpRequest request) {
+    public ResponseEntity<SlackActionResponse> handleInteractivity(SlackInteractionHttpRequest request) {
         validateRequest(request);
 
         if (!isAuthorized(request)) {
@@ -35,11 +35,11 @@ public class SlackInteractivityController {
                              .body(response);
     }
 
-    private boolean isAuthorized(SlackInteractivityHttpRequest parsed) {
+    private boolean isAuthorized(SlackInteractionHttpRequest parsed) {
         return slackSignatureVerifier.verify(parsed.timestamp(), parsed.signature(), parsed.rawBody());
     }
 
-    private void validateRequest(SlackInteractivityHttpRequest parsed) {
+    private void validateRequest(SlackInteractionHttpRequest parsed) {
         if (parsed == null) {
             throw new IllegalArgumentException("슬랙 인터랙티브 요청이 비어 있습니다.");
         }

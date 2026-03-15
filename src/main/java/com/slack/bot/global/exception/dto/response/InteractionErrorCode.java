@@ -4,7 +4,7 @@ import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
 @Getter
-public enum InteractivityErrorCode implements ErrorCode {
+public enum InteractionErrorCode implements ErrorCode {
 
     SLACK_SIGNATURE_VERIFICATION_FAILED("I00", "슬랙 요청 시그니처 검증 실패", HttpStatus.UNAUTHORIZED);
 
@@ -12,7 +12,7 @@ public enum InteractivityErrorCode implements ErrorCode {
     private final String message;
     private final HttpStatus httpStatus;
 
-    InteractivityErrorCode(String errorCode, String message, HttpStatus httpStatus) {
+    InteractionErrorCode(String errorCode, String message, HttpStatus httpStatus) {
         this.errorCode = errorCode;
         this.message = message;
         this.httpStatus = httpStatus;

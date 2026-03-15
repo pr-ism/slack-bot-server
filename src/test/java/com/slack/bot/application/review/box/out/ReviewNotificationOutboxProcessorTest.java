@@ -20,7 +20,7 @@ import com.slack.bot.application.interactivity.box.retry.InteractionRetryExcepti
 import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
-import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
+import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
@@ -247,7 +247,7 @@ class ReviewNotificationOutboxProcessorTest {
         processor.processPending(10, 60_000L);
 
         // then
-        verify(claimed).markFailed(any(), anyString(), eq(SlackInteractivityFailureType.BUSINESS_INVARIANT));
+        verify(claimed).markFailed(any(), anyString(), eq(SlackInteractionFailureType.BUSINESS_INVARIANT));
         verify(reviewNotificationOutboxRepository).save(claimed);
     }
 
@@ -389,7 +389,7 @@ class ReviewNotificationOutboxProcessorTest {
         processor.processPending(10, 60_000L);
 
         // then
-        verify(claimed).markFailed(any(), anyString(), eq(SlackInteractivityFailureType.RETRY_EXHAUSTED));
+        verify(claimed).markFailed(any(), anyString(), eq(SlackInteractionFailureType.RETRY_EXHAUSTED));
         verify(reviewNotificationOutboxRepository).save(claimed);
     }
 
@@ -407,7 +407,7 @@ class ReviewNotificationOutboxProcessorTest {
         processor.processPending(10, 60_000L);
 
         // then
-        verify(claimed).markFailed(any(), anyString(), eq(SlackInteractivityFailureType.BUSINESS_INVARIANT));
+        verify(claimed).markFailed(any(), anyString(), eq(SlackInteractionFailureType.BUSINESS_INVARIANT));
         verify(reviewNotificationOutboxRepository).save(claimed);
     }
 

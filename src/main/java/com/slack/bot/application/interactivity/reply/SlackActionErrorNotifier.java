@@ -11,11 +11,11 @@ public class SlackActionErrorNotifier {
 
     private final NotificationApiClient notificationApiClient;
 
-    public void notify(String token, String channelId, String slackUserId, InteractivityErrorType type) {
+    public void notify(String token, String channelId, String slackUserId, InteractionErrorType type) {
         notificationApiClient.sendEphemeralMessage(token, channelId, slackUserId, type.message());
     }
 
-    public SlackActionResponse respond(String token, String channelId, String slackUserId, InteractivityErrorType type) {
+    public SlackActionResponse respond(String token, String channelId, String slackUserId, InteractionErrorType type) {
         notify(token, channelId, slackUserId, type);
 
         return SlackActionResponse.empty();

@@ -7,9 +7,9 @@ import java.lang.annotation.Target;
 
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface TriggerInteractivityImmediateProcessing {
+public @interface TriggerInteractionImmediateProcessing {
 
-    InteractivityImmediateTriggerTarget value();
+    InteractionImmediateTriggerTarget value();
 
     boolean onlyWhenEnqueued() default false;
 }

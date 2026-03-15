@@ -3,7 +3,7 @@ package com.slack.bot.global.config;
 import com.slack.bot.global.config.properties.CorsProperties;
 import com.slack.bot.global.resolver.ProjectMemberIdArgumentResolver;
 import com.slack.bot.global.resolver.SlackCommandRequestArgumentResolver;
-import com.slack.bot.global.resolver.SlackInteractivityHttpRequestArgumentResolver;
+import com.slack.bot.global.resolver.SlackInteractionHttpRequestArgumentResolver;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -21,7 +21,7 @@ public class WebConfig implements WebMvcConfigurer {
     private final CorsProperties corsProperties;
     private final ProjectMemberIdArgumentResolver projectMemberIdArgumentResolver;
     private final SlackCommandRequestArgumentResolver slackCommandRequestArgumentResolver;
-    private final SlackInteractivityHttpRequestArgumentResolver slackInteractivityHttpRequestArgumentResolver;
+    private final SlackInteractionHttpRequestArgumentResolver slackInteractionHttpRequestArgumentResolver;
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
@@ -46,6 +46,6 @@ public class WebConfig implements WebMvcConfigurer {
     public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
         resolvers.add(projectMemberIdArgumentResolver);
         resolvers.add(slackCommandRequestArgumentResolver);
-        resolvers.add(slackInteractivityHttpRequestArgumentResolver);
+        resolvers.add(slackInteractionHttpRequestArgumentResolver);
     }
 }

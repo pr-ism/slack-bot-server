@@ -1,8 +1,8 @@
 package com.slack.bot.application.interactivity.box.aop.aspect;
 
 import com.slack.bot.application.interactivity.box.InteractionImmediateProcessor;
-import com.slack.bot.application.interactivity.box.aop.InteractivityImmediateTriggerTarget;
-import com.slack.bot.application.interactivity.box.aop.TriggerInteractivityImmediateProcessing;
+import com.slack.bot.application.interactivity.box.aop.InteractionImmediateTriggerTarget;
+import com.slack.bot.application.interactivity.box.aop.TriggerInteractionImmediateProcessing;
 import lombok.RequiredArgsConstructor;
 import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.annotation.Aspect;
@@ -11,19 +11,19 @@ import org.springframework.stereotype.Component;
 @Aspect
 @Component
 @RequiredArgsConstructor
-public class InteractivityImmediateProcessingTriggerAspect {
+public class InteractionImmediateProcessingTriggerAspect {
 
     private final InteractionImmediateProcessor interactionImmediateProcessor;
 
     @AfterReturning(
-            value = "@annotation(triggerInteractivityImmediateProcessing)",
+            value = "@annotation(triggerInteractionImmediateProcessing)",
             returning = "result"
     )
     public void trigger(
-            TriggerInteractivityImmediateProcessing triggerInteractivityImmediateProcessing,
+            TriggerInteractionImmediateProcessing triggerInteractionImmediateProcessing,
             Object result
     ) {
-        if (triggerInteractivityImmediateProcessing.onlyWhenEnqueued()) {
+        if (triggerInteractionImmediateProcessing.onlyWhenEnqueued()) {
             validateBooleanReturn(result);
 
             if (Boolean.FALSE.equals(result)) {
@@ -31,7 +31,7 @@ public class InteractivityImmediateProcessingTriggerAspect {
             }
         }
 
-        InteractivityImmediateTriggerTarget target = triggerInteractivityImmediateProcessing.value();
+        InteractionImmediateTriggerTarget target = triggerInteractionImmediateProcessing.value();
         target.trigger(interactionImmediateProcessor);
     }
 

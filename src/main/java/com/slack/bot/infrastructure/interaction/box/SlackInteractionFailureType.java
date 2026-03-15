@@ -1,6 +1,6 @@
 package com.slack.bot.infrastructure.interaction.box;
 
-public enum SlackInteractivityFailureType {
+public enum SlackInteractionFailureType {
     BUSINESS_INVARIANT,
     RETRY_EXHAUSTED
 }

@@ -2,8 +2,8 @@ package com.slack.bot.application.interactivity.box.in;
 
 import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyKeyGenerator;
 import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyScope;
-import com.slack.bot.application.interactivity.box.aop.InteractivityImmediateTriggerTarget;
-import com.slack.bot.application.interactivity.box.aop.TriggerInteractivityImmediateProcessing;
+import com.slack.bot.application.interactivity.box.aop.InteractionImmediateTriggerTarget;
+import com.slack.bot.application.interactivity.box.aop.TriggerInteractionImmediateProcessing;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.global.config.properties.InteractionWorkerProperties;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
@@ -33,8 +33,8 @@ public class SlackInteractionInboxProcessor {
     private final SlackInteractionIdempotencyKeyGenerator idempotencyKeyGenerator;
     private final SlackInteractionInboxEntryProcessor slackInteractionInboxEntryProcessor;
 
-    @TriggerInteractivityImmediateProcessing(
-            value = InteractivityImmediateTriggerTarget.BLOCK_ACTION_INBOX,
+    @TriggerInteractionImmediateProcessing(
+            value = InteractionImmediateTriggerTarget.BLOCK_ACTION_INBOX,
             onlyWhenEnqueued = true
     )
     public boolean enqueueBlockAction(String payloadJson) {
@@ -61,8 +61,8 @@ public class SlackInteractionInboxProcessor {
         );
     }
 
-    @TriggerInteractivityImmediateProcessing(
-            value = InteractivityImmediateTriggerTarget.VIEW_SUBMISSION_INBOX,
+    @TriggerInteractionImmediateProcessing(
+            value = InteractionImmediateTriggerTarget.VIEW_SUBMISSION_INBOX,
             onlyWhenEnqueued = true
     )
     public boolean enqueueViewSubmission(String payloadJson) {

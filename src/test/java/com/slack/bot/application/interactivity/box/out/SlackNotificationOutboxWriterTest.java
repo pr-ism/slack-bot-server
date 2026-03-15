@@ -8,7 +8,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.box.out.exception.SlackBlocksSerializationException;
-import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
+import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
@@ -429,7 +429,7 @@ class SlackNotificationOutboxWriterTest {
         existing.markFailed(
                 Instant.parse("2026-02-18T00:00:01Z"),
                 "failure",
-                SlackInteractivityFailureType.RETRY_EXHAUSTED
+                SlackInteractionFailureType.RETRY_EXHAUSTED
         );
         actualSlackNotificationOutboxRepository.save(existing);
 

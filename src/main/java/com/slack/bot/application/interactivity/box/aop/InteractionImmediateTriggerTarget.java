@@ -2,7 +2,7 @@ package com.slack.bot.application.interactivity.box.aop;
 
 import com.slack.bot.application.interactivity.box.InteractionImmediateProcessor;
 
-public enum InteractivityImmediateTriggerTarget {
+public enum InteractionImmediateTriggerTarget {
 
     BLOCK_ACTION_INBOX {
         @Override

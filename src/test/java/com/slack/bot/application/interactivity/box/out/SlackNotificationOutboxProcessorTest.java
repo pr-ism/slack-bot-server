@@ -12,7 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interactivity.client.exception.SlackBotMessageDispatchException;
 import com.slack.bot.domain.workspace.Workspace;
-import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
+import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
@@ -166,7 +166,7 @@ class SlackNotificationOutboxProcessorTest {
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(2),
-                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractivityFailureType.RETRY_EXHAUSTED),
+                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
                 () -> assertThat(actual.getFailureReason()).isNotBlank()
         );
     }
@@ -220,7 +220,7 @@ class SlackNotificationOutboxProcessorTest {
                 () -> assertThat(actualFirstFailed.getProcessingAttempt()).isEqualTo(1),
                 () -> assertThat(actualSecondFailed.getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED),
                 () -> assertThat(actualSecondFailed.getProcessingAttempt()).isEqualTo(2),
-                () -> assertThat(actualSecondFailed.getFailureType()).isEqualTo(SlackInteractivityFailureType.RETRY_EXHAUSTED),
+                () -> assertThat(actualSecondFailed.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
                 () -> assertThat(actualSecondFailed.getFailureReason()).isNotNull(),
                 () -> assertThat(actualSecondFailed.getFailureReason()).hasSize(500),
                 () -> assertThat(actualSecondFailed.getFailureReason()).isEqualTo("x".repeat(500))
@@ -243,7 +243,7 @@ class SlackNotificationOutboxProcessorTest {
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT)
+                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT)
         );
     }
 
@@ -268,7 +268,7 @@ class SlackNotificationOutboxProcessorTest {
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT)
+                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT)
         );
     }
 }

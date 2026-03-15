@@ -10,7 +10,7 @@ import com.slack.bot.application.interactivity.notification.NotificationDispatch
 import com.slack.bot.application.interactivity.notification.ReviewReservationNotifier;
 import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventPublisher;
 import com.slack.bot.application.interactivity.publisher.ReviewReservationFulfilledEvent;
-import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
+import com.slack.bot.application.interactivity.reply.InteractionErrorType;
 import com.slack.bot.application.interactivity.reply.SlackActionErrorNotifier;
 import com.slack.bot.application.interactivity.reservation.AuthorResolver;
 import com.slack.bot.application.interactivity.reservation.ReviewReservationCoordinator;
@@ -87,7 +87,7 @@ public class StartReviewActionHandler implements BlockActionHandler {
                 command.botToken(),
                 command.channelId(),
                 command.slackUserId(),
-                InteractivityErrorType.REVIEWEE_CANNOT_RESERVE
+                InteractionErrorType.REVIEWEE_CANNOT_RESERVE
         );
 
         return true;

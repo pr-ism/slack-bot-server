@@ -6,7 +6,7 @@ import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventPublisher;
 import com.slack.bot.application.interactivity.publisher.ReviewReservationCancelEvent;
 import com.slack.bot.application.interactivity.publisher.ReviewReservationChangeEvent;
-import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
+import com.slack.bot.application.interactivity.reply.InteractionErrorType;
 import com.slack.bot.application.interactivity.reply.SlackActionErrorNotifier;
 import com.slack.bot.application.interactivity.reservation.ReviewReservationCoordinator;
 import com.slack.bot.application.interactivity.reservation.ReviewScheduleMetaBuilder;
@@ -122,7 +122,7 @@ public class ReservationCommandWorkflow {
                                                        token,
                                                        channelId,
                                                        slackUserId,
-                                                       InteractivityErrorType.RESERVATION_NOT_FOUND
+                                                       InteractionErrorType.RESERVATION_NOT_FOUND
                                                );
                                                return null;
                                            });
@@ -133,7 +133,7 @@ public class ReservationCommandWorkflow {
             String token,
             String channelId,
             String slackUserId,
-            InteractivityErrorType failureType
+            InteractionErrorType failureType
     ) {
         if (!slackUserId.equals(reservation.getReviewerSlackId())) {
             errorNotifier.notify(token, channelId, slackUserId, failureType);
@@ -153,15 +153,15 @@ public class ReservationCommandWorkflow {
             return false;
         }
         if (!reservation.isActive()) {
-            errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.RESERVATION_ALREADY_CANCELLED);
+            errorNotifier.notify(token, channelId, slackUserId, InteractionErrorType.RESERVATION_ALREADY_CANCELLED);
             return false;
         }
         if (isReviewAlreadyStarted(reservation)) {
-            errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.RESERVATION_ALREADY_STARTED);
+            errorNotifier.notify(token, channelId, slackUserId, InteractionErrorType.RESERVATION_ALREADY_STARTED);
             return false;
         }
 
-        return isOwnerOrNotify(reservation, token, channelId, slackUserId, InteractivityErrorType.NOT_OWNER_CANCEL);
+        return isOwnerOrNotify(reservation, token, channelId, slackUserId, InteractionErrorType.NOT_OWNER_CANCEL);
     }
 
     private boolean isChangeableReservationOrNotify(
@@ -178,16 +178,16 @@ public class ReservationCommandWorkflow {
                     token,
                     channelId,
                     slackUserId,
-                    InteractivityErrorType.RESERVATION_CHANGE_NOT_ALLOWED_CANCELLED
+                    InteractionErrorType.RESERVATION_CHANGE_NOT_ALLOWED_CANCELLED
             );
             return false;
         }
         if (isReviewAlreadyStarted(reservation)) {
-            errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.RESERVATION_ALREADY_STARTED);
+            errorNotifier.notify(token, channelId, slackUserId, InteractionErrorType.RESERVATION_ALREADY_STARTED);
             return false;
         }
 
-        return isOwnerOrNotify(reservation, token, channelId, slackUserId, InteractivityErrorType.NOT_OWNER_CHANGE);
+        return isOwnerOrNotify(reservation, token, channelId, slackUserId, InteractionErrorType.NOT_OWNER_CHANGE);
     }
 
     private boolean isReviewAlreadyStarted(ReviewReservation reservation) {
@@ -209,7 +209,7 @@ public class ReservationCommandWorkflow {
 
             slackApiClient.openModal(token, triggerId, view);
         } catch (RuntimeException e) {
-            errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.RESERVATION_LOAD_FAILURE);
+            errorNotifier.notify(token, channelId, slackUserId, InteractionErrorType.RESERVATION_LOAD_FAILURE);
         }
     }
 

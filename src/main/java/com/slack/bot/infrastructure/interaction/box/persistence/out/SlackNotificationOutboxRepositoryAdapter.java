@@ -6,7 +6,7 @@ import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
-import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
+import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
@@ -92,7 +92,7 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                 .set(slackNotificationOutbox.processingAttempt, slackNotificationOutbox.processingAttempt.add(1))
                 .set(slackNotificationOutbox.failedAt, Expressions.nullExpression(Instant.class))
                 .set(slackNotificationOutbox.failureReason, Expressions.nullExpression(String.class))
-                .set(slackNotificationOutbox.failureType, Expressions.nullExpression(SlackInteractivityFailureType.class))
+                .set(slackNotificationOutbox.failureType, Expressions.nullExpression(SlackInteractionFailureType.class))
                 .where(
                         slackNotificationOutbox.id.eq(outboxId),
                         slackNotificationOutbox.status.in(PROCESSING_CLAIMABLE_STATUSES)
@@ -121,7 +121,7 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                 .set(slackNotificationOutbox.processingStartedAt, Expressions.nullExpression(Instant.class))
                 .set(slackNotificationOutbox.failedAt, failedAt)
                 .set(slackNotificationOutbox.failureReason, failureReason)
-                .set(slackNotificationOutbox.failureType, SlackInteractivityFailureType.RETRY_EXHAUSTED)
+                .set(slackNotificationOutbox.failureType, SlackInteractionFailureType.RETRY_EXHAUSTED)
                 .where(
                         slackNotificationOutbox.status.eq(SlackNotificationOutboxStatus.PROCESSING),
                         timeoutCondition,
@@ -135,7 +135,7 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                 .set(slackNotificationOutbox.processingStartedAt, Expressions.nullExpression(Instant.class))
                 .set(slackNotificationOutbox.failedAt, failedAt)
                 .set(slackNotificationOutbox.failureReason, failureReason)
-                .set(slackNotificationOutbox.failureType, Expressions.nullExpression(SlackInteractivityFailureType.class))
+                .set(slackNotificationOutbox.failureType, Expressions.nullExpression(SlackInteractionFailureType.class))
                 .where(
                         slackNotificationOutbox.status.eq(SlackNotificationOutboxStatus.PROCESSING),
                         timeoutCondition,

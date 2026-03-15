@@ -16,7 +16,7 @@ import com.slack.bot.application.interactivity.box.BoxFailureReasonTruncator;
 import com.slack.bot.application.interactivity.box.retry.InteractionRetryExceptionClassifier;
 import com.slack.bot.application.interactivity.view.ViewSubmissionInteractionCoordinator;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
-import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
+import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStatus;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
@@ -209,7 +209,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(2),
-                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractivityFailureType.RETRY_EXHAUSTED)
+                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED)
         );
         verify(slackInteractionInboxRepository).save(actual);
     }
@@ -239,7 +239,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         // then
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
-                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT),
+                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
                 () -> assertThat(actual.getFailureReason()).hasSize(500)
         );
         verify(slackInteractionInboxRepository).save(actual);
@@ -270,7 +270,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         // then
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
-                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT),
+                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
                 () -> assertThat(actual.getFailureReason()).isEqualTo("unknown failure")
         );
         verify(slackInteractionInboxRepository).save(actual);

@@ -28,7 +28,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
-class SlackInteractivityControllerTest extends CommonControllerSliceTestSupport {
+class SlackInteractionControllerTest extends CommonControllerSliceTestSupport {
 
     @Autowired
     SlackSignatureVerifier slackSignatureVerifier;

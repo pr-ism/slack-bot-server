@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
-import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
+import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -372,14 +372,14 @@ class SlackNotificationOutboxTest {
         // when
         Instant failedAt = Instant.parse("2026-02-15T02:00:00Z");
 
-        outbox.markFailed(failedAt, "failure", SlackInteractivityFailureType.RETRY_EXHAUSTED);
+        outbox.markFailed(failedAt, "failure", SlackInteractionFailureType.RETRY_EXHAUSTED);
 
         // then
         assertAll(
                 () -> assertThat(outbox.getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED),
                 () -> assertThat(outbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(outbox.getFailureReason()).isEqualTo("failure"),
-                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractivityFailureType.RETRY_EXHAUSTED)
+                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED)
         );
     }
 
@@ -453,7 +453,7 @@ class SlackNotificationOutboxTest {
         assertThatThrownBy(() -> outbox.markFailed(
                 failedAt,
                 null,
-                SlackInteractivityFailureType.RETRY_EXHAUSTED
+                SlackInteractionFailureType.RETRY_EXHAUSTED
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("failureReason은 비어 있을 수 없습니다.");
@@ -469,7 +469,7 @@ class SlackNotificationOutboxTest {
         assertThatThrownBy(() -> outbox.markFailed(
                 null,
                 "failure",
-                SlackInteractivityFailureType.RETRY_EXHAUSTED
+                SlackInteractionFailureType.RETRY_EXHAUSTED
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("failedAt은 비어 있을 수 없습니다.");
@@ -486,7 +486,7 @@ class SlackNotificationOutboxTest {
         assertThatThrownBy(() -> outbox.markFailed(
                 failedAt,
                 " ",
-                SlackInteractivityFailureType.RETRY_EXHAUSTED
+                SlackInteractionFailureType.RETRY_EXHAUSTED
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("failureReason은 비어 있을 수 없습니다.");
@@ -560,7 +560,7 @@ class SlackNotificationOutboxTest {
         assertThatThrownBy(() -> pending.markFailed(
                 Instant.parse("2026-02-15T03:00:00Z"),
                 "failure",
-                SlackInteractivityFailureType.RETRY_EXHAUSTED
+                SlackInteractionFailureType.RETRY_EXHAUSTED
         ))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("FAILED 전이는 PROCESSING 상태에서만 가능합니다.");
@@ -587,7 +587,7 @@ class SlackNotificationOutboxTest {
         outbox.markFailed(
                 Instant.parse("2026-02-15T01:00:00Z"),
                 "failure",
-                SlackInteractivityFailureType.RETRY_EXHAUSTED
+                SlackInteractionFailureType.RETRY_EXHAUSTED
         );
 
         // when & then
@@ -604,7 +604,7 @@ class SlackNotificationOutboxTest {
         outbox.markFailed(
                 Instant.parse("2026-02-15T01:00:00Z"),
                 "failure",
-                SlackInteractivityFailureType.RETRY_EXHAUSTED
+                SlackInteractionFailureType.RETRY_EXHAUSTED
         );
 
         // when & then
@@ -621,7 +621,7 @@ class SlackNotificationOutboxTest {
         outbox.markFailed(
                 Instant.parse("2026-02-15T01:00:00Z"),
                 "failure",
-                SlackInteractivityFailureType.RETRY_EXHAUSTED
+                SlackInteractionFailureType.RETRY_EXHAUSTED
         );
 
         // when & then

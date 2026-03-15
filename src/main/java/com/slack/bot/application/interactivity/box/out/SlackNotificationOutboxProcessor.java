@@ -11,7 +11,7 @@ import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.global.config.properties.InteractionWorkerProperties;
-import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
+import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
@@ -165,7 +165,7 @@ public class SlackNotificationOutboxProcessor {
         String reason = resolveFailureReason(exception);
 
         if (!retryExceptionClassifier.isRetryable(exception)) {
-            outbox.markFailed(clock.instant(), reason, SlackInteractivityFailureType.BUSINESS_INVARIANT);
+            outbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.BUSINESS_INVARIANT);
             return;
         }
 
@@ -174,7 +174,7 @@ public class SlackNotificationOutboxProcessor {
             return;
         }
 
-        outbox.markFailed(clock.instant(), reason, SlackInteractivityFailureType.RETRY_EXHAUSTED);
+        outbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.RETRY_EXHAUSTED);
     }
 
     private String resolveFailureReason(Exception exception) {

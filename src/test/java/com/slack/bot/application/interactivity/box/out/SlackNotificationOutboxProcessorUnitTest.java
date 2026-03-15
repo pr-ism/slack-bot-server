@@ -17,7 +17,7 @@ import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.global.config.properties.InteractionWorkerProperties;
-import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
+import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
@@ -135,7 +135,7 @@ class SlackNotificationOutboxProcessorUnitTest {
 
         // then
         ArgumentCaptor<String> reasonCaptor = ArgumentCaptor.forClass(String.class);
-        verify(outbox).markFailed(any(), reasonCaptor.capture(), eq(SlackInteractivityFailureType.BUSINESS_INVARIANT));
+        verify(outbox).markFailed(any(), reasonCaptor.capture(), eq(SlackInteractionFailureType.BUSINESS_INVARIANT));
         verify(slackNotificationOutboxRepository, times(1)).save(outbox);
         verify(notificationTransportApiClient, never()).sendMessage(anyString(), anyString(), anyString());
 
@@ -215,7 +215,7 @@ class SlackNotificationOutboxProcessorUnitTest {
 
         // then
         ArgumentCaptor<String> reasonCaptor = ArgumentCaptor.forClass(String.class);
-        verify(outbox).markFailed(any(), reasonCaptor.capture(), eq(SlackInteractivityFailureType.BUSINESS_INVARIANT));
+        verify(outbox).markFailed(any(), reasonCaptor.capture(), eq(SlackInteractionFailureType.BUSINESS_INVARIANT));
         verify(slackNotificationOutboxRepository).save(outbox);
         assertThat(reasonCaptor.getValue()).isEqualTo("unknown failure");
     }
@@ -260,7 +260,7 @@ class SlackNotificationOutboxProcessorUnitTest {
         slackNotificationOutboxProcessor.processPending(10);
 
         // then
-        verify(firstOutbox).markFailed(any(), anyString(), eq(SlackInteractivityFailureType.BUSINESS_INVARIANT));
+        verify(firstOutbox).markFailed(any(), anyString(), eq(SlackInteractionFailureType.BUSINESS_INVARIANT));
         verify(firstOutbox, never()).markSent(any());
         verify(secondOutbox).markSent(any());
         verify(secondOutbox, never()).markFailed(any(), anyString(), any());

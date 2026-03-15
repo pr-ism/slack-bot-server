@@ -5,9 +5,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyKeyGenerator;
 import com.slack.bot.application.interactivity.box.SlackInteractionIdempotencyScope;
-import com.slack.bot.application.interactivity.box.aop.InteractivityImmediateTriggerTarget;
+import com.slack.bot.application.interactivity.box.aop.InteractionImmediateTriggerTarget;
 import com.slack.bot.application.interactivity.box.aop.ResolveOutboxSource;
-import com.slack.bot.application.interactivity.box.aop.TriggerInteractivityImmediateProcessing;
+import com.slack.bot.application.interactivity.box.aop.TriggerInteractionImmediateProcessing;
 import com.slack.bot.application.interactivity.box.out.exception.SlackBlocksSerializationException;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
@@ -25,13 +25,13 @@ public class SlackNotificationOutboxWriter {
     private final SlackInteractionIdempotencyKeyGenerator idempotencyKeyGenerator;
 
     @ResolveOutboxSource
-    @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
+    @TriggerInteractionImmediateProcessing(InteractionImmediateTriggerTarget.OUTBOX)
     public void enqueueEphemeralText(String sourceKey, String teamId, String channelId, String userId, String text) {
         enqueue(OutboxEnqueueRequest.ephemeralText(sourceKey, teamId, channelId, userId, validateText(text)));
     }
 
     @ResolveOutboxSource
-    @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
+    @TriggerInteractionImmediateProcessing(InteractionImmediateTriggerTarget.OUTBOX)
     public void enqueueEphemeralBlocks(
             String sourceKey,
             String teamId,
@@ -51,7 +51,7 @@ public class SlackNotificationOutboxWriter {
     }
 
     @ResolveOutboxSource
-    @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
+    @TriggerInteractionImmediateProcessing(InteractionImmediateTriggerTarget.OUTBOX)
     public void enqueueEphemeralBlocks(
             String sourceKey,
             String teamId,
@@ -71,13 +71,13 @@ public class SlackNotificationOutboxWriter {
     }
 
     @ResolveOutboxSource
-    @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
+    @TriggerInteractionImmediateProcessing(InteractionImmediateTriggerTarget.OUTBOX)
     public void enqueueChannelText(String sourceKey, String teamId, String channelId, String text) {
         enqueue(OutboxEnqueueRequest.channelText(sourceKey, teamId, channelId, validateText(text)));
     }
 
     @ResolveOutboxSource
-    @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
+    @TriggerInteractionImmediateProcessing(InteractionImmediateTriggerTarget.OUTBOX)
     public void enqueueChannelBlocks(
             String sourceKey,
             String teamId,
@@ -95,7 +95,7 @@ public class SlackNotificationOutboxWriter {
     }
 
     @ResolveOutboxSource
-    @TriggerInteractivityImmediateProcessing(InteractivityImmediateTriggerTarget.OUTBOX)
+    @TriggerInteractionImmediateProcessing(InteractionImmediateTriggerTarget.OUTBOX)
     public void enqueueChannelBlocks(
             String sourceKey,
             String teamId,

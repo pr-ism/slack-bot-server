@@ -6,7 +6,7 @@ import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.application.interactivity.dto.ReviewScheduleMetaDto;
 import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventPublisher;
 import com.slack.bot.application.interactivity.publisher.ReviewReservationRequestEvent;
-import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
+import com.slack.bot.application.interactivity.reply.InteractionErrorType;
 import com.slack.bot.application.interactivity.reply.SlackActionErrorNotifier;
 import com.slack.bot.application.interactivity.reservation.AuthorResolver;
 import com.slack.bot.application.interactivity.reservation.ProjectIdResolver;
@@ -56,7 +56,7 @@ public class ReviewSchedulerWorkflow {
         }
 
         if (isRevieweeRequester(meta, context.slackUserId())) {
-            errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.REVIEWEE_CANNOT_RESERVE);
+            errorNotifier.notify(token, channelId, slackUserId, InteractionErrorType.REVIEWEE_CANNOT_RESERVE);
             return Optional.empty();
         }
 
@@ -69,7 +69,7 @@ public class ReviewSchedulerWorkflow {
                 return Optional.empty();
             });
         } catch (IllegalStateException e) {
-            errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.RESERVATION_LOAD_FAILURE);
+            errorNotifier.notify(token, channelId, slackUserId, InteractionErrorType.RESERVATION_LOAD_FAILURE);
             return Optional.empty();
         }
     }
@@ -87,7 +87,7 @@ public class ReviewSchedulerWorkflow {
                     context.token(),
                     context.channelId(),
                     context.slackUserId(),
-                    InteractivityErrorType.INVALID_META
+                    InteractionErrorType.INVALID_META
             );
             return null;
         }
@@ -119,7 +119,7 @@ public class ReviewSchedulerWorkflow {
                                 .asText(null);
 
         if (metaJson == null || metaJson.isBlank()) {
-            errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.INVALID_META);
+            errorNotifier.notify(token, channelId, slackUserId, InteractionErrorType.INVALID_META);
             return null;
         }
 
@@ -127,7 +127,7 @@ public class ReviewSchedulerWorkflow {
                                   .asText(null);
 
         if (triggerId == null || triggerId.isBlank()) {
-            errorNotifier.notify(token, channelId, slackUserId, InteractivityErrorType.INVALID_META);
+            errorNotifier.notify(token, channelId, slackUserId, InteractionErrorType.INVALID_META);
             return null;
         }
 

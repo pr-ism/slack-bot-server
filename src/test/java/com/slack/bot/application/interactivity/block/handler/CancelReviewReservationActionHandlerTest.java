@@ -16,7 +16,7 @@ import com.slack.bot.application.interactivity.block.dto.BlockActionOutcomeDto;
 import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.application.interactivity.publisher.ReviewInteractionEvent;
 import com.slack.bot.application.interactivity.publisher.ReviewReservationCancelEvent;
-import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
+import com.slack.bot.application.interactivity.reply.InteractionErrorType;
 import com.slack.bot.domain.reservation.ReservationStatus;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.repository.ReviewReservationRepository;
@@ -94,7 +94,7 @@ class CancelReviewReservationActionHandlerTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U1"),
-                        eq(InteractivityErrorType.RESERVATION_NOT_FOUND.message())
+                        eq(InteractionErrorType.RESERVATION_NOT_FOUND.message())
                 );
         assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }
@@ -117,7 +117,7 @@ class CancelReviewReservationActionHandlerTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U2"),
-                        eq(InteractivityErrorType.NOT_OWNER_CANCEL.message())
+                        eq(InteractionErrorType.NOT_OWNER_CANCEL.message())
                 );
         assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }

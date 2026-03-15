@@ -15,7 +15,7 @@ import com.slack.bot.application.interactivity.client.NotificationApiClient;
 import com.slack.bot.application.interactivity.publisher.ReviewInteractionEvent;
 import com.slack.bot.application.interactivity.publisher.ReviewReservationCancelEvent;
 import com.slack.bot.application.interactivity.publisher.ReviewReservationChangeEvent;
-import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
+import com.slack.bot.application.interactivity.reply.InteractionErrorType;
 import com.slack.bot.domain.reservation.ReservationStatus;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.repository.ReviewReservationRepository;
@@ -107,7 +107,7 @@ class ReservationCommandWorkflowTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U1"),
-                        eq(InteractivityErrorType.RESERVATION_NOT_FOUND.message())
+                        eq(InteractionErrorType.RESERVATION_NOT_FOUND.message())
                 );
         assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }
@@ -168,7 +168,7 @@ class ReservationCommandWorkflowTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U2"),
-                        eq(InteractivityErrorType.NOT_OWNER_CANCEL.message())
+                        eq(InteractionErrorType.NOT_OWNER_CANCEL.message())
                 );
         assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }
@@ -197,7 +197,7 @@ class ReservationCommandWorkflowTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U1"),
-                        eq(InteractivityErrorType.RESERVATION_ALREADY_CANCELLED.message())
+                        eq(InteractionErrorType.RESERVATION_ALREADY_CANCELLED.message())
                 );
         assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }
@@ -226,7 +226,7 @@ class ReservationCommandWorkflowTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U1"),
-                        eq(InteractivityErrorType.RESERVATION_ALREADY_STARTED.message())
+                        eq(InteractionErrorType.RESERVATION_ALREADY_STARTED.message())
                 );
         assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }
@@ -288,7 +288,7 @@ class ReservationCommandWorkflowTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U2"),
-                        eq(InteractivityErrorType.NOT_OWNER_CHANGE.message())
+                        eq(InteractionErrorType.NOT_OWNER_CHANGE.message())
                 );
         assertThat(actual.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }
@@ -319,7 +319,7 @@ class ReservationCommandWorkflowTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U1"),
-                        eq(InteractivityErrorType.RESERVATION_CHANGE_NOT_ALLOWED_CANCELLED.message())
+                        eq(InteractionErrorType.RESERVATION_CHANGE_NOT_ALLOWED_CANCELLED.message())
                 );
         verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
         assertThat(actual.stream(ReviewInteractionEvent.class).toList()).isEmpty();
@@ -351,7 +351,7 @@ class ReservationCommandWorkflowTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U1"),
-                        eq(InteractivityErrorType.RESERVATION_ALREADY_STARTED.message())
+                        eq(InteractionErrorType.RESERVATION_ALREADY_STARTED.message())
                 );
         verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
         assertThat(actual.stream(ReviewInteractionEvent.class).toList()).isEmpty();
@@ -379,7 +379,7 @@ class ReservationCommandWorkflowTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         eq("U1"),
-                        eq(InteractivityErrorType.RESERVATION_NOT_FOUND.message())
+                        eq(InteractionErrorType.RESERVATION_NOT_FOUND.message())
                 );
         assertThat(actual.stream(ReviewInteractionEvent.class).toList()).isEmpty();
         verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));

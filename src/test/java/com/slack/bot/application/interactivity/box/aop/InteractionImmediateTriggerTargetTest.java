@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
-class InteractivityImmediateTriggerTargetTest {
+class InteractionImmediateTriggerTargetTest {
 
     @Test
     void BLOCK_ACTION_INBOX_타겟은_블록액션_인박스를_즉시_처리한다() {
@@ -19,7 +19,7 @@ class InteractivityImmediateTriggerTargetTest {
         InteractionImmediateProcessor interactionImmediateProcessor = mock(InteractionImmediateProcessor.class);
 
         // when
-        InteractivityImmediateTriggerTarget.BLOCK_ACTION_INBOX.trigger(interactionImmediateProcessor);
+        InteractionImmediateTriggerTarget.BLOCK_ACTION_INBOX.trigger(interactionImmediateProcessor);
 
         // then
         verify(interactionImmediateProcessor).triggerBlockActionInbox();
@@ -33,7 +33,7 @@ class InteractivityImmediateTriggerTargetTest {
         InteractionImmediateProcessor interactionImmediateProcessor = mock(InteractionImmediateProcessor.class);
 
         // when
-        InteractivityImmediateTriggerTarget.VIEW_SUBMISSION_INBOX.trigger(interactionImmediateProcessor);
+        InteractionImmediateTriggerTarget.VIEW_SUBMISSION_INBOX.trigger(interactionImmediateProcessor);
 
         // then
         verify(interactionImmediateProcessor).triggerViewSubmissionInbox();
@@ -47,7 +47,7 @@ class InteractivityImmediateTriggerTargetTest {
         InteractionImmediateProcessor interactionImmediateProcessor = mock(InteractionImmediateProcessor.class);
 
         // when
-        InteractivityImmediateTriggerTarget.OUTBOX.trigger(interactionImmediateProcessor);
+        InteractionImmediateTriggerTarget.OUTBOX.trigger(interactionImmediateProcessor);
 
         // then
         verify(interactionImmediateProcessor).triggerOutbox();

@@ -6,7 +6,7 @@ import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
-import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
+import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStatus;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
@@ -92,7 +92,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                 .set(slackInteractionInbox.processingStartedAt, processingStartedAt)
                 .set(slackInteractionInbox.failedAt, Expressions.nullExpression(Instant.class))
                 .set(slackInteractionInbox.failureReason, Expressions.nullExpression(String.class))
-                .set(slackInteractionInbox.failureType, Expressions.nullExpression(SlackInteractivityFailureType.class))
+                .set(slackInteractionInbox.failureType, Expressions.nullExpression(SlackInteractionFailureType.class))
                 .where(
                         slackInteractionInbox.id.eq(inboxId),
                         slackInteractionInbox.status.in(PROCESSING_CLAIMABLE_STATUSES)
@@ -122,7 +122,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                 .set(slackInteractionInbox.processingStartedAt, Expressions.nullExpression(Instant.class))
                 .set(slackInteractionInbox.failedAt, failedAt)
                 .set(slackInteractionInbox.failureReason, failureReason)
-                .set(slackInteractionInbox.failureType, SlackInteractivityFailureType.RETRY_EXHAUSTED)
+                .set(slackInteractionInbox.failureType, SlackInteractionFailureType.RETRY_EXHAUSTED)
                 .where(
                         slackInteractionInbox.interactionType.eq(interactionType),
                         slackInteractionInbox.status.eq(SlackInteractionInboxStatus.PROCESSING),
@@ -137,7 +137,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                 .set(slackInteractionInbox.processingStartedAt, Expressions.nullExpression(Instant.class))
                 .set(slackInteractionInbox.failedAt, failedAt)
                 .set(slackInteractionInbox.failureReason, failureReason)
-                .set(slackInteractionInbox.failureType, Expressions.nullExpression(SlackInteractivityFailureType.class))
+                .set(slackInteractionInbox.failureType, Expressions.nullExpression(SlackInteractionFailureType.class))
                 .where(
                         slackInteractionInbox.interactionType.eq(interactionType),
                         slackInteractionInbox.status.eq(SlackInteractionInboxStatus.PROCESSING),

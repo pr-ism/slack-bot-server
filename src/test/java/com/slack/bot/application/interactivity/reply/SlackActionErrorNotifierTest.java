@@ -26,14 +26,14 @@ class SlackActionErrorNotifierTest {
         SlackActionErrorNotifier notifier = new SlackActionErrorNotifier(notificationApiClient);
 
         // when
-        notifier.notify("xoxb", "C1", "U1", InteractivityErrorType.INVALID_META);
+        notifier.notify("xoxb", "C1", "U1", InteractionErrorType.INVALID_META);
 
         // then
         verify(notificationApiClient).sendEphemeralMessage(
                 "xoxb",
                 "C1",
                 "U1",
-                InteractivityErrorType.INVALID_META.message()
+                InteractionErrorType.INVALID_META.message()
         );
     }
 
@@ -43,14 +43,14 @@ class SlackActionErrorNotifierTest {
         SlackActionErrorNotifier notifier = new SlackActionErrorNotifier(notificationApiClient);
 
         // when
-        SlackActionResponse actual = notifier.respond("xoxb", "C1", "U1", InteractivityErrorType.RESERVATION_NOT_FOUND);
+        SlackActionResponse actual = notifier.respond("xoxb", "C1", "U1", InteractionErrorType.RESERVATION_NOT_FOUND);
 
         // then
         verify(notificationApiClient).sendEphemeralMessage(
                         "xoxb",
                         "C1",
                         "U1",
-                        InteractivityErrorType.RESERVATION_NOT_FOUND.message()
+                        InteractionErrorType.RESERVATION_NOT_FOUND.message()
                 );
         assertThat(actual).isEqualTo(SlackActionResponse.empty());
     }

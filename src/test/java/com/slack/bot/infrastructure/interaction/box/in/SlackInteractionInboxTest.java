@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
-import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
+import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -159,14 +159,14 @@ class SlackInteractionInboxTest {
         // when
         Instant failedAt = Instant.parse("2026-02-15T01:00:00Z");
 
-        inbox.markFailed(failedAt, "failure", SlackInteractivityFailureType.BUSINESS_INVARIANT);
+        inbox.markFailed(failedAt, "failure", SlackInteractionFailureType.BUSINESS_INVARIANT);
 
         // then
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
                 () -> assertThat(inbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(inbox.getFailureReason()).isEqualTo("failure"),
-                () -> assertThat(inbox.getFailureType()).isEqualTo(SlackInteractivityFailureType.BUSINESS_INVARIANT)
+                () -> assertThat(inbox.getFailureType()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT)
         );
     }
 
@@ -266,7 +266,7 @@ class SlackInteractionInboxTest {
         );
 
         // when & then
-        assertThatThrownBy(() -> inbox.markFailed(null, "failure", SlackInteractivityFailureType.BUSINESS_INVARIANT))
+        assertThatThrownBy(() -> inbox.markFailed(null, "failure", SlackInteractionFailureType.BUSINESS_INVARIANT))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("failedAt은 비어 있을 수 없습니다.");
     }
@@ -282,7 +282,7 @@ class SlackInteractionInboxTest {
         Instant failedAt = Instant.parse("2026-02-15T01:00:00Z");
 
         // when & then
-        assertThatThrownBy(() -> inbox.markFailed(failedAt, null, SlackInteractivityFailureType.BUSINESS_INVARIANT))
+        assertThatThrownBy(() -> inbox.markFailed(failedAt, null, SlackInteractionFailureType.BUSINESS_INVARIANT))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("failureReason은 비어 있을 수 없습니다.");
     }
@@ -298,7 +298,7 @@ class SlackInteractionInboxTest {
         Instant failedAt = Instant.parse("2026-02-15T01:00:00Z");
 
         // when & then
-        assertThatThrownBy(() -> inbox.markFailed(failedAt, " ", SlackInteractivityFailureType.BUSINESS_INVARIANT))
+        assertThatThrownBy(() -> inbox.markFailed(failedAt, " ", SlackInteractionFailureType.BUSINESS_INVARIANT))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("failureReason은 비어 있을 수 없습니다.");
     }
@@ -395,7 +395,7 @@ class SlackInteractionInboxTest {
                 inbox.markFailed(
                         Instant.parse("2026-02-15T01:00:00Z"),
                         "failure",
-                        SlackInteractivityFailureType.BUSINESS_INVARIANT
+                        SlackInteractionFailureType.BUSINESS_INVARIANT
                 )
         ).isInstanceOf(IllegalStateException.class)
          .hasMessage("FAILED 전이는 PROCESSING 상태에서만 가능합니다. 현재: PENDING");

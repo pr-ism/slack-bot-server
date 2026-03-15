@@ -4,7 +4,7 @@ import com.slack.bot.application.interactivity.dto.ReviewScheduleMetaDto;
 import com.slack.bot.application.interactivity.notification.ReviewReservationNotifier;
 import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventPublisher;
 import com.slack.bot.application.interactivity.publisher.ReviewReservationScheduledEvent;
-import com.slack.bot.application.interactivity.reply.InteractivityErrorType;
+import com.slack.bot.application.interactivity.reply.InteractionErrorType;
 import com.slack.bot.application.interactivity.reply.SlackActionErrorNotifier;
 import com.slack.bot.application.interactivity.reply.dto.response.SlackActionResponse;
 import com.slack.bot.application.interactivity.reservation.AuthorResolver;
@@ -166,7 +166,7 @@ public class ReviewReservationWorkflow {
                     token,
                     meta.channelId(),
                     reviewerId,
-                    InteractivityErrorType.RESERVATION_FAILURE
+                    InteractionErrorType.RESERVATION_FAILURE
             );
         }
     }

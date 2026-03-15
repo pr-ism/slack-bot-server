@@ -1,6 +1,6 @@
 package com.slack.bot.global.resolver;
 
-import com.slack.bot.presentation.interactivity.dto.request.SlackInteractivityHttpRequest;
+import com.slack.bot.presentation.interactivity.dto.request.SlackInteractionHttpRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -13,11 +13,11 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 @Component
-public class SlackInteractivityHttpRequestArgumentResolver implements HandlerMethodArgumentResolver {
+public class SlackInteractionHttpRequestArgumentResolver implements HandlerMethodArgumentResolver {
 
     @Override
     public boolean supportsParameter(MethodParameter parameter) {
-        return SlackInteractivityHttpRequest.class.isAssignableFrom(parameter.getParameterType());
+        return SlackInteractionHttpRequest.class.isAssignableFrom(parameter.getParameterType());
     }
 
     @Override
@@ -36,13 +36,13 @@ public class SlackInteractivityHttpRequestArgumentResolver implements HandlerMet
         return parse(request);
     }
 
-    private SlackInteractivityHttpRequest parse(HttpServletRequest request) {
+    private SlackInteractionHttpRequest parse(HttpServletRequest request) {
         String timestamp = request.getHeader("X-Slack-Request-Timestamp");
         String signature = request.getHeader("X-Slack-Signature");
         String rawBody = readBody(request);
         String payloadJson = extractPayloadJson(rawBody);
 
-        return new SlackInteractivityHttpRequest(timestamp, signature, rawBody, payloadJson);
+        return new SlackInteractionHttpRequest(timestamp, signature, rawBody, payloadJson);
     }
 
     private String readBody(HttpServletRequest request) {
