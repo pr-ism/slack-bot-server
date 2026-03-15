@@ -15,8 +15,8 @@ import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.slack.bot.application.interactivity.box.BoxFailureReasonTruncator;
-import com.slack.bot.application.interactivity.box.retry.InteractionRetryExceptionClassifier;
+import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
+import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
 import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;

@@ -12,8 +12,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.slack.bot.application.interactivity.SlackInteractionServiceFacade;
-import com.slack.bot.application.interactivity.reply.dto.response.SlackActionResponse;
+import com.slack.bot.application.interaction.SlackInteractionServiceFacade;
+import com.slack.bot.application.interaction.reply.dto.response.SlackActionResponse;
 import com.slack.bot.global.security.SlackSignatureVerifier;
 import com.slack.bot.presentation.CommonControllerSliceTestSupport;
 import java.net.URLEncoder;

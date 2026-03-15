@@ -1,7 +1,7 @@
 package com.slack.bot.presentation.interactivity;
 
-import com.slack.bot.application.interactivity.SlackInteractionServiceFacade;
-import com.slack.bot.application.interactivity.reply.dto.response.SlackActionResponse;
+import com.slack.bot.application.interaction.SlackInteractionServiceFacade;
+import com.slack.bot.application.interaction.reply.dto.response.SlackActionResponse;
 import com.slack.bot.global.security.SlackSignatureVerifier;
 import com.slack.bot.presentation.interactivity.dto.request.SlackInteractionHttpRequest;
 import com.slack.bot.presentation.interactivity.exception.SlackSignatureVerificationException;

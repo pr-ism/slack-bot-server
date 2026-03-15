@@ -1,0 +1,12 @@
+package com.slack.bot.application.interaction.client.exception;
+
+public class SlackBotMessageDispatchException extends RuntimeException {
+
+    public SlackBotMessageDispatchException(String message) {
+        super(message);
+    }
+
+    public SlackBotMessageDispatchException(String message, Throwable cause) {
+        super(message, cause);
+    }
+}
