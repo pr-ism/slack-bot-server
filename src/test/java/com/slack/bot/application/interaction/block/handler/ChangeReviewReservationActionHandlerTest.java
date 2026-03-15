@@ -42,7 +42,7 @@ class ChangeReviewReservationActionHandlerTest {
     NotificationApiClient notificationApiClient;
 
     @Test
-    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    @Sql("classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql")
     void 리뷰_예약_변경_요청이면_모달을_열고_이벤트를_발행하며_빈_응답을_반환한다(ApplicationEvents actualApplicationEvents) {
         // given
         BlockActionCommandDto command = commandWithReservationId("100", "U1", "TRIGGER_1");
@@ -71,7 +71,7 @@ class ChangeReviewReservationActionHandlerTest {
     }
 
     @Test
-    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    @Sql("classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql")
     void 본인_소유가_아닌_리뷰_예약_변경_요청이면_권한_오류_알림을_보내고_모달을_열지_않는다(ApplicationEvents actualApplicationEvents) {
         // given
         BlockActionCommandDto command = commandWithReservationId("100", "U2", "TRIGGER_1");

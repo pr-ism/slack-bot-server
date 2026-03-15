@@ -138,7 +138,7 @@ class ReviewSchedulerWorkflowTest {
     @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/reservation/project_123.sql",
-            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
+            "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
     })
     void 활성_예약이_있으면_모달을_열지_않고_기존_예약을_반환한다(ApplicationEvents actualApplicationEvents) {
         // given
@@ -246,7 +246,7 @@ class ReviewSchedulerWorkflowTest {
     @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/reservation/project_123.sql",
-            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
+            "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
     })
     void 같은_리뷰어의_다른_PR이면_중복으로_보지_않고_모달을_연다(ApplicationEvents actualApplicationEvents) {
         // given

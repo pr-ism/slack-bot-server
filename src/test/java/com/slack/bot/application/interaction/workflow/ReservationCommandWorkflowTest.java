@@ -113,7 +113,7 @@ class ReservationCommandWorkflowTest {
     }
 
     @Test
-    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    @Sql("classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql")
     void 리뷰_예약_취소_요청은_예약을_취소하고_취소_이벤트를_발행한다(ApplicationEvents actualApplicationEvents) {
         // given
         JsonNode action = actionWithReservationId("100");
@@ -148,7 +148,7 @@ class ReservationCommandWorkflowTest {
     }
 
     @Test
-    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    @Sql("classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql")
     void 리뷰_예약_취소는_본인만_가능하다는_알림을_보낸다(ApplicationEvents actualApplicationEvents) {
         // given
         JsonNode action = actionWithReservationId("100");
@@ -174,7 +174,7 @@ class ReservationCommandWorkflowTest {
     }
 
     @Test
-    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    @Sql("classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql")
     void 이미_취소된_예약은_취소할_수_없다는_알림을_보낸다(ApplicationEvents actualApplicationEvents) {
         // given
         JsonNode action = actionWithReservationId("100");
@@ -203,7 +203,7 @@ class ReservationCommandWorkflowTest {
     }
 
     @Test
-    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    @Sql("classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql")
     void 이미_시작된_예약은_취소할_수_없다는_알림을_보낸다(ApplicationEvents actualApplicationEvents) {
         // given
         JsonNode action = actionWithReservationId("100");
@@ -232,7 +232,7 @@ class ReservationCommandWorkflowTest {
     }
 
     @Test
-    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    @Sql("classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql")
     void 리뷰_예약_변경_요청은_모달을_열고_변경_이벤트를_발행한다(ApplicationEvents actualApplicationEvents) {
         // given
         JsonNode payload = objectMapper.createObjectNode()
@@ -266,7 +266,7 @@ class ReservationCommandWorkflowTest {
     }
 
     @Test
-    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    @Sql("classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql")
     void 리뷰_예약_변경은_본인만_가능하다는_알림을_보낸다(ApplicationEvents actual) {
         // given
         JsonNode payload = objectMapper.createObjectNode()
@@ -294,7 +294,7 @@ class ReservationCommandWorkflowTest {
     }
 
     @Test
-    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    @Sql("classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql")
     void 이미_취소된_예약은_변경할_수_없다는_알림을_보낸다(ApplicationEvents actual) {
         // given
         JsonNode payload = objectMapper.createObjectNode()
@@ -326,7 +326,7 @@ class ReservationCommandWorkflowTest {
     }
 
     @Test
-    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    @Sql("classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql")
     void 이미_시작된_예약은_변경할_수_없다는_알림을_보낸다(ApplicationEvents actual) {
         // given
         JsonNode payload = objectMapper.createObjectNode()

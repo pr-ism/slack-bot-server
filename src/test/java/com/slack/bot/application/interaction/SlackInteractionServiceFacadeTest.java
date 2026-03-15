@@ -51,7 +51,7 @@ class SlackInteractionServiceFacadeTest {
     @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
-            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
+            "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
     })
     void 슬랙_type이_누락된_인터랙션은_block_actions로_간주되어_리뷰_예약_취소_도메인_흐름을_수행한다() throws Exception {
         // given
@@ -83,7 +83,7 @@ class SlackInteractionServiceFacadeTest {
     @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
-            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
+            "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
     })
     void view_submission_요청은_블록_액션_처리를_건너뛰고_모달_제출_라우터로_흘러간다() throws Exception {
         // given
@@ -156,7 +156,7 @@ class SlackInteractionServiceFacadeTest {
     @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
-            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
+            "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
     })
     void 블록_알림_전달중_예상치못한_런타임_예외가_나도_슬랙_재시도를_피하기위해_빈_응답을_반환한다() throws Exception {
         // given

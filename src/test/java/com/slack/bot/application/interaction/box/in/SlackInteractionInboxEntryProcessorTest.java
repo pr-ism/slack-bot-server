@@ -55,7 +55,7 @@ class SlackInteractionInboxEntryProcessorTest {
     @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
-            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
+            "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
     })
     void block_actions_엔트리_처리시_PROCESSED로_마킹되고_취소_예약_흐름이_수행된다() throws Exception {
         // given
@@ -90,7 +90,7 @@ class SlackInteractionInboxEntryProcessorTest {
     @Sql(scripts = {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
             "classpath:sql/fixtures/reservation/project_123.sql",
-            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
+            "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
     })
     void block_actions_엔트리_처리시_중복_예약_안내를_전송하고_기존_예약은_유지된다() throws Exception {
         // given
@@ -124,7 +124,7 @@ class SlackInteractionInboxEntryProcessorTest {
     @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
-            "classpath:sql/fixtures/interactivity/project_123.sql"
+            "classpath:sql/fixtures/interaction/project_123.sql"
     })
     void view_submission_엔트리_처리시_PROCESSED로_마킹되고_리뷰_예약이_생성된다() throws Exception {
         // given

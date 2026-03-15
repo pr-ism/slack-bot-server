@@ -369,7 +369,7 @@ class StartReviewActionHandlerTest {
     }
 
     @Test
-    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    @Sql("classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql")
     void 리뷰_바로_시작을_누르면_해당_활성_예약을_즉시_종료한다(ApplicationEvents actualApplicationEvents) {
         // given
         given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U_AUTHOR")).willReturn("D_AUTHOR");
@@ -398,9 +398,9 @@ class StartReviewActionHandlerTest {
 
     @Test
     @Sql(scripts = {
-            "classpath:sql/fixtures/interactivity/workspace_t1.sql",
-            "classpath:sql/fixtures/interactivity/project_member_t1.sql",
-            "classpath:sql/fixtures/interactivity/notification_settings_t1_u1_dm_enabled.sql"
+            "classpath:sql/fixtures/interaction/workspace_t1.sql",
+            "classpath:sql/fixtures/interaction/project_member_t1.sql",
+            "classpath:sql/fixtures/interaction/notification_settings_t1_u1_dm_enabled.sql"
     })
     void 프로젝트_ID가_숫자가_아니면_예약_취소는_건너뛰고_알림은_보낸다(ApplicationEvents actualApplicationEvents) {
         // given

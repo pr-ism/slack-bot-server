@@ -66,7 +66,7 @@ class ViewSubmissionInteractionCoordinatorTest {
     @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
-            "classpath:sql/fixtures/interactivity/project_123.sql"
+            "classpath:sql/fixtures/interaction/project_123.sql"
     })
     void enqueued_view_submission을_처리하면_리뷰_예약이_생성된다() {
         // given

@@ -61,7 +61,7 @@ class SlackInteractionInboxProcessorTest {
     @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
-            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
+            "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
     })
     void block_actions_인박스를_처리하면_취소_예약_도메인_흐름이_수행된다() throws Exception {
         // given
@@ -96,7 +96,7 @@ class SlackInteractionInboxProcessorTest {
     @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
-            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql",
+            "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql",
             "classpath:sql/fixtures/box/processing_timeout_block_action_inbox.sql"
     })
     void PROCESSING_타임아웃_block_actions_inbox는_RETRY_PENDING으로_복구된_후_정상_재처리된다() {
@@ -159,7 +159,7 @@ class SlackInteractionInboxProcessorTest {
     @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
-            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
+            "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
     })
     void 동일_payload를_중복_enqueue하면_한번만_적재되고_한번만_처리된다() throws Exception {
         // given
@@ -183,7 +183,7 @@ class SlackInteractionInboxProcessorTest {
     @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
-            "classpath:sql/fixtures/interactivity/project_123.sql"
+            "classpath:sql/fixtures/interaction/project_123.sql"
     })
     void view_submission_인박스를_처리하면_리뷰_예약_워크플로우가_비동기로_수행된다() throws Exception {
         // given

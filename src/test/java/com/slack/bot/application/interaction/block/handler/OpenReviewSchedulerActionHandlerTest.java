@@ -42,7 +42,7 @@ class OpenReviewSchedulerActionHandlerTest {
     @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/reservation/project_123.sql",
-            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
+            "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
     })
     void 활성_리뷰_예약이_이미_있으면_중복_예약으로_응답하고_모달은_열지_않는다(ApplicationEvents actualApplicationEvents) {
         // given

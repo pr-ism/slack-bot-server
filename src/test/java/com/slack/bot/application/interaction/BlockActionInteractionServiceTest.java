@@ -46,7 +46,7 @@ class BlockActionInteractionServiceTest {
     @Sql(scripts = {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
             "classpath:sql/fixtures/reservation/project_123.sql",
-            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
+            "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
     })
     void 동일_PR에_이미_활성_리뷰_예약이_있을때_스케줄러를_다시_열면_중복_예약_안내를_보낸다() {
         // given
@@ -76,7 +76,7 @@ class BlockActionInteractionServiceTest {
     @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
-            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
+            "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
     })
     void 예약자가_리뷰_예약_취소_버튼을_누르면_예약은_CANCELLED로_전이되고_취소_안내를_보낸다() {
         // given

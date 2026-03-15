@@ -129,7 +129,7 @@ class BlockActionDispatcherTest {
     }
 
     @Test
-    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    @Sql("classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql")
     void 예약_변경_액션이면_변경_모달을_열고_변경_이벤트를_발행한다(ApplicationEvents actualApplicationEvents) {
         // given
         BlockActionCommandDto command = command(
@@ -163,7 +163,7 @@ class BlockActionDispatcherTest {
     }
 
     @Test
-    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    @Sql("classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql")
     void 예약_취소_액션이면_예약을_취소하고_취소된_예약을_반환한다() {
         // given
         BlockActionCommandDto command = command(

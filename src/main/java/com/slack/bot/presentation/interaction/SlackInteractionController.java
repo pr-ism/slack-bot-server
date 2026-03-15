@@ -21,7 +21,7 @@ public class SlackInteractionController {
     private final SlackInteractionServiceFacade slackInteractionServiceFacade;
 
     @PostMapping(consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-    public ResponseEntity<SlackActionResponse> handleInteractivity(SlackInteractionHttpRequest request) {
+    public ResponseEntity<SlackActionResponse> handleinteraction(SlackInteractionHttpRequest request) {
         validateRequest(request);
 
         if (!isAuthorized(request)) {

@@ -48,7 +48,7 @@ class CancelReviewReservationActionHandlerTest {
     ObjectMapper objectMapper;
 
     @Test
-    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    @Sql("classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql")
     void 리뷰_예약_취소_요청이면_예약을_취소하고_취소_예약을_응답한다(ApplicationEvents actualApplicationEvents) {
         // given
         BlockActionCommandDto command = commandWithReservationId("100", "U1");
@@ -100,7 +100,7 @@ class CancelReviewReservationActionHandlerTest {
     }
 
     @Test
-    @Sql("classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql")
+    @Sql("classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql")
     void 비소유자의_취소_요청이면_권한_없음_알림을_보내고_빈_응답을_반환한다(ApplicationEvents actualApplicationEvents) {
         // given
         BlockActionCommandDto command = commandWithReservationId("100", "U2");

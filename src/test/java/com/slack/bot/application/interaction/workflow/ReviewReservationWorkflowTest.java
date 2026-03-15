@@ -58,7 +58,7 @@ class ReviewReservationWorkflowTest {
     ReviewReservationCoordinator reviewReservationCoordinator;
 
     @Test
-    @Sql("classpath:sql/fixtures/interactivity/project_123.sql")
+    @Sql("classpath:sql/fixtures/interaction/project_123.sql")
     void 신규_예약을_생성하면_clear_응답을_반환한다(ApplicationEvents actualApplicationEvents) {
         // given
         ReviewScheduleMetaDto meta = meta("123", null);
@@ -89,8 +89,8 @@ class ReviewReservationWorkflowTest {
 
     @Test
     @Sql(scripts = {
-            "classpath:sql/fixtures/interactivity/project_123.sql",
-            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
+            "classpath:sql/fixtures/interaction/project_123.sql",
+            "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
     })
     void 중복된_신규_예약이면_빈_응답을_반환한다(ApplicationEvents actualApplicationEvents) {
         // given
@@ -132,7 +132,7 @@ class ReviewReservationWorkflowTest {
     }
 
     @Test
-    @Sql("classpath:sql/fixtures/interactivity/project_123.sql")
+    @Sql("classpath:sql/fixtures/interaction/project_123.sql")
     void reservation_ID가_숫자가_아니면_신규_예약으로_처리한다(ApplicationEvents actualApplicationEvents) {
         // given
         ReviewScheduleMetaDto meta = meta("123", "abc");
@@ -162,8 +162,8 @@ class ReviewReservationWorkflowTest {
 
     @Test
     @Sql(scripts = {
-            "classpath:sql/fixtures/interactivity/project_123.sql",
-            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
+            "classpath:sql/fixtures/interaction/project_123.sql",
+            "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
     })
     void 예약_ID가_있으면_기존_예약을_변경한다(ApplicationEvents actualApplicationEvents) {
         // given
@@ -197,8 +197,8 @@ class ReviewReservationWorkflowTest {
 
     @Test
     @Sql(scripts = {
-            "classpath:sql/fixtures/interactivity/project_123.sql",
-            "classpath:sql/fixtures/interactivity/active_review_reservation_t1_project_123_u1.sql"
+            "classpath:sql/fixtures/interaction/project_123.sql",
+            "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
     })
     void 동시성_중복_예외가_발생하면_활성_예약을_조회해_중복_안내를_수행한다(ApplicationEvents actualApplicationEvents) {
         // given
@@ -241,7 +241,7 @@ class ReviewReservationWorkflowTest {
     }
 
     @Test
-    @Sql("classpath:sql/fixtures/interactivity/project_123.sql")
+    @Sql("classpath:sql/fixtures/interaction/project_123.sql")
     void 즉시_알림_분기를_통과한다(ApplicationEvents actualApplicationEvents) {
         // given
         Instant nowForValidation = Instant.parse("2099-01-01T00:00:00Z");
@@ -269,7 +269,7 @@ class ReviewReservationWorkflowTest {
     }
 
     @Test
-    @Sql("classpath:sql/fixtures/interactivity/project_123.sql")
+    @Sql("classpath:sql/fixtures/interaction/project_123.sql")
     void 예약_시간이_과거로_판정되면_모달_에러로_메시지를_반환한다(ApplicationEvents actualApplicationEvents) {
         // given
         ReviewScheduleMetaDto meta = meta("123", null);
