@@ -17,7 +17,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.slack.api.model.view.View;
 import com.slack.api.model.view.Views;
-import com.slack.bot.application.interactivity.client.exception.SlackBotMessageDispatchException;
+import com.slack.bot.application.interaction.client.exception.SlackBotMessageDispatchException;
 import java.io.IOException;
 import java.io.InputStream;
 import org.junit.jupiter.api.BeforeEach;

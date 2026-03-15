@@ -1,7 +1,7 @@
 package com.slack.bot.infrastructure.interaction.box.in;
 
 import com.slack.bot.domain.common.BaseTimeEntity;
-import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
+import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -38,7 +38,7 @@ public class SlackInteractionInbox extends BaseTimeEntity {
     private String failureReason;
 
     @Enumerated(EnumType.STRING)
-    private SlackInteractivityFailureType failureType;
+    private SlackInteractionFailureType failureType;
 
     public static SlackInteractionInbox pending(
             SlackInteractionInboxType interactionType,
@@ -129,7 +129,7 @@ public class SlackInteractionInbox extends BaseTimeEntity {
     public void markFailed(
             Instant failedAt,
             String failureReason,
-            SlackInteractivityFailureType failureType
+            SlackInteractionFailureType failureType
     ) {
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
@@ -167,7 +167,7 @@ public class SlackInteractionInbox extends BaseTimeEntity {
         }
     }
 
-    private void validateFailureType(SlackInteractivityFailureType failureType) {
+    private void validateFailureType(SlackInteractionFailureType failureType) {
         if (failureType == null) {
             throw new IllegalArgumentException("failureType은 비어 있을 수 없습니다.");
         }

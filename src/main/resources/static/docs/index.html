@@ -1186,6 +1186,7 @@ X-API-Key: test-api-key
   "pullRequestTitle" : "Fix bug",
   "pullRequestUrl" : "https://github.com/pr/1",
   "authorGithubId" : "author-gh",
+  "startCommitHash" : "abc123",
   "pendingReviewers" : [ "reviewer-gh-1" ],
   "reviewedReviewers" : [ ]
 }</code></pre>
@@ -1279,6 +1280,13 @@ X-API-Key: test-api-key
 <td class="tableblock halign-left valign-top"><p class="tableblock">PR 작성자 GitHub ID</p></td>
 </tr>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>startCommitHash</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>String</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">리뷰 라운드 시작 커밋 해시</p></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><code>pendingReviewers</code></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><code>Array</code></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -1307,7 +1315,7 @@ X-API-Key: test-api-key
 </div>
 </div>
 <div class="sect1">
-<h2 id="Interactivity-API"><a class="link" href="#Interactivity-API">Interactivity API</a></h2>
+<h2 id="interaction-API"><a class="link" href="#interaction-API">interaction API</a></h2>
 <div class="sectionbody">
 <div class="sect2">
 <h3 id="handle"><a class="link" href="#handle">슬랙 인터렉션 핸들링</a></h3>
@@ -1391,7 +1399,7 @@ Content-Type: application/json;charset=UTF-8
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-02-12 00:23:18 +0900
+Last updated 2026-03-15 13:16:18 +0900
 </div>
 </div>
 </body>

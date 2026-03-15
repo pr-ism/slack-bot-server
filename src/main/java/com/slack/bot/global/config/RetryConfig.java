@@ -1,6 +1,6 @@
 package com.slack.bot.global.config;
 
-import com.slack.bot.application.interactivity.box.retry.InteractionRetryExceptionClassifier;
+import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.global.config.properties.InteractionWorkerProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

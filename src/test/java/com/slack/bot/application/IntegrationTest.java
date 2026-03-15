@@ -2,11 +2,11 @@ package com.slack.bot.application;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.event.handler.SlackEventHandlerRegistry;
-import com.slack.bot.application.interactivity.box.in.SlackInteractionInboxProcessor;
-import com.slack.bot.application.interactivity.publisher.ReviewInteractionEventPublisher;
-import com.slack.bot.application.interactivity.reservation.ReviewReservationCoordinator;
+import com.slack.bot.application.interaction.box.in.SlackInteractionInboxProcessor;
+import com.slack.bot.application.interaction.publisher.ReviewInteractionEventPublisher;
+import com.slack.bot.application.interaction.reservation.ReviewReservationCoordinator;
 import com.slack.bot.context.CleanupExecutionListener;
-import com.slack.bot.application.interactivity.client.NotificationApiClient;
+import com.slack.bot.application.interaction.client.NotificationApiClient;
 import com.slack.bot.domain.auth.TokenDecoder;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.review.batch.SpyReviewNotificationService;

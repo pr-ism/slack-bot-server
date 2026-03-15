@@ -1,0 +1,7 @@
+[[interaction-API]]
+== interaction API
+
+[[handle]]
+=== 슬랙 인터렉션 핸들링
+
+operation::slack-interaction-controller-test/인터랙티브_요청_처리_성공_테스트[snippets='http-request,request-headers,form-parameters,http-response']
