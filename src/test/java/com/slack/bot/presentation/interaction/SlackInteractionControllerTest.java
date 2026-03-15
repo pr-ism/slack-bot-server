@@ -1,4 +1,4 @@
-package com.slack.bot.presentation.interactivity;
+package com.slack.bot.presentation.interaction;
 
 import static org.mockito.BDDMockito.given;
 import static org.springframework.restdocs.headers.HeaderDocumentation.headerWithName;

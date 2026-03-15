@@ -1,4 +1,4 @@
-package com.slack.bot.presentation.interactivity.exception;
+package com.slack.bot.presentation.interaction.exception;
 
 public class SlackSignatureVerificationException extends RuntimeException {
 

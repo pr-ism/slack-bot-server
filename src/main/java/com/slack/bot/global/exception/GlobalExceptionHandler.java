@@ -24,7 +24,7 @@ import com.slack.bot.infrastructure.auth.jwt.exception.InvalidTokenException;
 import com.slack.bot.infrastructure.link.persistence.exception.AccessLinkDuplicateKeyException;
 import com.slack.bot.infrastructure.link.persistence.exception.AccessLinkSequenceStateException;
 import com.slack.bot.infrastructure.setting.exception.NotificationSettingsCreationConflictException;
-import com.slack.bot.presentation.interactivity.exception.SlackSignatureVerificationException;
+import com.slack.bot.presentation.interaction.exception.SlackSignatureVerificationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.StringUtils;
 import org.springframework.http.HttpHeaders;

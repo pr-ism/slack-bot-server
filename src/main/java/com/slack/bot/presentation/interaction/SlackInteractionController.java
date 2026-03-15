@@ -1,10 +1,10 @@
-package com.slack.bot.presentation.interactivity;
+package com.slack.bot.presentation.interaction;
 
 import com.slack.bot.application.interaction.SlackInteractionServiceFacade;
 import com.slack.bot.application.interaction.reply.dto.response.SlackActionResponse;
 import com.slack.bot.global.security.SlackSignatureVerifier;
-import com.slack.bot.presentation.interactivity.dto.request.SlackInteractionHttpRequest;
-import com.slack.bot.presentation.interactivity.exception.SlackSignatureVerificationException;
+import com.slack.bot.presentation.interaction.dto.request.SlackInteractionHttpRequest;
+import com.slack.bot.presentation.interaction.exception.SlackSignatureVerificationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;

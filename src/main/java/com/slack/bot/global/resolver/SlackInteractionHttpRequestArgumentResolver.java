@@ -1,6 +1,6 @@
 package com.slack.bot.global.resolver;
 
-import com.slack.bot.presentation.interactivity.dto.request.SlackInteractionHttpRequest;
+import com.slack.bot.presentation.interaction.dto.request.SlackInteractionHttpRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;

@@ -1,4 +1,4 @@
-package com.slack.bot.presentation.interactivity.dto.request;
+package com.slack.bot.presentation.interaction.dto.request;
 
 public record SlackInteractionHttpRequest(
         String timestamp,
