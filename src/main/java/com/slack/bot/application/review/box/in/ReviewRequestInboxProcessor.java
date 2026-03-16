@@ -2,8 +2,8 @@ package com.slack.bot.application.review.box.in;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.slack.bot.application.interactivity.box.BoxFailureReasonTruncator;
-import com.slack.bot.application.interactivity.box.retry.InteractionRetryExceptionClassifier;
+import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
+import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
 import com.slack.bot.application.review.ReviewNotificationService;
 import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
 import com.slack.bot.application.review.dto.ReviewNotificationPayload;

@@ -7,7 +7,7 @@ import com.google.gson.Gson;
 import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.view.View;
 import com.slack.api.util.json.GsonFactory;
-import com.slack.bot.application.interactivity.client.exception.SlackBotMessageDispatchException;
+import com.slack.bot.application.interaction.client.exception.SlackBotMessageDispatchException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;

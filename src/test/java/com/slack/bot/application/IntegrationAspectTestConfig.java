@@ -1,8 +1,8 @@
 package com.slack.bot.application;
 
-import com.slack.bot.application.interactivity.box.ProcessingSourceContext;
-import com.slack.bot.application.interactivity.box.aop.aspect.support.AspectIntegrationProbes;
-import com.slack.bot.application.interactivity.box.out.OutboxIdempotencySourceContext;
+import com.slack.bot.application.interaction.box.ProcessingSourceContext;
+import com.slack.bot.application.interaction.box.aop.aspect.support.AspectIntegrationProbes;
+import com.slack.bot.application.interaction.box.out.OutboxIdempotencySourceContext;
 import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
 import com.slack.bot.application.review.box.aop.aspect.support.ReviewAspectIntegrationProbes;
 import org.springframework.boot.test.context.TestConfiguration;

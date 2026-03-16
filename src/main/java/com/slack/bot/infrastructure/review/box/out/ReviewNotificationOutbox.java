@@ -1,7 +1,7 @@
 package com.slack.bot.infrastructure.review.box.out;
 
 import com.slack.bot.domain.common.BaseTimeEntity;
-import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
+import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -42,7 +42,7 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
     private String failureReason;
 
     @Enumerated(EnumType.STRING)
-    private SlackInteractivityFailureType failureType;
+    private SlackInteractionFailureType failureType;
 
     @Builder
     private ReviewNotificationOutbox(
@@ -101,7 +101,7 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
         this.failureType = null;
     }
 
-    public void markFailed(Instant failedAt, String failureReason, SlackInteractivityFailureType failureType) {
+    public void markFailed(Instant failedAt, String failureReason, SlackInteractionFailureType failureType) {
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
         validateFailureType(failureType);
@@ -182,7 +182,7 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
         }
     }
 
-    private void validateFailureType(SlackInteractivityFailureType failureType) {
+    private void validateFailureType(SlackInteractionFailureType failureType) {
         if (failureType == null) {
             throw new IllegalArgumentException("failureType은 비어 있을 수 없습니다.");
         }

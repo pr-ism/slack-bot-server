@@ -1,0 +1,222 @@
+package com.slack.bot.application.interaction.client;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.slack.api.model.view.View;
+import com.slack.api.model.view.Views;
+import com.slack.bot.application.interaction.box.out.OutboxIdempotencySourceContext;
+import com.slack.bot.application.interaction.box.out.OutboxWorkspaceResolver;
+import com.slack.bot.application.interaction.box.out.SlackNotificationOutboxWriter;
+import com.slack.bot.application.interaction.box.out.exception.OutboxWorkspaceNotFoundException;
+import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
+import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayNameGeneration;
+import org.junit.jupiter.api.DisplayNameGenerator;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+@SuppressWarnings("NonAsciiCharacters")
+@DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
+@ExtendWith(MockitoExtension.class)
+class NotificationApiClientTest {
+
+    private NotificationApiClient notificationApiClient;
+
+    @Mock
+    private SlackNotificationOutboxWriter slackNotificationOutboxWriter;
+
+    @Mock
+    private NotificationTransportApiClient notificationTransportApiClient;
+
+    @Mock
+    private OutboxIdempotencySourceContext outboxIdempotencySourceContext;
+
+    @Mock
+    private OutboxWorkspaceResolver outboxWorkspaceResolver;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(outboxWorkspaceResolver.resolve("token")).thenReturn("T1");
+        lenient().when(outboxIdempotencySourceContext.currentSourceKey()).thenReturn(Optional.of("INBOX:1"));
+
+        notificationApiClient = new NotificationApiClient(
+                outboxWorkspaceResolver,
+                slackNotificationOutboxWriter,
+                notificationTransportApiClient,
+                outboxIdempotencySourceContext
+        );
+    }
+
+    @Test
+    void 에페메랄_텍스트_메시지는_outbox에_적재한다() {
+        // when
+        notificationApiClient.sendEphemeralMessage("token", "C1", "U1", "hello");
+
+        // then
+        verify(slackNotificationOutboxWriter).enqueueEphemeralText(
+                eq("INBOX:1"),
+                eq("T1"),
+                eq("C1"),
+                eq("U1"),
+                eq("hello")
+        );
+    }
+
+    @Test
+    void 에페메랄_블록_메시지는_outbox에_적재한다() {
+        // given
+        JsonNode blocks = new ObjectMapper().createArrayNode();
+
+        // when
+        notificationApiClient.sendEphemeralBlockMessage("token", "C1", "U1", blocks, "fallback");
+
+        // then
+        verify(slackNotificationOutboxWriter).enqueueEphemeralBlocks(
+                eq("INBOX:1"),
+                eq("T1"),
+                eq("C1"),
+                eq("U1"),
+                eq(blocks),
+                eq("fallback")
+        );
+    }
+
+    @Test
+    void 채널_텍스트_메시지는_outbox에_적재한다() {
+        // when
+        notificationApiClient.sendMessage("token", "C1", "hello");
+
+        // then
+        verify(slackNotificationOutboxWriter).enqueueChannelText(
+                eq("INBOX:1"),
+                eq("T1"),
+                eq("C1"),
+                eq("hello")
+        );
+    }
+
+    @Test
+    void 채널_블록_메시지는_outbox에_적재한다() {
+        // given
+        JsonNode blocks = new ObjectMapper().createArrayNode();
+
+        // when
+        notificationApiClient.sendBlockMessage("token", "C1", blocks, "fallback");
+
+        // then
+        verify(slackNotificationOutboxWriter).enqueueChannelBlocks(
+                eq("INBOX:1"),
+                eq("T1"),
+                eq("C1"),
+                eq(blocks),
+                eq("fallback")
+        );
+    }
+
+    @Test
+    void source_컨텍스트가_없으면_ad_hoc_source를_생성해_outbox에_적재한다() {
+        // given
+        given(outboxIdempotencySourceContext.currentSourceKey()).willReturn(Optional.empty());
+
+        // when
+        notificationApiClient.sendMessage("token", "C1", "hello");
+
+        // then
+        verify(slackNotificationOutboxWriter).enqueueChannelText(
+                argThat(sourceKey -> sourceKey != null && sourceKey.startsWith("BUSINESS:ADHOC:")),
+                eq("T1"),
+                eq("C1"),
+                eq("hello")
+        );
+    }
+
+    @Test
+    void 명시적_source를_전달하면_컨텍스트_대신_해당_source를_사용한다() {
+        // when
+        notificationApiClient.sendMessage("EVENT-1", "token", "C1", "hello");
+
+        // then
+        verify(slackNotificationOutboxWriter).enqueueChannelText(
+                eq("EVENT-1"),
+                eq("T1"),
+                eq("C1"),
+                eq("hello")
+        );
+    }
+
+    @Test
+    void 토큰에_해당하는_workspace가_없으면_custom_exception을_던진다() {
+        // given
+        given(outboxWorkspaceResolver.resolve("unknown-token"))
+                .willThrow(OutboxWorkspaceNotFoundException.forToken("unknown-token"));
+
+        // when & then
+        assertThatThrownBy(() -> notificationApiClient.sendMessage("unknown-token", "C1", "hello"))
+                .isInstanceOf(OutboxWorkspaceNotFoundException.class)
+                .hasMessageContaining("outbox 적재 대상 워크스페이스를 찾을 수 없습니다.");
+    }
+
+    @Test
+    void 모달_오픈은_전송_클라이언트에_위임한다() {
+        // given
+        JsonNode view = new ObjectMapper().createObjectNode();
+
+        // when
+        notificationApiClient.openModal("token", "TRIGGER", view);
+
+        // then
+        verify(notificationTransportApiClient).openModal("token", "TRIGGER", view);
+    }
+
+    @Test
+    void View_모달_오픈은_전송_클라이언트에_위임한다() {
+        // given
+        View view = Views.view(v -> v.type("modal"));
+
+        // when
+        notificationApiClient.openModal("token", "TRIGGER", view);
+
+        // then
+        verify(notificationTransportApiClient).openModal("token", "TRIGGER", view);
+    }
+
+    @Test
+    void DM_채널_오픈은_전송_클라이언트에_위임한다() {
+        // given
+        given(notificationTransportApiClient.openDirectMessageChannel("token", "U1"))
+                .willReturn("D123");
+
+        // when
+        String actual = notificationApiClient.openDirectMessageChannel("token", "U1");
+
+        // then
+        assertThat(actual).isEqualTo("D123");
+        verify(notificationTransportApiClient).openDirectMessageChannel("token", "U1");
+    }
+
+    @Test
+    void 비즈니스_이벤트_source_컨텍스트_실행을_위임한다() {
+        // given
+        given(outboxIdempotencySourceContext.withBusinessEventSource(eq("EVENT-1"), any()))
+                .willReturn("done");
+
+        // when
+        String actual = notificationApiClient.withBusinessEventSource("EVENT-1", () -> "ignored");
+
+        // then
+        assertThat(actual).isEqualTo("done");
+        verify(outboxIdempotencySourceContext).withBusinessEventSource(eq("EVENT-1"), any());
+    }
+}

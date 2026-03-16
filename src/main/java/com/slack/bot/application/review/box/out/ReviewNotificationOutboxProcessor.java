@@ -3,12 +3,12 @@ package com.slack.bot.application.review.box.out;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.slack.bot.application.interactivity.box.BoxFailureReasonTruncator;
-import com.slack.bot.application.interactivity.box.retry.InteractionRetryExceptionClassifier;
+import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
+import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
 import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
-import com.slack.bot.infrastructure.interaction.box.SlackInteractivityFailureType;
+import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
@@ -159,7 +159,7 @@ public class ReviewNotificationOutboxProcessor {
         String reason = resolveFailureReason(exception);
 
         if (!retryExceptionClassifier.isRetryable(exception)) {
-            outbox.markFailed(clock.instant(), reason, SlackInteractivityFailureType.BUSINESS_INVARIANT);
+            outbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.BUSINESS_INVARIANT);
             return;
         }
 
@@ -168,7 +168,7 @@ public class ReviewNotificationOutboxProcessor {
             return;
         }
 
-        outbox.markFailed(clock.instant(), reason, SlackInteractivityFailureType.RETRY_EXHAUSTED);
+        outbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.RETRY_EXHAUSTED);
     }
 
     private String resolveFailureReason(Exception exception) {
