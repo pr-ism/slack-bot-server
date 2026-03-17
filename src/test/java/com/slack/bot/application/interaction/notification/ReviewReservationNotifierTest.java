@@ -392,13 +392,13 @@ class ReviewReservationNotifierTest {
         // then
         verify(reservationBlockCreator).create(reservation, headerText, ReviewReservationBlockType.RESERVATION);
         verify(notificationDispatcher).sendReservationBlockBySettingOrDefault(
-                        eq(token),
-                        eq(teamId),
-                        eq(channelId),
-                        eq(slackUserId),
-                        eq(blocks),
-                        eq(fallbackText),
-                        eq("리뷰 예약 완료\nFix bug\n리뷰 시작 시간: 2024년 1월 1일 11시 00분")
+                        token,
+                        teamId,
+                        channelId,
+                        slackUserId,
+                        blocks,
+                        fallbackText,
+                        "리뷰 예약 완료\nFix bug\n리뷰 시작 시간: 2024년 1월 1일 11시 00분"
                 );
     }
 
@@ -541,13 +541,13 @@ class ReviewReservationNotifierTest {
 
         // then
         verify(notificationDispatcher).sendReservationBlockBySettingOrDefault(
-                eq(token),
-                eq(teamId),
-                eq(channelId),
-                eq(slackUserId),
-                eq(blocks),
-                eq(fallbackText),
-                eq("리뷰 예약 완료\nPR #42\n리뷰 시작 시간: 2024년 1월 1일 11시 00분")
+                token,
+                teamId,
+                channelId,
+                slackUserId,
+                blocks,
+                fallbackText,
+                "리뷰 예약 완료\nPR #42\n리뷰 시작 시간: 2024년 1월 1일 11시 00분"
         );
     }
 

@@ -357,10 +357,10 @@ class ReviewSchedulerWorkflowTest {
                         any(View.class)
                 );
         verify(notificationApiClient, never()).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq(" "),
-                        eq(InteractionErrorType.REVIEWEE_CANNOT_RESERVE.message())
+                        "xoxb-test-token",
+                        "C1",
+                        " ",
+                        InteractionErrorType.REVIEWEE_CANNOT_RESERVE.message()
                 );
     }
 
