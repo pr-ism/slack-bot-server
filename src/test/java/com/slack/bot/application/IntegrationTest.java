@@ -5,6 +5,7 @@ import com.slack.bot.application.event.handler.SlackEventHandlerRegistry;
 import com.slack.bot.application.interaction.box.in.SlackInteractionInboxProcessor;
 import com.slack.bot.application.interaction.publisher.ReviewInteractionEventPublisher;
 import com.slack.bot.application.interaction.reservation.ReviewReservationCoordinator;
+import com.slack.bot.application.review.box.out.ReviewNotificationOutboxEnqueuer;
 import com.slack.bot.context.CleanupExecutionListener;
 import com.slack.bot.application.interaction.client.NotificationApiClient;
 import com.slack.bot.domain.auth.TokenDecoder;
@@ -39,6 +40,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 })
 @MockitoSpyBean(types = {
         Clock.class,
+        ReviewNotificationOutboxEnqueuer.class,
         ReviewInteractionEventPublisher.class,
         ReviewReservationCoordinator.class,
         SlackInteractionInboxProcessor.class,

@@ -2,8 +2,10 @@ package com.slack.bot.infrastructure.review.batch;
 
 import com.slack.bot.application.review.ReviewBlockCreator;
 import com.slack.bot.application.review.ReviewNotificationService;
+import com.slack.bot.application.review.box.aop.BindReviewNotificationSourceKey;
+import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
+import com.slack.bot.application.review.box.out.ReviewNotificationOutboxEnqueuer;
 import com.slack.bot.application.review.channel.ReviewSlackChannelResolver;
-import com.slack.bot.application.review.client.ReviewSlackApiClient;
 import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.application.review.meta.ReviewActionMetaBuilder;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -14,14 +16,22 @@ public class SpyReviewNotificationService extends ReviewNotificationService {
 
     public SpyReviewNotificationService(
             ReviewBlockCreator blockFactory,
-            ReviewSlackApiClient slackApiClient,
+            ReviewNotificationOutboxEnqueuer reviewNotificationOutboxEnqueuer,
             ReviewActionMetaBuilder actionMetaBuilder,
-            ReviewSlackChannelResolver channelResolver
+            ReviewSlackChannelResolver channelResolver,
+            ReviewNotificationSourceContext reviewNotificationSourceContext
     ) {
-        super(blockFactory, slackApiClient, actionMetaBuilder, channelResolver);
+        super(
+                blockFactory,
+                reviewNotificationOutboxEnqueuer,
+                actionMetaBuilder,
+                channelResolver,
+                reviewNotificationSourceContext
+        );
     }
 
     @Override
+    @BindReviewNotificationSourceKey
     public void sendSimpleNotification(String apiKey, ReviewNotificationPayload request) {
         super.sendSimpleNotification(apiKey, request);
         sendCount.incrementAndGet();

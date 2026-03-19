@@ -14,12 +14,14 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
+import com.slack.bot.application.review.box.out.ReviewNotificationOutboxEnqueuer;
 import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.infrastructure.review.batch.SpyReviewNotificationService;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
+import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxRepository;
 import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxRepository;
 import java.lang.reflect.Method;
 import java.time.Instant;
@@ -49,17 +51,28 @@ class ReviewRequestInboxProcessorTest {
     JpaReviewRequestInboxRepository jpaReviewRequestInboxRepository;
 
     @Autowired
+    JpaReviewNotificationOutboxRepository jpaReviewNotificationOutboxRepository;
+
+    @Autowired
     SpyReviewNotificationService spyReviewNotificationService;
 
     @Autowired
     ReviewNotificationSourceContext reviewNotificationSourceContext;
 
     @Autowired
+    ReviewNotificationOutboxEnqueuer reviewNotificationOutboxEnqueuer;
+
+    @Autowired
     ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
-        reset(reviewRequestInboxRepository, spyReviewNotificationService, objectMapper);
+        reset(
+                reviewRequestInboxRepository,
+                reviewNotificationOutboxEnqueuer,
+                spyReviewNotificationService,
+                objectMapper
+        );
         spyReviewNotificationService.resetCount();
     }
 
@@ -80,9 +93,11 @@ class ReviewRequestInboxProcessorTest {
 
         // then
         List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAll();
+        var outboxes = jpaReviewNotificationOutboxRepository.findAll();
         ReviewRequestInbox inbox = inboxes.getFirst();
         assertAll(
                 () -> assertThat(inboxes).hasSize(1),
+                () -> assertThat(outboxes).hasSize(1),
                 () -> assertThat(spyReviewNotificationService.getSendCount()).isEqualTo(1),
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
                 () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
@@ -110,9 +125,11 @@ class ReviewRequestInboxProcessorTest {
 
         // then
         List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAll();
+        var outboxes = jpaReviewNotificationOutboxRepository.findAll();
         ReviewRequestInbox inbox = inboxes.getFirst();
         assertAll(
                 () -> assertThat(inboxes).hasSize(1),
+                () -> assertThat(outboxes).hasSize(1),
                 () -> assertThat(spyReviewNotificationService.getSendCount()).isEqualTo(1),
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
                 () -> assertThat(objectMapper.readTree(inbox.getRequestJson()).path("pullRequestTitle").asText())
@@ -339,13 +356,26 @@ class ReviewRequestInboxProcessorTest {
     }
 
     @Test
+    @Sql(scripts = {
+            "classpath:sql/fixtures/review/project_t1.sql",
+            "classpath:sql/fixtures/review/workspace_t1.sql",
+            "classpath:sql/fixtures/review/channel_t1.sql",
+            "classpath:sql/fixtures/review/project_member_t1_mapped.sql"
+    })
     void retryable_예외가_발생하고_최대시도_미만이면_RETRY_PENDING으로_마킹된다() {
         // given
         ReviewNotificationPayload request = request(601L, "retry-pending");
         reviewRequestInboxProcessor.enqueue("test-api-key", request, 0);
         doThrow(new ResourceAccessException("temporary network issue"))
-                .when(spyReviewNotificationService)
-                .sendSimpleNotification(any(), any(ReviewNotificationPayload.class));
+                .when(reviewNotificationOutboxEnqueuer)
+                .enqueueChannelBlocks(
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any()
+                );
 
         // when
         reviewRequestInboxProcessor.processPending(10, 1_000);
@@ -356,11 +386,18 @@ class ReviewRequestInboxProcessorTest {
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
                 () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
                 () -> assertThat(inbox.getFailureType()).isNull(),
-                () -> assertThat(inbox.getFailureReason()).isNotBlank()
+                () -> assertThat(inbox.getFailureReason()).isNotBlank(),
+                () -> assertThat(jpaReviewNotificationOutboxRepository.findAll()).isEmpty()
         );
     }
 
     @Test
+    @Sql(scripts = {
+            "classpath:sql/fixtures/review/project_t1.sql",
+            "classpath:sql/fixtures/review/workspace_t1.sql",
+            "classpath:sql/fixtures/review/channel_t1.sql",
+            "classpath:sql/fixtures/review/project_member_t1_mapped.sql"
+    })
     void retryable_예외가_최대시도에_도달하면_FAILED_RETRY_EXHAUSTED로_마킹된다() throws Exception {
         // given
         ReviewNotificationPayload request = request(602L, "retry-exhausted");
@@ -376,8 +413,15 @@ class ReviewRequestInboxProcessorTest {
         ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
 
         doThrow(new ResourceAccessException("temporary network issue"))
-                .when(spyReviewNotificationService)
-                .sendSimpleNotification(any(), any(ReviewNotificationPayload.class));
+                .when(reviewNotificationOutboxEnqueuer)
+                .enqueueChannelBlocks(
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any()
+                );
 
         // when
         reviewRequestInboxProcessor.processPending(10, 1_000);
@@ -388,7 +432,8 @@ class ReviewRequestInboxProcessorTest {
                 () -> assertThat(failed.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
                 () -> assertThat(failed.getProcessingAttempt()).isEqualTo(2),
                 () -> assertThat(failed.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.RETRY_EXHAUSTED),
-                () -> assertThat(failed.getFailureReason()).isNotBlank()
+                () -> assertThat(failed.getFailureReason()).isNotBlank(),
+                () -> assertThat(jpaReviewNotificationOutboxRepository.findAll()).isEmpty()
         );
     }
 

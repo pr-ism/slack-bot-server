@@ -64,6 +64,33 @@ class ReviewNotificationOutboxEnqueuerTest {
     }
 
     @Test
+    void attachment_blocks를_포함한_메시지를_하나의_blocks_json으로_merge해_enqueue한다() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        // when
+        enqueuer.enqueueChannelBlocks(
+                "SOURCE-1",
+                "T1",
+                "C1",
+                objectMapper.readTree("[{\"type\":\"section\"}]"),
+                objectMapper.readTree("""
+                        [
+                          {"blocks":[{"type":"actions"},{"type":"context"}]},
+                          {}
+                        ]
+                        """),
+                "fallback"
+        );
+
+        // then
+        ArgumentCaptor<ReviewNotificationOutbox> captor = ArgumentCaptor.forClass(ReviewNotificationOutbox.class);
+        verify(reviewNotificationOutboxRepository).enqueue(captor.capture());
+
+        assertThat(captor.getValue().getBlocksJson())
+                .isEqualTo("[{\"type\":\"section\"},{\"type\":\"actions\"},{\"type\":\"context\"}]");
+    }
+
+    @Test
     void 동일한_입력이면_동일한_멱등키로_enqueue한다() throws Exception {
         // when
         enqueuer.enqueueChannelBlocks(
