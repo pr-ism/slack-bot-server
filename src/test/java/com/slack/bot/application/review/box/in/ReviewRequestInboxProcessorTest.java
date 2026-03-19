@@ -433,7 +433,7 @@ class ReviewRequestInboxProcessorTest {
         ReviewRequestInbox saved = jpaReviewRequestInboxRepository.findAll().getFirst();
 
         doReturn(true).when(reviewRequestInboxRepository).markProcessingIfClaimable(eq(saved.getId()), any(), any());
-        doReturn(Optional.empty()).when(reviewRequestInboxRepository).findById(eq(saved.getId()));
+        doReturn(Optional.empty()).when(reviewRequestInboxRepository).findById(saved.getId());
 
         // when
         reviewRequestInboxProcessor.processPending(10, 1_000);

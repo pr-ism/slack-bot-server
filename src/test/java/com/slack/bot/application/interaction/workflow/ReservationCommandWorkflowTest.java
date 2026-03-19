@@ -104,10 +104,10 @@ class ReservationCommandWorkflowTest {
         // then
         assertThat(actual).isEmpty();
         verify(notificationApiClient).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq("U1"),
-                        eq(InteractionErrorType.RESERVATION_NOT_FOUND.message())
+                        "xoxb-test-token",
+                        "C1",
+                        "U1",
+                        InteractionErrorType.RESERVATION_NOT_FOUND.message()
                 );
         assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }
@@ -165,10 +165,10 @@ class ReservationCommandWorkflowTest {
         // then
         assertThat(actual).isEmpty();
         verify(notificationApiClient).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq("U2"),
-                        eq(InteractionErrorType.NOT_OWNER_CANCEL.message())
+                        "xoxb-test-token",
+                        "C1",
+                        "U2",
+                        InteractionErrorType.NOT_OWNER_CANCEL.message()
                 );
         assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }
@@ -194,10 +194,10 @@ class ReservationCommandWorkflowTest {
         // then
         assertThat(actual).isEmpty();
         verify(notificationApiClient).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq("U1"),
-                        eq(InteractionErrorType.RESERVATION_ALREADY_CANCELLED.message())
+                        "xoxb-test-token",
+                        "C1",
+                        "U1",
+                        InteractionErrorType.RESERVATION_ALREADY_CANCELLED.message()
                 );
         assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }
@@ -223,10 +223,10 @@ class ReservationCommandWorkflowTest {
         // then
         assertThat(actual).isEmpty();
         verify(notificationApiClient).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq("U1"),
-                        eq(InteractionErrorType.RESERVATION_ALREADY_STARTED.message())
+                        "xoxb-test-token",
+                        "C1",
+                        "U1",
+                        InteractionErrorType.RESERVATION_ALREADY_STARTED.message()
                 );
         assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }
@@ -285,10 +285,10 @@ class ReservationCommandWorkflowTest {
 
         // then
         verify(notificationApiClient).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq("U2"),
-                        eq(InteractionErrorType.NOT_OWNER_CHANGE.message())
+                        "xoxb-test-token",
+                        "C1",
+                        "U2",
+                        InteractionErrorType.NOT_OWNER_CHANGE.message()
                 );
         assertThat(actual.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }
@@ -316,10 +316,10 @@ class ReservationCommandWorkflowTest {
 
         // then
         verify(notificationApiClient).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq("U1"),
-                        eq(InteractionErrorType.RESERVATION_CHANGE_NOT_ALLOWED_CANCELLED.message())
+                        "xoxb-test-token",
+                        "C1",
+                        "U1",
+                        InteractionErrorType.RESERVATION_CHANGE_NOT_ALLOWED_CANCELLED.message()
                 );
         verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
         assertThat(actual.stream(ReviewInteractionEvent.class).toList()).isEmpty();
@@ -348,10 +348,10 @@ class ReservationCommandWorkflowTest {
 
         // then
         verify(notificationApiClient).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq("U1"),
-                        eq(InteractionErrorType.RESERVATION_ALREADY_STARTED.message())
+                        "xoxb-test-token",
+                        "C1",
+                        "U1",
+                        InteractionErrorType.RESERVATION_ALREADY_STARTED.message()
                 );
         verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
         assertThat(actual.stream(ReviewInteractionEvent.class).toList()).isEmpty();
@@ -376,10 +376,10 @@ class ReservationCommandWorkflowTest {
 
         // then
         verify(notificationApiClient).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq("U1"),
-                        eq(InteractionErrorType.RESERVATION_NOT_FOUND.message())
+                        "xoxb-test-token",
+                        "C1",
+                        "U1",
+                        InteractionErrorType.RESERVATION_NOT_FOUND.message()
                 );
         assertThat(actual.stream(ReviewInteractionEvent.class).toList()).isEmpty();
         verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));

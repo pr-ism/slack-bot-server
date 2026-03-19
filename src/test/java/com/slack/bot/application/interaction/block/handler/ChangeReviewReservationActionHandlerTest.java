@@ -85,10 +85,10 @@ class ChangeReviewReservationActionHandlerTest {
                 () -> assertThat(actual.cancelledReservation()).isNull()
         );
         verify(notificationApiClient).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq("U2"),
-                        eq(InteractionErrorType.NOT_OWNER_CHANGE.message())
+                        "xoxb-test-token",
+                        "C1",
+                        "U2",
+                        InteractionErrorType.NOT_OWNER_CHANGE.message()
                 );
         verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
         assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();

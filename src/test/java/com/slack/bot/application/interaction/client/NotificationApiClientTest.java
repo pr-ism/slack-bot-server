@@ -66,11 +66,11 @@ class NotificationApiClientTest {
 
         // then
         verify(slackNotificationOutboxWriter).enqueueEphemeralText(
-                eq("INBOX:1"),
-                eq("T1"),
-                eq("C1"),
-                eq("U1"),
-                eq("hello")
+                "INBOX:1",
+                "T1",
+                "C1",
+                "U1",
+                "hello"
         );
     }
 
@@ -84,12 +84,12 @@ class NotificationApiClientTest {
 
         // then
         verify(slackNotificationOutboxWriter).enqueueEphemeralBlocks(
-                eq("INBOX:1"),
-                eq("T1"),
-                eq("C1"),
-                eq("U1"),
-                eq(blocks),
-                eq("fallback")
+                "INBOX:1",
+                "T1",
+                "C1",
+                "U1",
+                blocks,
+                "fallback"
         );
     }
 
@@ -100,10 +100,10 @@ class NotificationApiClientTest {
 
         // then
         verify(slackNotificationOutboxWriter).enqueueChannelText(
-                eq("INBOX:1"),
-                eq("T1"),
-                eq("C1"),
-                eq("hello")
+                "INBOX:1",
+                "T1",
+                "C1",
+                "hello"
         );
     }
 
@@ -117,11 +117,11 @@ class NotificationApiClientTest {
 
         // then
         verify(slackNotificationOutboxWriter).enqueueChannelBlocks(
-                eq("INBOX:1"),
-                eq("T1"),
-                eq("C1"),
-                eq(blocks),
-                eq("fallback")
+                "INBOX:1",
+                "T1",
+                "C1",
+                blocks,
+                "fallback"
         );
     }
 
@@ -149,10 +149,10 @@ class NotificationApiClientTest {
 
         // then
         verify(slackNotificationOutboxWriter).enqueueChannelText(
-                eq("EVENT-1"),
-                eq("T1"),
-                eq("C1"),
-                eq("hello")
+                "EVENT-1",
+                "T1",
+                "C1",
+                "hello"
         );
     }
 

@@ -7,7 +7,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -123,10 +122,10 @@ class ReviewReservationWorkflowTest {
         // then
         assertThat(actual).isEqualTo(SlackActionResponse.empty());
         verify(notificationApiClient).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq("U1"),
-                        eq(InteractionErrorType.RESERVATION_FAILURE.message())
+                        "xoxb-test-token",
+                        "C1",
+                        "U1",
+                        InteractionErrorType.RESERVATION_FAILURE.message()
                 );
         assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }

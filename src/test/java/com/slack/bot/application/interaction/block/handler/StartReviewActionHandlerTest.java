@@ -70,10 +70,10 @@ class StartReviewActionHandlerTest {
         // then
         assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty());
         verify(notificationApiClient).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq("U2"),
-                        eq("리뷰 시작 알림을 전송했습니다.")
+                        "xoxb-test-token",
+                        "C1",
+                        "U2",
+                        "리뷰 시작 알림을 전송했습니다."
                 );
         verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1");
         verify(notificationApiClient).sendMessage(
@@ -148,10 +148,10 @@ class StartReviewActionHandlerTest {
         // then
         assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty());
         verify(notificationApiClient).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq("U1"),
-                        eq("리뷰이는 해당 PR에 대한 리뷰를 할 수 없습니다.")
+                        "xoxb-test-token",
+                        "C1",
+                        "U1",
+                        "리뷰이는 해당 PR에 대한 리뷰를 할 수 없습니다."
                 );
         verify(notificationApiClient, never()).openDirectMessageChannel(any(), any());
         verify(notificationApiClient, never()).sendMessage(any(), any(), any());
@@ -176,10 +176,10 @@ class StartReviewActionHandlerTest {
         verify(notificationApiClient, never()).openDirectMessageChannel(any(), any());
         verify(notificationApiClient, never()).sendMessage(any(), any(), any());
         verify(notificationApiClient).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq(""),
-                        eq("리뷰 시작 알림을 전송했습니다.")
+                        "xoxb-test-token",
+                        "C1",
+                        "",
+                        "리뷰 시작 알림을 전송했습니다."
                 );
         assertThat(actualApplicationEvents.stream(ReviewReservationFulfilledEvent.class).toList()).isEmpty();
     }
@@ -208,10 +208,10 @@ class StartReviewActionHandlerTest {
                         argThat(message -> message.contains("<@U1>") && message.contains("<@U9>"))
                 );
         verify(notificationApiClient).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq("U9"),
-                        eq("이미 해당 PR에 대한 리뷰를 시작했습니다.")
+                        "xoxb-test-token",
+                        "C1",
+                        "U9",
+                        "이미 해당 PR에 대한 리뷰를 시작했습니다."
                 );
         assertThat(actualApplicationEvents.stream(ReviewReservationFulfilledEvent.class).toList())
                         .singleElement()
@@ -247,10 +247,10 @@ class StartReviewActionHandlerTest {
                         argThat(message -> message.contains("<@U1>") && message.contains("<@U9>"))
                 );
         verify(notificationApiClient).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq("U9"),
-                        eq("리뷰 시작 알림을 전송했습니다.")
+                        "xoxb-test-token",
+                        "C1",
+                        "U9",
+                        "리뷰 시작 알림을 전송했습니다."
                 );
         assertThat(actualApplicationEvents.stream(ReviewReservationFulfilledEvent.class).toList())
                         .singleElement()
@@ -285,10 +285,10 @@ class StartReviewActionHandlerTest {
                         any()
                 );
         verify(notificationApiClient).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq("U8"),
-                        eq("리뷰 시작 알림을 전송했습니다.")
+                        "xoxb-test-token",
+                        "C1",
+                        "U8",
+                        "리뷰 시작 알림을 전송했습니다."
                 );
         assertThat(actualApplicationEvents.stream(ReviewReservationFulfilledEvent.class).toList())
                         .singleElement()
@@ -319,10 +319,10 @@ class StartReviewActionHandlerTest {
                         argThat(message -> message.contains("<@U3>") && message.contains("<@U7>"))
                 );
         verify(notificationApiClient).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq("U7"),
-                        eq("리뷰 시작 알림을 전송했습니다.")
+                        "xoxb-test-token",
+                        "C1",
+                        "U7",
+                        "리뷰 시작 알림을 전송했습니다."
                 );
         assertThat(actualApplicationEvents.stream(ReviewReservationFulfilledEvent.class).toList())
                         .singleElement()
@@ -419,10 +419,10 @@ class StartReviewActionHandlerTest {
                         argThat(message -> message.contains("<@U1>") && message.contains("<@U9>"))
                 );
         verify(notificationApiClient).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq("U9"),
-                        eq("리뷰 시작 알림을 전송했습니다.")
+                        "xoxb-test-token",
+                        "C1",
+                        "U9",
+                        "리뷰 시작 알림을 전송했습니다."
                 );
         assertThat(actualApplicationEvents.stream(ReviewReservationFulfilledEvent.class).toList()).isEmpty();
     }

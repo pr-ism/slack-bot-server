@@ -3,7 +3,6 @@ package com.slack.bot.application.interaction.block.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -91,10 +90,10 @@ class CancelReviewReservationActionHandlerTest {
                 () -> assertThat(actual.cancelledReservation()).isNull()
         );
         verify(notificationApiClient).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq("U1"),
-                        eq(InteractionErrorType.RESERVATION_NOT_FOUND.message())
+                        "xoxb-test-token",
+                        "C1",
+                        "U1",
+                        InteractionErrorType.RESERVATION_NOT_FOUND.message()
                 );
         assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }
@@ -114,10 +113,10 @@ class CancelReviewReservationActionHandlerTest {
                 () -> assertThat(actual.cancelledReservation()).isNull()
         );
         verify(notificationApiClient).sendEphemeralMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq("U2"),
-                        eq(InteractionErrorType.NOT_OWNER_CANCEL.message())
+                        "xoxb-test-token",
+                        "C1",
+                        "U2",
+                        InteractionErrorType.NOT_OWNER_CANCEL.message()
                 );
         assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }
