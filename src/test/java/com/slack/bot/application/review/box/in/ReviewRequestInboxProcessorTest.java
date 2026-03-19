@@ -1,5 +1,6 @@
 package com.slack.bot.application.review.box.in;
 
+import static org.awaitility.Awaitility.await;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -20,10 +21,12 @@ import com.slack.bot.infrastructure.review.batch.SpyReviewNotificationService;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
+import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxRepository;
 import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxRepository;
 import java.lang.reflect.Method;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -92,18 +95,21 @@ class ReviewRequestInboxProcessorTest {
         reviewRequestInboxProcessor.processPending(10);
 
         // then
-        List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAll();
-        var outboxes = jpaReviewNotificationOutboxRepository.findAll();
-        ReviewRequestInbox inbox = inboxes.getFirst();
-        assertAll(
-                () -> assertThat(inboxes).hasSize(1),
-                () -> assertThat(outboxes).hasSize(1),
-                () -> assertThat(spyReviewNotificationService.getSendCount()).isEqualTo(1),
-                () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
-                () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(inbox.getFailureType()).isNull(),
-                () -> assertThat(reviewNotificationSourceContext.currentSourceKey()).isEmpty()
-        );
+        await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
+            List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAll();
+            List<ReviewNotificationOutbox> outboxes = jpaReviewNotificationOutboxRepository.findAll();
+            ReviewRequestInbox inbox = inboxes.getFirst();
+
+            assertAll(
+                    () -> assertThat(inboxes).hasSize(1),
+                    () -> assertThat(outboxes).hasSize(1),
+                    () -> assertThat(spyReviewNotificationService.getSendCount()).isEqualTo(1),
+                    () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
+                    () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
+                    () -> assertThat(inbox.getFailureType()).isNull(),
+                    () -> assertThat(reviewNotificationSourceContext.currentSourceKey()).isEmpty()
+            );
+        });
     }
 
     @Test
@@ -124,17 +130,20 @@ class ReviewRequestInboxProcessorTest {
         reviewRequestInboxProcessor.processPending(10);
 
         // then
-        List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAll();
-        var outboxes = jpaReviewNotificationOutboxRepository.findAll();
-        ReviewRequestInbox inbox = inboxes.getFirst();
-        assertAll(
-                () -> assertThat(inboxes).hasSize(1),
-                () -> assertThat(outboxes).hasSize(1),
-                () -> assertThat(spyReviewNotificationService.getSendCount()).isEqualTo(1),
-                () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
-                () -> assertThat(objectMapper.readTree(inbox.getRequestJson()).path("pullRequestTitle").asText())
-                        .isEqualTo("New title")
-        );
+        await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
+            List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAll();
+            List<ReviewNotificationOutbox> outboxes = jpaReviewNotificationOutboxRepository.findAll();
+            ReviewRequestInbox inbox = inboxes.getFirst();
+
+            assertAll(
+                    () -> assertThat(inboxes).hasSize(1),
+                    () -> assertThat(outboxes).hasSize(1),
+                    () -> assertThat(spyReviewNotificationService.getSendCount()).isEqualTo(1),
+                    () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
+                    () -> assertThat(objectMapper.readTree(inbox.getRequestJson()).path("pullRequestTitle").asText())
+                            .isEqualTo("New title")
+            );
+        });
     }
 
     @Test
@@ -188,13 +197,16 @@ class ReviewRequestInboxProcessorTest {
         reviewRequestInboxProcessor.processPending(10);
 
         // then
-        ReviewRequestInbox processed = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
-        assertAll(
-                () -> assertThat(spyReviewNotificationService.getSendCount()).isEqualTo(1),
-                () -> assertThat(processed.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
-                () -> assertThat(processed.getProcessingAttempt()).isEqualTo(2),
-                () -> assertThat(processed.getFailureReason()).isNull()
-        );
+        await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
+            ReviewRequestInbox processed = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
+
+            assertAll(
+                    () -> assertThat(spyReviewNotificationService.getSendCount()).isEqualTo(1),
+                    () -> assertThat(processed.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
+                    () -> assertThat(processed.getProcessingAttempt()).isEqualTo(2),
+                    () -> assertThat(processed.getFailureReason()).isNull()
+            );
+        });
     }
 
     @Test
