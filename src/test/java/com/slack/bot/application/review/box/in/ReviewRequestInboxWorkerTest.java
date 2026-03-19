@@ -2,7 +2,6 @@ package com.slack.bot.application.review.box.in;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.BDDMockito.willThrow;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -28,30 +27,17 @@ class ReviewRequestInboxWorkerTest {
     void setUp() {
         reviewRequestInboxWorker = new ReviewRequestInboxWorker(reviewRequestInboxProcessor);
 
-        ReflectionTestUtils.setField(reviewRequestInboxWorker, "workerEnabled", true);
         ReflectionTestUtils.setField(reviewRequestInboxWorker, "batchSize", 30);
         ReflectionTestUtils.setField(reviewRequestInboxWorker, "processingTimeoutMs", 60_000L);
     }
 
     @Test
-    void worker_enabled가_true면_pending을_처리한다() {
+    void worker는_pending을_처리한다() {
         // when
         reviewRequestInboxWorker.processPendingReviewRequestInbox();
 
         // then
         verify(reviewRequestInboxProcessor).processPending(30, 60_000L);
-    }
-
-    @Test
-    void worker_enabled가_false면_처리하지_않는다() {
-        // given
-        ReflectionTestUtils.setField(reviewRequestInboxWorker, "workerEnabled", false);
-
-        // when
-        reviewRequestInboxWorker.processPendingReviewRequestInbox();
-
-        // then
-        verify(reviewRequestInboxProcessor, never()).processPending(30, 60_000L);
     }
 
     @Test

@@ -1,4 +1,4 @@
-package com.slack.bot.application.interaction.box.out;
+package com.slack.bot.application.interaction.box.in;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.BDDMockito.willThrow;
@@ -15,37 +15,36 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @SuppressWarnings("NonAsciiCharacters")
 @ExtendWith(MockitoExtension.class)
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
-class SlackNotificationOutboxWorkerTest {
+class SlackBlockActionInboxWorkerTest {
 
     @Mock
-    SlackNotificationOutboxProcessor slackNotificationOutboxProcessor;
+    SlackInteractionInboxProcessor slackInteractionInboxProcessor;
 
-    SlackNotificationOutboxWorker slackNotificationOutboxWorker;
+    SlackBlockActionInboxWorker slackBlockActionInboxWorker;
 
     @BeforeEach
     void setUp() {
-        slackNotificationOutboxWorker = new SlackNotificationOutboxWorker(slackNotificationOutboxProcessor);
+        slackBlockActionInboxWorker = new SlackBlockActionInboxWorker(slackInteractionInboxProcessor);
     }
 
     @Test
-    void 워커는_기본_배치_크기로_outbox를_처리한다() {
+    void 워커는_기본_배치_크기로_block_actions_인박스를_처리한다() {
         // when
-        slackNotificationOutboxWorker.processPendingOutbox();
+        slackBlockActionInboxWorker.processBlockActionInbox();
 
         // then
-        verify(slackNotificationOutboxProcessor).processPending(50);
+        verify(slackInteractionInboxProcessor).processPendingBlockActions(30);
     }
 
     @Test
     void 워커_실행_중_예외가_발생해도_예외를_전파하지_않는다() {
         // given
         willThrow(new RuntimeException("worker failure"))
-                .given(slackNotificationOutboxProcessor)
-                .processPending(50);
+                .given(slackInteractionInboxProcessor)
+                .processPendingBlockActions(30);
 
         // when & then
-        assertThatCode(() -> slackNotificationOutboxWorker.processPendingOutbox())
+        assertThatCode(() -> slackBlockActionInboxWorker.processBlockActionInbox())
                 .doesNotThrowAnyException();
     }
-
 }
