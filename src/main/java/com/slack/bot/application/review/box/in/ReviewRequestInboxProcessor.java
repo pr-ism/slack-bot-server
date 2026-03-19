@@ -68,11 +68,7 @@ public class ReviewRequestInboxProcessor {
         );
     }
 
-    public void processPending(int limit, long processingTimeoutMs) {
-        validateProcessingTimeoutMs(processingTimeoutMs);
-
-        recoverTimeoutProcessing(processingTimeoutMs);
-
+    public void processPending(int limit) {
         Instant now = clock.instant();
         List<ReviewRequestInbox> pendings = reviewRequestInboxRepository.findClaimable(now, limit);
 
@@ -81,7 +77,9 @@ public class ReviewRequestInboxProcessor {
         }
     }
 
-    private void recoverTimeoutProcessing(long processingTimeoutMs) {
+    public int recoverTimeoutProcessing(long processingTimeoutMs) {
+        validateProcessingTimeoutMs(processingTimeoutMs);
+
         Instant now = clock.instant();
         int recoveredCount = reviewRequestInboxRepository.recoverTimeoutProcessing(
                 now.minusMillis(processingTimeoutMs),
@@ -93,6 +91,8 @@ public class ReviewRequestInboxProcessor {
         if (recoveredCount > 0) {
             log.warn("review_request inbox PROCESSING 고착 건을 복구했습니다. count={}", recoveredCount);
         }
+
+        return recoveredCount;
     }
 
     private void processSafely(ReviewRequestInbox pending) {

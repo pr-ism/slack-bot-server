@@ -108,18 +108,15 @@ class ReviewNotificationOutboxProcessorTest {
 
     @Test
     void processingTimeout이_0이하면_예외가_발생한다() {
-        assertThatThrownBy(() -> processor.processPending(10, 0L))
+        assertThatThrownBy(() -> processor.recoverTimeoutProcessing(0L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("processingTimeoutMs");
     }
 
     @Test
     void processing_timeout_복구시_maxAttempts를_전달한다() {
-        // given
-        given(reviewNotificationOutboxRepository.findClaimable(10)).willReturn(List.of());
-
         // when
-        processor.processPending(10, 60_000L);
+        processor.recoverTimeoutProcessing(60_000L);
 
         // then
         verify(reviewNotificationOutboxRepository).recoverTimeoutProcessing(
@@ -139,7 +136,7 @@ class ReviewNotificationOutboxProcessorTest {
         given(reviewNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(false);
 
         // when
-        processor.processPending(10, 60_000L);
+        processor.processPending(10);
 
         // then
         verify(reviewNotificationOutboxRepository, never()).findById(anyLong());
@@ -155,7 +152,7 @@ class ReviewNotificationOutboxProcessorTest {
         given(reviewNotificationOutboxRepository.findById(10L)).willReturn(Optional.empty());
 
         // when
-        processor.processPending(10, 60_000L);
+        processor.processPending(10);
 
         // then
         verify(reviewNotificationOutboxRepository, never()).save(any());
@@ -175,7 +172,7 @@ class ReviewNotificationOutboxProcessorTest {
         given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.of(workspace));
 
         // when
-        processor.processPending(10, 60_000L);
+        processor.processPending(10);
 
         // then
         verify(notificationTransportApiClient).sendBlockMessage(
@@ -206,7 +203,7 @@ class ReviewNotificationOutboxProcessorTest {
                 .save(claimed);
 
         // when
-        processor.processPending(10, 60_000L);
+        processor.processPending(10);
 
         // then
         verify(notificationTransportApiClient).sendBlockMessage(
@@ -244,7 +241,7 @@ class ReviewNotificationOutboxProcessorTest {
                 );
 
         // when
-        processor.processPending(10, 60_000L);
+        processor.processPending(10);
 
         // then
         verify(claimed).markFailed(any(), anyString(), eq(SlackInteractionFailureType.BUSINESS_INVARIANT));
@@ -279,7 +276,7 @@ class ReviewNotificationOutboxProcessorTest {
                 .save(firstClaimed);
 
         // when & then
-        assertThatCode(() -> processor.processPending(10, 60_000L)).doesNotThrowAnyException();
+        assertThatCode(() -> processor.processPending(10)).doesNotThrowAnyException();
 
         verify(firstClaimed).markRetryPending(any(), anyString());
         verify(secondClaimed).markSent(any());
@@ -312,7 +309,7 @@ class ReviewNotificationOutboxProcessorTest {
                 .markSent(any());
 
         // when & then
-        assertThatCode(() -> processor.processPending(10, 60_000L)).doesNotThrowAnyException();
+        assertThatCode(() -> processor.processPending(10)).doesNotThrowAnyException();
 
         verify(notificationTransportApiClient).sendBlockMessage(
                 eq("xoxb-test-token"),
@@ -355,7 +352,7 @@ class ReviewNotificationOutboxProcessorTest {
                 );
 
         // when
-        processor.processPending(10, 60_000L);
+        processor.processPending(10);
 
         // then
         verify(claimed).markRetryPending(any(), anyString());
@@ -386,7 +383,7 @@ class ReviewNotificationOutboxProcessorTest {
                 );
 
         // when
-        processor.processPending(10, 60_000L);
+        processor.processPending(10);
 
         // then
         verify(claimed).markFailed(any(), anyString(), eq(SlackInteractionFailureType.RETRY_EXHAUSTED));
@@ -404,7 +401,7 @@ class ReviewNotificationOutboxProcessorTest {
         given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.empty());
 
         // when
-        processor.processPending(10, 60_000L);
+        processor.processPending(10);
 
         // then
         verify(claimed).markFailed(any(), anyString(), eq(SlackInteractionFailureType.BUSINESS_INVARIANT));

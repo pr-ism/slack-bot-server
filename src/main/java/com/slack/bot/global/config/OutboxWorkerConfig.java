@@ -1,8 +1,10 @@
 package com.slack.bot.global.config;
 
 import com.slack.bot.application.interaction.box.out.SlackNotificationOutboxProcessor;
+import com.slack.bot.application.interaction.box.out.SlackNotificationOutboxTimeoutRecoveryWorker;
 import com.slack.bot.application.interaction.box.out.SlackNotificationOutboxWorker;
 import com.slack.bot.application.review.box.out.ReviewNotificationOutboxProcessor;
+import com.slack.bot.application.review.box.out.ReviewNotificationOutboxTimeoutRecoveryWorker;
 import com.slack.bot.application.review.box.out.ReviewNotificationOutboxWorker;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -26,6 +28,19 @@ public class OutboxWorkerConfig {
 
     @Bean
     @ConditionalOnProperty(
+            prefix = "app.interaction.outbox",
+            name = "worker-enabled",
+            havingValue = "true",
+            matchIfMissing = true
+    )
+    public SlackNotificationOutboxTimeoutRecoveryWorker slackNotificationOutboxTimeoutRecoveryWorker(
+            SlackNotificationOutboxProcessor slackNotificationOutboxProcessor
+    ) {
+        return new SlackNotificationOutboxTimeoutRecoveryWorker(slackNotificationOutboxProcessor);
+    }
+
+    @Bean
+    @ConditionalOnProperty(
             prefix = "review.notification.outbox",
             name = "worker-enabled",
             havingValue = "true",
@@ -35,5 +50,18 @@ public class OutboxWorkerConfig {
             ReviewNotificationOutboxProcessor reviewNotificationOutboxProcessor
     ) {
         return new ReviewNotificationOutboxWorker(reviewNotificationOutboxProcessor);
+    }
+
+    @Bean
+    @ConditionalOnProperty(
+            prefix = "review.notification.outbox",
+            name = "worker-enabled",
+            havingValue = "true",
+            matchIfMissing = true
+    )
+    public ReviewNotificationOutboxTimeoutRecoveryWorker reviewNotificationOutboxTimeoutRecoveryWorker(
+            ReviewNotificationOutboxProcessor reviewNotificationOutboxProcessor
+    ) {
+        return new ReviewNotificationOutboxTimeoutRecoveryWorker(reviewNotificationOutboxProcessor);
     }
 }

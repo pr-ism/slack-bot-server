@@ -1,0 +1,21 @@
+package com.slack.bot.application.interaction.box.in;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
+
+@Slf4j
+@RequiredArgsConstructor
+public class SlackBlockActionInboxTimeoutRecoveryWorker {
+
+    private final SlackInteractionInboxProcessor slackInteractionInboxProcessor;
+
+    @Scheduled(fixedDelayString = "${app.interaction.inbox.block-actions.poll-delay-ms:1000}")
+    public void recoverTimeoutBlockActionInbox() {
+        try {
+            slackInteractionInboxProcessor.recoverBlockActionTimeoutProcessing();
+        } catch (Exception e) {
+            log.error("block_actions inbox timeout recovery worker 실행에 실패했습니다.", e);
+        }
+    }
+}

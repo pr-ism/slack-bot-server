@@ -59,7 +59,7 @@ class SlackNotificationOutboxProcessorTest {
 
         // then
         SlackNotificationOutbox actual = slackNotificationOutboxRepository.findById(pending.getId())
-                                                                             .orElseThrow();
+                                                                          .orElseThrow();
 
         verify(notificationTransportApiClient).sendEphemeralMessage("xoxb-test-token", "C1", "U1", "hello-100");
         assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.SENT);
@@ -77,15 +77,15 @@ class SlackNotificationOutboxProcessorTest {
 
         // then
         SlackNotificationOutbox actual = slackNotificationOutboxRepository.findById(pending.getId())
-                                                                             .orElseThrow();
+                                                                          .orElseThrow();
 
         verify(notificationTransportApiClient).sendEphemeralBlockMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        eq("U1"),
-                        any(JsonNode.class),
-                        eq("fallback")
-                );
+                eq("xoxb-test-token"),
+                eq("C1"),
+                eq("U1"),
+                any(JsonNode.class),
+                eq("fallback")
+        );
         assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.SENT);
     }
 
@@ -101,7 +101,7 @@ class SlackNotificationOutboxProcessorTest {
 
         // then
         SlackNotificationOutbox actual = slackNotificationOutboxRepository.findById(pending.getId())
-                                                                             .orElseThrow();
+                                                                          .orElseThrow();
 
         verify(notificationTransportApiClient).sendMessage("xoxb-test-token", "C1", "hello-102");
         assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.SENT);
@@ -127,11 +127,12 @@ class SlackNotificationOutboxProcessorTest {
     @Sql(scripts = "/sql/fixtures/box/out/processing_timeout_outbox_channel_text.sql")
     void PROCESSING_타임아웃_outbox는_RETRY_PENDING으로_복구된_후_정상_재처리된다() {
         // when
+        slackNotificationOutboxProcessor.recoverTimeoutProcessing();
         slackNotificationOutboxProcessor.processPending(10);
 
         // then
         SlackNotificationOutbox actual = slackNotificationOutboxRepository.findById(200L)
-                                                                             .orElseThrow();
+                                                                          .orElseThrow();
 
         verify(notificationTransportApiClient).sendMessage("xoxb-test-token", "C1", "hello-timeout-200");
         assertAll(
@@ -158,7 +159,7 @@ class SlackNotificationOutboxProcessorTest {
         SlackNotificationOutbox saved = slackNotificationOutboxRepository.save(timeoutOutbox);
 
         // when
-        slackNotificationOutboxProcessor.processPending(10);
+        slackNotificationOutboxProcessor.recoverTimeoutProcessing();
 
         // then
         SlackNotificationOutbox actual = slackNotificationOutboxRepository.findById(saved.getId())
@@ -183,14 +184,14 @@ class SlackNotificationOutboxProcessorTest {
 
         // then
         SlackNotificationOutbox actual = slackNotificationOutboxRepository.findById(pending.getId())
-                                                                             .orElseThrow();
+                                                                          .orElseThrow();
 
         verify(notificationTransportApiClient).sendBlockMessage(
-                        eq("xoxb-test-token"),
-                        eq("C1"),
-                        any(JsonNode.class),
-                        eq("fallback")
-                );
+                eq("xoxb-test-token"),
+                eq("C1"),
+                any(JsonNode.class),
+                eq("fallback")
+        );
         assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.SENT);
     }
 
@@ -208,11 +209,11 @@ class SlackNotificationOutboxProcessorTest {
         // when
         slackNotificationOutboxProcessor.processPending(10);
         SlackNotificationOutbox actualFirstFailed = slackNotificationOutboxRepository.findById(pending.getId())
-                                                                               .orElseThrow();
+                                                                                     .orElseThrow();
 
         slackNotificationOutboxProcessor.processPending(10);
         SlackNotificationOutbox actualSecondFailed = slackNotificationOutboxRepository.findById(pending.getId())
-                                                                                .orElseThrow();
+                                                                                      .orElseThrow();
 
         // then
         assertAll(

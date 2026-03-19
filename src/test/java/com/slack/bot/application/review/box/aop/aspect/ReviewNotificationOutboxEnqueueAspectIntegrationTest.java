@@ -24,11 +24,9 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.mockito.ArgumentCaptor;
 
 @IntegrationTest
-@MockitoBean(types = ReviewNotificationOutboxEnqueuer.class)
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class ReviewNotificationOutboxEnqueueAspectIntegrationTest {
@@ -88,6 +86,7 @@ class ReviewNotificationOutboxEnqueueAspectIntegrationTest {
 
         // then
         JsonNode actualMergedBlocks = blocksCaptor.getValue();
+
         assertAll(
                 () -> assertThat(actual).isNull(),
                 () -> assertThat(actualReviewNotificationOutboxEnqueueProbe.proceedCount()).isZero(),

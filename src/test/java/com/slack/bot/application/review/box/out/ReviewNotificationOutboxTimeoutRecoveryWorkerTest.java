@@ -16,37 +16,36 @@ import org.springframework.test.util.ReflectionTestUtils;
 @SuppressWarnings("NonAsciiCharacters")
 @ExtendWith(MockitoExtension.class)
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
-class ReviewNotificationOutboxWorkerTest {
+class ReviewNotificationOutboxTimeoutRecoveryWorkerTest {
 
     @Mock
     ReviewNotificationOutboxProcessor reviewNotificationOutboxProcessor;
 
-    ReviewNotificationOutboxWorker reviewNotificationOutboxWorker;
+    ReviewNotificationOutboxTimeoutRecoveryWorker worker;
 
     @BeforeEach
     void setUp() {
-        reviewNotificationOutboxWorker = new ReviewNotificationOutboxWorker(reviewNotificationOutboxProcessor);
-        ReflectionTestUtils.setField(reviewNotificationOutboxWorker, "batchSize", 50);
+        worker = new ReviewNotificationOutboxTimeoutRecoveryWorker(reviewNotificationOutboxProcessor);
+        ReflectionTestUtils.setField(worker, "processingTimeoutMs", 60_000L);
     }
 
     @Test
-    void worker는_outbox를_처리한다() {
+    void timeout_recovery를_실행한다() {
         // when
-        reviewNotificationOutboxWorker.processPendingReviewNotificationOutbox();
+        worker.recoverTimeoutReviewNotificationOutbox();
 
         // then
-        verify(reviewNotificationOutboxProcessor).processPending(50);
+        verify(reviewNotificationOutboxProcessor).recoverTimeoutProcessing(60_000L);
     }
 
     @Test
-    void worker_실행중_예외가_발생해도_전파하지_않는다() {
+    void timeout_recovery_실행중_예외가_발생해도_전파하지_않는다() {
         // given
         willThrow(new RuntimeException("worker failure"))
                 .given(reviewNotificationOutboxProcessor)
-                .processPending(50);
+                .recoverTimeoutProcessing(60_000L);
 
         // when & then
-        assertThatCode(() -> reviewNotificationOutboxWorker.processPendingReviewNotificationOutbox())
-                .doesNotThrowAnyException();
+        assertThatCode(() -> worker.recoverTimeoutReviewNotificationOutbox()).doesNotThrowAnyException();
     }
 }

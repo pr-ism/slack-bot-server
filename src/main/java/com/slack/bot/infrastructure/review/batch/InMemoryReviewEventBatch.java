@@ -21,7 +21,6 @@ public class InMemoryReviewEventBatch implements ReviewEventBatch {
 
     private static final long DEFAULT_BATCH_WINDOW_MILLIS = 5_000L;
     private static final int DEFAULT_PROCESS_BATCH_SIZE = 30;
-    private static final long DEFAULT_PROCESSING_TIMEOUT_MS = 60_000L;
 
     private final TaskScheduler taskScheduler;
     private final ReviewRequestInboxProcessor reviewRequestInboxProcessor;
@@ -35,9 +34,6 @@ public class InMemoryReviewEventBatch implements ReviewEventBatch {
 
     @Value("${review.notification.inbox.batch-size:" + DEFAULT_PROCESS_BATCH_SIZE + "}")
     private int batchSize;
-
-    @Value("${review.notification.inbox.processing-timeout-ms:" + DEFAULT_PROCESSING_TIMEOUT_MS + "}")
-    private long processingTimeoutMs;
 
     @Override
     public void buffer(String apiKey, ReviewAssignmentRequest request) {
@@ -75,7 +71,7 @@ public class InMemoryReviewEventBatch implements ReviewEventBatch {
 
     private void flush(String coalescingKey, long version) {
         try {
-            reviewRequestInboxProcessor.processPending(batchSize, processingTimeoutMs);
+            reviewRequestInboxProcessor.processPending(batchSize);
         } finally {
             Long currentVersion = scheduledVersions.get(coalescingKey);
             if (currentVersion != null && currentVersion == version) {

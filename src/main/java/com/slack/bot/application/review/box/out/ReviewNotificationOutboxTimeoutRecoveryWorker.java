@@ -7,25 +7,21 @@ import org.springframework.scheduling.annotation.Scheduled;
 
 @Slf4j
 @RequiredArgsConstructor
-public class ReviewNotificationOutboxWorker {
+public class ReviewNotificationOutboxTimeoutRecoveryWorker {
 
-    private static final int DEFAULT_BATCH_SIZE = 50;
     private static final long DEFAULT_PROCESSING_TIMEOUT_MS = 60_000L;
 
     private final ReviewNotificationOutboxProcessor reviewNotificationOutboxProcessor;
-
-    @Value("${review.notification.outbox.batch-size:" + DEFAULT_BATCH_SIZE + "}")
-    private int batchSize;
 
     @Value("${review.notification.outbox.processing-timeout-ms:" + DEFAULT_PROCESSING_TIMEOUT_MS + "}")
     private long processingTimeoutMs;
 
     @Scheduled(fixedDelayString = "${review.notification.outbox.poll-delay-ms:1000}")
-    public void processPendingReviewNotificationOutbox() {
+    public void recoverTimeoutReviewNotificationOutbox() {
         try {
-            reviewNotificationOutboxProcessor.processPending(batchSize);
+            reviewNotificationOutboxProcessor.recoverTimeoutProcessing(processingTimeoutMs);
         } catch (Exception exception) {
-            log.error("review_notification outbox worker 실행에 실패했습니다.", exception);
+            log.error("review_notification outbox timeout recovery worker 실행에 실패했습니다.", exception);
         }
     }
 }

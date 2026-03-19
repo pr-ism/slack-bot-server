@@ -81,16 +81,16 @@ class SlackInteractionInboxProcessorTest {
         );
         verify(notificationApiClient, times(1)).openDirectMessageChannel("xoxb-test-token", "U1");
         verify(notificationApiClient, times(1)).sendBlockMessage(
-                        eq("xoxb-test-token"),
-                        eq("D-REVIEWER"),
-                        any(),
-                        any()
-                );
+                eq("xoxb-test-token"),
+                eq("D-REVIEWER"),
+                any(),
+                any()
+        );
         assertThat(actualReviewReservationRepository.findById(100L))
-                        .isPresent()
-                        .get()
-                        .extracting(reservation -> reservation.getStatus())
-                        .isEqualTo(ReservationStatus.CANCELLED);
+                .isPresent()
+                .get()
+                .extracting(reservation -> reservation.getStatus())
+                .isEqualTo(ReservationStatus.CANCELLED);
     }
 
     @Test
@@ -105,6 +105,7 @@ class SlackInteractionInboxProcessorTest {
                 .willReturn("D-REVIEWER");
 
         // when
+        slackInteractionInboxProcessor.recoverBlockActionTimeoutProcessing();
         slackInteractionInboxProcessor.processPendingBlockActions(10);
 
         // then
@@ -116,16 +117,16 @@ class SlackInteractionInboxProcessorTest {
         );
         verify(notificationApiClient, times(1)).openDirectMessageChannel("xoxb-test-token", "U1");
         verify(notificationApiClient, times(1)).sendBlockMessage(
-                        eq("xoxb-test-token"),
-                        eq("D-REVIEWER"),
-                        any(),
-                        any()
-                );
+                eq("xoxb-test-token"),
+                eq("D-REVIEWER"),
+                any(),
+                any()
+        );
         assertThat(actualReviewReservationRepository.findById(100L))
-                        .isPresent()
-                        .get()
-                        .extracting(reservation -> reservation.getStatus())
-                        .isEqualTo(ReservationStatus.CANCELLED);
+                .isPresent()
+                .get()
+                .extracting(reservation -> reservation.getStatus())
+                .isEqualTo(ReservationStatus.CANCELLED);
     }
 
     @Test
@@ -143,7 +144,7 @@ class SlackInteractionInboxProcessorTest {
         SlackInteractionInbox actualSaved = jpaSlackInteractionInboxRepository.save(timeoutInbox);
 
         // when
-        slackInteractionInboxProcessor.processPendingBlockActions(10);
+        slackInteractionInboxProcessor.recoverBlockActionTimeoutProcessing();
 
         // then
         SlackInteractionInbox actual = jpaSlackInteractionInboxRepository.findById(actualSaved.getId()).orElseThrow();

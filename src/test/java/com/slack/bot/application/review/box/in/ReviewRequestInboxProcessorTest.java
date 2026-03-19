@@ -89,7 +89,7 @@ class ReviewRequestInboxProcessorTest {
 
         // when
         reviewRequestInboxProcessor.enqueue("test-api-key", request, 0);
-        reviewRequestInboxProcessor.processPending(10, 1_000);
+        reviewRequestInboxProcessor.processPending(10);
 
         // then
         List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAll();
@@ -121,7 +121,7 @@ class ReviewRequestInboxProcessorTest {
         // when
         reviewRequestInboxProcessor.enqueue("test-api-key", first, 0);
         reviewRequestInboxProcessor.enqueue("test-api-key", second, 0);
-        reviewRequestInboxProcessor.processPending(10, 1_000);
+        reviewRequestInboxProcessor.processPending(10);
 
         // then
         List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAll();
@@ -149,7 +149,7 @@ class ReviewRequestInboxProcessorTest {
         );
 
         // when
-        reviewRequestInboxProcessor.processPending(10, 1_000);
+        reviewRequestInboxProcessor.processPending(10);
 
         // then
         ReviewRequestInbox inbox = jpaReviewRequestInboxRepository.findAll().getFirst();
@@ -184,7 +184,8 @@ class ReviewRequestInboxProcessorTest {
         ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
 
         // when
-        reviewRequestInboxProcessor.processPending(10, 1_000);
+        reviewRequestInboxProcessor.recoverTimeoutProcessing(1_000);
+        reviewRequestInboxProcessor.processPending(10);
 
         // then
         ReviewRequestInbox processed = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
@@ -213,7 +214,7 @@ class ReviewRequestInboxProcessorTest {
         ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
 
         // when
-        reviewRequestInboxProcessor.processPending(10, 1_000);
+        reviewRequestInboxProcessor.recoverTimeoutProcessing(1_000);
 
         // then
         ReviewRequestInbox failed = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
@@ -350,7 +351,7 @@ class ReviewRequestInboxProcessorTest {
     @Test
     void processingTimeoutMs가_0이면_processPending은_예외를_던진다() {
         // when & then
-        assertThatThrownBy(() -> reviewRequestInboxProcessor.processPending(10, 0))
+        assertThatThrownBy(() -> reviewRequestInboxProcessor.recoverTimeoutProcessing(0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("processingTimeoutMs는 0보다 커야 합니다.");
     }
@@ -378,7 +379,7 @@ class ReviewRequestInboxProcessorTest {
                 );
 
         // when
-        reviewRequestInboxProcessor.processPending(10, 1_000);
+        reviewRequestInboxProcessor.processPending(10);
 
         // then
         ReviewRequestInbox inbox = jpaReviewRequestInboxRepository.findAll().getFirst();
@@ -424,7 +425,7 @@ class ReviewRequestInboxProcessorTest {
                 );
 
         // when
-        reviewRequestInboxProcessor.processPending(10, 1_000);
+        reviewRequestInboxProcessor.processPending(10);
 
         // then
         ReviewRequestInbox failed = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
@@ -459,7 +460,7 @@ class ReviewRequestInboxProcessorTest {
         }).when(reviewRequestInboxRepository).save(any(ReviewRequestInbox.class));
 
         // when
-        reviewRequestInboxProcessor.processPending(10, 1_000);
+        reviewRequestInboxProcessor.processPending(10);
 
         // then
         ReviewRequestInbox inbox = jpaReviewRequestInboxRepository.findAll().getFirst();
@@ -481,7 +482,7 @@ class ReviewRequestInboxProcessorTest {
         doReturn(Optional.empty()).when(reviewRequestInboxRepository).findById(saved.getId());
 
         // when
-        reviewRequestInboxProcessor.processPending(10, 1_000);
+        reviewRequestInboxProcessor.processPending(10);
 
         // then
         ReviewRequestInbox reloaded = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
