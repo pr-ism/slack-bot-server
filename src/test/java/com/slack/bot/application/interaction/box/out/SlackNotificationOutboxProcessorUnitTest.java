@@ -56,8 +56,8 @@ class SlackNotificationOutboxProcessorUnitTest {
     @BeforeEach
     void setUp() {
         InteractionRetryProperties retryProperties = new InteractionRetryProperties(
-                new InteractionRetryProperties.Retry(2, 100, 2.0, 1000),
-                new InteractionRetryProperties.Retry(2, 100, 2.0, 1000)
+                new InteractionRetryProperties.InboxRetryProperties(2, 100, 2.0, 1000),
+                new InteractionRetryProperties.OutboxRetryProperties(2, 100, 2.0, 1000)
         );
         InteractionRetryExceptionClassifier classifier = InteractionRetryExceptionClassifier.create();
 

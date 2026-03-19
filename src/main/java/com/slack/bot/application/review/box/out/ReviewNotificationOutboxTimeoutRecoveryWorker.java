@@ -1,20 +1,24 @@
 package com.slack.bot.application.review.box.out;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 
 @Slf4j
-@RequiredArgsConstructor
 public class ReviewNotificationOutboxTimeoutRecoveryWorker {
 
-    private static final long DEFAULT_PROCESSING_TIMEOUT_MS = 60_000L;
-
     private final ReviewNotificationOutboxProcessor reviewNotificationOutboxProcessor;
+    private final long processingTimeoutMs;
 
-    @Value("${review.notification.outbox.processing-timeout-ms:" + DEFAULT_PROCESSING_TIMEOUT_MS + "}")
-    private long processingTimeoutMs;
+    public ReviewNotificationOutboxTimeoutRecoveryWorker(
+            ReviewNotificationOutboxProcessor reviewNotificationOutboxProcessor,
+            long processingTimeoutMs
+    ) {
+        if (processingTimeoutMs <= 0) {
+            throw new IllegalArgumentException("processingTimeoutMs는 0보다 커야 합니다.");
+        }
+        this.reviewNotificationOutboxProcessor = reviewNotificationOutboxProcessor;
+        this.processingTimeoutMs = processingTimeoutMs;
+    }
 
     @Scheduled(fixedDelayString = "${review.notification.outbox.poll-delay-ms:1000}")
     public void recoverTimeoutReviewNotificationOutbox() {

@@ -6,6 +6,7 @@ import com.slack.bot.application.interaction.box.out.SlackNotificationOutboxWork
 import com.slack.bot.application.review.box.out.ReviewNotificationOutboxProcessor;
 import com.slack.bot.application.review.box.out.ReviewNotificationOutboxTimeoutRecoveryWorker;
 import com.slack.bot.application.review.box.out.ReviewNotificationOutboxWorker;
+import com.slack.bot.global.config.properties.ReviewWorkerProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -47,9 +48,13 @@ public class OutboxWorkerConfig {
             matchIfMissing = true
     )
     public ReviewNotificationOutboxWorker reviewNotificationOutboxWorker(
-            ReviewNotificationOutboxProcessor reviewNotificationOutboxProcessor
+            ReviewNotificationOutboxProcessor reviewNotificationOutboxProcessor,
+            ReviewWorkerProperties reviewWorkerProperties
     ) {
-        return new ReviewNotificationOutboxWorker(reviewNotificationOutboxProcessor);
+        return new ReviewNotificationOutboxWorker(
+                reviewNotificationOutboxProcessor,
+                reviewWorkerProperties.outbox().batchSize()
+        );
     }
 
     @Bean
@@ -60,8 +65,12 @@ public class OutboxWorkerConfig {
             matchIfMissing = true
     )
     public ReviewNotificationOutboxTimeoutRecoveryWorker reviewNotificationOutboxTimeoutRecoveryWorker(
-            ReviewNotificationOutboxProcessor reviewNotificationOutboxProcessor
+            ReviewNotificationOutboxProcessor reviewNotificationOutboxProcessor,
+            ReviewWorkerProperties reviewWorkerProperties
     ) {
-        return new ReviewNotificationOutboxTimeoutRecoveryWorker(reviewNotificationOutboxProcessor);
+        return new ReviewNotificationOutboxTimeoutRecoveryWorker(
+                reviewNotificationOutboxProcessor,
+                reviewWorkerProperties.outbox().processingTimeoutMs()
+        );
     }
 }

@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SuppressWarnings("NonAsciiCharacters")
 @ExtendWith(MockitoExtension.class)
@@ -25,8 +25,7 @@ class ReviewRequestInboxTimeoutRecoveryWorkerTest {
 
     @BeforeEach
     void setUp() {
-        worker = new ReviewRequestInboxTimeoutRecoveryWorker(reviewRequestInboxProcessor);
-        ReflectionTestUtils.setField(worker, "processingTimeoutMs", 60_000L);
+        worker = new ReviewRequestInboxTimeoutRecoveryWorker(reviewRequestInboxProcessor, 60_000L);
     }
 
     @Test
@@ -47,5 +46,12 @@ class ReviewRequestInboxTimeoutRecoveryWorkerTest {
 
         // when & then
         assertThatCode(() -> worker.recoverTimeoutReviewRequestInbox()).doesNotThrowAnyException();
+    }
+
+    @Test
+    void processingTimeoutMs가_0이하면_생성자에서_예외가_발생한다() {
+        assertThatThrownBy(() -> new ReviewRequestInboxTimeoutRecoveryWorker(reviewRequestInboxProcessor, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("processingTimeoutMs는 0보다 커야 합니다.");
     }
 }

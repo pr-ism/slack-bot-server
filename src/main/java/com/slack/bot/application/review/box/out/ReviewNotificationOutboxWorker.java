@@ -1,24 +1,24 @@
 package com.slack.bot.application.review.box.out;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 
 @Slf4j
-@RequiredArgsConstructor
 public class ReviewNotificationOutboxWorker {
 
-    private static final int DEFAULT_BATCH_SIZE = 50;
-    private static final long DEFAULT_PROCESSING_TIMEOUT_MS = 60_000L;
-
     private final ReviewNotificationOutboxProcessor reviewNotificationOutboxProcessor;
+    private final int batchSize;
 
-    @Value("${review.notification.outbox.batch-size:" + DEFAULT_BATCH_SIZE + "}")
-    private int batchSize;
-
-    @Value("${review.notification.outbox.processing-timeout-ms:" + DEFAULT_PROCESSING_TIMEOUT_MS + "}")
-    private long processingTimeoutMs;
+    public ReviewNotificationOutboxWorker(
+            ReviewNotificationOutboxProcessor reviewNotificationOutboxProcessor,
+            int batchSize
+    ) {
+        if (batchSize <= 0) {
+            throw new IllegalArgumentException("batchSize는 0보다 커야 합니다.");
+        }
+        this.reviewNotificationOutboxProcessor = reviewNotificationOutboxProcessor;
+        this.batchSize = batchSize;
+    }
 
     @Scheduled(fixedDelayString = "${review.notification.outbox.poll-delay-ms:1000}")
     public void processPendingReviewNotificationOutbox() {

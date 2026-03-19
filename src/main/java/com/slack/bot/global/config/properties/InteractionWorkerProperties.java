@@ -5,83 +5,83 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 
 @ConfigurationProperties(prefix = "app.interaction")
 public record InteractionWorkerProperties(
-        @DefaultValue Inbox inbox,
-        @DefaultValue Outbox outbox
+        @DefaultValue InboxProperties inbox,
+        @DefaultValue OutboxProperties outbox
 ) {
 
     public InteractionWorkerProperties() {
-        this(new Inbox(), new Outbox());
+        this(new InboxProperties(), new OutboxProperties());
     }
 
     public InteractionWorkerProperties {
         if (inbox == null) {
-            inbox = new Inbox();
+            inbox = new InboxProperties();
         }
         if (outbox == null) {
-            outbox = new Outbox();
+            outbox = new OutboxProperties();
         }
     }
 
-    public record Inbox(
-            @DefaultValue BlockActions blockActions,
-            @DefaultValue ViewSubmission viewSubmission
+    public record InboxProperties(
+            @DefaultValue BlockActionsProperties blockActions,
+            @DefaultValue ViewSubmissionProperties viewSubmission
     ) {
 
-        public Inbox() {
-            this(new BlockActions(), new ViewSubmission());
+        public InboxProperties() {
+            this(new BlockActionsProperties(), new ViewSubmissionProperties());
         }
 
-        public Inbox {
+        public InboxProperties {
             if (blockActions == null) {
-                blockActions = new BlockActions();
+                blockActions = new BlockActionsProperties();
             }
             if (viewSubmission == null) {
-                viewSubmission = new ViewSubmission();
+                viewSubmission = new ViewSubmissionProperties();
             }
         }
     }
 
-    public record BlockActions(
+    public record BlockActionsProperties(
             @DefaultValue("true") boolean workerEnabled,
             @DefaultValue("1000") long pollDelayMs,
             @DefaultValue("60000") long processingTimeoutMs
     ) {
 
-        public BlockActions() {
+        public BlockActionsProperties() {
             this(true, 1000L, 60000L);
         }
 
-        public BlockActions(boolean workerEnabled, long pollDelayMs) {
+        public BlockActionsProperties(boolean workerEnabled, long pollDelayMs) {
             this(workerEnabled, pollDelayMs, 60000L);
         }
     }
 
-    public record ViewSubmission(
+    public record ViewSubmissionProperties(
             @DefaultValue("true") boolean workerEnabled,
             @DefaultValue("1000") long pollDelayMs,
             @DefaultValue("60000") long processingTimeoutMs
     ) {
 
-        public ViewSubmission() {
+        public ViewSubmissionProperties() {
             this(true, 1000L, 60000L);
         }
 
-        public ViewSubmission(boolean workerEnabled, long pollDelayMs) {
+        public ViewSubmissionProperties(boolean workerEnabled, long pollDelayMs) {
             this(workerEnabled, pollDelayMs, 60000L);
         }
     }
 
-    public record Outbox(
+    public record OutboxProperties(
             @DefaultValue("true") boolean workerEnabled,
             @DefaultValue("1000") long pollDelayMs,
             @DefaultValue("60000") long processingTimeoutMs
     ) {
 
-        public Outbox() {
+        public OutboxProperties() {
             this(true, 1000L, 60000L);
         }
 
-        public Outbox(boolean workerEnabled, long pollDelayMs) {
+        public OutboxProperties(boolean workerEnabled, long pollDelayMs) {
             this(workerEnabled, pollDelayMs, 60000L);
         }
     }

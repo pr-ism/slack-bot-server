@@ -24,7 +24,7 @@ public class RetryConfig {
             InteractionRetryProperties interactionRetryProperties,
             InteractionRetryExceptionClassifier retryExceptionClassifier
     ) {
-        InteractionRetryProperties.Retry retry = interactionRetryProperties.inbox();
+        InteractionRetryProperties.InboxRetryProperties retry = interactionRetryProperties.inbox();
         RetryTemplate retryTemplate = new RetryTemplate();
         retryTemplate.setRetryPolicy(new SimpleRetryPolicy(
                 retry.maxAttempts(),
@@ -47,7 +47,7 @@ public class RetryConfig {
             InteractionRetryProperties interactionRetryProperties,
             InteractionRetryExceptionClassifier retryExceptionClassifier
     ) {
-        InteractionRetryProperties.Retry retry = interactionRetryProperties.outbox();
+        InteractionRetryProperties.OutboxRetryProperties retry = interactionRetryProperties.outbox();
         RetryTemplate retryTemplate = new RetryTemplate();
         retryTemplate.setRetryPolicy(new SimpleRetryPolicy(
                 retry.maxAttempts(),

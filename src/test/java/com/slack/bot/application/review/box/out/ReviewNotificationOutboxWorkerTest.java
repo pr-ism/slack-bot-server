@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SuppressWarnings("NonAsciiCharacters")
 @ExtendWith(MockitoExtension.class)
@@ -25,8 +25,7 @@ class ReviewNotificationOutboxWorkerTest {
 
     @BeforeEach
     void setUp() {
-        reviewNotificationOutboxWorker = new ReviewNotificationOutboxWorker(reviewNotificationOutboxProcessor);
-        ReflectionTestUtils.setField(reviewNotificationOutboxWorker, "batchSize", 50);
+        reviewNotificationOutboxWorker = new ReviewNotificationOutboxWorker(reviewNotificationOutboxProcessor, 50);
     }
 
     @Test
@@ -48,5 +47,12 @@ class ReviewNotificationOutboxWorkerTest {
         // when & then
         assertThatCode(() -> reviewNotificationOutboxWorker.processPendingReviewNotificationOutbox())
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    void batchSize가_0이하면_생성자에서_예외가_발생한다() {
+        assertThatThrownBy(() -> new ReviewNotificationOutboxWorker(reviewNotificationOutboxProcessor, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("batchSize는 0보다 커야 합니다.");
     }
 }
