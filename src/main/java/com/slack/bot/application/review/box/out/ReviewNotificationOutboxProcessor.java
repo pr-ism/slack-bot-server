@@ -138,6 +138,7 @@ public class ReviewNotificationOutboxProcessor {
                 token,
                 outbox.getChannelId(),
                 readBlocks(outbox.getBlocksJson()),
+                readAttachments(outbox.getAttachmentsJson()),
                 outbox.getFallbackText()
         );
     }
@@ -153,6 +154,14 @@ public class ReviewNotificationOutboxProcessor {
 
     private JsonNode readBlocks(String blocksJson) throws JsonProcessingException {
         return objectMapper.readTree(blocksJson);
+    }
+
+    private JsonNode readAttachments(String attachmentsJson) throws JsonProcessingException {
+        if (attachmentsJson == null || attachmentsJson.isBlank()) {
+            return null;
+        }
+
+        return objectMapper.readTree(attachmentsJson);
     }
 
     private void markFailureStatus(ReviewNotificationOutbox outbox, Exception exception) {

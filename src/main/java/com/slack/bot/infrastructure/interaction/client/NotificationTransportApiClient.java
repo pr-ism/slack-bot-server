@@ -57,14 +57,21 @@ public class NotificationTransportApiClient {
     }
 
     public void sendBlockMessage(String token, String channelId, JsonNode blocks, String text) {
-        Map<String, Object> body = buildBlockMessageBody(channelId, blocks, text);
+        Map<String, Object> body = buildBlockMessageBody(channelId, blocks, null, text);
+        JsonNode response = postForJson("chat.postMessage", token, body);
+
+        ensureOk(response, "슬랙 봇 메시지 전송 실패: 블록 메시지 전송 실패");
+    }
+
+    public void sendBlockMessage(String token, String channelId, JsonNode blocks, JsonNode attachments, String text) {
+        Map<String, Object> body = buildBlockMessageBody(channelId, blocks, attachments, text);
         JsonNode response = postForJson("chat.postMessage", token, body);
 
         ensureOk(response, "슬랙 봇 메시지 전송 실패: 블록 메시지 전송 실패");
     }
 
     public void sendBlockMessage(String token, String channelId, List<LayoutBlock> blocks, String text) {
-        Map<String, Object> body = buildBlockMessageBody(channelId, blocks, text);
+        Map<String, Object> body = buildBlockMessageBody(channelId, blocks, null, text);
         JsonNode response = postForJson("chat.postMessage", token, body);
 
         ensureOk(response, "슬랙 봇 메시지 전송 실패: 블록 메시지 전송 실패");
@@ -209,12 +216,15 @@ public class NotificationTransportApiClient {
         return body;
     }
 
-    private Map<String, Object> buildBlockMessageBody(String channelId, Object blocks, String text) {
+    private Map<String, Object> buildBlockMessageBody(String channelId, Object blocks, JsonNode attachments, String text) {
         Map<String, Object> body = new HashMap<>();
 
         body.put("channel", channelId);
         body.put("blocks", blocks);
 
+        if (attachments != null && !attachments.isNull()) {
+            body.put("attachments", attachments);
+        }
         if (text != null && !text.isBlank()) {
             body.put("text", text);
         }

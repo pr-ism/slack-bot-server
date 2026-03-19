@@ -1,8 +1,6 @@
 package com.slack.bot.application.review.box.out;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.slack.bot.application.review.box.ReviewNotificationIdempotencyKeyGenerator;
 import com.slack.bot.application.review.box.ReviewNotificationIdempotencyScope;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
@@ -25,13 +23,24 @@ public class ReviewNotificationOutboxEnqueuer {
             JsonNode attachments,
             String fallbackText
     ) {
-        enqueueChannelBlocks(
-                sourceKey,
-                teamId,
-                channelId,
-                mergeBlocks(blocks, attachments),
-                fallbackText
+        String normalizedBlocksJson = normalizeBlocks(blocks);
+        String normalizedAttachmentsJson = normalizeAttachments(attachments);
+        String idempotencyPayload = idempotencyPayload(sourceKey, teamId, channelId);
+        String idempotencyKey = idempotencyKeyGenerator.generate(
+                ReviewNotificationIdempotencyScope.REVIEW_NOTIFICATION_OUTBOX,
+                idempotencyPayload
         );
+
+        ReviewNotificationOutbox outbox = ReviewNotificationOutbox.builder()
+                                                                  .idempotencyKey(idempotencyKey)
+                                                                  .teamId(teamId)
+                                                                  .channelId(channelId)
+                                                                  .blocksJson(normalizedBlocksJson)
+                                                                  .attachmentsJson(normalizedAttachmentsJson)
+                                                                  .fallbackText(fallbackText)
+                                                                  .build();
+
+        reviewNotificationOutboxRepository.enqueue(outbox);
     }
 
     public void enqueueChannelBlocks(
@@ -53,39 +62,11 @@ public class ReviewNotificationOutboxEnqueuer {
                                                                   .teamId(teamId)
                                                                   .channelId(channelId)
                                                                   .blocksJson(normalizedBlocksJson)
+                                                                  .attachmentsJson(null)
                                                                   .fallbackText(fallbackText)
                                                                   .build();
 
         reviewNotificationOutboxRepository.enqueue(outbox);
-    }
-
-    private JsonNode mergeBlocks(JsonNode topLevelBlocks, JsonNode attachments) {
-        ArrayNode merged = JsonNodeFactory.instance.arrayNode();
-
-        appendBlocks(merged, topLevelBlocks);
-        appendAttachmentBlocks(merged, attachments);
-
-        return merged;
-    }
-
-    private void appendBlocks(ArrayNode merged, JsonNode blocks) {
-        if (blocks == null || !blocks.isArray()) {
-            return;
-        }
-
-        for (JsonNode block : blocks) {
-            merged.add(block);
-        }
-    }
-
-    private void appendAttachmentBlocks(ArrayNode merged, JsonNode attachments) {
-        if (attachments == null || !attachments.isArray()) {
-            return;
-        }
-
-        for (JsonNode attachment : attachments) {
-            appendBlocks(merged, attachment.path("blocks"));
-        }
     }
 
     private String normalizeBlocks(JsonNode blocks) {
@@ -94,6 +75,14 @@ public class ReviewNotificationOutboxEnqueuer {
         }
 
         return blocks.toString();
+    }
+
+    private String normalizeAttachments(JsonNode attachments) {
+        if (attachments == null) {
+            return null;
+        }
+
+        return attachments.toString();
     }
 
     private String idempotencyPayload(String sourceKey, String teamId, String channelId) {

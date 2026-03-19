@@ -58,13 +58,14 @@ class ReviewNotificationOutboxEnqueuerTest {
                 () -> assertThat(actual.getTeamId()).isEqualTo("T1"),
                 () -> assertThat(actual.getChannelId()).isEqualTo("C1"),
                 () -> assertThat(actual.getBlocksJson()).isEqualTo("[{\"type\":\"section\"}]"),
+                () -> assertThat(actual.getAttachmentsJson()).isNull(),
                 () -> assertThat(actual.getFallbackText()).isEqualTo("fallback"),
                 () -> assertThat(actual.getIdempotencyKey()).hasSize(64)
         );
     }
 
     @Test
-    void attachment_blocks를_포함한_메시지를_하나의_blocks_json으로_merge해_enqueue한다() throws Exception {
+    void attachments를_원형_그대로_보존해_enqueue한다() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
 
         // when
@@ -86,8 +87,32 @@ class ReviewNotificationOutboxEnqueuerTest {
         ArgumentCaptor<ReviewNotificationOutbox> captor = ArgumentCaptor.forClass(ReviewNotificationOutbox.class);
         verify(reviewNotificationOutboxRepository).enqueue(captor.capture());
 
-        assertThat(captor.getValue().getBlocksJson())
-                .isEqualTo("[{\"type\":\"section\"},{\"type\":\"actions\"},{\"type\":\"context\"}]");
+        assertAll(
+                () -> assertThat(captor.getValue().getBlocksJson())
+                        .isEqualTo("[{\"type\":\"section\"}]"),
+                () -> assertThat(captor.getValue().getAttachmentsJson()).isEqualTo(
+                        "[{\"blocks\":[{\"type\":\"actions\"},{\"type\":\"context\"}]},{}]"
+                )
+        );
+    }
+
+    @Test
+    void attachments가_null이면_attachmentsJson은_null로_enqueue한다() throws Exception {
+        // when
+        enqueuer.enqueueChannelBlocks(
+                "SOURCE-1",
+                "T1",
+                "C1",
+                new ObjectMapper().readTree("[{\"type\":\"section\"}]"),
+                null,
+                "fallback"
+        );
+
+        // then
+        ArgumentCaptor<ReviewNotificationOutbox> captor = ArgumentCaptor.forClass(ReviewNotificationOutbox.class);
+        verify(reviewNotificationOutboxRepository).enqueue(captor.capture());
+
+        assertThat(captor.getValue().getAttachmentsJson()).isNull();
     }
 
     @Test

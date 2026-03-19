@@ -179,6 +179,7 @@ class ReviewNotificationOutboxProcessorTest {
                 eq("xoxb-test-token"),
                 eq("C1"),
                 any(JsonNode.class),
+                eq(null),
                 eq("fallback")
         );
         verify(claimed).markSent(any());
@@ -210,6 +211,7 @@ class ReviewNotificationOutboxProcessorTest {
                 eq("xoxb-test-token"),
                 eq("C1"),
                 any(JsonNode.class),
+                eq(null),
                 eq("fallback")
         );
         verify(claimed).markSent(any());
@@ -237,6 +239,7 @@ class ReviewNotificationOutboxProcessorTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         any(JsonNode.class),
+                        eq(null),
                         eq("fallback")
                 );
 
@@ -270,7 +273,7 @@ class ReviewNotificationOutboxProcessorTest {
 
         doThrow(new ResourceAccessException("io failure"))
                 .when(notificationTransportApiClient)
-                .sendBlockMessage(eq("xoxb-test-token"), eq("C1"), any(JsonNode.class), eq("fallback"));
+                .sendBlockMessage(eq("xoxb-test-token"), eq("C1"), any(JsonNode.class), eq(null), eq("fallback"));
         doThrow(new RuntimeException("db failure"))
                 .when(reviewNotificationOutboxRepository)
                 .save(firstClaimed);
@@ -315,12 +318,14 @@ class ReviewNotificationOutboxProcessorTest {
                 eq("xoxb-test-token"),
                 eq("C1"),
                 any(JsonNode.class),
+                eq(null),
                 eq("fallback")
         );
         verify(notificationTransportApiClient).sendBlockMessage(
                 eq("xoxb-test-token"),
                 eq("C2"),
                 any(JsonNode.class),
+                eq(null),
                 eq("fallback")
         );
         verify(reviewNotificationOutboxRepository, never()).save(firstClaimed);
@@ -348,6 +353,7 @@ class ReviewNotificationOutboxProcessorTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         any(JsonNode.class),
+                        eq(null),
                         eq("fallback")
                 );
 
@@ -379,6 +385,7 @@ class ReviewNotificationOutboxProcessorTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         any(JsonNode.class),
+                        eq(null),
                         eq("fallback")
                 );
 
@@ -408,6 +415,34 @@ class ReviewNotificationOutboxProcessorTest {
         verify(reviewNotificationOutboxRepository).save(claimed);
     }
 
+    @Test
+    void attachments_json이_있으면_attachment를_보존해_전송한다() {
+        // given
+        ReviewNotificationOutbox pending = mockPending(10L);
+        ReviewNotificationOutbox claimed = mockClaimed(10L, 1);
+        given(claimed.getAttachmentsJson()).willReturn("[{\"color\":\"#6366F1\",\"blocks\":[{\"type\":\"actions\"}]}]");
+        given(reviewNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(pending));
+        given(reviewNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
+        given(reviewNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(claimed));
+
+        Workspace workspace = mock(Workspace.class);
+        given(workspace.getAccessToken()).willReturn("xoxb-test-token");
+        given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.of(workspace));
+
+        // when
+        processor.processPending(10);
+
+        // then
+        verify(notificationTransportApiClient).sendBlockMessage(
+                eq("xoxb-test-token"),
+                eq("C1"),
+                any(JsonNode.class),
+                any(JsonNode.class),
+                eq("fallback")
+        );
+        verify(reviewNotificationOutboxRepository).save(claimed);
+    }
+
     private ReviewNotificationOutbox mockPending(Long id) {
         ReviewNotificationOutbox outbox = mock(ReviewNotificationOutbox.class);
         given(outbox.getId()).willReturn(id);
@@ -421,6 +456,7 @@ class ReviewNotificationOutboxProcessorTest {
         given(outbox.getTeamId()).willReturn("T1");
         given(outbox.getChannelId()).willReturn("C1");
         given(outbox.getBlocksJson()).willReturn("[]");
+        given(outbox.getAttachmentsJson()).willReturn(null);
         given(outbox.getFallbackText()).willReturn("fallback");
         given(outbox.getProcessingAttempt()).willReturn(processingAttempt);
 
