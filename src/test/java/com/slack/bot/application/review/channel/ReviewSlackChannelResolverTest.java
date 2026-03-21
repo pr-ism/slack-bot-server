@@ -33,6 +33,7 @@ class ReviewSlackChannelResolverTest {
 
         // then
         assertAll(
+                () -> assertThat(actual.projectId()).isEqualTo(1L),
                 () -> assertThat(actual.teamId()).isEqualTo("T1"),
                 () -> assertThat(actual.channelId()).isEqualTo("C1"),
                 () -> assertThat(actual.accessToken()).isEqualTo("xoxb-test-token")

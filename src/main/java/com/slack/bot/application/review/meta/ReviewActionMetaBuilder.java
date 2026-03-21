@@ -23,6 +23,12 @@ public class ReviewActionMetaBuilder {
         Long projectId = projectRepository.findIdByApiKey(apiKey)
                                           .orElseThrow(() -> new ProjectNotFoundException(apiKey));
 
+        return build(teamId, channelId, projectId, report);
+    }
+
+    public String build(String teamId, String channelId, Long projectId, ReviewNotificationPayload report) {
+        validateProjectId(projectId);
+
         ObjectNode meta = objectMapper.createObjectNode();
         Long githubPullRequestId = requireGithubPullRequestId(report.githubPullRequestId());
 
@@ -58,5 +64,14 @@ public class ReviewActionMetaBuilder {
             );
         }
         return githubPullRequestId;
+    }
+
+    private void validateProjectId(Long projectId) {
+        if (projectId == null || projectId <= 0) {
+            throw new ReviewActionMetaException(
+                    "리뷰 스케줄러 메타데이터 생성 실패: projectId는 1 이상의 정수여야 합니다.",
+                    new IllegalArgumentException("projectId invalid")
+            );
+        }
     }
 }
