@@ -20,9 +20,13 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
 
     private String idempotencyKey;
 
+    private Long projectId;
+
     private String teamId;
 
     private String channelId;
+
+    private String payloadJson;
 
     private String blocksJson;
 
@@ -49,20 +53,25 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
     @Builder
     private ReviewNotificationOutbox(
             String idempotencyKey,
+            Long projectId,
             String teamId,
             String channelId,
+            String payloadJson,
             String blocksJson,
             String attachmentsJson,
             String fallbackText
     ) {
         validateIdempotencyKey(idempotencyKey);
+        validateProjectId(projectId, payloadJson);
         validateTeamId(teamId);
         validateChannelId(channelId);
-        validateBlocksJson(blocksJson);
+        validateMessagePayload(payloadJson, blocksJson);
 
         this.idempotencyKey = idempotencyKey;
+        this.projectId = projectId;
         this.teamId = teamId;
         this.channelId = channelId;
+        this.payloadJson = payloadJson;
         this.blocksJson = blocksJson;
         this.attachmentsJson = attachmentsJson;
         this.fallbackText = fallbackText;
@@ -150,16 +159,35 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
         }
     }
 
+    private void validateProjectId(Long projectId, String payloadJson) {
+        if ((payloadJson == null || payloadJson.isBlank()) && projectId == null) {
+            return;
+        }
+
+        if (projectId == null || projectId <= 0) {
+            throw new IllegalArgumentException("projectId는 1 이상의 값이어야 합니다.");
+        }
+    }
+
     private void validateChannelId(String channelId) {
         if (channelId == null || channelId.isBlank()) {
             throw new IllegalArgumentException("channelId는 비어 있을 수 없습니다.");
         }
     }
 
-    private void validateBlocksJson(String blocksJson) {
-        if (blocksJson == null || blocksJson.isBlank()) {
-            throw new IllegalArgumentException("blocksJson은 비어 있을 수 없습니다.");
+    private void validateMessagePayload(String payloadJson, String blocksJson) {
+        boolean hasSemanticPayload = payloadJson != null && !payloadJson.isBlank();
+        boolean hasSnapshotPayload = blocksJson != null && !blocksJson.isBlank();
+
+        if (hasSemanticPayload || hasSnapshotPayload) {
+            return;
         }
+
+        throw new IllegalArgumentException("payloadJson 또는 blocksJson 중 하나는 비어 있을 수 없습니다.");
+    }
+
+    public boolean hasSemanticPayload() {
+        return payloadJson != null && !payloadJson.isBlank();
     }
 
     private void validateProcessingStartedAt(Instant processingStartedAt) {

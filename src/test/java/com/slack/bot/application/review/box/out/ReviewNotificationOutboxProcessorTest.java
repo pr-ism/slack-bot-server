@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
 import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
+import com.slack.bot.application.review.dto.ReviewMessageDto;
 import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
@@ -56,6 +57,9 @@ class ReviewNotificationOutboxProcessorTest {
     @Mock
     ReviewNotificationOutboxRepository reviewNotificationOutboxRepository;
 
+    @Mock
+    ReviewNotificationMessageRenderer reviewNotificationMessageRenderer;
+
     ReviewNotificationOutboxProcessor processor;
 
     InteractionRetryExceptionClassifier classifier;
@@ -73,6 +77,7 @@ class ReviewNotificationOutboxProcessorTest {
         processor = new ReviewNotificationOutboxProcessor(
                 fixedClock,
                 new ObjectMapper(),
+                reviewNotificationMessageRenderer,
                 createOutboxRetryTemplate(retryProperties, classifier),
                 workspaceRepository,
                 new BoxFailureReasonTruncator(),
@@ -437,6 +442,53 @@ class ReviewNotificationOutboxProcessorTest {
         processor.processPending(10);
 
         // then
+        verify(notificationTransportApiClient).sendBlockMessage(
+                eq("xoxb-test-token"),
+                eq("C1"),
+                any(JsonNode.class),
+                any(JsonNode.class),
+                eq("fallback")
+        );
+        verify(reviewNotificationOutboxRepository).save(claimed);
+    }
+
+    @Test
+    void semantic_payload가_있으면_renderer로_최종_payload를_조립해_전송한다() throws Exception {
+        // given
+        ReviewNotificationOutbox pending = mockPending(10L);
+        ReviewNotificationOutbox claimed = spy(ReviewNotificationOutbox.builder()
+                                                                       .idempotencyKey("semantic-outbox")
+                                                                       .projectId(1L)
+                                                                       .teamId("T1")
+                                                                       .channelId("C1")
+                                                                       .payloadJson("""
+                                                                               {"repositoryName":"repo","githubPullRequestId":101,
+                                                                               "pullRequestNumber":42,"pullRequestTitle":"Fix bug",
+                                                                               "pullRequestUrl":"https://github.com/pr/1",
+                                                                               "authorGithubId":"author-gh",
+                                                                               "pendingReviewers":["reviewer-gh-1"],
+                                                                               "reviewersToMention":["reviewer-gh-1"]}
+                                                                               """)
+                                                                       .build());
+        claimed.markProcessing(Instant.parse("2026-02-23T23:58:00Z"));
+        given(reviewNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(pending));
+        given(reviewNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
+        given(reviewNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(claimed));
+        given(reviewNotificationMessageRenderer.render(claimed)).willReturn(new ReviewMessageDto(
+                new ObjectMapper().readTree("[{\"type\":\"section\"}]"),
+                new ObjectMapper().readTree("[{\"blocks\":[{\"type\":\"actions\"}]}]"),
+                "fallback"
+        ));
+
+        Workspace workspace = mock(Workspace.class);
+        given(workspace.getAccessToken()).willReturn("xoxb-test-token");
+        given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.of(workspace));
+
+        // when
+        processor.processPending(10);
+
+        // then
+        verify(reviewNotificationMessageRenderer).render(claimed);
         verify(notificationTransportApiClient).sendBlockMessage(
                 eq("xoxb-test-token"),
                 eq("C1"),

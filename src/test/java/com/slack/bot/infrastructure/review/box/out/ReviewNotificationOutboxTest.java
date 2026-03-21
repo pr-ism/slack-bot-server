@@ -32,6 +32,26 @@ class ReviewNotificationOutboxTest {
     }
 
     @Test
+    void semantic_payload만으로도_outbox를_생성할_수_있다() {
+        // when
+        ReviewNotificationOutbox outbox = ReviewNotificationOutbox.builder()
+                                                                  .idempotencyKey("idempotency")
+                                                                  .projectId(1L)
+                                                                  .teamId("T1")
+                                                                  .channelId("C1")
+                                                                  .payloadJson("{\"repositoryName\":\"repo\"}")
+                                                                  .build();
+
+        // then
+        assertAll(
+                () -> assertThat(outbox.getProjectId()).isEqualTo(1L),
+                () -> assertThat(outbox.getPayloadJson()).isEqualTo("{\"repositoryName\":\"repo\"}"),
+                () -> assertThat(outbox.getBlocksJson()).isNull(),
+                () -> assertThat(outbox.hasSemanticPayload()).isTrue()
+        );
+    }
+
+    @Test
     void idempotencyKey가_null이면_예외를_던진다() {
         // when & then
         assertThatThrownBy(() -> ReviewNotificationOutbox.builder()
@@ -119,7 +139,7 @@ class ReviewNotificationOutboxTest {
                                                          .blocksJson(null)
                                                          .build())
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("blocksJson은 비어 있을 수 없습니다.");
+                .hasMessage("payloadJson 또는 blocksJson 중 하나는 비어 있을 수 없습니다.");
     }
 
     @Test
@@ -132,7 +152,7 @@ class ReviewNotificationOutboxTest {
                                                          .blocksJson(" ")
                                                          .build())
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("blocksJson은 비어 있을 수 없습니다.");
+                .hasMessage("payloadJson 또는 blocksJson 중 하나는 비어 있을 수 없습니다.");
     }
 
     @Test

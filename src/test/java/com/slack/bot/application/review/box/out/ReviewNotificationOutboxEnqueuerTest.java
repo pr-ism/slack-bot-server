@@ -3,13 +3,17 @@ package com.slack.bot.application.review.box.out;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.review.box.ReviewNotificationIdempotencyKeyGenerator;
+import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -18,6 +22,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import static org.mockito.Mockito.doThrow;
 
 @SuppressWarnings("NonAsciiCharacters")
 @ExtendWith(MockitoExtension.class)
@@ -32,13 +38,47 @@ class ReviewNotificationOutboxEnqueuerTest {
     @BeforeEach
     void setUp() {
         enqueuer = new ReviewNotificationOutboxEnqueuer(
+                new ObjectMapper(),
                 reviewNotificationOutboxRepository,
                 new ReviewNotificationIdempotencyKeyGenerator()
         );
     }
 
     @Test
-    void 채널_블록_메시지를_review_outbox에_enqueue한다() throws Exception {
+    void semantic_review_notification을_review_outbox에_enqueue한다() {
+        // given
+        ReviewNotificationPayload payload = new ReviewNotificationPayload(
+                "repo",
+                101L,
+                42,
+                "Fix bug",
+                "https://github.com/pr/1",
+                "author-gh",
+                List.of("reviewer-gh-1"),
+                List.of("reviewer-gh-1")
+        );
+
+        // when
+        enqueuer.enqueueReviewNotification("SOURCE-1", 1L, "T1", "C1", payload);
+
+        // then
+        ArgumentCaptor<ReviewNotificationOutbox> captor = ArgumentCaptor.forClass(ReviewNotificationOutbox.class);
+        verify(reviewNotificationOutboxRepository).enqueue(captor.capture());
+
+        ReviewNotificationOutbox actual = captor.getValue();
+
+        assertAll(
+                () -> assertThat(actual.getProjectId()).isEqualTo(1L),
+                () -> assertThat(actual.getTeamId()).isEqualTo("T1"),
+                () -> assertThat(actual.getChannelId()).isEqualTo("C1"),
+                () -> assertThat(actual.getPayloadJson()).contains("\"repositoryName\":\"repo\""),
+                () -> assertThat(actual.getBlocksJson()).isNull(),
+                () -> assertThat(actual.getIdempotencyKey()).hasSize(64)
+        );
+    }
+
+    @Test
+    void 채널_블록_메시지_snapshot을_review_outbox에_enqueue한다() throws Exception {
         // when
         enqueuer.enqueueChannelBlocks(
                 "SOURCE-1",
@@ -166,5 +206,45 @@ class ReviewNotificationOutboxEnqueuerTest {
                 .hasMessageContaining("blocks");
 
         verify(reviewNotificationOutboxRepository, never()).enqueue(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void semantic_payload가_null이면_예외를_던지고_enqueue하지_않는다() {
+        // when & then
+        assertThatThrownBy(() -> enqueuer.enqueueReviewNotification("SOURCE", 1L, "T1", "C1", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("payload");
+
+        verify(reviewNotificationOutboxRepository, never()).enqueue(any());
+    }
+
+    @Test
+    void semantic_payload_직렬화에_실패하면_예외를_던지고_enqueue하지_않는다() throws Exception {
+        // given
+        ObjectMapper objectMapper = org.mockito.Mockito.mock(ObjectMapper.class);
+        ReviewNotificationOutboxEnqueuer failingEnqueuer = new ReviewNotificationOutboxEnqueuer(
+                objectMapper,
+                reviewNotificationOutboxRepository,
+                new ReviewNotificationIdempotencyKeyGenerator()
+        );
+        ReviewNotificationPayload payload = new ReviewNotificationPayload(
+                "repo",
+                101L,
+                42,
+                "Fix bug",
+                "https://github.com/pr/1",
+                "author-gh",
+                List.of("reviewer-gh-1"),
+                List.of("reviewer-gh-1")
+        );
+        doThrow(new JsonProcessingException("serialize fail") {
+        }).when(objectMapper).writeValueAsString(payload);
+
+        // when & then
+        assertThatThrownBy(() -> failingEnqueuer.enqueueReviewNotification("SOURCE", 1L, "T1", "C1", payload))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("직렬화");
+
+        verify(reviewNotificationOutboxRepository, never()).enqueue(any());
     }
 }

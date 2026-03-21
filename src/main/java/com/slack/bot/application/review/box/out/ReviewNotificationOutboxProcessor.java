@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
 import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
+import com.slack.bot.application.review.dto.ReviewMessageDto;
 import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
@@ -31,6 +32,7 @@ public class ReviewNotificationOutboxProcessor {
 
     private final Clock clock;
     private final ObjectMapper objectMapper;
+    private final ReviewNotificationMessageRenderer reviewNotificationMessageRenderer;
     private final RetryTemplate slackNotificationOutboxRetryTemplate;
     private final WorkspaceRepository workspaceRepository;
     private final BoxFailureReasonTruncator failureReasonTruncator;
@@ -133,13 +135,14 @@ public class ReviewNotificationOutboxProcessor {
 
     private void dispatch(ReviewNotificationOutbox outbox) throws JsonProcessingException {
         String token = resolveToken(outbox.getTeamId());
+        ReviewMessageDto message = renderMessage(outbox);
 
         notificationTransportApiClient.sendBlockMessage(
                 token,
                 outbox.getChannelId(),
-                readBlocks(outbox.getBlocksJson()),
-                readAttachments(outbox.getAttachmentsJson()),
-                outbox.getFallbackText()
+                message.blocks(),
+                message.attachments(),
+                message.fallbackText()
         );
     }
 
@@ -154,6 +157,18 @@ public class ReviewNotificationOutboxProcessor {
 
     private JsonNode readBlocks(String blocksJson) throws JsonProcessingException {
         return objectMapper.readTree(blocksJson);
+    }
+
+    private ReviewMessageDto renderMessage(ReviewNotificationOutbox outbox) throws JsonProcessingException {
+        if (outbox.hasSemanticPayload()) {
+            return reviewNotificationMessageRenderer.render(outbox);
+        }
+
+        return new ReviewMessageDto(
+                readBlocks(outbox.getBlocksJson()),
+                readAttachments(outbox.getAttachmentsJson()),
+                outbox.getFallbackText()
+        );
     }
 
     private JsonNode readAttachments(String attachmentsJson) throws JsonProcessingException {
