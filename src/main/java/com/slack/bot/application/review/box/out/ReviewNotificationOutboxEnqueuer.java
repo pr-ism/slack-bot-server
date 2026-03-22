@@ -18,6 +18,7 @@ public class ReviewNotificationOutboxEnqueuer {
     private final ObjectMapper objectMapper;
     private final ReviewNotificationOutboxRepository reviewNotificationOutboxRepository;
     private final ReviewNotificationIdempotencyKeyGenerator idempotencyKeyGenerator;
+    private final ReviewNotificationOutboxIdempotencyPayloadEncoder idempotencyPayloadEncoder;
 
     public void enqueueReviewNotification(
             String sourceKey,
@@ -28,7 +29,7 @@ public class ReviewNotificationOutboxEnqueuer {
     ) {
         validatePayload(payload);
         String payloadJson = serializePayload(payload);
-        String idempotencyPayload = idempotencyPayload(sourceKey, teamId, channelId);
+        String idempotencyPayload = idempotencyPayloadEncoder.encode(sourceKey, teamId, channelId);
         String idempotencyKey = idempotencyKeyGenerator.generate(
                 ReviewNotificationIdempotencyScope.REVIEW_NOTIFICATION_OUTBOX,
                 idempotencyPayload
@@ -55,7 +56,7 @@ public class ReviewNotificationOutboxEnqueuer {
     ) {
         String normalizedBlocksJson = normalizeBlocks(blocks);
         String normalizedAttachmentsJson = normalizeAttachments(attachments);
-        String idempotencyPayload = idempotencyPayload(sourceKey, teamId, channelId);
+        String idempotencyPayload = idempotencyPayloadEncoder.encode(sourceKey, teamId, channelId);
         String idempotencyKey = idempotencyKeyGenerator.generate(
                 ReviewNotificationIdempotencyScope.REVIEW_NOTIFICATION_OUTBOX,
                 idempotencyPayload
@@ -81,7 +82,7 @@ public class ReviewNotificationOutboxEnqueuer {
             String fallbackText
     ) {
         String normalizedBlocksJson = normalizeBlocks(blocks);
-        String idempotencyPayload = idempotencyPayload(sourceKey, teamId, channelId);
+        String idempotencyPayload = idempotencyPayloadEncoder.encode(sourceKey, teamId, channelId);
         String idempotencyKey = idempotencyKeyGenerator.generate(
                 ReviewNotificationIdempotencyScope.REVIEW_NOTIFICATION_OUTBOX,
                 idempotencyPayload
@@ -129,23 +130,4 @@ public class ReviewNotificationOutboxEnqueuer {
         }
     }
 
-    private String idempotencyPayload(String sourceKey, String teamId, String channelId) {
-        return "source=" + encodeComponent(sourceKey)
-                + "|teamId=" + encodeComponent(teamId)
-                + "|channelId=" + encodeComponent(channelId);
-    }
-
-    private String encodeComponent(String value) {
-        String normalized = nullToEmpty(value);
-
-        return normalized.length() + "#" + normalized;
-    }
-
-    private String nullToEmpty(String value) {
-        if (value == null) {
-            return "";
-        }
-
-        return value;
-    }
 }

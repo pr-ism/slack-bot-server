@@ -40,7 +40,8 @@ class ReviewNotificationOutboxEnqueuerTest {
         enqueuer = new ReviewNotificationOutboxEnqueuer(
                 new ObjectMapper(),
                 reviewNotificationOutboxRepository,
-                new ReviewNotificationIdempotencyKeyGenerator()
+                new ReviewNotificationIdempotencyKeyGenerator(),
+                new ReviewNotificationOutboxIdempotencyPayloadEncoder(new ObjectMapper())
         );
     }
 
@@ -225,7 +226,8 @@ class ReviewNotificationOutboxEnqueuerTest {
         ReviewNotificationOutboxEnqueuer failingEnqueuer = new ReviewNotificationOutboxEnqueuer(
                 objectMapper,
                 reviewNotificationOutboxRepository,
-                new ReviewNotificationIdempotencyKeyGenerator()
+                new ReviewNotificationIdempotencyKeyGenerator(),
+                new ReviewNotificationOutboxIdempotencyPayloadEncoder(objectMapper)
         );
         ReviewNotificationPayload payload = new ReviewNotificationPayload(
                 "repo",
@@ -246,5 +248,31 @@ class ReviewNotificationOutboxEnqueuerTest {
                 .hasMessageContaining("직렬화");
 
         verify(reviewNotificationOutboxRepository, never()).enqueue(any());
+    }
+
+    @Test
+    void 의미있는_outbox_입력이_달라지면_다른_멱등키로_enqueue한다() throws Exception {
+        // when
+        enqueuer.enqueueChannelBlocks(
+                "SOURCE-1",
+                "T1",
+                "C1",
+                new ObjectMapper().readTree("[]"),
+                "fallback"
+        );
+        enqueuer.enqueueChannelBlocks(
+                "SOURCE-2",
+                "T1",
+                "C1",
+                new ObjectMapper().readTree("[]"),
+                "fallback"
+        );
+
+        // then
+        ArgumentCaptor<ReviewNotificationOutbox> captor = ArgumentCaptor.forClass(ReviewNotificationOutbox.class);
+        verify(reviewNotificationOutboxRepository, org.mockito.Mockito.times(2)).enqueue(captor.capture());
+
+        assertThat(captor.getAllValues().get(0).getIdempotencyKey())
+                .isNotEqualTo(captor.getAllValues().get(1).getIdempotencyKey());
     }
 }
