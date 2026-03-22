@@ -38,6 +38,7 @@ import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.ResourceAccessException;
 
 @IntegrationTest
@@ -192,7 +193,7 @@ class ReviewRequestInboxProcessorTest {
                 objectMapper.writeValueAsString(request),
                 Instant.now().minusSeconds(120)
         );
-        inbox.markProcessing(Instant.now().minusSeconds(120));
+        setProcessingState(inbox, Instant.now().minusSeconds(120), 1);
         ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
 
         // when
@@ -223,9 +224,9 @@ class ReviewRequestInboxProcessorTest {
                 objectMapper.writeValueAsString(request),
                 Instant.now().minusSeconds(120)
         );
-        inbox.markProcessing(Instant.now().minusSeconds(120));
+        setProcessingState(inbox, Instant.now().minusSeconds(120), 1);
         inbox.markRetryPending(Instant.now().minusSeconds(110), "first timeout failure");
-        inbox.markProcessing(Instant.now().minusSeconds(100));
+        setProcessingState(inbox, Instant.now().minusSeconds(100), 2);
         ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
 
         // when
@@ -418,7 +419,7 @@ class ReviewRequestInboxProcessorTest {
                 objectMapper.writeValueAsString(request),
                 Instant.now().minusSeconds(60)
         );
-        inbox.markProcessing(Instant.now().minusSeconds(55));
+        setProcessingState(inbox, Instant.now().minusSeconds(55), 1);
         inbox.markRetryPending(Instant.now().minusSeconds(50), "first failure");
         ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
 
@@ -516,6 +517,15 @@ class ReviewRequestInboxProcessorTest {
                 List.of("reviewer-gh-1"),
                 reviewRoundKey
         );
+    }
+
+    private void setProcessingState(ReviewRequestInbox inbox, Instant processingStartedAt, int processingAttempt) {
+        ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
+        ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
+        ReflectionTestUtils.setField(inbox, "failedAt", null);
+        ReflectionTestUtils.setField(inbox, "failureReason", null);
+        ReflectionTestUtils.setField(inbox, "failureType", null);
     }
 
     @Test

@@ -12,6 +12,7 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @IntegrationTest
 @SuppressWarnings("NonAsciiCharacters")
@@ -36,7 +37,7 @@ class ReviewRequestInboxRepositoryAdapterTest {
                 "{\"pullRequestTitle\":\"old\"}",
                 oldAvailableAt
         );
-        inbox.markProcessing(processingStartedAt);
+        setProcessingState(inbox, processingStartedAt, 1);
         ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
 
         // when
@@ -70,7 +71,7 @@ class ReviewRequestInboxRepositoryAdapterTest {
                 "{\"pullRequestTitle\":\"old\"}",
                 Instant.parse("2026-02-24T00:00:00Z")
         );
-        inbox.markProcessing(Instant.parse("2026-02-24T00:01:00Z"));
+        setProcessingState(inbox, Instant.parse("2026-02-24T00:01:00Z"), 1);
         inbox.markRetryPending(Instant.parse("2026-02-24T00:02:00Z"), "temporary failure");
         ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
 
@@ -96,5 +97,14 @@ class ReviewRequestInboxRepositoryAdapterTest {
                 () -> assertThat(actual.getRequestJson()).isEqualTo("{\"pullRequestTitle\":\"new\"}"),
                 () -> assertThat(actual.getAvailableAt()).isEqualTo(newAvailableAt)
         );
+    }
+
+    private void setProcessingState(ReviewRequestInbox inbox, Instant processingStartedAt, int processingAttempt) {
+        ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
+        ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
+        ReflectionTestUtils.setField(inbox, "failedAt", null);
+        ReflectionTestUtils.setField(inbox, "failureReason", null);
+        ReflectionTestUtils.setField(inbox, "failureType", null);
     }
 }
