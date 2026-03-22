@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
 import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
+import com.slack.bot.application.review.box.ReviewNotificationIdempotencyKeyGenerator;
+import com.slack.bot.application.review.box.ReviewNotificationIdempotencyScope;
 import com.slack.bot.application.review.ReviewNotificationService;
 import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
 import com.slack.bot.application.review.dto.ReviewNotificationPayload;
@@ -37,35 +39,20 @@ public class ReviewRequestInboxProcessor {
     private final InteractionRetryProperties interactionRetryProperties;
     private final ReviewRequestInboxRepository reviewRequestInboxRepository;
     private final InteractionRetryExceptionClassifier retryExceptionClassifier;
+    private final ReviewRequestInboxIdempotencyPayloadEncoder idempotencyPayloadEncoder;
+    private final ReviewNotificationIdempotencyKeyGenerator idempotencyKeyGenerator;
 
     public void enqueue(String apiKey, ReviewNotificationPayload request, long batchWindowMillis) {
-        String coalescingKey = buildCoalescingKey(apiKey, request);
-        enqueue(apiKey, request, batchWindowMillis, coalescingKey);
-    }
-
-    public void enqueue(
-            String apiKey,
-            ReviewNotificationPayload request,
-            long batchWindowMillis,
-            String coalescingKey
-    ) {
         validateBatchWindowMillis(batchWindowMillis);
         if (request == null) {
             throw new IllegalArgumentException("request는 비어 있을 수 없습니다.");
         }
 
         validateApiKeyAndGithubPullRequestId(apiKey, request.githubPullRequestId());
-        validateCoalescingKey(coalescingKey);
         String requestJson = serializeRequest(request);
-        Instant availableAt = clock.instant().plusMillis(batchWindowMillis);
+        String coalescingKey = buildCoalescingKey(apiKey, request);
 
-        reviewRequestInboxRepository.upsertPending(
-                coalescingKey,
-                apiKey,
-                request.githubPullRequestId(),
-                requestJson,
-                availableAt
-        );
+        enqueuePending(apiKey, request.githubPullRequestId(), requestJson, batchWindowMillis, coalescingKey);
     }
 
     public void processPending(int limit) {
@@ -164,17 +151,6 @@ public class ReviewRequestInboxProcessor {
         inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.RETRY_EXHAUSTED);
     }
 
-    private String buildCoalescingKey(String apiKey, ReviewNotificationPayload request) {
-        if (request == null) {
-            throw new IllegalArgumentException("request는 비어 있을 수 없습니다.");
-        }
-
-        Long githubPullRequestId = request.githubPullRequestId();
-        validateApiKeyAndGithubPullRequestId(apiKey, githubPullRequestId);
-
-        return apiKey + ":" + githubPullRequestId;
-    }
-
     private void validateApiKeyAndGithubPullRequestId(String apiKey, Long githubPullRequestId) {
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalArgumentException("apiKey는 비어 있을 수 없습니다.");
@@ -184,10 +160,31 @@ public class ReviewRequestInboxProcessor {
         }
     }
 
-    private void validateCoalescingKey(String coalescingKey) {
-        if (coalescingKey == null || coalescingKey.isBlank()) {
-            throw new IllegalArgumentException("coalescingKey는 비어 있을 수 없습니다.");
-        }
+    private String buildCoalescingKey(String apiKey, ReviewNotificationPayload request) {
+        String idempotencyPayload = idempotencyPayloadEncoder.encode(apiKey, request);
+
+        return idempotencyKeyGenerator.generate(
+                ReviewNotificationIdempotencyScope.REVIEW_REQUEST_INBOX,
+                idempotencyPayload
+        );
+    }
+
+    private void enqueuePending(
+            String apiKey,
+            Long githubPullRequestId,
+            String requestJson,
+            long batchWindowMillis,
+            String coalescingKey
+    ) {
+        Instant availableAt = clock.instant().plusMillis(batchWindowMillis);
+
+        reviewRequestInboxRepository.upsertPending(
+                coalescingKey,
+                apiKey,
+                githubPullRequestId,
+                requestJson,
+                availableAt
+        );
     }
 
     private String serializeRequest(ReviewNotificationPayload request) {

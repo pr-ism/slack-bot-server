@@ -44,14 +44,10 @@ public class InMemoryReviewEventBatch implements ReviewEventBatch {
 
         ReviewNotificationPayload requestForNotification = ReviewNotificationPayload.of(
                 request,
-                roundResult.reviewersToMention()
-        );
-        reviewRequestInboxProcessor.enqueue(
-                apiKey,
-                requestForNotification,
-                batchWindowMillis,
+                roundResult.reviewersToMention(),
                 roundResult.coalescingKey()
         );
+        reviewRequestInboxProcessor.enqueue(apiKey, requestForNotification, batchWindowMillis);
         scheduleFlush(roundResult.coalescingKey());
     }
 
