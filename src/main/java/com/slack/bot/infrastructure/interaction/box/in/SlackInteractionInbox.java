@@ -90,18 +90,6 @@ public class SlackInteractionInbox extends BaseTimeEntity {
         this.processingAttempt = processingAttempt;
     }
 
-    public void markProcessing(Instant processingStartedAt) {
-        validateProcessingStartedAt(processingStartedAt);
-        validateProcessingTransition();
-
-        this.status = SlackInteractionInboxStatus.PROCESSING;
-        this.processingAttempt += 1;
-        this.processingStartedAt = processingStartedAt;
-        this.failureReason = null;
-        this.failureType = null;
-        this.failedAt = null;
-    }
-
     public void markProcessed(Instant processedAt) {
         validateProcessedAt(processedAt);
         validateTransition(SlackInteractionInboxStatus.PROCESSING, "PROCESSED");
@@ -143,12 +131,6 @@ public class SlackInteractionInbox extends BaseTimeEntity {
         this.failureType = failureType;
     }
 
-    private void validateProcessingStartedAt(Instant processingStartedAt) {
-        if (processingStartedAt == null) {
-            throw new IllegalArgumentException("processingStartedAt은 비어 있을 수 없습니다.");
-        }
-    }
-
     private void validateProcessedAt(Instant processedAt) {
         if (processedAt == null) {
             throw new IllegalArgumentException("processedAt은 비어 있을 수 없습니다.");
@@ -171,17 +153,6 @@ public class SlackInteractionInbox extends BaseTimeEntity {
         if (failureType == null) {
             throw new IllegalArgumentException("failureType은 비어 있을 수 없습니다.");
         }
-    }
-
-    private void validateProcessingTransition() {
-        if (this.status == SlackInteractionInboxStatus.PENDING
-                || this.status == SlackInteractionInboxStatus.RETRY_PENDING) {
-            return;
-        }
-
-        throw new IllegalStateException(
-                "PROCESSING 전이는 PENDING 또는 RETRY_PENDING 상태에서만 가능합니다. 현재: " + this.status
-        );
     }
 
     private void validateTransition(SlackInteractionInboxStatus expectedStatus, String targetStatus) {
