@@ -28,6 +28,7 @@ import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @IntegrationTest
 @SuppressWarnings("NonAsciiCharacters")
@@ -165,9 +166,9 @@ class SlackNotificationOutboxProcessorTest {
                                                                        .text("hello-timeout-poison-pill")
                                                                        .build();
         Instant base = clock.instant();
-        timeoutOutbox.markProcessing(base.minusSeconds(120));
+        setProcessingState(timeoutOutbox, base.minusSeconds(120), 1);
         timeoutOutbox.markRetryPending(base.minusSeconds(110), "first failure");
-        timeoutOutbox.markProcessing(base.minusSeconds(100));
+        setProcessingState(timeoutOutbox, base.minusSeconds(100), 2);
         SlackNotificationOutbox saved = slackNotificationOutboxRepository.save(timeoutOutbox);
 
         // when
@@ -293,5 +294,18 @@ class SlackNotificationOutboxProcessorTest {
                     () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT)
             );
         });
+    }
+
+    private void setProcessingState(
+            SlackNotificationOutbox outbox,
+            Instant processingStartedAt,
+            int processingAttempt
+    ) {
+        ReflectionTestUtils.setField(outbox, "status", SlackNotificationOutboxStatus.PROCESSING);
+        ReflectionTestUtils.setField(outbox, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
+        ReflectionTestUtils.setField(outbox, "failedAt", null);
+        ReflectionTestUtils.setField(outbox, "failureReason", null);
+        ReflectionTestUtils.setField(outbox, "failureType", null);
     }
 }
