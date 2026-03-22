@@ -9,6 +9,7 @@ import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
@@ -156,74 +157,10 @@ class ReviewNotificationOutboxTest {
     }
 
     @Test
-    void markProcessing을_호출하면_PROCESSING_상태로_변경되고_시도횟수가_증가한다() {
-        // given
-        ReviewNotificationOutbox outbox = pendingOutbox();
-
-        // when
-        Instant processingStartedAt = Instant.parse("2026-02-24T00:00:00Z");
-        outbox.markProcessing(processingStartedAt);
-
-        // then
-        assertAll(
-                () -> assertThat(outbox.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.PROCESSING),
-                () -> assertThat(outbox.getProcessingStartedAt()).isEqualTo(processingStartedAt),
-                () -> assertThat(outbox.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(outbox.getFailedAt()).isNull(),
-                () -> assertThat(outbox.getFailureReason()).isNull(),
-                () -> assertThat(outbox.getFailureType()).isNull()
-        );
-    }
-
-    @Test
-    void markProcessing은_RETRY_PENDING에서_재진입하면_이전_실패정보를_초기화한다() {
-        // given
-        ReviewNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-24T00:00:00Z"));
-        outbox.markRetryPending(Instant.parse("2026-02-24T00:01:00Z"), "retry");
-
-        // when
-        outbox.markProcessing(Instant.parse("2026-02-24T00:02:00Z"));
-
-        // then
-        assertAll(
-                () -> assertThat(outbox.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.PROCESSING),
-                () -> assertThat(outbox.getProcessingAttempt()).isEqualTo(2),
-                () -> assertThat(outbox.getFailedAt()).isNull(),
-                () -> assertThat(outbox.getFailureReason()).isNull(),
-                () -> assertThat(outbox.getFailureType()).isNull()
-        );
-    }
-
-    @Test
-    void markProcessing은_processingStartedAt이_null이면_예외를_던진다() {
-        // given
-        ReviewNotificationOutbox outbox = pendingOutbox();
-
-        // when & then
-        assertThatThrownBy(() -> outbox.markProcessing(null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("processingStartedAt은 비어 있을 수 없습니다.");
-    }
-
-    @Test
-    void markProcessing은_PENDING이나_RETRY_PENDING이_아니면_예외를_던진다() {
-        // given
-        ReviewNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-24T00:00:00Z"));
-        outbox.markSent(Instant.parse("2026-02-24T00:01:00Z"));
-
-        // when & then
-        assertThatThrownBy(() -> outbox.markProcessing(Instant.parse("2026-02-24T00:02:00Z")))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("PROCESSING 전이는 PENDING 또는 RETRY_PENDING 상태에서만 가능합니다.");
-    }
-
-    @Test
     void markSent를_호출하면_SENT_상태와_전송시각이_저장된다() {
         // given
         ReviewNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-24T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
 
         // when
         Instant sentAt = Instant.parse("2026-02-24T00:03:00Z");
@@ -243,7 +180,7 @@ class ReviewNotificationOutboxTest {
     void markSent는_sentAt이_null이면_예외를_던진다() {
         // given
         ReviewNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-24T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
 
         // when & then
         assertThatThrownBy(() -> outbox.markSent(null))
@@ -266,7 +203,7 @@ class ReviewNotificationOutboxTest {
     void markRetryPending을_호출하면_RETRY_PENDING_상태와_실패정보가_저장된다() {
         // given
         ReviewNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-24T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
 
         // when
         Instant failedAt = Instant.parse("2026-02-24T00:04:00Z");
@@ -286,7 +223,7 @@ class ReviewNotificationOutboxTest {
     void markRetryPending은_failedAt이_null이면_예외를_던진다() {
         // given
         ReviewNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-24T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
 
         // when & then
         assertThatThrownBy(() -> outbox.markRetryPending(null, "retry"))
@@ -298,7 +235,7 @@ class ReviewNotificationOutboxTest {
     void markRetryPending은_failureReason이_null이면_예외를_던진다() {
         // given
         ReviewNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-24T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
 
         // when & then
         assertThatThrownBy(() -> outbox.markRetryPending(Instant.parse("2026-02-24T00:04:00Z"), null))
@@ -310,7 +247,7 @@ class ReviewNotificationOutboxTest {
     void markRetryPending은_failureReason이_공백이면_예외를_던진다() {
         // given
         ReviewNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-24T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
 
         // when & then
         assertThatThrownBy(() -> outbox.markRetryPending(Instant.parse("2026-02-24T00:04:00Z"), " "))
@@ -333,7 +270,7 @@ class ReviewNotificationOutboxTest {
     void markFailed를_호출하면_FAILED_상태와_실패정보가_저장된다() {
         // given
         ReviewNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-24T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
 
         // when
         Instant failedAt = Instant.parse("2026-02-24T00:05:00Z");
@@ -353,7 +290,7 @@ class ReviewNotificationOutboxTest {
     void markFailed는_failedAt이_null이면_예외를_던진다() {
         // given
         ReviewNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-24T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
 
         // when & then
         assertThatThrownBy(() -> outbox.markFailed(null, "failure", SlackInteractionFailureType.RETRY_EXHAUSTED))
@@ -365,7 +302,7 @@ class ReviewNotificationOutboxTest {
     void markFailed는_failureReason이_null이면_예외를_던진다() {
         // given
         ReviewNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-24T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
 
         // when & then
         assertThatThrownBy(
@@ -383,7 +320,7 @@ class ReviewNotificationOutboxTest {
     void markFailed는_failureReason이_공백이면_예외를_던진다() {
         // given
         ReviewNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-24T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
 
         // when & then
         assertThatThrownBy(
@@ -401,7 +338,7 @@ class ReviewNotificationOutboxTest {
     void markFailed는_failureType이_null이면_예외를_던진다() {
         // given
         ReviewNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-24T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
 
         // when & then
         assertThatThrownBy(
@@ -440,5 +377,18 @@ class ReviewNotificationOutboxTest {
                                        .blocksJson("[{\"type\":\"section\"}]")
                                        .fallbackText("fallback")
                                        .build();
+    }
+
+    private void setProcessingState(
+            ReviewNotificationOutbox outbox,
+            Instant processingStartedAt,
+            int processingAttempt
+    ) {
+        ReflectionTestUtils.setField(outbox, "status", ReviewNotificationOutboxStatus.PROCESSING);
+        ReflectionTestUtils.setField(outbox, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
+        ReflectionTestUtils.setField(outbox, "failedAt", null);
+        ReflectionTestUtils.setField(outbox, "failureReason", null);
+        ReflectionTestUtils.setField(outbox, "failureType", null);
     }
 }

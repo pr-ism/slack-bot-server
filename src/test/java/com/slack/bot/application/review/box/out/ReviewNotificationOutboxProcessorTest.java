@@ -25,6 +25,7 @@ import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
+import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxStatus;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -41,6 +42,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.retry.backoff.ExponentialBackOffPolicy;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.ResourceAccessException;
 
 @SuppressWarnings("NonAsciiCharacters")
@@ -470,7 +472,7 @@ class ReviewNotificationOutboxProcessorTest {
                                                                                "reviewersToMention":["reviewer-gh-1"]}
                                                                                """)
                                                                        .build());
-        claimed.markProcessing(Instant.parse("2026-02-23T23:58:00Z"));
+        setProcessingState(claimed, Instant.parse("2026-02-23T23:58:00Z"), 1);
         given(reviewNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(pending));
         given(reviewNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
         given(reviewNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(claimed));
@@ -516,13 +518,26 @@ class ReviewNotificationOutboxProcessorTest {
                                                                   .fallbackText("fallback")
                                                                   .build();
         Instant base = Instant.parse("2026-02-24T00:00:00Z");
-        outbox.markProcessing(base.minusSeconds(120));
+        setProcessingState(outbox, base.minusSeconds(120), 1);
 
         for (int attempt = 1; attempt < processingAttempt; attempt++) {
             outbox.markRetryPending(base.minusSeconds(110 - attempt), "retry failure");
-            outbox.markProcessing(base.minusSeconds(100 - attempt));
+            setProcessingState(outbox, base.minusSeconds(100 - attempt), attempt + 1);
         }
 
         return spy(outbox);
+    }
+
+    private void setProcessingState(
+            ReviewNotificationOutbox outbox,
+            Instant processingStartedAt,
+            int processingAttempt
+    ) {
+        ReflectionTestUtils.setField(outbox, "status", ReviewNotificationOutboxStatus.PROCESSING);
+        ReflectionTestUtils.setField(outbox, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
+        ReflectionTestUtils.setField(outbox, "failedAt", null);
+        ReflectionTestUtils.setField(outbox, "failureReason", null);
+        ReflectionTestUtils.setField(outbox, "failureType", null);
     }
 }

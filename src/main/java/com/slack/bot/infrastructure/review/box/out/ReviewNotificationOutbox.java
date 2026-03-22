@@ -79,18 +79,6 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
         this.processingAttempt = 0;
     }
 
-    public void markProcessing(Instant processingStartedAt) {
-        validateProcessingStartedAt(processingStartedAt);
-        validateProcessingTransition();
-
-        this.status = ReviewNotificationOutboxStatus.PROCESSING;
-        this.processingStartedAt = processingStartedAt;
-        this.processingAttempt += 1;
-        this.failedAt = null;
-        this.failureReason = null;
-        this.failureType = null;
-    }
-
     public void markSent(Instant sentAt) {
         validateSentAt(sentAt);
         validateTransition(ReviewNotificationOutboxStatus.PROCESSING, "SENT");
@@ -125,16 +113,6 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = failureType;
-    }
-
-    private void validateProcessingTransition() {
-        if (status == ReviewNotificationOutboxStatus.PENDING || status == ReviewNotificationOutboxStatus.RETRY_PENDING) {
-            return;
-        }
-
-        throw new IllegalStateException(
-                "PROCESSING 전이는 PENDING 또는 RETRY_PENDING 상태에서만 가능합니다. 현재: " + status
-        );
     }
 
     private void validateTransition(ReviewNotificationOutboxStatus expectedStatus, String targetStatus) {
@@ -188,12 +166,6 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
 
     public boolean hasSemanticPayload() {
         return payloadJson != null && !payloadJson.isBlank();
-    }
-
-    private void validateProcessingStartedAt(Instant processingStartedAt) {
-        if (processingStartedAt == null) {
-            throw new IllegalArgumentException("processingStartedAt은 비어 있을 수 없습니다.");
-        }
     }
 
     private void validateSentAt(Instant sentAt) {
