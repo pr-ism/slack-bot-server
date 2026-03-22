@@ -26,6 +26,8 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
 
     private String blocksJson;
 
+    private String attachmentsJson;
+
     private String fallbackText;
 
     @Enumerated(EnumType.STRING)
@@ -50,6 +52,7 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
             String teamId,
             String channelId,
             String blocksJson,
+            String attachmentsJson,
             String fallbackText
     ) {
         validateIdempotencyKey(idempotencyKey);
@@ -61,6 +64,7 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
         this.teamId = teamId;
         this.channelId = channelId;
         this.blocksJson = blocksJson;
+        this.attachmentsJson = attachmentsJson;
         this.fallbackText = fallbackText;
         this.status = ReviewNotificationOutboxStatus.PENDING;
         this.processingAttempt = 0;

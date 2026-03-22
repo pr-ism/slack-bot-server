@@ -22,6 +22,7 @@ import com.slack.bot.global.config.properties.AppProperties;
 import com.slack.bot.global.config.properties.ClaimMappingMessageProperties;
 import com.slack.bot.global.config.properties.CommandMessageProperties;
 import com.slack.bot.global.config.properties.EventMessageProperties;
+import com.slack.bot.global.config.properties.ReviewWorkerProperties;
 import com.slack.bot.global.config.properties.ReviewReminderMessageProperties;
 import com.slack.bot.global.config.properties.ReviewReservationTimeOptionsProperties;
 import com.slack.bot.global.config.properties.SlackEventAsyncProperties;
@@ -47,7 +48,7 @@ import org.springframework.web.client.RestClient;
 @EnableConfigurationProperties({
         SlackProperties.class, AccessLinkKeyProperties.class, CommandMessageProperties.class, AppProperties.class,
         SlackEventAsyncProperties.class, EventMessageProperties.class, ReviewReminderMessageProperties.class,
-        ReviewReservationTimeOptionsProperties.class, ClaimMappingMessageProperties.class
+        ReviewReservationTimeOptionsProperties.class, ClaimMappingMessageProperties.class, ReviewWorkerProperties.class
 })
 public class AppConfig {
 

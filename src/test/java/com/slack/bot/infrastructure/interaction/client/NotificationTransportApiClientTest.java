@@ -367,6 +367,64 @@ class NotificationTransportApiClientTest {
     }
 
     @Test
+    void 블록_메시지를_attachments와_함께_전송한다() throws Exception {
+        // given
+        String token = "xoxb-token";
+        String channelId = "C123";
+        ArrayNode blocks = sectionBlocks();
+        JsonNode attachments = new ObjectMapper().readTree("""
+                [
+                  {
+                    "color": "#6366F1",
+                    "blocks": [
+                      {
+                        "type": "actions"
+                      }
+                    ]
+                  }
+                ]
+                """);
+        String text = "fallback text";
+
+        String requestBody = """
+                {
+                  "channel": "C123",
+                  "blocks": [
+                    {
+                      "type": "section"
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "color": "#6366F1",
+                      "blocks": [
+                        {
+                          "type": "actions"
+                        }
+                      ]
+                    }
+                  ],
+                  "text": "fallback text"
+                }
+                """;
+        String responseBody = """
+                {
+                  "ok": true
+                }
+                """;
+
+        mockServer.expect(requestTo("https://slack.com/api/chat.postMessage"))
+                  .andExpect(method(POST))
+                  .andExpect(header("Authorization", "Bearer " + token))
+                  .andExpect(content().json(requestBody))
+                  .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
+
+        // when & then
+        assertDoesNotThrow(() -> notificationApiClient.sendBlockMessage(token, channelId, blocks, attachments, text));
+        mockServer.verify();
+    }
+
+    @Test
     void DM_채널을_연다() {
         // given
         String token = "xoxb-token";

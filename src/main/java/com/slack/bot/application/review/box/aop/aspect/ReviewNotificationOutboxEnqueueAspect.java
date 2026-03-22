@@ -1,8 +1,6 @@
 package com.slack.bot.application.review.box.aop.aspect;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
 import com.slack.bot.application.review.box.out.ReviewNotificationOutboxEnqueuer;
 import com.slack.bot.domain.workspace.Workspace;
@@ -18,7 +16,6 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ReviewNotificationOutboxEnqueueAspect {
 
-    private final ObjectMapper objectMapper;
     private final WorkspaceRepository workspaceRepository;
     private final ReviewNotificationOutboxEnqueuer reviewNotificationOutboxEnqueuer;
     private final ReviewNotificationSourceContext reviewNotificationSourceContext;
@@ -37,13 +34,13 @@ public class ReviewNotificationOutboxEnqueueAspect {
     ) {
         String sourceKey = reviewNotificationSourceContext.requireSourceKey();
         String teamId = resolveTeamId(token);
-        JsonNode mergedBlocks = mergeBlocks(blocks, attachments);
 
         reviewNotificationOutboxEnqueuer.enqueueChannelBlocks(
                 sourceKey,
                 teamId,
                 channelId,
-                mergedBlocks,
+                blocks,
+                attachments,
                 fallbackText
         );
 
@@ -57,34 +54,5 @@ public class ReviewNotificationOutboxEnqueueAspect {
                                                  ));
 
         return workspace.getTeamId();
-    }
-
-    private JsonNode mergeBlocks(JsonNode topBlocks, JsonNode attachments) {
-        ArrayNode merged = objectMapper.createArrayNode();
-
-        appendBlocks(merged, topBlocks);
-        appendAttachmentBlocks(merged, attachments);
-
-        return merged;
-    }
-
-    private void appendBlocks(ArrayNode merged, JsonNode blocks) {
-        if (blocks == null || !blocks.isArray()) {
-            return;
-        }
-
-        for (JsonNode block : blocks) {
-            merged.add(block);
-        }
-    }
-
-    private void appendAttachmentBlocks(ArrayNode merged, JsonNode attachments) {
-        if (attachments == null || !attachments.isArray()) {
-            return;
-        }
-
-        for (JsonNode attachment : attachments) {
-            appendBlocks(merged, attachment.path("blocks"));
-        }
     }
 }

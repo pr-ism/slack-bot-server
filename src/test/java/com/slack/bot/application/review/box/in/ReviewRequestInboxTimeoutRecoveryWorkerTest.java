@@ -16,43 +16,42 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SuppressWarnings("NonAsciiCharacters")
 @ExtendWith(MockitoExtension.class)
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
-class ReviewRequestInboxWorkerTest {
+class ReviewRequestInboxTimeoutRecoveryWorkerTest {
 
     @Mock
     ReviewRequestInboxProcessor reviewRequestInboxProcessor;
 
-    ReviewRequestInboxWorker reviewRequestInboxWorker;
+    ReviewRequestInboxTimeoutRecoveryWorker worker;
 
     @BeforeEach
     void setUp() {
-        reviewRequestInboxWorker = new ReviewRequestInboxWorker(reviewRequestInboxProcessor, 30);
+        worker = new ReviewRequestInboxTimeoutRecoveryWorker(reviewRequestInboxProcessor, 60_000L);
     }
 
     @Test
-    void worker는_pending을_처리한다() {
+    void timeout_recovery를_실행한다() {
         // when
-        reviewRequestInboxWorker.processPendingReviewRequestInbox();
+        worker.recoverTimeoutReviewRequestInbox();
 
         // then
-        verify(reviewRequestInboxProcessor).processPending(30);
+        verify(reviewRequestInboxProcessor).recoverTimeoutProcessing(60_000L);
     }
 
     @Test
-    void worker_실행중_예외가_발생해도_전파하지_않는다() {
+    void timeout_recovery_실행중_예외가_발생해도_전파하지_않는다() {
         // given
         willThrow(new RuntimeException("worker failure"))
                 .given(reviewRequestInboxProcessor)
-                .processPending(30);
+                .recoverTimeoutProcessing(60_000L);
 
         // when & then
-        assertThatCode(() -> reviewRequestInboxWorker.processPendingReviewRequestInbox())
-                .doesNotThrowAnyException();
+        assertThatCode(() -> worker.recoverTimeoutReviewRequestInbox()).doesNotThrowAnyException();
     }
 
     @Test
-    void batchSize가_0이하면_생성자에서_예외가_발생한다() {
-        assertThatThrownBy(() -> new ReviewRequestInboxWorker(reviewRequestInboxProcessor, 0))
+    void processingTimeoutMs가_0이하면_생성자에서_예외가_발생한다() {
+        assertThatThrownBy(() -> new ReviewRequestInboxTimeoutRecoveryWorker(reviewRequestInboxProcessor, 0))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("batchSize는 0보다 커야 합니다.");
+                .hasMessage("processingTimeoutMs는 0보다 커야 합니다.");
     }
 }

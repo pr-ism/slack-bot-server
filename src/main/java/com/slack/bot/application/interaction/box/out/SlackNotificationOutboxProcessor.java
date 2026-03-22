@@ -44,8 +44,6 @@ public class SlackNotificationOutboxProcessor {
     private final InteractionRetryExceptionClassifier retryExceptionClassifier;
 
     public void processPending(int limit) {
-        recoverTimeoutProcessing();
-
         List<SlackNotificationOutbox> pendings = slackNotificationOutboxRepository.findClaimable(limit);
 
         for (SlackNotificationOutbox pending : pendings) {
@@ -53,7 +51,7 @@ public class SlackNotificationOutboxProcessor {
         }
     }
 
-    private void recoverTimeoutProcessing() {
+    public int recoverTimeoutProcessing() {
         Instant now = clock.instant();
         int recoveredCount = slackNotificationOutboxRepository.recoverTimeoutProcessing(
                 now.minusMillis(interactionWorkerProperties.outbox().processingTimeoutMs()),
@@ -65,6 +63,8 @@ public class SlackNotificationOutboxProcessor {
         if (recoveredCount > 0) {
             log.warn("outbox PROCESSING 고착 건을 복구했습니다. count={}", recoveredCount);
         }
+
+        return recoveredCount;
     }
 
     private void processPending(SlackNotificationOutbox pending) {

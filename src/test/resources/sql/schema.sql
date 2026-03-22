@@ -212,6 +212,7 @@ CREATE TABLE IF NOT EXISTS review_notification_outbox (
     team_id VARCHAR(255) NOT NULL,
     channel_id VARCHAR(255) NOT NULL,
     blocks_json CLOB NOT NULL,
+    attachments_json CLOB,
     fallback_text VARCHAR(500),
     status VARCHAR(20) NOT NULL,
     processing_attempt INT NOT NULL,

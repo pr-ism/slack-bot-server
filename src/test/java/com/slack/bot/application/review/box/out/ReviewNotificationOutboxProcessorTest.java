@@ -10,6 +10,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -36,8 +37,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
 import org.springframework.retry.backoff.ExponentialBackOffPolicy;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
@@ -45,7 +44,6 @@ import org.springframework.web.client.ResourceAccessException;
 
 @SuppressWarnings("NonAsciiCharacters")
 @ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class ReviewNotificationOutboxProcessorTest {
 
@@ -65,8 +63,8 @@ class ReviewNotificationOutboxProcessorTest {
     @BeforeEach
     void setUp() {
         InteractionRetryProperties retryProperties = new InteractionRetryProperties(
-                new InteractionRetryProperties.Retry(2, 100, 2.0, 1_000),
-                new InteractionRetryProperties.Retry(2, 100, 2.0, 1_000)
+                new InteractionRetryProperties.InboxRetryProperties(2, 100, 2.0, 1_000),
+                new InteractionRetryProperties.OutboxRetryProperties(2, 100, 2.0, 1_000)
         );
         classifier = InteractionRetryExceptionClassifier.create();
 
@@ -108,18 +106,22 @@ class ReviewNotificationOutboxProcessorTest {
 
     @Test
     void processingTimeout이_0이하면_예외가_발생한다() {
-        assertThatThrownBy(() -> processor.processPending(10, 0L))
+        assertThatThrownBy(() -> processor.recoverTimeoutProcessing(0L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("processingTimeoutMs");
+    }
+
+    @Test
+    void processingTimeout이_음수이면_예외가_발생한다() {
+        assertThatThrownBy(() -> processor.recoverTimeoutProcessing(-1L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("processingTimeoutMs");
     }
 
     @Test
     void processing_timeout_복구시_maxAttempts를_전달한다() {
-        // given
-        given(reviewNotificationOutboxRepository.findClaimable(10)).willReturn(List.of());
-
         // when
-        processor.processPending(10, 60_000L);
+        processor.recoverTimeoutProcessing(60_000L);
 
         // then
         verify(reviewNotificationOutboxRepository).recoverTimeoutProcessing(
@@ -139,7 +141,7 @@ class ReviewNotificationOutboxProcessorTest {
         given(reviewNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(false);
 
         // when
-        processor.processPending(10, 60_000L);
+        processor.processPending(10);
 
         // then
         verify(reviewNotificationOutboxRepository, never()).findById(anyLong());
@@ -155,7 +157,7 @@ class ReviewNotificationOutboxProcessorTest {
         given(reviewNotificationOutboxRepository.findById(10L)).willReturn(Optional.empty());
 
         // when
-        processor.processPending(10, 60_000L);
+        processor.processPending(10);
 
         // then
         verify(reviewNotificationOutboxRepository, never()).save(any());
@@ -165,7 +167,7 @@ class ReviewNotificationOutboxProcessorTest {
     void 정상_처리되면_메시지를_전송하고_SENT로_저장한다() {
         // given
         ReviewNotificationOutbox pending = mockPending(10L);
-        ReviewNotificationOutbox claimed = mockClaimed(10L, 1);
+        ReviewNotificationOutbox claimed = spyClaimed("C1", 1, null);
         given(reviewNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(pending));
         given(reviewNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
         given(reviewNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(claimed));
@@ -175,13 +177,14 @@ class ReviewNotificationOutboxProcessorTest {
         given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.of(workspace));
 
         // when
-        processor.processPending(10, 60_000L);
+        processor.processPending(10);
 
         // then
         verify(notificationTransportApiClient).sendBlockMessage(
                 eq("xoxb-test-token"),
                 eq("C1"),
                 any(JsonNode.class),
+                eq(null),
                 eq("fallback")
         );
         verify(claimed).markSent(any());
@@ -192,7 +195,7 @@ class ReviewNotificationOutboxProcessorTest {
     void 전송_성공후_SENT_저장_실패는_실패상태로_재마킹하지_않는다() {
         // given
         ReviewNotificationOutbox pending = mockPending(10L);
-        ReviewNotificationOutbox claimed = mockClaimed(10L, 1);
+        ReviewNotificationOutbox claimed = spyClaimed("C1", 1, null);
         given(reviewNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(pending));
         given(reviewNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
         given(reviewNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(claimed));
@@ -206,13 +209,14 @@ class ReviewNotificationOutboxProcessorTest {
                 .save(claimed);
 
         // when
-        processor.processPending(10, 60_000L);
+        processor.processPending(10);
 
         // then
         verify(notificationTransportApiClient).sendBlockMessage(
                 eq("xoxb-test-token"),
                 eq("C1"),
                 any(JsonNode.class),
+                eq(null),
                 eq("fallback")
         );
         verify(claimed).markSent(any());
@@ -224,7 +228,7 @@ class ReviewNotificationOutboxProcessorTest {
     void 비재시도_예외면_FAILED_BUSINESS_INVARIANT로_저장한다() {
         // given
         ReviewNotificationOutbox pending = mockPending(10L);
-        ReviewNotificationOutbox claimed = mockClaimed(10L, 1);
+        ReviewNotificationOutbox claimed = spyClaimed("C1", 1, null);
         given(reviewNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(pending));
         given(reviewNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
         given(reviewNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(claimed));
@@ -240,11 +244,12 @@ class ReviewNotificationOutboxProcessorTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         any(JsonNode.class),
+                        eq(null),
                         eq("fallback")
                 );
 
         // when
-        processor.processPending(10, 60_000L);
+        processor.processPending(10);
 
         // then
         verify(claimed).markFailed(any(), anyString(), eq(SlackInteractionFailureType.BUSINESS_INVARIANT));
@@ -256,10 +261,8 @@ class ReviewNotificationOutboxProcessorTest {
         // given
         ReviewNotificationOutbox firstPending = mockPending(10L);
         ReviewNotificationOutbox secondPending = mockPending(20L);
-        ReviewNotificationOutbox firstClaimed = mockClaimed(10L, 1);
-        ReviewNotificationOutbox secondClaimed = mockClaimed(20L, 1);
-        given(firstClaimed.getChannelId()).willReturn("C1");
-        given(secondClaimed.getChannelId()).willReturn("C2");
+        ReviewNotificationOutbox firstClaimed = spyClaimed("C1", 1, null);
+        ReviewNotificationOutbox secondClaimed = spyClaimed("C2", 1, null);
 
         given(reviewNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(firstPending, secondPending));
         given(reviewNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
@@ -273,13 +276,13 @@ class ReviewNotificationOutboxProcessorTest {
 
         doThrow(new ResourceAccessException("io failure"))
                 .when(notificationTransportApiClient)
-                .sendBlockMessage(eq("xoxb-test-token"), eq("C1"), any(JsonNode.class), eq("fallback"));
+                .sendBlockMessage(eq("xoxb-test-token"), eq("C1"), any(JsonNode.class), eq(null), eq("fallback"));
         doThrow(new RuntimeException("db failure"))
                 .when(reviewNotificationOutboxRepository)
                 .save(firstClaimed);
 
         // when & then
-        assertThatCode(() -> processor.processPending(10, 60_000L)).doesNotThrowAnyException();
+        assertThatCode(() -> processor.processPending(10)).doesNotThrowAnyException();
 
         verify(firstClaimed).markRetryPending(any(), anyString());
         verify(secondClaimed).markSent(any());
@@ -292,10 +295,8 @@ class ReviewNotificationOutboxProcessorTest {
         // given
         ReviewNotificationOutbox firstPending = mockPending(10L);
         ReviewNotificationOutbox secondPending = mockPending(20L);
-        ReviewNotificationOutbox firstClaimed = mockClaimed(10L, 1);
-        ReviewNotificationOutbox secondClaimed = mockClaimed(20L, 1);
-        given(firstClaimed.getChannelId()).willReturn("C1");
-        given(secondClaimed.getChannelId()).willReturn("C2");
+        ReviewNotificationOutbox firstClaimed = spyClaimed("C1", 1, null);
+        ReviewNotificationOutbox secondClaimed = spyClaimed("C2", 1, null);
 
         given(reviewNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(firstPending, secondPending));
         given(reviewNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
@@ -312,18 +313,20 @@ class ReviewNotificationOutboxProcessorTest {
                 .markSent(any());
 
         // when & then
-        assertThatCode(() -> processor.processPending(10, 60_000L)).doesNotThrowAnyException();
+        assertThatCode(() -> processor.processPending(10)).doesNotThrowAnyException();
 
         verify(notificationTransportApiClient).sendBlockMessage(
                 eq("xoxb-test-token"),
                 eq("C1"),
                 any(JsonNode.class),
+                eq(null),
                 eq("fallback")
         );
         verify(notificationTransportApiClient).sendBlockMessage(
                 eq("xoxb-test-token"),
                 eq("C2"),
                 any(JsonNode.class),
+                eq(null),
                 eq("fallback")
         );
         verify(reviewNotificationOutboxRepository, never()).save(firstClaimed);
@@ -335,7 +338,7 @@ class ReviewNotificationOutboxProcessorTest {
     void 재시도_가능_예외이고_시도횟수가_남아있으면_RETRY_PENDING으로_저장한다() {
         // given
         ReviewNotificationOutbox pending = mockPending(10L);
-        ReviewNotificationOutbox claimed = mockClaimed(10L, 1);
+        ReviewNotificationOutbox claimed = spyClaimed("C1", 1, null);
         given(reviewNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(pending));
         given(reviewNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
         given(reviewNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(claimed));
@@ -351,11 +354,12 @@ class ReviewNotificationOutboxProcessorTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         any(JsonNode.class),
+                        eq(null),
                         eq("fallback")
                 );
 
         // when
-        processor.processPending(10, 60_000L);
+        processor.processPending(10);
 
         // then
         verify(claimed).markRetryPending(any(), anyString());
@@ -366,7 +370,7 @@ class ReviewNotificationOutboxProcessorTest {
     void 재시도_가능_예외이고_최대시도_도달이면_FAILED_RETRY_EXHAUSTED로_저장한다() {
         // given
         ReviewNotificationOutbox pending = mockPending(10L);
-        ReviewNotificationOutbox claimed = mockClaimed(10L, 2);
+        ReviewNotificationOutbox claimed = spyClaimed("C1", 2, null);
         given(reviewNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(pending));
         given(reviewNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
         given(reviewNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(claimed));
@@ -382,11 +386,12 @@ class ReviewNotificationOutboxProcessorTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         any(JsonNode.class),
+                        eq(null),
                         eq("fallback")
                 );
 
         // when
-        processor.processPending(10, 60_000L);
+        processor.processPending(10);
 
         // then
         verify(claimed).markFailed(any(), anyString(), eq(SlackInteractionFailureType.RETRY_EXHAUSTED));
@@ -397,17 +402,48 @@ class ReviewNotificationOutboxProcessorTest {
     void 팀에_해당하는_workspace가_없으면_FAILED_BUSINESS_INVARIANT로_저장한다() {
         // given
         ReviewNotificationOutbox pending = mockPending(10L);
-        ReviewNotificationOutbox claimed = mockClaimed(10L, 1);
+        ReviewNotificationOutbox claimed = spyClaimed("C1", 1, null);
         given(reviewNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(pending));
         given(reviewNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
         given(reviewNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(claimed));
         given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.empty());
 
         // when
-        processor.processPending(10, 60_000L);
+        processor.processPending(10);
 
         // then
         verify(claimed).markFailed(any(), anyString(), eq(SlackInteractionFailureType.BUSINESS_INVARIANT));
+        verify(reviewNotificationOutboxRepository).save(claimed);
+    }
+
+    @Test
+    void attachments_json이_있으면_attachment를_보존해_전송한다() {
+        // given
+        ReviewNotificationOutbox pending = mockPending(10L);
+        ReviewNotificationOutbox claimed = spyClaimed(
+                "C1",
+                1,
+                "[{\"color\":\"#6366F1\",\"blocks\":[{\"type\":\"actions\"}]}]"
+        );
+        given(reviewNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(pending));
+        given(reviewNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
+        given(reviewNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(claimed));
+
+        Workspace workspace = mock(Workspace.class);
+        given(workspace.getAccessToken()).willReturn("xoxb-test-token");
+        given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.of(workspace));
+
+        // when
+        processor.processPending(10);
+
+        // then
+        verify(notificationTransportApiClient).sendBlockMessage(
+                eq("xoxb-test-token"),
+                eq("C1"),
+                any(JsonNode.class),
+                any(JsonNode.class),
+                eq("fallback")
+        );
         verify(reviewNotificationOutboxRepository).save(claimed);
     }
 
@@ -418,15 +454,23 @@ class ReviewNotificationOutboxProcessorTest {
         return outbox;
     }
 
-    private ReviewNotificationOutbox mockClaimed(Long id, int processingAttempt) {
-        ReviewNotificationOutbox outbox = mock(ReviewNotificationOutbox.class);
-        given(outbox.getId()).willReturn(id);
-        given(outbox.getTeamId()).willReturn("T1");
-        given(outbox.getChannelId()).willReturn("C1");
-        given(outbox.getBlocksJson()).willReturn("[]");
-        given(outbox.getFallbackText()).willReturn("fallback");
-        given(outbox.getProcessingAttempt()).willReturn(processingAttempt);
+    private ReviewNotificationOutbox spyClaimed(String channelId, int processingAttempt, String attachmentsJson) {
+        ReviewNotificationOutbox outbox = ReviewNotificationOutbox.builder()
+                                                                  .idempotencyKey("OUTBOX-" + channelId + "-" + processingAttempt)
+                                                                  .teamId("T1")
+                                                                  .channelId(channelId)
+                                                                  .blocksJson("[]")
+                                                                  .attachmentsJson(attachmentsJson)
+                                                                  .fallbackText("fallback")
+                                                                  .build();
+        Instant base = Instant.parse("2026-02-24T00:00:00Z");
+        outbox.markProcessing(base.minusSeconds(120));
 
-        return outbox;
+        for (int attempt = 1; attempt < processingAttempt; attempt++) {
+            outbox.markRetryPending(base.minusSeconds(110 - attempt), "retry failure");
+            outbox.markProcessing(base.minusSeconds(100 - attempt));
+        }
+
+        return spy(outbox);
     }
 }

@@ -51,15 +51,15 @@ class SlackInteractionInboxProcessorUnitTest {
     void setUp() {
         Clock clock = Clock.fixed(Instant.parse("2026-02-18T00:00:00Z"), ZoneOffset.UTC);
         InteractionRetryProperties interactionRetryProperties = new InteractionRetryProperties(
-                new InteractionRetryProperties.Retry(2, 100L, 2.0, 1_000L),
-                new InteractionRetryProperties.Retry(2, 100L, 2.0, 1_000L)
+                new InteractionRetryProperties.InboxRetryProperties(2, 100L, 2.0, 1_000L),
+                new InteractionRetryProperties.OutboxRetryProperties(2, 100L, 2.0, 1_000L)
         );
         InteractionWorkerProperties interactionWorkerProperties = new InteractionWorkerProperties(
-                new InteractionWorkerProperties.Inbox(
-                        new InteractionWorkerProperties.BlockActions(true, 200L, 60000L),
-                        new InteractionWorkerProperties.ViewSubmission(true, 200L, 60000L)
+                new InteractionWorkerProperties.InboxProperties(
+                        new InteractionWorkerProperties.BlockActionsProperties(true, 200L, 60000L),
+                        new InteractionWorkerProperties.ViewSubmissionProperties(true, 200L, 60000L)
                 ),
-                new InteractionWorkerProperties.Outbox()
+                new InteractionWorkerProperties.OutboxProperties()
         );
 
         slackInteractionInboxProcessor = new SlackInteractionInboxProcessor(

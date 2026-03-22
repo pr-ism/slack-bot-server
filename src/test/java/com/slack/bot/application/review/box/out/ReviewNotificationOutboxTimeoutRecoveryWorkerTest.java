@@ -16,43 +16,45 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SuppressWarnings("NonAsciiCharacters")
 @ExtendWith(MockitoExtension.class)
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
-class ReviewNotificationOutboxWorkerTest {
+class ReviewNotificationOutboxTimeoutRecoveryWorkerTest {
 
     @Mock
     ReviewNotificationOutboxProcessor reviewNotificationOutboxProcessor;
 
-    ReviewNotificationOutboxWorker reviewNotificationOutboxWorker;
+    ReviewNotificationOutboxTimeoutRecoveryWorker worker;
 
     @BeforeEach
     void setUp() {
-        reviewNotificationOutboxWorker = new ReviewNotificationOutboxWorker(reviewNotificationOutboxProcessor, 50);
+        worker = new ReviewNotificationOutboxTimeoutRecoveryWorker(reviewNotificationOutboxProcessor, 60_000L);
     }
 
     @Test
-    void worker는_outbox를_처리한다() {
+    void timeout_recovery를_실행한다() {
         // when
-        reviewNotificationOutboxWorker.processPendingReviewNotificationOutbox();
+        worker.recoverTimeoutReviewNotificationOutbox();
 
         // then
-        verify(reviewNotificationOutboxProcessor).processPending(50);
+        verify(reviewNotificationOutboxProcessor).recoverTimeoutProcessing(60_000L);
     }
 
     @Test
-    void worker_실행중_예외가_발생해도_전파하지_않는다() {
+    void timeout_recovery_실행중_예외가_발생해도_전파하지_않는다() {
         // given
         willThrow(new RuntimeException("worker failure"))
                 .given(reviewNotificationOutboxProcessor)
-                .processPending(50);
+                .recoverTimeoutProcessing(60_000L);
 
         // when & then
-        assertThatCode(() -> reviewNotificationOutboxWorker.processPendingReviewNotificationOutbox())
-                .doesNotThrowAnyException();
+        assertThatCode(() -> worker.recoverTimeoutReviewNotificationOutbox()).doesNotThrowAnyException();
     }
 
     @Test
-    void batchSize가_0이하면_생성자에서_예외가_발생한다() {
-        assertThatThrownBy(() -> new ReviewNotificationOutboxWorker(reviewNotificationOutboxProcessor, 0))
+    void processingTimeoutMs가_0이하면_생성자에서_예외가_발생한다() {
+        assertThatThrownBy(() -> new ReviewNotificationOutboxTimeoutRecoveryWorker(
+                reviewNotificationOutboxProcessor,
+                0
+        ))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("batchSize는 0보다 커야 합니다.");
+                .hasMessage("processingTimeoutMs는 0보다 커야 합니다.");
     }
 }

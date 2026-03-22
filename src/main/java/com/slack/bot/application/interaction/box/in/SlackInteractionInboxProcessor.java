@@ -55,7 +55,6 @@ public class SlackInteractionInboxProcessor {
     public void processPendingBlockActions(int limit) {
         processPending(
                 SlackInteractionInboxType.BLOCK_ACTIONS,
-                interactionWorkerProperties.inbox().blockActions().processingTimeoutMs(),
                 limit,
                 pending -> slackInteractionInboxEntryProcessor.processBlockAction(pending)
         );
@@ -83,7 +82,6 @@ public class SlackInteractionInboxProcessor {
     public void processPendingViewSubmissions(int limit) {
         processPending(
                 SlackInteractionInboxType.VIEW_SUBMISSION,
-                interactionWorkerProperties.inbox().viewSubmission().processingTimeoutMs(),
                 limit,
                 pending -> slackInteractionInboxEntryProcessor.processViewSubmission(pending)
         );
@@ -91,12 +89,9 @@ public class SlackInteractionInboxProcessor {
 
     private void processPending(
             SlackInteractionInboxType interactionType,
-            long processingTimeoutMs,
             int limit,
             Consumer<SlackInteractionInbox> action
     ) {
-        recoverTimeoutProcessing(interactionType, processingTimeoutMs);
-
         List<SlackInteractionInbox> pendings = slackInteractionInboxRepository.findClaimable(
                 interactionType,
                 limit
@@ -107,7 +102,21 @@ public class SlackInteractionInboxProcessor {
         }
     }
 
-    private void recoverTimeoutProcessing(SlackInteractionInboxType interactionType, long processingTimeoutMs) {
+    public int recoverBlockActionTimeoutProcessing() {
+        return recoverTimeoutProcessing(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                interactionWorkerProperties.inbox().blockActions().processingTimeoutMs()
+        );
+    }
+
+    public int recoverViewSubmissionTimeoutProcessing() {
+        return recoverTimeoutProcessing(
+                SlackInteractionInboxType.VIEW_SUBMISSION,
+                interactionWorkerProperties.inbox().viewSubmission().processingTimeoutMs()
+        );
+    }
+
+    private int recoverTimeoutProcessing(SlackInteractionInboxType interactionType, long processingTimeoutMs) {
         Instant now = clock.instant();
         int recoveredCount = slackInteractionInboxRepository.recoverTimeoutProcessing(
                 interactionType,
@@ -120,6 +129,8 @@ public class SlackInteractionInboxProcessor {
         if (recoveredCount > 0) {
             log.warn("{} inbox PROCESSING 고착 건을 복구했습니다. count={}", interactionType, recoveredCount);
         }
+
+        return recoveredCount;
     }
 
     private void processSafely(

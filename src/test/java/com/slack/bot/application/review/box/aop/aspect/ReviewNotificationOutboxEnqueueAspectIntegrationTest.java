@@ -24,11 +24,9 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.mockito.ArgumentCaptor;
 
 @IntegrationTest
-@MockitoBean(types = ReviewNotificationOutboxEnqueuer.class)
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class ReviewNotificationOutboxEnqueueAspectIntegrationTest {
@@ -78,24 +76,25 @@ class ReviewNotificationOutboxEnqueueAspectIntegrationTest {
                 )
         );
         ArgumentCaptor<JsonNode> blocksCaptor = ArgumentCaptor.forClass(JsonNode.class);
+        ArgumentCaptor<JsonNode> attachmentsCaptor = ArgumentCaptor.forClass(JsonNode.class);
         verify(reviewNotificationOutboxEnqueuer).enqueueChannelBlocks(
                 eq(sourceKey),
                 eq(teamId),
                 eq(channelId),
                 blocksCaptor.capture(),
+                attachmentsCaptor.capture(),
                 eq(fallbackText)
         );
 
         // then
-        JsonNode actualMergedBlocks = blocksCaptor.getValue();
+        JsonNode actualBlocks = blocksCaptor.getValue();
+        JsonNode actualAttachments = attachmentsCaptor.getValue();
+
         assertAll(
                 () -> assertThat(actual).isNull(),
                 () -> assertThat(actualReviewNotificationOutboxEnqueueProbe.proceedCount()).isZero(),
-                () -> assertThat(actualMergedBlocks.isArray()).isTrue(),
-                () -> assertThat(actualMergedBlocks.size()).isEqualTo(3),
-                () -> assertThat(actualMergedBlocks.get(0).path("type").asText()).isEqualTo("section"),
-                () -> assertThat(actualMergedBlocks.get(1).path("type").asText()).isEqualTo("actions"),
-                () -> assertThat(actualMergedBlocks.get(2).path("type").asText()).isEqualTo("context")
+                () -> assertThat(actualBlocks).isEqualTo(blocks),
+                () -> assertThat(actualAttachments).isEqualTo(attachments)
         );
     }
 
@@ -128,6 +127,7 @@ class ReviewNotificationOutboxEnqueueAspectIntegrationTest {
                         anyString(),
                         anyString(),
                         anyString(),
+                        any(JsonNode.class),
                         any(JsonNode.class),
                         any()
                 );

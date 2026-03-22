@@ -39,11 +39,7 @@ public class ReviewNotificationOutboxProcessor {
     private final ReviewNotificationOutboxRepository reviewNotificationOutboxRepository;
     private final InteractionRetryExceptionClassifier retryExceptionClassifier;
 
-    public void processPending(int limit, long processingTimeoutMs) {
-        validateProcessingTimeoutMs(processingTimeoutMs);
-
-        recoverTimeoutProcessing(processingTimeoutMs);
-
+    public void processPending(int limit) {
         List<ReviewNotificationOutbox> pendings = reviewNotificationOutboxRepository.findClaimable(limit);
 
         for (ReviewNotificationOutbox pending : pendings) {
@@ -51,7 +47,9 @@ public class ReviewNotificationOutboxProcessor {
         }
     }
 
-    private void recoverTimeoutProcessing(long processingTimeoutMs) {
+    public int recoverTimeoutProcessing(long processingTimeoutMs) {
+        validateProcessingTimeoutMs(processingTimeoutMs);
+
         Instant now = clock.instant();
         int recoveredCount = reviewNotificationOutboxRepository.recoverTimeoutProcessing(
                 now.minusMillis(processingTimeoutMs),
@@ -63,6 +61,8 @@ public class ReviewNotificationOutboxProcessor {
         if (recoveredCount > 0) {
             log.warn("review_notification outbox PROCESSING 고착 건을 복구했습니다. count={}", recoveredCount);
         }
+
+        return recoveredCount;
     }
 
     private void processSafely(ReviewNotificationOutbox pending) {
@@ -76,13 +76,13 @@ public class ReviewNotificationOutboxProcessor {
         }
 
         reviewNotificationOutboxRepository.findById(outboxId)
-                                         .ifPresentOrElse(
-                                                 outbox -> processClaimedOutboxSafely(outbox, outboxId),
-                                                 () -> log.warn(
-                                                         "PROCESSING으로 전이된 review_notification outbox를 조회하지 못했습니다. outboxId={}",
-                                                         outboxId
-                                                 )
-                                         );
+                                          .ifPresentOrElse(
+                                                  outbox -> processClaimedOutboxSafely(outbox, outboxId),
+                                                  () -> log.warn(
+                                                          "PROCESSING으로 전이된 review_notification outbox를 조회하지 못했습니다. outboxId={}",
+                                                          outboxId
+                                                  )
+                                          );
     }
 
     private void processClaimedOutboxSafely(ReviewNotificationOutbox outbox, Long outboxId) {
@@ -138,6 +138,7 @@ public class ReviewNotificationOutboxProcessor {
                 token,
                 outbox.getChannelId(),
                 readBlocks(outbox.getBlocksJson()),
+                readAttachments(outbox.getAttachmentsJson()),
                 outbox.getFallbackText()
         );
     }
@@ -153,6 +154,14 @@ public class ReviewNotificationOutboxProcessor {
 
     private JsonNode readBlocks(String blocksJson) throws JsonProcessingException {
         return objectMapper.readTree(blocksJson);
+    }
+
+    private JsonNode readAttachments(String attachmentsJson) throws JsonProcessingException {
+        if (attachmentsJson == null || attachmentsJson.isBlank()) {
+            return null;
+        }
+
+        return objectMapper.readTree(attachmentsJson);
     }
 
     private void markFailureStatus(ReviewNotificationOutbox outbox, Exception exception) {

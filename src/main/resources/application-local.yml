@@ -102,15 +102,15 @@ app:
     inbox:
       block-actions:
         worker-enabled: true
-        poll-delay-ms: 200
+        poll-delay-ms: 1000
         processing-timeout-ms: 60000
       view-submission:
         worker-enabled: true
-        poll-delay-ms: 200
+        poll-delay-ms: 1000
         processing-timeout-ms: 60000
     outbox:
       worker-enabled: true
-      poll-delay-ms: 200
+      poll-delay-ms: 1000
       processing-timeout-ms: 60000
     retry:
       inbox:

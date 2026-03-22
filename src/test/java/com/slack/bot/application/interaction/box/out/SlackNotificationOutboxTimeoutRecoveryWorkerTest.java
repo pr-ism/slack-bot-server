@@ -15,37 +15,35 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @SuppressWarnings("NonAsciiCharacters")
 @ExtendWith(MockitoExtension.class)
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
-class SlackNotificationOutboxWorkerTest {
+class SlackNotificationOutboxTimeoutRecoveryWorkerTest {
 
     @Mock
     SlackNotificationOutboxProcessor slackNotificationOutboxProcessor;
 
-    SlackNotificationOutboxWorker slackNotificationOutboxWorker;
+    SlackNotificationOutboxTimeoutRecoveryWorker worker;
 
     @BeforeEach
     void setUp() {
-        slackNotificationOutboxWorker = new SlackNotificationOutboxWorker(slackNotificationOutboxProcessor);
+        worker = new SlackNotificationOutboxTimeoutRecoveryWorker(slackNotificationOutboxProcessor);
     }
 
     @Test
-    void 워커는_기본_배치_크기로_outbox를_처리한다() {
+    void timeout_recovery를_실행한다() {
         // when
-        slackNotificationOutboxWorker.processPendingOutbox();
+        worker.recoverTimeoutOutbox();
 
         // then
-        verify(slackNotificationOutboxProcessor).processPending(50);
+        verify(slackNotificationOutboxProcessor).recoverTimeoutProcessing();
     }
 
     @Test
-    void 워커_실행_중_예외가_발생해도_예외를_전파하지_않는다() {
+    void timeout_recovery_실행중_예외가_발생해도_전파하지_않는다() {
         // given
         willThrow(new RuntimeException("worker failure"))
                 .given(slackNotificationOutboxProcessor)
-                .processPending(50);
+                .recoverTimeoutProcessing();
 
         // when & then
-        assertThatCode(() -> slackNotificationOutboxWorker.processPendingOutbox())
-                .doesNotThrowAnyException();
+        assertThatCode(() -> worker.recoverTimeoutOutbox()).doesNotThrowAnyException();
     }
-
 }

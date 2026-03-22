@@ -1,5 +1,6 @@
 package com.slack.bot.application.interaction.box.out;
 
+import static org.awaitility.Awaitility.await;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -13,6 +14,8 @@ import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
+import com.slack.bot.infrastructure.interaction.box.persistence.out.JpaSlackNotificationOutboxRepository;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -33,6 +36,9 @@ class SlackNotificationOutboxWriterTest {
     SlackNotificationOutboxRepository actualSlackNotificationOutboxRepository;
 
     @Autowired
+    JpaSlackNotificationOutboxRepository jpaSlackNotificationOutboxRepository;
+
+    @Autowired
     ObjectMapper objectMapper;
 
     @Test
@@ -48,19 +54,14 @@ class SlackNotificationOutboxWriterTest {
         targetWriter().enqueueEphemeralText(sourceKey, teamId, channelId, userId, text);
 
         // then
-        List<SlackNotificationOutbox> actualPendings = actualSlackNotificationOutboxRepository.findClaimable(10);
-
-        assertThat(actualPendings).hasSize(1);
-
-        SlackNotificationOutbox actual = actualPendings.getFirst();
+        SlackNotificationOutbox actual = awaitSingleOutbox();
 
         assertAll(
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.EPHEMERAL_TEXT),
                 () -> assertThat(actual.getTeamId()).isEqualTo(teamId),
                 () -> assertThat(actual.getChannelId()).isEqualTo(channelId),
                 () -> assertThat(actual.getUserId()).isEqualTo(userId),
-                () -> assertThat(actual.getText()).isEqualTo(text),
-                () -> assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.PENDING)
+                () -> assertThat(actual.getText()).isEqualTo(text)
         );
     }
 
@@ -78,11 +79,7 @@ class SlackNotificationOutboxWriterTest {
         targetWriter().enqueueEphemeralBlocks(sourceKey, teamId, channelId, userId, blocks, fallbackText);
 
         // then
-        List<SlackNotificationOutbox> actualPendings = actualSlackNotificationOutboxRepository.findClaimable(10);
-
-        assertThat(actualPendings).hasSize(1);
-
-        SlackNotificationOutbox actual = actualPendings.getFirst();
+        SlackNotificationOutbox actual = awaitSingleOutbox();
 
         assertAll(
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.EPHEMERAL_BLOCKS),
@@ -90,8 +87,7 @@ class SlackNotificationOutboxWriterTest {
                 () -> assertThat(actual.getChannelId()).isEqualTo(channelId),
                 () -> assertThat(actual.getUserId()).isEqualTo(userId),
                 () -> assertThat(actual.getBlocksJson()).isEqualTo("[]"),
-                () -> assertThat(actual.getFallbackText()).isEqualTo(fallbackText),
-                () -> assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.PENDING)
+                () -> assertThat(actual.getFallbackText()).isEqualTo(fallbackText)
         );
     }
 
@@ -107,19 +103,14 @@ class SlackNotificationOutboxWriterTest {
         targetWriter().enqueueChannelText(sourceKey, teamId, channelId, text);
 
         // then
-        List<SlackNotificationOutbox> actualPendings = actualSlackNotificationOutboxRepository.findClaimable(10);
-
-        assertThat(actualPendings).hasSize(1);
-
-        SlackNotificationOutbox actual = actualPendings.getFirst();
+        SlackNotificationOutbox actual = awaitSingleOutbox();
 
         assertAll(
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.CHANNEL_TEXT),
                 () -> assertThat(actual.getTeamId()).isEqualTo(teamId),
                 () -> assertThat(actual.getChannelId()).isEqualTo(channelId),
                 () -> assertThat(actual.getText()).isEqualTo(text),
-                () -> assertThat(actual.getUserId()).isNull(),
-                () -> assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.PENDING)
+                () -> assertThat(actual.getUserId()).isNull()
         );
     }
 
@@ -136,11 +127,7 @@ class SlackNotificationOutboxWriterTest {
         targetWriter().enqueueChannelBlocks(sourceKey, teamId, channelId, blocks, fallbackText);
 
         // then
-        List<SlackNotificationOutbox> actualPendings = actualSlackNotificationOutboxRepository.findClaimable(10);
-
-        assertThat(actualPendings).hasSize(1);
-
-        SlackNotificationOutbox actual = actualPendings.getFirst();
+        SlackNotificationOutbox actual = awaitSingleOutbox();
 
         assertAll(
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.CHANNEL_BLOCKS),
@@ -148,8 +135,7 @@ class SlackNotificationOutboxWriterTest {
                 () -> assertThat(actual.getChannelId()).isEqualTo(channelId),
                 () -> assertThat(actual.getBlocksJson()).isEqualTo("[]"),
                 () -> assertThat(actual.getFallbackText()).isEqualTo(fallbackText),
-                () -> assertThat(actual.getUserId()).isNull(),
-                () -> assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.PENDING)
+                () -> assertThat(actual.getUserId()).isNull()
         );
     }
 
@@ -166,11 +152,7 @@ class SlackNotificationOutboxWriterTest {
         targetWriter().enqueueChannelBlocks(sourceKey, teamId, channelId, blocks, fallbackText);
 
         // then
-        List<SlackNotificationOutbox> actualPendings = actualSlackNotificationOutboxRepository.findClaimable(10);
-
-        assertThat(actualPendings).hasSize(1);
-
-        SlackNotificationOutbox actual = actualPendings.getFirst();
+        SlackNotificationOutbox actual = awaitSingleOutbox();
 
         assertAll(
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.CHANNEL_BLOCKS),
@@ -193,11 +175,7 @@ class SlackNotificationOutboxWriterTest {
         targetWriter().enqueueEphemeralBlocks(sourceKey, teamId, channelId, userId, blocks, fallbackText);
 
         // then
-        List<SlackNotificationOutbox> actualPendings = actualSlackNotificationOutboxRepository.findClaimable(10);
-
-        assertThat(actualPendings).hasSize(1);
-
-        SlackNotificationOutbox actual = actualPendings.getFirst();
+        SlackNotificationOutbox actual = awaitSingleOutbox();
 
         assertAll(
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.EPHEMERAL_BLOCKS),
@@ -225,7 +203,7 @@ class SlackNotificationOutboxWriterTest {
                 ))
                         .isInstanceOf(SlackBlocksSerializationException.class)
                         .hasMessage("blocks JSON 직렬화에 실패했습니다.");
-        var actual = actualSlackNotificationOutboxRepository.findClaimable(10);
+        List<SlackNotificationOutbox> actual = jpaSlackNotificationOutboxRepository.findAll();
         assertThat(actual).isEmpty();
     }
 
@@ -249,7 +227,7 @@ class SlackNotificationOutboxWriterTest {
                 ))
                         .isInstanceOf(SlackBlocksSerializationException.class)
                         .hasMessage("blocks JSON 직렬화에 실패했습니다.");
-        var actual = actualSlackNotificationOutboxRepository.findClaimable(10);
+        List<SlackNotificationOutbox> actual = jpaSlackNotificationOutboxRepository.findAll();
         assertThat(actual).isEmpty();
     }
 
@@ -272,7 +250,7 @@ class SlackNotificationOutboxWriterTest {
                 ))
                         .isInstanceOf(IllegalArgumentException.class)
                         .hasMessage("blocks는 null일 수 없습니다.");
-        var actual = actualSlackNotificationOutboxRepository.findClaimable(10);
+        List<SlackNotificationOutbox> actual = jpaSlackNotificationOutboxRepository.findAll();
         assertThat(actual).isEmpty();
     }
 
@@ -293,7 +271,7 @@ class SlackNotificationOutboxWriterTest {
                 ))
                         .isInstanceOf(IllegalArgumentException.class)
                         .hasMessage("blocks는 null일 수 없습니다.");
-        var actual = actualSlackNotificationOutboxRepository.findClaimable(10);
+        List<SlackNotificationOutbox> actual = jpaSlackNotificationOutboxRepository.findAll();
         assertThat(actual).isEmpty();
     }
 
@@ -315,7 +293,7 @@ class SlackNotificationOutboxWriterTest {
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("text는 null일 수 없습니다.");
-        var actual = actualSlackNotificationOutboxRepository.findClaimable(10);
+        List<SlackNotificationOutbox> actual = jpaSlackNotificationOutboxRepository.findAll();
         assertThat(actual).isEmpty();
     }
 
@@ -335,7 +313,7 @@ class SlackNotificationOutboxWriterTest {
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("text는 null일 수 없습니다.");
-        var actual = actualSlackNotificationOutboxRepository.findClaimable(10);
+        List<SlackNotificationOutbox> actual = jpaSlackNotificationOutboxRepository.findAll();
         assertThat(actual).isEmpty();
     }
 
@@ -352,9 +330,9 @@ class SlackNotificationOutboxWriterTest {
         targetWriter().enqueueChannelText(sourceKey, teamId, channelId, text);
 
         // then
-        List<SlackNotificationOutbox> actual = actualSlackNotificationOutboxRepository.findClaimable(10);
-
-        assertThat(actual).hasSize(1);
+        await().atMost(Duration.ofSeconds(3)).untilAsserted(() ->
+                assertThat(jpaSlackNotificationOutboxRepository.findAll()).hasSize(1)
+        );
     }
 
     @Test
@@ -367,7 +345,7 @@ class SlackNotificationOutboxWriterTest {
 
         targetWriter().enqueueChannelText(sourceKey, teamId, channelId, text);
 
-        SlackNotificationOutbox existing = actualSlackNotificationOutboxRepository.findClaimable(10).getFirst();
+        SlackNotificationOutbox existing = awaitSingleOutbox();
         existing.markProcessing(Instant.parse("2026-02-18T00:00:00Z"));
         existing.markSent(Instant.parse("2026-02-18T00:00:01Z"));
         actualSlackNotificationOutboxRepository.save(existing);
@@ -376,10 +354,13 @@ class SlackNotificationOutboxWriterTest {
         targetWriter().enqueueChannelText(sourceKey, teamId, channelId, text);
 
         // then
-        var actual = actualSlackNotificationOutboxRepository.findClaimable(10);
-        var actualStatus = actualSlackNotificationOutboxRepository.findById(existing.getId())
-                .get()
-                .getStatus();
+        await().atMost(Duration.ofSeconds(3)).untilAsserted(() ->
+                assertThat(jpaSlackNotificationOutboxRepository.findAll()).hasSize(1)
+        );
+        List<SlackNotificationOutbox> actual = actualSlackNotificationOutboxRepository.findClaimable(10);
+        SlackNotificationOutboxStatus actualStatus = actualSlackNotificationOutboxRepository.findById(existing.getId())
+                                                                                            .orElseThrow()
+                                                                                            .getStatus();
         assertAll(
                 () -> assertThat(actual).isEmpty(),
                 () -> assertThat(actualStatus).isEqualTo(SlackNotificationOutboxStatus.SENT)
@@ -396,7 +377,7 @@ class SlackNotificationOutboxWriterTest {
 
         targetWriter().enqueueChannelText(sourceKey, teamId, channelId, text);
 
-        SlackNotificationOutbox existing = actualSlackNotificationOutboxRepository.findClaimable(10).getFirst();
+        SlackNotificationOutbox existing = awaitSingleOutbox();
         existing.markProcessing(Instant.parse("2026-02-18T00:00:00Z"));
         actualSlackNotificationOutboxRepository.save(existing);
 
@@ -404,10 +385,13 @@ class SlackNotificationOutboxWriterTest {
         targetWriter().enqueueChannelText(sourceKey, teamId, channelId, text);
 
         // then
-        var actual = actualSlackNotificationOutboxRepository.findClaimable(10);
-        var actualStatus = actualSlackNotificationOutboxRepository.findById(existing.getId())
-                .get()
-                .getStatus();
+        await().atMost(Duration.ofSeconds(3)).untilAsserted(() ->
+                assertThat(jpaSlackNotificationOutboxRepository.findAll()).hasSize(1)
+        );
+        List<SlackNotificationOutbox> actual = actualSlackNotificationOutboxRepository.findClaimable(10);
+        SlackNotificationOutboxStatus actualStatus = actualSlackNotificationOutboxRepository.findById(existing.getId())
+                                                                                            .orElseThrow()
+                                                                                            .getStatus();
         assertAll(
                 () -> assertThat(actual).isEmpty(),
                 () -> assertThat(actualStatus).isEqualTo(SlackNotificationOutboxStatus.PROCESSING)
@@ -424,7 +408,7 @@ class SlackNotificationOutboxWriterTest {
 
         targetWriter().enqueueChannelText(sourceKey, teamId, channelId, text);
 
-        SlackNotificationOutbox existing = actualSlackNotificationOutboxRepository.findClaimable(10).getFirst();
+        SlackNotificationOutbox existing = awaitSingleOutbox();
         existing.markProcessing(Instant.parse("2026-02-18T00:00:00Z"));
         existing.markFailed(
                 Instant.parse("2026-02-18T00:00:01Z"),
@@ -437,14 +421,24 @@ class SlackNotificationOutboxWriterTest {
         targetWriter().enqueueChannelText(sourceKey, teamId, channelId, text);
 
         // then
-        var actual = actualSlackNotificationOutboxRepository.findClaimable(10);
-        var actualStatus = actualSlackNotificationOutboxRepository.findById(existing.getId())
-                .get()
-                .getStatus();
+        await().atMost(Duration.ofSeconds(3)).untilAsserted(() ->
+                assertThat(jpaSlackNotificationOutboxRepository.findAll()).hasSize(1)
+        );
+        List<SlackNotificationOutbox> actual = actualSlackNotificationOutboxRepository.findClaimable(10);
+        SlackNotificationOutboxStatus actualStatus = actualSlackNotificationOutboxRepository.findById(existing.getId())
+                                                                                            .orElseThrow()
+                                                                                            .getStatus();
         assertAll(
                 () -> assertThat(actual).isEmpty(),
                 () -> assertThat(actualStatus).isEqualTo(SlackNotificationOutboxStatus.FAILED)
         );
+    }
+
+    private SlackNotificationOutbox awaitSingleOutbox() {
+        await().atMost(Duration.ofSeconds(3)).untilAsserted(() ->
+                assertThat(jpaSlackNotificationOutboxRepository.findAll()).hasSize(1)
+        );
+        return jpaSlackNotificationOutboxRepository.findAll().getFirst();
     }
 
     private SlackNotificationOutboxWriter targetWriter() {

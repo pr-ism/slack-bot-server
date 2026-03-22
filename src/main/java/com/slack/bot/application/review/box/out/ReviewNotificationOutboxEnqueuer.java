@@ -20,6 +20,34 @@ public class ReviewNotificationOutboxEnqueuer {
             String teamId,
             String channelId,
             JsonNode blocks,
+            JsonNode attachments,
+            String fallbackText
+    ) {
+        String normalizedBlocksJson = normalizeBlocks(blocks);
+        String normalizedAttachmentsJson = normalizeAttachments(attachments);
+        String idempotencyPayload = idempotencyPayload(sourceKey, teamId, channelId);
+        String idempotencyKey = idempotencyKeyGenerator.generate(
+                ReviewNotificationIdempotencyScope.REVIEW_NOTIFICATION_OUTBOX,
+                idempotencyPayload
+        );
+
+        ReviewNotificationOutbox outbox = ReviewNotificationOutbox.builder()
+                                                                  .idempotencyKey(idempotencyKey)
+                                                                  .teamId(teamId)
+                                                                  .channelId(channelId)
+                                                                  .blocksJson(normalizedBlocksJson)
+                                                                  .attachmentsJson(normalizedAttachmentsJson)
+                                                                  .fallbackText(fallbackText)
+                                                                  .build();
+
+        reviewNotificationOutboxRepository.enqueue(outbox);
+    }
+
+    public void enqueueChannelBlocks(
+            String sourceKey,
+            String teamId,
+            String channelId,
+            JsonNode blocks,
             String fallbackText
     ) {
         String normalizedBlocksJson = normalizeBlocks(blocks);
@@ -34,6 +62,7 @@ public class ReviewNotificationOutboxEnqueuer {
                                                                   .teamId(teamId)
                                                                   .channelId(channelId)
                                                                   .blocksJson(normalizedBlocksJson)
+                                                                  .attachmentsJson(null)
                                                                   .fallbackText(fallbackText)
                                                                   .build();
 
@@ -46,6 +75,14 @@ public class ReviewNotificationOutboxEnqueuer {
         }
 
         return blocks.toString();
+    }
+
+    private String normalizeAttachments(JsonNode attachments) {
+        if (attachments == null) {
+            return null;
+        }
+
+        return attachments.toString();
     }
 
     private String idempotencyPayload(String sourceKey, String teamId, String channelId) {
