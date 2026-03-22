@@ -275,4 +275,30 @@ class ReviewNotificationOutboxEnqueuerTest {
         assertThat(captor.getAllValues().get(0).getIdempotencyKey())
                 .isNotEqualTo(captor.getAllValues().get(1).getIdempotencyKey());
     }
+
+    @Test
+    void semantic_projectId가_달라지면_다른_멱등키로_enqueue한다() {
+        // given
+        ReviewNotificationPayload payload = new ReviewNotificationPayload(
+                "repo",
+                101L,
+                42,
+                "Fix bug",
+                "https://github.com/pr/1",
+                "author-gh",
+                List.of("reviewer-gh-1"),
+                List.of("reviewer-gh-1")
+        );
+
+        // when
+        enqueuer.enqueueReviewNotification("SOURCE-1", 1L, "T1", "C1", payload);
+        enqueuer.enqueueReviewNotification("SOURCE-1", 2L, "T1", "C1", payload);
+
+        // then
+        ArgumentCaptor<ReviewNotificationOutbox> captor = ArgumentCaptor.forClass(ReviewNotificationOutbox.class);
+        verify(reviewNotificationOutboxRepository, org.mockito.Mockito.times(2)).enqueue(captor.capture());
+
+        assertThat(captor.getAllValues().get(0).getIdempotencyKey())
+                .isNotEqualTo(captor.getAllValues().get(1).getIdempotencyKey());
+    }
 }

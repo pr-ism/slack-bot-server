@@ -26,10 +26,10 @@ public class ReviewNotificationOutboxEnqueuer {
             String teamId,
             String channelId,
             ReviewNotificationPayload payload
-    ) {
+        ) {
         validatePayload(payload);
         String payloadJson = serializePayload(payload);
-        String idempotencyPayload = idempotencyPayloadEncoder.encode(sourceKey, teamId, channelId);
+        String idempotencyPayload = idempotencyPayloadEncoder.encode(sourceKey, projectId, teamId, channelId);
         String idempotencyKey = idempotencyKeyGenerator.generate(
                 ReviewNotificationIdempotencyScope.REVIEW_NOTIFICATION_OUTBOX,
                 idempotencyPayload

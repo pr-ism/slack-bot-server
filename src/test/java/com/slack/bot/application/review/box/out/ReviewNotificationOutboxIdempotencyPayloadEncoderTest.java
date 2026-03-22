@@ -18,18 +18,19 @@ class ReviewNotificationOutboxIdempotencyPayloadEncoderTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    void source_team_channel을_DTO_JSON으로_인코딩한다() throws Exception {
+    void source_project_team_channel을_DTO_JSON으로_인코딩한다() throws Exception {
         // given
         ReviewNotificationOutboxIdempotencyPayloadEncoder encoder =
                 new ReviewNotificationOutboxIdempotencyPayloadEncoder(objectMapper);
 
         // when
-        String actualJson = encoder.encode("SOURCE-1", "T1", "C1");
+        String actualJson = encoder.encode("SOURCE-1", 1L, "T1", "C1");
 
         // then
         JsonNode actual = objectMapper.readTree(actualJson);
         assertAll(
                 () -> assertThat(actual.path("sourceKey").asText()).isEqualTo("SOURCE-1"),
+                () -> assertThat(actual.path("projectId").asLong()).isEqualTo(1L),
                 () -> assertThat(actual.path("teamId").asText()).isEqualTo("T1"),
                 () -> assertThat(actual.path("channelId").asText()).isEqualTo("C1")
         );
@@ -48,8 +49,28 @@ class ReviewNotificationOutboxIdempotencyPayloadEncoderTest {
         JsonNode actual = objectMapper.readTree(actualJson);
         assertAll(
                 () -> assertThat(actual.path("sourceKey").asText()).isEmpty(),
+                () -> assertThat(actual.path("projectId").isNull()).isTrue(),
                 () -> assertThat(actual.path("teamId").asText()).isEmpty(),
                 () -> assertThat(actual.path("channelId").asText()).isEmpty()
+        );
+    }
+
+    @Test
+    void snapshot_경로는_projectId를_null로_인코딩한다() throws Exception {
+        // given
+        ReviewNotificationOutboxIdempotencyPayloadEncoder encoder =
+                new ReviewNotificationOutboxIdempotencyPayloadEncoder(objectMapper);
+
+        // when
+        String actualJson = encoder.encode("SOURCE-1", "T1", "C1");
+
+        // then
+        JsonNode actual = objectMapper.readTree(actualJson);
+        assertAll(
+                () -> assertThat(actual.path("sourceKey").asText()).isEqualTo("SOURCE-1"),
+                () -> assertThat(actual.path("projectId").isNull()).isTrue(),
+                () -> assertThat(actual.path("teamId").asText()).isEqualTo("T1"),
+                () -> assertThat(actual.path("channelId").asText()).isEqualTo("C1")
         );
     }
 
@@ -60,7 +81,7 @@ class ReviewNotificationOutboxIdempotencyPayloadEncoderTest {
                 new ReviewNotificationOutboxIdempotencyPayloadEncoder(new FailingObjectMapper());
 
         // when & then
-        assertThatThrownBy(() -> encoder.encode("SOURCE-1", "T1", "C1"))
+        assertThatThrownBy(() -> encoder.encode("SOURCE-1", 1L, "T1", "C1"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("review outbox 멱등성 payload 직렬화에 실패했습니다.");
     }

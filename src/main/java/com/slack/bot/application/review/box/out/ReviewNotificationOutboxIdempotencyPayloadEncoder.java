@@ -12,8 +12,13 @@ public class ReviewNotificationOutboxIdempotencyPayloadEncoder {
     private final ObjectMapper objectMapper;
 
     public String encode(String sourceKey, String teamId, String channelId) {
+        return encode(sourceKey, null, teamId, channelId);
+    }
+
+    public String encode(String sourceKey, Long projectId, String teamId, String channelId) {
         ReviewNotificationOutboxIdempotencySource source = new ReviewNotificationOutboxIdempotencySource(
                 nullToEmpty(sourceKey),
+                projectId,
                 nullToEmpty(teamId),
                 nullToEmpty(channelId)
         );
@@ -35,6 +40,7 @@ public class ReviewNotificationOutboxIdempotencyPayloadEncoder {
 
     private record ReviewNotificationOutboxIdempotencySource(
             String sourceKey,
+            Long projectId,
             String teamId,
             String channelId
     ) {
