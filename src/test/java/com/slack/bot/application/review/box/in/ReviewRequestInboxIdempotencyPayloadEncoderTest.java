@@ -58,11 +58,11 @@ class ReviewRequestInboxIdempotencyPayloadEncoderTest {
                 new ReviewRequestInboxIdempotencyPayloadEncoder(objectMapper);
 
         // when
-        String actualJson = encoder.encode("api-key", request(303L, "title", "api-key:303:2"));
+        String actualJson = encoder.encode("api-key", request(303L, "title", "2"));
 
         // then
         JsonNode actual = objectMapper.readTree(actualJson);
-        assertThat(actual.path("reviewRoundKey").asText()).isEqualTo("api-key:303:2");
+        assertThat(actual.path("reviewRoundKey").asText()).isEqualTo("2");
     }
 
     @Test

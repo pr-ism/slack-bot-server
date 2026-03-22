@@ -42,37 +42,42 @@ public class InMemoryReviewEventBatch implements ReviewEventBatch {
             return;
         }
 
+        String reviewRoundKey = Integer.toString(roundResult.roundNumber());
         ReviewNotificationPayload requestForNotification = ReviewNotificationPayload.of(
                 request,
                 roundResult.reviewersToMention(),
-                roundResult.coalescingKey()
+                reviewRoundKey
         );
         reviewRequestInboxProcessor.enqueue(apiKey, requestForNotification, batchWindowMillis);
-        scheduleFlush(roundResult.coalescingKey());
+        scheduleFlush(buildBatchKey(apiKey, request.githubPullRequestId(), reviewRoundKey));
     }
 
-    private void scheduleFlush(String coalescingKey) {
+    private String buildBatchKey(String apiKey, Long githubPullRequestId, String reviewRoundKey) {
+        return apiKey + ":" + githubPullRequestId + ":" + reviewRoundKey;
+    }
+
+    private void scheduleFlush(String batchKey) {
         long version = scheduleVersionSequence.incrementAndGet();
-        scheduledVersions.put(coalescingKey, version);
+        scheduledVersions.put(batchKey, version);
 
         ScheduledFuture<?> nextFuture = taskScheduler.schedule(
-                () -> flush(coalescingKey, version),
+                () -> flush(batchKey, version),
                 Instant.now().plusMillis(batchWindowMillis)
         );
-        ScheduledFuture<?> previousFuture = scheduledTasks.put(coalescingKey, nextFuture);
+        ScheduledFuture<?> previousFuture = scheduledTasks.put(batchKey, nextFuture);
         if (previousFuture != null) {
             previousFuture.cancel(false);
         }
     }
 
-    private void flush(String coalescingKey, long version) {
+    private void flush(String batchKey, long version) {
         try {
             reviewRequestInboxProcessor.processPending(batchSize);
         } finally {
-            Long currentVersion = scheduledVersions.get(coalescingKey);
+            Long currentVersion = scheduledVersions.get(batchKey);
             if (currentVersion != null && currentVersion == version) {
-                scheduledVersions.remove(coalescingKey);
-                scheduledTasks.remove(coalescingKey);
+                scheduledVersions.remove(batchKey);
+                scheduledTasks.remove(batchKey);
             }
         }
     }

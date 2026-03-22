@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ReviewRequestInbox extends BaseTimeEntity {
 
-    private String coalescingKey;
+    private String idempotencyKey;
 
     private String apiKey;
 
@@ -43,20 +43,20 @@ public class ReviewRequestInbox extends BaseTimeEntity {
     private ReviewRequestInboxFailureType failureType;
 
     public static ReviewRequestInbox pending(
-            String coalescingKey,
+            String idempotencyKey,
             String apiKey,
             Long githubPullRequestId,
             String requestJson,
             Instant availableAt
     ) {
-        validateCoalescingKey(coalescingKey);
+        validateIdempotencyKey(idempotencyKey);
         validateApiKey(apiKey);
         validateGithubPullRequestId(githubPullRequestId);
         validateRequestJson(requestJson);
         validateAvailableAt(availableAt);
 
         return new ReviewRequestInbox(
-                coalescingKey,
+                idempotencyKey,
                 apiKey,
                 githubPullRequestId,
                 requestJson,
@@ -66,9 +66,9 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         );
     }
 
-    private static void validateCoalescingKey(String coalescingKey) {
-        if (coalescingKey == null || coalescingKey.isBlank()) {
-            throw new IllegalArgumentException("coalescingKey는 비어 있을 수 없습니다.");
+    private static void validateIdempotencyKey(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new IllegalArgumentException("idempotencyKey는 비어 있을 수 없습니다.");
         }
     }
 
@@ -97,7 +97,7 @@ public class ReviewRequestInbox extends BaseTimeEntity {
     }
 
     private ReviewRequestInbox(
-            String coalescingKey,
+            String idempotencyKey,
             String apiKey,
             Long githubPullRequestId,
             String requestJson,
@@ -105,7 +105,7 @@ public class ReviewRequestInbox extends BaseTimeEntity {
             ReviewRequestInboxStatus status,
             int processingAttempt
     ) {
-        this.coalescingKey = coalescingKey;
+        this.idempotencyKey = idempotencyKey;
         this.apiKey = apiKey;
         this.githubPullRequestId = githubPullRequestId;
         this.requestJson = requestJson;

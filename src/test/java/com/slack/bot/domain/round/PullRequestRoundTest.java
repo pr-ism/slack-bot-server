@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 class PullRequestRoundTest {
 
     @Test
-    void 라운드_생성시_필드와_coalescing_key가_정상적으로_설정된다() {
+    void 라운드_생성시_필드와_batch_key가_정상적으로_설정된다() {
         // when
         PullRequestRound round = PullRequestRound.create("api-key", 123L, 2, "commit-hash-2");
 
@@ -22,7 +22,7 @@ class PullRequestRoundTest {
                 () -> assertThat(round.getRoundNumber()).isEqualTo(2),
                 () -> assertThat(round.getGithubPullRequestId()).isEqualTo(123L),
                 () -> assertThat(round.hasSameStartCommitHash("commit-hash-2")).isTrue(),
-                () -> assertThat(round.coalescingKey()).isEqualTo("api-key:123:2")
+                () -> assertThat(round.batchKey()).isEqualTo("api-key:123:2")
         );
     }
 

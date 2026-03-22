@@ -108,7 +108,7 @@ class ReviewRequestInboxProcessorTest {
                     () -> assertThat(spyReviewNotificationService.getSendCount()).isEqualTo(1),
                     () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
                     () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
-                    () -> assertThat(inbox.getCoalescingKey()).hasSize(64),
+                    () -> assertThat(inbox.getIdempotencyKey()).hasSize(64),
                     () -> assertThat(inbox.getFailureType()).isNull(),
                     () -> assertThat(reviewNotificationSourceContext.currentSourceKey()).isEmpty()
             );
@@ -122,7 +122,7 @@ class ReviewRequestInboxProcessorTest {
             "classpath:sql/fixtures/review/channel_t1.sql",
             "classpath:sql/fixtures/review/project_member_t1_mapped.sql"
     })
-    void 동일_coalescing_key로_중복_enqueue하면_1건만_처리되고_최신_요청으로_업데이트된다() {
+    void 동일_idempotency_key로_중복_enqueue하면_1건만_처리되고_최신_요청으로_업데이트된다() {
         // given
         ReviewNotificationPayload first = request(202L, "Old title");
         ReviewNotificationPayload second = request(202L, "New title");
@@ -143,7 +143,7 @@ class ReviewRequestInboxProcessorTest {
                     () -> assertThat(outboxes).hasSize(1),
                     () -> assertThat(spyReviewNotificationService.getSendCount()).isEqualTo(1),
                     () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
-                    () -> assertThat(inbox.getCoalescingKey()).hasSize(64),
+                    () -> assertThat(inbox.getIdempotencyKey()).hasSize(64),
                     () -> assertThat(objectMapper.readTree(inbox.getRequestJson()).path("pullRequestTitle").asText())
                             .isEqualTo("New title")
             );
@@ -294,56 +294,56 @@ class ReviewRequestInboxProcessorTest {
     }
 
     @Test
-    void 기본_enqueue는_같은_apiKey와_pullRequestId면_같은_해시_coalescingKey를_사용한다() {
+    void 기본_enqueue는_같은_apiKey와_pullRequestId면_같은_해시_idempotencyKey를_사용한다() {
         // given
         ReviewNotificationPayload first = request(901L, "first-title");
         ReviewNotificationPayload second = request(901L, "second-title");
 
         // when
         reviewRequestInboxProcessor.enqueue("test-api-key", first, 0);
-        String firstCoalescingKey = jpaReviewRequestInboxRepository.findAll().getFirst().getCoalescingKey();
+        String firstIdempotencyKey = jpaReviewRequestInboxRepository.findAll().getFirst().getIdempotencyKey();
         reviewRequestInboxProcessor.enqueue("test-api-key", second, 0);
 
         // then
         List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAll();
         assertAll(
                 () -> assertThat(inboxes).hasSize(1),
-                () -> assertThat(inboxes.getFirst().getCoalescingKey()).hasSize(64),
-                () -> assertThat(inboxes.getFirst().getCoalescingKey()).isEqualTo(firstCoalescingKey)
+                () -> assertThat(inboxes.getFirst().getIdempotencyKey()).hasSize(64),
+                () -> assertThat(inboxes.getFirst().getIdempotencyKey()).isEqualTo(firstIdempotencyKey)
         );
     }
 
     @Test
-    void 기본_enqueue는_apiKey가_다르면_다른_해시_coalescingKey를_사용한다() {
+    void 기본_enqueue는_apiKey가_다르면_다른_해시_idempotencyKey를_사용한다() {
         // given
         ReviewNotificationPayload request = request(902L, "same-pr");
 
         // when
         reviewRequestInboxProcessor.enqueue("test-api-key-1", request, 0);
-        String firstCoalescingKey = jpaReviewRequestInboxRepository.findAll().getFirst().getCoalescingKey();
+        String firstIdempotencyKey = jpaReviewRequestInboxRepository.findAll().getFirst().getIdempotencyKey();
         jpaReviewRequestInboxRepository.deleteAll();
         reviewRequestInboxProcessor.enqueue("test-api-key-2", request, 0);
-        String secondCoalescingKey = jpaReviewRequestInboxRepository.findAll().getFirst().getCoalescingKey();
+        String secondIdempotencyKey = jpaReviewRequestInboxRepository.findAll().getFirst().getIdempotencyKey();
 
         // then
-        assertThat(firstCoalescingKey).isNotEqualTo(secondCoalescingKey);
+        assertThat(firstIdempotencyKey).isNotEqualTo(secondIdempotencyKey);
     }
 
     @Test
-    void 기본_enqueue는_reviewRoundKey가_다르면_다른_해시_coalescingKey를_사용한다() {
+    void 기본_enqueue는_reviewRoundKey가_다르면_다른_해시_idempotencyKey를_사용한다() {
         // given
-        ReviewNotificationPayload first = request(903L, "same-pr", "api-key:903:1");
-        ReviewNotificationPayload second = request(903L, "same-pr", "api-key:903:2");
+        ReviewNotificationPayload first = request(903L, "same-pr", "1");
+        ReviewNotificationPayload second = request(903L, "same-pr", "2");
 
         // when
         reviewRequestInboxProcessor.enqueue("test-api-key", first, 0);
-        String firstCoalescingKey = jpaReviewRequestInboxRepository.findAll().getFirst().getCoalescingKey();
+        String firstIdempotencyKey = jpaReviewRequestInboxRepository.findAll().getFirst().getIdempotencyKey();
         jpaReviewRequestInboxRepository.deleteAll();
         reviewRequestInboxProcessor.enqueue("test-api-key", second, 0);
-        String secondCoalescingKey = jpaReviewRequestInboxRepository.findAll().getFirst().getCoalescingKey();
+        String secondIdempotencyKey = jpaReviewRequestInboxRepository.findAll().getFirst().getIdempotencyKey();
 
         // then
-        assertThat(firstCoalescingKey).isNotEqualTo(secondCoalescingKey);
+        assertThat(firstIdempotencyKey).isNotEqualTo(secondIdempotencyKey);
     }
 
     @Test

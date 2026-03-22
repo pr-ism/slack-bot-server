@@ -36,20 +36,20 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
     @Override
     @Transactional
     public void upsertPending(
-            String coalescingKey,
+            String idempotencyKey,
             String apiKey,
             Long githubPullRequestId,
             String requestJson,
             Instant availableAt
     ) {
-        validateCoalescingKey(coalescingKey);
+        validateIdempotencyKey(idempotencyKey);
         validateApiKey(apiKey);
         validateGithubPullRequestId(githubPullRequestId);
         validateRequestJson(requestJson);
         validateAvailableAt(availableAt);
 
         ReviewRequestInbox inbox = ReviewRequestInbox.pending(
-                coalescingKey,
+                idempotencyKey,
                 apiKey,
                 githubPullRequestId,
                 requestJson,
@@ -63,7 +63,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                 throw exception;
             }
 
-            updatePending(coalescingKey, apiKey, githubPullRequestId, requestJson, availableAt);
+            updatePending(idempotencyKey, apiKey, githubPullRequestId, requestJson, availableAt);
         }
     }
 
@@ -187,7 +187,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
     }
 
     private long updatePending(
-            String coalescingKey,
+            String idempotencyKey,
             String apiKey,
             Long githubPullRequestId,
             String requestJson,
@@ -213,7 +213,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                                    Expressions.nullExpression(ReviewRequestInboxFailureType.class)
                            )
                            .where(
-                                   reviewRequestInbox.coalescingKey.eq(coalescingKey),
+                                   reviewRequestInbox.idempotencyKey.eq(idempotencyKey),
                                    reviewRequestInbox.status.in(CLAIMABLE_STATUSES)
                            )
                            .execute();
@@ -225,9 +225,9 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
         }
     }
 
-    private void validateCoalescingKey(String coalescingKey) {
-        if (coalescingKey == null || coalescingKey.isBlank()) {
-            throw new IllegalArgumentException("coalescingKey는 비어 있을 수 없습니다.");
+    private void validateIdempotencyKey(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new IllegalArgumentException("idempotencyKey는 비어 있을 수 없습니다.");
         }
     }
 

@@ -7,6 +7,8 @@ import static org.awaitility.Awaitility.await;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.review.ReviewEventBatch;
 import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
+import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
+import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxRepository;
 import java.util.List;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -24,6 +26,9 @@ class InMemoryReviewEventBatchTest {
 
     @Autowired
     SpyReviewNotificationService spyNotificationService;
+
+    @Autowired
+    JpaReviewRequestInboxRepository jpaReviewRequestInboxRepository;
 
     @Test
     @Sql(scripts = {
@@ -117,6 +122,30 @@ class InMemoryReviewEventBatchTest {
         // then
         await().atMost(3, SECONDS)
                .untilAsserted(() -> assertThat(spyNotificationService.getSendCount()).isEqualTo(1));
+    }
+
+    @Test
+    @Sql(scripts = {
+            "classpath:sql/fixtures/review/project_t1.sql",
+            "classpath:sql/fixtures/review/workspace_t1.sql",
+            "classpath:sql/fixtures/review/channel_t1.sql",
+            "classpath:sql/fixtures/review/project_member_t1_mapped.sql"
+    })
+    void 배치_enqueue는_requestJson에_apiKey를_노출하지_않고_roundNumber만_reviewRoundKey로_저장한다() {
+        // given
+        ReviewAssignmentRequest request = createRequest("commit-hash-1", List.of("reviewer-gh-1"));
+
+        // when
+        eventBatch.buffer("test-api-key", request);
+
+        // then
+        await().atMost(3, SECONDS).untilAsserted(() -> {
+            ReviewRequestInbox inbox = jpaReviewRequestInboxRepository.findAll().getFirst();
+
+            assertThat(inbox.getRequestJson())
+                    .contains("\"reviewRoundKey\":\"1\"")
+                    .doesNotContain("test-api-key");
+        });
     }
 
     private ReviewAssignmentRequest createRequest(String startCommitHash, List<String> reviewers) {

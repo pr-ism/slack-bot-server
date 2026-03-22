@@ -21,7 +21,7 @@ class ReviewRequestInboxTest {
 
         // then
         assertAll(
-                () -> assertThat(inbox.getCoalescingKey()).isEqualTo("api-key:42"),
+                () -> assertThat(inbox.getIdempotencyKey()).isEqualTo("api-key:42"),
                 () -> assertThat(inbox.getApiKey()).isEqualTo("api-key"),
                 () -> assertThat(inbox.getGithubPullRequestId()).isEqualTo(42L),
                 () -> assertThat(inbox.getRequestJson()).isEqualTo("{\"githubPullRequestId\":42}"),
@@ -32,7 +32,7 @@ class ReviewRequestInboxTest {
     }
 
     @Test
-    void pending은_coalescingKey가_null이면_예외를_던진다() {
+    void pending은_idempotencyKey가_null이면_예외를_던진다() {
         // when & then
         assertThatThrownBy(
                 () -> ReviewRequestInbox.pending(
@@ -44,11 +44,11 @@ class ReviewRequestInboxTest {
                 )
         )
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("coalescingKey는 비어 있을 수 없습니다.");
+                .hasMessage("idempotencyKey는 비어 있을 수 없습니다.");
     }
 
     @Test
-    void pending은_coalescingKey가_공백이면_예외를_던진다() {
+    void pending은_idempotencyKey가_공백이면_예외를_던진다() {
         // when & then
         assertThatThrownBy(
                 () -> ReviewRequestInbox.pending(
@@ -60,7 +60,7 @@ class ReviewRequestInboxTest {
                 )
         )
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("coalescingKey는 비어 있을 수 없습니다.");
+                .hasMessage("idempotencyKey는 비어 있을 수 없습니다.");
     }
 
     @Test

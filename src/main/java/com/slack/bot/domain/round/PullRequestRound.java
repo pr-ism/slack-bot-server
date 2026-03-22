@@ -77,7 +77,7 @@ public class PullRequestRound extends CreatedAtEntity {
         return this.startCommitHash.equals(startCommitHash);
     }
 
-    public String coalescingKey() {
+    public String batchKey() {
         return apiKey + ":" + githubPullRequestId + ":" + roundNumber;
     }
 }

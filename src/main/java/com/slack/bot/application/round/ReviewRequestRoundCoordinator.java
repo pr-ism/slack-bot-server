@@ -50,7 +50,11 @@ public class ReviewRequestRoundCoordinator {
             markReviewedReviewers(round, request.reviewedReviewers());
         }
 
-        return new ReviewRoundRegistrationResultDto(round.coalescingKey(), new ArrayList<>(reviewersToMention));
+        return new ReviewRoundRegistrationResultDto(
+                round.batchKey(),
+                round.getRoundNumber(),
+                new ArrayList<>(reviewersToMention)
+        );
     }
 
     private RoundResolution resolveRound(

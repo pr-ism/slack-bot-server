@@ -50,9 +50,9 @@ public class ReviewRequestInboxProcessor {
 
         validateApiKeyAndGithubPullRequestId(apiKey, request.githubPullRequestId());
         String requestJson = serializeRequest(request);
-        String coalescingKey = buildCoalescingKey(apiKey, request);
+        String idempotencyKey = buildIdempotencyKey(apiKey, request);
 
-        enqueuePending(apiKey, request.githubPullRequestId(), requestJson, batchWindowMillis, coalescingKey);
+        enqueuePending(apiKey, request.githubPullRequestId(), requestJson, batchWindowMillis, idempotencyKey);
     }
 
     public void processPending(int limit) {
@@ -160,7 +160,7 @@ public class ReviewRequestInboxProcessor {
         }
     }
 
-    private String buildCoalescingKey(String apiKey, ReviewNotificationPayload request) {
+    private String buildIdempotencyKey(String apiKey, ReviewNotificationPayload request) {
         String idempotencyPayload = idempotencyPayloadEncoder.encode(apiKey, request);
 
         return idempotencyKeyGenerator.generate(
@@ -174,12 +174,12 @@ public class ReviewRequestInboxProcessor {
             Long githubPullRequestId,
             String requestJson,
             long batchWindowMillis,
-            String coalescingKey
+            String idempotencyKey
     ) {
         Instant availableAt = clock.instant().plusMillis(batchWindowMillis);
 
         reviewRequestInboxRepository.upsertPending(
-                coalescingKey,
+                idempotencyKey,
                 apiKey,
                 githubPullRequestId,
                 requestJson,
@@ -209,7 +209,7 @@ public class ReviewRequestInboxProcessor {
         long availableAtEpochMillis = resolveAvailableAtEpochMillis(inbox.getAvailableAt());
 
         return REVIEW_REQUEST_INBOX_SOURCE_PREFIX
-                + ":" + inbox.getCoalescingKey()
+                + ":" + inbox.getIdempotencyKey()
                 + ":" + availableAtEpochMillis;
     }
 
