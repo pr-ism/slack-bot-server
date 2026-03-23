@@ -47,7 +47,11 @@ public class InboxToOutboxSourceAspect {
 
         Object firstArgument = args[0];
         if (firstArgument instanceof SlackInteractionInbox inbox) {
-            return inbox.getId();
+            Long inboxId = inbox.getId();
+            if (inboxId == null) {
+                throw new IllegalStateException("인박스 source 바인딩 대상의 id가 없습니다.");
+            }
+            return inboxId;
         }
 
         if (firstArgument instanceof Long inboxId) {

@@ -59,7 +59,7 @@ class InboxToOutboxSourceAspectIntegrationTest {
     }
 
     @Test
-    void inbox_id가_null이어도_INBOX_접두사로_출처를_바인딩한다() throws Exception {
+    void inbox_id가_null이면_즉시_예외를_던진다() {
         // given
         SlackInteractionInbox inbox = SlackInteractionInbox.pending(
                 SlackInteractionInboxType.BLOCK_ACTIONS,
@@ -67,14 +67,14 @@ class InboxToOutboxSourceAspectIntegrationTest {
                 "{}"
         );
 
-        // when
-        String actual = inboxToOutboxProbe.bind(inbox, InboxToOutboxMode.RETURN_VALUE);
+        // when & then
+        assertThatThrownBy(() -> inboxToOutboxProbe.bind(inbox, InboxToOutboxMode.RETURN_VALUE))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("인박스 source 바인딩 대상의 id가 없습니다.");
 
-        // then
         assertAll(
-                () -> assertThat(actual).isEqualTo("INBOX:"),
-                () -> assertThat(inboxToOutboxProbe.observedInboxProcessing()).isTrue(),
-                () -> assertThat(inboxToOutboxProbe.observedSourceKey()).hasValue("INBOX:"),
+                () -> assertThat(inboxToOutboxProbe.observedInboxProcessing()).isFalse(),
+                () -> assertThat(inboxToOutboxProbe.observedSourceKey()).isEmpty(),
                 () -> assertThat(processingSourceContext.isInboxProcessing()).isFalse(),
                 () -> assertThat(outboxIdempotencySourceContext.currentSourceKey()).isEmpty()
         );
