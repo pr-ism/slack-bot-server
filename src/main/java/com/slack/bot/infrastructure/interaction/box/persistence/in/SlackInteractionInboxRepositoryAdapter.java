@@ -5,7 +5,6 @@ import static com.slack.bot.infrastructure.interaction.box.in.QSlackInteractionI
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
-import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStatus;
@@ -17,7 +16,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -30,22 +28,23 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
     private final JPAQueryFactory queryFactory;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
     private final JpaSlackInteractionInboxRepository repository;
-    private final SlackInteractionInboxCreator inboxCreator;
-    private final MysqlDuplicateKeyDetector mysqlDuplicateKeyDetector;
 
     @Override
     public boolean enqueue(SlackInteractionInboxType interactionType, String idempotencyKey, String payloadJson) {
         SlackInteractionInbox inbox = SlackInteractionInbox.pending(interactionType, idempotencyKey, payloadJson);
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("interactionType", inbox.getInteractionType().name())
+                .addValue("idempotencyKey", inbox.getIdempotencyKey())
+                .addValue("payloadJson", inbox.getPayloadJson())
+                .addValue("pendingStatus", inbox.getStatus().name())
+                .addValue("processingAttempt", inbox.getProcessingAttempt());
 
-        try {
-            inboxCreator.saveNew(inbox);
-            return true;
-        } catch (DataIntegrityViolationException exception) {
-            if (mysqlDuplicateKeyDetector.isNotDuplicateKey(exception)) {
-                throw exception;
-            }
-            return false;
-        }
+        int updatedCount = namedParameterJdbcTemplate.update(
+                buildEnqueueSql(),
+                parameters
+        );
+
+        return updatedCount > 0;
     }
 
     @Override
@@ -210,6 +209,31 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
         validateMaxAttempts(maxAttempts);
+    }
+
+    protected String buildEnqueueSql() {
+        return """
+                INSERT INTO slack_interaction_inbox (
+                    created_at,
+                    updated_at,
+                    interaction_type,
+                    idempotency_key,
+                    payload_json,
+                    status,
+                    processing_attempt
+                )
+                VALUES (
+                    CURRENT_TIMESTAMP(6),
+                    CURRENT_TIMESTAMP(6),
+                    :interactionType,
+                    :idempotencyKey,
+                    :payloadJson,
+                    :pendingStatus,
+                    :processingAttempt
+                )
+                ON DUPLICATE KEY UPDATE
+                    idempotency_key = idempotency_key
+                """;
     }
 
     private void validateInteractionType(SlackInteractionInboxType interactionType) {

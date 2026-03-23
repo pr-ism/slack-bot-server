@@ -5,7 +5,6 @@ import static com.slack.bot.infrastructure.review.box.in.QReviewRequestInbox.rev
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
-import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
@@ -16,7 +15,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -33,8 +31,6 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
 
     private final JPAQueryFactory queryFactory;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
-    private final MysqlDuplicateKeyDetector mysqlDuplicateKeyDetector;
-    private final ReviewRequestInboxCreator reviewRequestInboxCreator;
     private final JpaReviewRequestInboxRepository reviewRequestInboxJpaRepository;
 
     @Override
@@ -60,15 +56,19 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                 availableAt
         );
 
-        try {
-            reviewRequestInboxCreator.saveNew(inbox);
-        } catch (DataIntegrityViolationException exception) {
-            if (mysqlDuplicateKeyDetector.isNotDuplicateKey(exception)) {
-                throw exception;
-            }
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("idempotencyKey", inbox.getIdempotencyKey())
+                .addValue("apiKey", inbox.getApiKey())
+                .addValue("githubPullRequestId", inbox.getGithubPullRequestId())
+                .addValue("requestJson", inbox.getRequestJson())
+                .addValue("availableAt", Timestamp.from(inbox.getAvailableAt()))
+                .addValue("pendingStatus", ReviewRequestInboxStatus.PENDING.name())
+                .addValue("retryPendingStatus", ReviewRequestInboxStatus.RETRY_PENDING.name());
 
-            updatePending(idempotencyKey, apiKey, githubPullRequestId, requestJson, availableAt);
-        }
+        namedParameterJdbcTemplate.update(
+                buildUpsertPendingSql(),
+                parameters
+        );
     }
 
     @Override
@@ -239,37 +239,92 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
         return reviewRequestInboxJpaRepository.save(inbox);
     }
 
-    private long updatePending(
-            String idempotencyKey,
-            String apiKey,
-            Long githubPullRequestId,
-            String requestJson,
-            Instant availableAt
-    ) {
-        // PROCESSING / PROCESSED / FAILED는 현재 워커 전이를 보호하기 위해 재큐잉으로 덮어쓰지 않음
-        return queryFactory.update(reviewRequestInbox)
-                           .set(reviewRequestInbox.apiKey, apiKey)
-                           .set(reviewRequestInbox.githubPullRequestId, githubPullRequestId)
-                           .set(reviewRequestInbox.requestJson, requestJson)
-                           .set(reviewRequestInbox.availableAt, availableAt)
-                           .set(reviewRequestInbox.status, ReviewRequestInboxStatus.PENDING)
-                           .set(reviewRequestInbox.processingAttempt, 0)
-                           .set(
-                                   reviewRequestInbox.processingStartedAt,
-                                   Expressions.nullExpression(Instant.class)
-                           )
-                           .set(reviewRequestInbox.processedAt, Expressions.nullExpression(Instant.class))
-                           .set(reviewRequestInbox.failedAt, Expressions.nullExpression(Instant.class))
-                           .set(reviewRequestInbox.failureReason, Expressions.nullExpression(String.class))
-                           .set(
-                                   reviewRequestInbox.failureType,
-                                   Expressions.nullExpression(ReviewRequestInboxFailureType.class)
-                           )
-                           .where(
-                                   reviewRequestInbox.idempotencyKey.eq(idempotencyKey),
-                                   reviewRequestInbox.status.in(CLAIMABLE_STATUSES)
-                           )
-                           .execute();
+    protected String buildUpsertPendingSql() {
+        return """
+                INSERT INTO review_request_inbox (
+                    created_at,
+                    updated_at,
+                    idempotency_key,
+                    api_key,
+                    github_pull_request_id,
+                    request_json,
+                    available_at,
+                    status,
+                    processing_attempt
+                )
+                VALUES (
+                    CURRENT_TIMESTAMP(6),
+                    CURRENT_TIMESTAMP(6),
+                    :idempotencyKey,
+                    :apiKey,
+                    :githubPullRequestId,
+                    :requestJson,
+                    :availableAt,
+                    :pendingStatus,
+                    0
+                )
+                ON DUPLICATE KEY UPDATE
+                    updated_at = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        CURRENT_TIMESTAMP(6),
+                        updated_at
+                    ),
+                    api_key = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        :apiKey,
+                        api_key
+                    ),
+                    github_pull_request_id = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        :githubPullRequestId,
+                        github_pull_request_id
+                    ),
+                    request_json = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        :requestJson,
+                        request_json
+                    ),
+                    available_at = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        :availableAt,
+                        available_at
+                    ),
+                    status = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        :pendingStatus,
+                        status
+                    ),
+                    processing_attempt = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        0,
+                        processing_attempt
+                    ),
+                    processing_started_at = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        NULL,
+                        processing_started_at
+                    ),
+                    processed_at = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        NULL,
+                        processed_at
+                    ),
+                    failed_at = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        NULL,
+                        failed_at
+                    ),
+                    failure_reason = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        NULL,
+                        failure_reason
+                    ),
+                    failure_type = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        NULL,
+                        failure_type
+                    )
+                """;
     }
 
     private void validateIdempotencyKey(String idempotencyKey) {

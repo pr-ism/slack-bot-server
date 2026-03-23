@@ -5,7 +5,6 @@ import static com.slack.bot.infrastructure.interaction.box.out.QSlackNotificatio
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
-import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
@@ -16,7 +15,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -29,20 +27,27 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
     private final JPAQueryFactory queryFactory;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
     private final JpaSlackNotificationOutboxRepository repository;
-    private final SlackNotificationOutboxCreator outboxCreator;
-    private final MysqlDuplicateKeyDetector mysqlDuplicateKeyDetector;
 
     @Override
     public boolean enqueue(SlackNotificationOutbox outbox) {
-        try {
-            outboxCreator.saveNew(outbox);
-            return true;
-        } catch (DataIntegrityViolationException exception) {
-            if (mysqlDuplicateKeyDetector.isNotDuplicateKey(exception)) {
-                throw exception;
-            }
-            return false;
-        }
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("messageType", outbox.getMessageType().name())
+                .addValue("idempotencyKey", outbox.getIdempotencyKey())
+                .addValue("teamId", outbox.getTeamId())
+                .addValue("channelId", outbox.getChannelId())
+                .addValue("userId", outbox.getUserId())
+                .addValue("text", outbox.getText())
+                .addValue("blocksJson", outbox.getBlocksJson())
+                .addValue("fallbackText", outbox.getFallbackText())
+                .addValue("pendingStatus", outbox.getStatus().name())
+                .addValue("processingAttempt", outbox.getProcessingAttempt());
+
+        int updatedCount = namedParameterJdbcTemplate.update(
+                buildEnqueueSql(),
+                parameters
+        );
+
+        return updatedCount > 0;
     }
 
     @Override
@@ -203,6 +208,41 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
         validateMaxAttempts(maxAttempts);
+    }
+
+    protected String buildEnqueueSql() {
+        return """
+                INSERT INTO slack_notification_outbox (
+                    created_at,
+                    updated_at,
+                    message_type,
+                    idempotency_key,
+                    team_id,
+                    channel_id,
+                    user_id,
+                    text,
+                    blocks_json,
+                    fallback_text,
+                    status,
+                    processing_attempt
+                )
+                VALUES (
+                    CURRENT_TIMESTAMP(6),
+                    CURRENT_TIMESTAMP(6),
+                    :messageType,
+                    :idempotencyKey,
+                    :teamId,
+                    :channelId,
+                    :userId,
+                    :text,
+                    :blocksJson,
+                    :fallbackText,
+                    :pendingStatus,
+                    :processingAttempt
+                )
+                ON DUPLICATE KEY UPDATE
+                    idempotency_key = idempotency_key
+                """;
     }
 
     private void validateProcessingStartedAt(Instant processingStartedAt) {

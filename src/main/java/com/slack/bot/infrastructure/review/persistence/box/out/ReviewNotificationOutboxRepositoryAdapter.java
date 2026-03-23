@@ -5,7 +5,6 @@ import static com.slack.bot.infrastructure.review.box.out.QReviewNotificationOut
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
-import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxStatus;
@@ -16,7 +15,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -28,22 +26,28 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
 
     private final JPAQueryFactory queryFactory;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
-    private final MysqlDuplicateKeyDetector mysqlDuplicateKeyDetector;
-    private final ReviewNotificationOutboxCreator outboxCreator;
     private final JpaReviewNotificationOutboxRepository repository;
 
     @Override
     public boolean enqueue(ReviewNotificationOutbox outbox) {
-        try {
-            outboxCreator.saveNew(outbox);
-            return true;
-        } catch (DataIntegrityViolationException exception) {
-            if (mysqlDuplicateKeyDetector.isNotDuplicateKey(exception)) {
-                throw exception;
-            }
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("idempotencyKey", outbox.getIdempotencyKey())
+                .addValue("projectId", outbox.getProjectId())
+                .addValue("teamId", outbox.getTeamId())
+                .addValue("channelId", outbox.getChannelId())
+                .addValue("payloadJson", outbox.getPayloadJson())
+                .addValue("blocksJson", outbox.getBlocksJson())
+                .addValue("attachmentsJson", outbox.getAttachmentsJson())
+                .addValue("fallbackText", outbox.getFallbackText())
+                .addValue("pendingStatus", outbox.getStatus().name())
+                .addValue("processingAttempt", outbox.getProcessingAttempt());
 
-            return false;
-        }
+        int updatedCount = namedParameterJdbcTemplate.update(
+                buildEnqueueSql(),
+                parameters
+        );
+
+        return updatedCount > 0;
     }
 
     @Override
@@ -217,6 +221,41 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
         if (processingStartedBefore == null) {
             throw new IllegalArgumentException("processingStartedBefore는 비어 있을 수 없습니다.");
         }
+    }
+
+    protected String buildEnqueueSql() {
+        return """
+                INSERT INTO review_notification_outbox (
+                    created_at,
+                    updated_at,
+                    idempotency_key,
+                    project_id,
+                    team_id,
+                    channel_id,
+                    payload_json,
+                    blocks_json,
+                    attachments_json,
+                    fallback_text,
+                    status,
+                    processing_attempt
+                )
+                VALUES (
+                    CURRENT_TIMESTAMP(6),
+                    CURRENT_TIMESTAMP(6),
+                    :idempotencyKey,
+                    :projectId,
+                    :teamId,
+                    :channelId,
+                    :payloadJson,
+                    :blocksJson,
+                    :attachmentsJson,
+                    :fallbackText,
+                    :pendingStatus,
+                    :processingAttempt
+                )
+                ON DUPLICATE KEY UPDATE
+                    idempotency_key = idempotency_key
+                """;
     }
 
     private void validateFailedAt(Instant failedAt) {
