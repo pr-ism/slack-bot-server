@@ -11,6 +11,12 @@ public interface ReviewNotificationOutboxRepository {
 
     ReviewNotificationOutbox save(ReviewNotificationOutbox outbox);
 
+    boolean renewProcessingLease(
+            Long outboxId,
+            Instant currentProcessingStartedAt,
+            Instant renewedProcessingStartedAt
+    );
+
     boolean saveIfProcessingLeaseMatched(
             ReviewNotificationOutbox outbox,
             Instant claimedProcessingStartedAt

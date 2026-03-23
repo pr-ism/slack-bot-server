@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
+import com.slack.bot.application.interaction.box.out.exception.OutboxProcessingLeaseLostException;
 import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
 import com.slack.bot.application.review.dto.ReviewMessageDto;
 import com.slack.bot.domain.workspace.Workspace;
@@ -18,6 +19,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.retry.support.RetryTemplate;
@@ -118,11 +120,15 @@ public class ReviewNotificationOutboxProcessor {
             return;
         }
 
+        AtomicReference<Instant> currentProcessingStartedAt = new AtomicReference<>(claimedProcessingStartedAt);
         try {
             slackNotificationOutboxRetryTemplate.execute(context -> {
+                renewProcessingLease(outbox, currentProcessingStartedAt);
                 dispatch(outbox);
                 return null;
             });
+        } catch (OutboxProcessingLeaseLostException e) {
+            return;
         } catch (Exception exception) {
             log.warn("review_notification outbox 처리에 실패했습니다. outboxId={}", outbox.getId(), exception);
 
@@ -130,13 +136,13 @@ public class ReviewNotificationOutboxProcessor {
             try {
                 boolean updated = reviewNotificationOutboxRepository.saveIfProcessingLeaseMatched(
                         outbox,
-                        claimedProcessingStartedAt
+                        currentProcessingStartedAt.get()
                 );
                 if (updated) {
                     return;
                 }
 
-                logLeaseLost(outbox.getId(), claimedProcessingStartedAt, outbox.getProcessingStartedAt());
+                logLeaseLost(outbox.getId(), currentProcessingStartedAt.get(), outbox.getProcessingStartedAt());
             } catch (Exception e) {
                 log.error(
                         "review_notification outbox 실패 상태 저장에 실패했습니다. outboxId={}",
@@ -151,13 +157,13 @@ public class ReviewNotificationOutboxProcessor {
         try {
             boolean updated = reviewNotificationOutboxRepository.saveIfProcessingLeaseMatched(
                     outbox,
-                    claimedProcessingStartedAt
+                    currentProcessingStartedAt.get()
             );
             if (updated) {
                 return;
             }
 
-            logLeaseLost(outbox.getId(), claimedProcessingStartedAt, outbox.getProcessingStartedAt());
+            logLeaseLost(outbox.getId(), currentProcessingStartedAt.get(), outbox.getProcessingStartedAt());
         } catch (Exception e) {
             log.error(
                     "review_notification outbox 전송은 성공했지만 SENT 상태 저장에 실패했습니다. outboxId={}",
@@ -247,6 +253,25 @@ public class ReviewNotificationOutboxProcessor {
 
     private Instant currentLeaseStartedAt() {
         return clock.instant().truncatedTo(ChronoUnit.MICROS);
+    }
+
+    private void renewProcessingLease(
+            ReviewNotificationOutbox outbox,
+            AtomicReference<Instant> currentProcessingStartedAt
+    ) {
+        Instant renewedProcessingStartedAt = currentLeaseStartedAt();
+        boolean renewed = reviewNotificationOutboxRepository.renewProcessingLease(
+                outbox.getId(),
+                currentProcessingStartedAt.get(),
+                renewedProcessingStartedAt
+        );
+        if (!renewed) {
+            logLeaseLost(outbox.getId(), currentProcessingStartedAt.get(), renewedProcessingStartedAt);
+            throw new OutboxProcessingLeaseLostException("review_notification outbox processing lease를 상실했습니다.");
+        }
+
+        currentProcessingStartedAt.set(renewedProcessingStartedAt);
+        outbox.renewProcessingLease(renewedProcessingStartedAt);
     }
 
     private boolean hasProcessingLease(

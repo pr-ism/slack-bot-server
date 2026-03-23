@@ -91,6 +91,13 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
         this.failureType = null;
     }
 
+    public void renewProcessingLease(Instant processingStartedAt) {
+        validateTransition(SlackNotificationOutboxStatus.PROCESSING, "PROCESSING");
+        validateProcessingStartedAt(processingStartedAt);
+
+        this.processingStartedAt = processingStartedAt;
+    }
+
     public void markRetryPending(Instant failedAt, String failureReason) {
         validateTransition(SlackNotificationOutboxStatus.PROCESSING, "RETRY_PENDING");
         validateFailedAt(failedAt);
@@ -212,6 +219,12 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
     private void validateSentAt(Instant sentAt) {
         if (sentAt == null) {
             throw new IllegalArgumentException("sentAt은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateProcessingStartedAt(Instant processingStartedAt) {
+        if (processingStartedAt == null) {
+            throw new IllegalArgumentException("processingStartedAt은 비어 있을 수 없습니다.");
         }
     }
 

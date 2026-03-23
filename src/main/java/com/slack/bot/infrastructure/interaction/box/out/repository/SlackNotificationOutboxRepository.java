@@ -11,6 +11,12 @@ public interface SlackNotificationOutboxRepository {
 
     SlackNotificationOutbox save(SlackNotificationOutbox outbox);
 
+    boolean renewProcessingLease(
+            Long outboxId,
+            Instant currentProcessingStartedAt,
+            Instant renewedProcessingStartedAt
+    );
+
     boolean saveIfProcessingLeaseMatched(
             SlackNotificationOutbox outbox,
             Instant claimedProcessingStartedAt

@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -90,6 +91,8 @@ class ReviewNotificationOutboxProcessorTest {
                 reviewNotificationOutboxRepository,
                 classifier
         );
+
+        lenient().when(reviewNotificationOutboxRepository.renewProcessingLease(any(), any(), any())).thenReturn(true);
     }
 
     private RetryTemplate createOutboxRetryTemplate(
@@ -188,6 +191,26 @@ class ReviewNotificationOutboxProcessorTest {
         // then
         verify(notificationTransportApiClient, never())
                 .sendBlockMessage(anyString(), anyString(), any(), any(), anyString());
+        verify(reviewNotificationOutboxRepository, never()).saveIfProcessingLeaseMatched(any(), any());
+    }
+
+    @Test
+    void lease_연장에_실패하면_전송을_건너뛴다() {
+        // given
+        ReviewNotificationOutbox claimed = spyClaimed("C1", 1, null);
+        given(reviewNotificationOutboxRepository.claimNextId(any(), anyCollection()))
+                .willReturn(Optional.of(10L), Optional.empty());
+        given(reviewNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(claimed));
+        given(reviewNotificationOutboxRepository.renewProcessingLease(any(), any(), any())).willReturn(false);
+
+        // when
+        processor.processPending(10);
+
+        // then
+        verify(notificationTransportApiClient, never())
+                .sendBlockMessage(anyString(), anyString(), any(), any(), anyString());
+        verify(claimed, never()).markSent(any());
+        verify(claimed, never()).markFailed(any(), anyString(), any());
         verify(reviewNotificationOutboxRepository, never()).saveIfProcessingLeaseMatched(any(), any());
     }
 

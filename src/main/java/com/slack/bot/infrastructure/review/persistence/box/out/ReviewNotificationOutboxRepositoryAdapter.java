@@ -58,6 +58,40 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
 
     @Override
     @Transactional
+    public boolean renewProcessingLease(
+            Long outboxId,
+            Instant currentProcessingStartedAt,
+            Instant renewedProcessingStartedAt
+    ) {
+        validateRenewProcessingLeaseArguments(
+                outboxId,
+                currentProcessingStartedAt,
+                renewedProcessingStartedAt
+        );
+
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("renewedProcessingStartedAt", Timestamp.from(renewedProcessingStartedAt))
+                .addValue("outboxId", outboxId)
+                .addValue("processingStatus", ReviewNotificationOutboxStatus.PROCESSING.name())
+                .addValue("currentProcessingStartedAt", Timestamp.from(currentProcessingStartedAt));
+
+        int updatedCount = namedParameterJdbcTemplate.update(
+                """
+                UPDATE review_notification_outbox
+                SET updated_at = CURRENT_TIMESTAMP(6),
+                    processing_started_at = :renewedProcessingStartedAt
+                WHERE id = :outboxId
+                  AND status = :processingStatus
+                  AND processing_started_at = :currentProcessingStartedAt
+                """,
+                parameters
+        );
+
+        return updatedCount > 0;
+    }
+
+    @Override
+    @Transactional
     public boolean saveIfProcessingLeaseMatched(
             ReviewNotificationOutbox outbox,
             Instant claimedProcessingStartedAt
@@ -267,6 +301,18 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
             throw new IllegalArgumentException("outboxId는 비어 있을 수 없습니다.");
         }
         validateProcessingStartedAt(claimedProcessingStartedAt);
+    }
+
+    private void validateRenewProcessingLeaseArguments(
+            Long outboxId,
+            Instant currentProcessingStartedAt,
+            Instant renewedProcessingStartedAt
+    ) {
+        if (outboxId == null) {
+            throw new IllegalArgumentException("outboxId는 비어 있을 수 없습니다.");
+        }
+        validateProcessingStartedAt(currentProcessingStartedAt);
+        validateProcessingStartedAt(renewedProcessingStartedAt);
     }
 
     private void validateProcessingStartedBefore(Instant processingStartedBefore) {

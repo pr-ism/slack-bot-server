@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -79,6 +80,8 @@ class SlackNotificationOutboxProcessorUnitTest {
                 slackNotificationOutboxRepository,
                 classifier
         );
+
+        lenient().when(slackNotificationOutboxRepository.renewProcessingLease(any(), any(), any())).thenReturn(true);
     }
 
     private RetryTemplate createOutboxRetryTemplate(
@@ -425,5 +428,26 @@ class SlackNotificationOutboxProcessorUnitTest {
         verify(notificationTransportApiClient, never()).sendMessage(anyString(), anyString(), anyString());
         verify(slackNotificationOutboxRepository, never())
                 .saveIfProcessingLeaseMatched(any(), any());
+    }
+
+    @Test
+    void lease_연장에_실패하면_전송을_건너뛴다() {
+        // given
+        SlackNotificationOutbox outbox = org.mockito.Mockito.mock(SlackNotificationOutbox.class);
+        given(outbox.getId()).willReturn(10L);
+        given(outbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
+        given(slackNotificationOutboxRepository.claimNextId(any(), anyCollection()))
+                .willReturn(Optional.of(10L), Optional.empty());
+        given(slackNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(outbox));
+        given(slackNotificationOutboxRepository.renewProcessingLease(any(), any(), any())).willReturn(false);
+
+        // when
+        slackNotificationOutboxProcessor.processPending(10);
+
+        // then
+        verify(notificationTransportApiClient, never()).sendMessage(anyString(), anyString(), anyString());
+        verify(outbox, never()).markSent(any());
+        verify(outbox, never()).markFailed(any(), anyString(), any());
+        verify(slackNotificationOutboxRepository, never()).saveIfProcessingLeaseMatched(any(), any());
     }
 }
