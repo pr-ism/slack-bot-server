@@ -11,6 +11,11 @@ public interface SlackNotificationOutboxRepository {
 
     SlackNotificationOutbox save(SlackNotificationOutbox outbox);
 
+    boolean saveIfProcessingLeaseMatched(
+            SlackNotificationOutbox outbox,
+            Instant claimedProcessingStartedAt
+    );
+
     Optional<SlackNotificationOutbox> findById(Long outboxId);
 
     Optional<Long> claimNextId(Instant processingStartedAt, Collection<Long> excludedOutboxIds);

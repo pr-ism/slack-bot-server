@@ -57,6 +57,45 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
     }
 
     @Override
+    @Transactional
+    public boolean saveIfProcessingLeaseMatched(
+            ReviewNotificationOutbox outbox,
+            Instant claimedProcessingStartedAt
+    ) {
+        validateSaveIfProcessingLeaseMatchedArguments(outbox, claimedProcessingStartedAt);
+
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("status", outbox.getStatus().name())
+                .addValue("processingStartedAt", toTimestamp(outbox.getProcessingStartedAt()))
+                .addValue("sentAt", toTimestamp(outbox.getSentAt()))
+                .addValue("failedAt", toTimestamp(outbox.getFailedAt()))
+                .addValue("failureReason", outbox.getFailureReason())
+                .addValue("failureType", resolveFailureTypeName(outbox))
+                .addValue("outboxId", outbox.getId())
+                .addValue("processingStatus", ReviewNotificationOutboxStatus.PROCESSING.name())
+                .addValue("claimedProcessingStartedAt", Timestamp.from(claimedProcessingStartedAt));
+
+        int updatedCount = namedParameterJdbcTemplate.update(
+                """
+                UPDATE review_notification_outbox
+                SET updated_at = CURRENT_TIMESTAMP(6),
+                    status = :status,
+                    processing_started_at = :processingStartedAt,
+                    sent_at = :sentAt,
+                    failed_at = :failedAt,
+                    failure_reason = :failureReason,
+                    failure_type = :failureType
+                WHERE id = :outboxId
+                  AND status = :processingStatus
+                  AND processing_started_at = :claimedProcessingStartedAt
+                """,
+                parameters
+        );
+
+        return updatedCount > 0;
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Optional<ReviewNotificationOutbox> findById(Long outboxId) {
         return repository.findById(outboxId);
@@ -217,6 +256,19 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
         }
     }
 
+    private void validateSaveIfProcessingLeaseMatchedArguments(
+            ReviewNotificationOutbox outbox,
+            Instant claimedProcessingStartedAt
+    ) {
+        if (outbox == null) {
+            throw new IllegalArgumentException("outbox는 비어 있을 수 없습니다.");
+        }
+        if (outbox.getId() == null) {
+            throw new IllegalArgumentException("outboxId는 비어 있을 수 없습니다.");
+        }
+        validateProcessingStartedAt(claimedProcessingStartedAt);
+    }
+
     private void validateProcessingStartedBefore(Instant processingStartedBefore) {
         if (processingStartedBefore == null) {
             throw new IllegalArgumentException("processingStartedBefore는 비어 있을 수 없습니다.");
@@ -274,5 +326,21 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
         if (maxAttempts <= 0) {
             throw new IllegalArgumentException("maxAttempts는 0보다 커야 합니다.");
         }
+    }
+
+    private Timestamp toTimestamp(Instant instant) {
+        if (instant == null) {
+            return null;
+        }
+
+        return Timestamp.from(instant);
+    }
+
+    private String resolveFailureTypeName(ReviewNotificationOutbox outbox) {
+        if (outbox.getFailureType() == null) {
+            return null;
+        }
+
+        return outbox.getFailureType().name();
     }
 }

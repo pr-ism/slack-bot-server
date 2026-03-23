@@ -11,6 +11,11 @@ public interface ReviewNotificationOutboxRepository {
 
     ReviewNotificationOutbox save(ReviewNotificationOutbox outbox);
 
+    boolean saveIfProcessingLeaseMatched(
+            ReviewNotificationOutbox outbox,
+            Instant claimedProcessingStartedAt
+    );
+
     Optional<ReviewNotificationOutbox> findById(Long outboxId);
 
     Optional<Long> claimNextId(Instant processingStartedAt, Collection<Long> excludedOutboxIds);

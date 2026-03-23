@@ -50,6 +50,8 @@ import org.springframework.web.client.ResourceAccessException;
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class ReviewNotificationOutboxProcessorTest {
 
+    private static final Instant CLAIMED_PROCESSING_STARTED_AT = Instant.parse("2026-02-24T00:00:00Z");
+
     @Mock
     WorkspaceRepository workspaceRepository;
 
@@ -74,7 +76,7 @@ class ReviewNotificationOutboxProcessorTest {
         );
         classifier = InteractionRetryExceptionClassifier.create();
 
-        Clock fixedClock = Clock.fixed(Instant.parse("2026-02-24T00:00:00Z"), ZoneOffset.UTC);
+        Clock fixedClock = Clock.fixed(CLAIMED_PROCESSING_STARTED_AT, ZoneOffset.UTC);
 
         processor = new ReviewNotificationOutboxProcessor(
                 fixedClock,
@@ -150,7 +152,7 @@ class ReviewNotificationOutboxProcessorTest {
 
         // then
         verify(reviewNotificationOutboxRepository, never()).findById(anyLong());
-        verify(reviewNotificationOutboxRepository, never()).save(any());
+        verify(reviewNotificationOutboxRepository, never()).saveIfProcessingLeaseMatched(any(), any());
     }
 
     @Test
@@ -164,7 +166,29 @@ class ReviewNotificationOutboxProcessorTest {
         processor.processPending(10);
 
         // then
-        verify(reviewNotificationOutboxRepository, never()).save(any());
+        verify(reviewNotificationOutboxRepository, never()).saveIfProcessingLeaseMatched(any(), any());
+    }
+
+    @Test
+    void claim_lease가_달라지면_전송을_건너뛴다() {
+        // given
+        ReviewNotificationOutbox claimed = spyClaimed("C1", 1, null);
+        ReflectionTestUtils.setField(
+                claimed,
+                "processingStartedAt",
+                Instant.parse("2026-02-24T00:00:01Z")
+        );
+        given(reviewNotificationOutboxRepository.claimNextId(any(), anyCollection()))
+                .willReturn(Optional.of(10L), Optional.empty());
+        given(reviewNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(claimed));
+
+        // when
+        processor.processPending(10);
+
+        // then
+        verify(notificationTransportApiClient, never())
+                .sendBlockMessage(anyString(), anyString(), any(), any(), anyString());
+        verify(reviewNotificationOutboxRepository, never()).saveIfProcessingLeaseMatched(any(), any());
     }
 
     @Test
@@ -191,7 +215,8 @@ class ReviewNotificationOutboxProcessorTest {
                 eq("fallback")
         );
         verify(claimed).markSent(any());
-        verify(reviewNotificationOutboxRepository).save(claimed);
+        verify(reviewNotificationOutboxRepository)
+                .saveIfProcessingLeaseMatched(claimed, CLAIMED_PROCESSING_STARTED_AT);
     }
 
     @Test
@@ -208,7 +233,7 @@ class ReviewNotificationOutboxProcessorTest {
 
         doThrow(new RuntimeException("db failure"))
                 .when(reviewNotificationOutboxRepository)
-                .save(claimed);
+                .saveIfProcessingLeaseMatched(claimed, CLAIMED_PROCESSING_STARTED_AT);
 
         // when
         processor.processPending(10);
@@ -254,7 +279,8 @@ class ReviewNotificationOutboxProcessorTest {
 
         // then
         verify(claimed).markFailed(any(), anyString(), eq(SlackInteractionFailureType.BUSINESS_INVARIANT));
-        verify(reviewNotificationOutboxRepository).save(claimed);
+        verify(reviewNotificationOutboxRepository)
+                .saveIfProcessingLeaseMatched(claimed, CLAIMED_PROCESSING_STARTED_AT);
     }
 
     @Test
@@ -277,15 +303,17 @@ class ReviewNotificationOutboxProcessorTest {
                 .sendBlockMessage(eq("xoxb-test-token"), eq("C1"), any(JsonNode.class), eq(null), eq("fallback"));
         doThrow(new RuntimeException("db failure"))
                 .when(reviewNotificationOutboxRepository)
-                .save(firstClaimed);
+                .saveIfProcessingLeaseMatched(firstClaimed, CLAIMED_PROCESSING_STARTED_AT);
 
         // when & then
         assertThatCode(() -> processor.processPending(10)).doesNotThrowAnyException();
 
         verify(firstClaimed).markRetryPending(any(), anyString());
         verify(secondClaimed).markSent(any());
-        verify(reviewNotificationOutboxRepository).save(secondClaimed);
-        verify(reviewNotificationOutboxRepository, times(2)).save(any(ReviewNotificationOutbox.class));
+        verify(reviewNotificationOutboxRepository)
+                .saveIfProcessingLeaseMatched(secondClaimed, CLAIMED_PROCESSING_STARTED_AT);
+        verify(reviewNotificationOutboxRepository, times(2))
+                .saveIfProcessingLeaseMatched(any(ReviewNotificationOutbox.class), eq(CLAIMED_PROCESSING_STARTED_AT));
     }
 
     @Test
@@ -325,8 +353,11 @@ class ReviewNotificationOutboxProcessorTest {
                 eq("fallback")
         );
         verify(reviewNotificationOutboxRepository, never()).save(firstClaimed);
+        verify(reviewNotificationOutboxRepository, never())
+                .saveIfProcessingLeaseMatched(firstClaimed, CLAIMED_PROCESSING_STARTED_AT);
         verify(secondClaimed).markSent(any());
-        verify(reviewNotificationOutboxRepository).save(secondClaimed);
+        verify(reviewNotificationOutboxRepository)
+                .saveIfProcessingLeaseMatched(secondClaimed, CLAIMED_PROCESSING_STARTED_AT);
     }
 
     @Test
@@ -357,7 +388,8 @@ class ReviewNotificationOutboxProcessorTest {
 
         // then
         verify(claimed).markRetryPending(any(), anyString());
-        verify(reviewNotificationOutboxRepository).save(claimed);
+        verify(reviewNotificationOutboxRepository)
+                .saveIfProcessingLeaseMatched(claimed, CLAIMED_PROCESSING_STARTED_AT);
     }
 
     @Test
@@ -388,7 +420,8 @@ class ReviewNotificationOutboxProcessorTest {
 
         // then
         verify(claimed).markFailed(any(), anyString(), eq(SlackInteractionFailureType.RETRY_EXHAUSTED));
-        verify(reviewNotificationOutboxRepository).save(claimed);
+        verify(reviewNotificationOutboxRepository)
+                .saveIfProcessingLeaseMatched(claimed, CLAIMED_PROCESSING_STARTED_AT);
     }
 
     @Test
@@ -405,7 +438,8 @@ class ReviewNotificationOutboxProcessorTest {
 
         // then
         verify(claimed).markFailed(any(), anyString(), eq(SlackInteractionFailureType.BUSINESS_INVARIANT));
-        verify(reviewNotificationOutboxRepository).save(claimed);
+        verify(reviewNotificationOutboxRepository)
+                .saveIfProcessingLeaseMatched(claimed, CLAIMED_PROCESSING_STARTED_AT);
     }
 
     @Test
@@ -435,7 +469,8 @@ class ReviewNotificationOutboxProcessorTest {
                 any(JsonNode.class),
                 eq("fallback")
         );
-        verify(reviewNotificationOutboxRepository).save(claimed);
+        verify(reviewNotificationOutboxRepository)
+                .saveIfProcessingLeaseMatched(claimed, CLAIMED_PROCESSING_STARTED_AT);
     }
 
     @Test
@@ -455,7 +490,7 @@ class ReviewNotificationOutboxProcessorTest {
                                                                                "reviewersToMention":["reviewer-gh-1"]}
                                                                                """)
                                                                        .build());
-        setProcessingState(claimed, Instant.parse("2026-02-23T23:58:00Z"), 1);
+        setProcessingState(claimed, CLAIMED_PROCESSING_STARTED_AT, 1);
         given(reviewNotificationOutboxRepository.claimNextId(any(), anyCollection()))
                 .willReturn(Optional.of(10L), Optional.empty());
         given(reviewNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(claimed));
@@ -481,7 +516,8 @@ class ReviewNotificationOutboxProcessorTest {
                 any(JsonNode.class),
                 eq("fallback")
         );
-        verify(reviewNotificationOutboxRepository).save(claimed);
+        verify(reviewNotificationOutboxRepository)
+                .saveIfProcessingLeaseMatched(claimed, CLAIMED_PROCESSING_STARTED_AT);
     }
 
     private ReviewNotificationOutbox spyClaimed(String channelId, int processingAttempt, String attachmentsJson) {
@@ -493,12 +529,12 @@ class ReviewNotificationOutboxProcessorTest {
                                                                   .attachmentsJson(attachmentsJson)
                                                                   .fallbackText("fallback")
                                                                   .build();
-        Instant base = Instant.parse("2026-02-24T00:00:00Z");
-        setProcessingState(outbox, base.minusSeconds(120), 1);
+        Instant base = CLAIMED_PROCESSING_STARTED_AT;
+        setProcessingState(outbox, base, 1);
 
         for (int attempt = 1; attempt < processingAttempt; attempt++) {
             outbox.markRetryPending(base.minusSeconds(110 - attempt), "retry failure");
-            setProcessingState(outbox, base.minusSeconds(100 - attempt), attempt + 1);
+            setProcessingState(outbox, base, attempt + 1);
         }
 
         return spy(outbox);

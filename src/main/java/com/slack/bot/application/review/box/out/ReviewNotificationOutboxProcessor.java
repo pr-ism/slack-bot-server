@@ -15,6 +15,7 @@ import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -45,8 +46,9 @@ public class ReviewNotificationOutboxProcessor {
     public void processPending(int limit) {
         Set<Long> claimedOutboxIds = new HashSet<>();
         for (int count = 0; count < limit; count++) {
+            Instant claimedProcessingStartedAt = currentLeaseStartedAt();
             Long claimedOutboxId = reviewNotificationOutboxRepository.claimNextId(
-                    clock.instant(),
+                    claimedProcessingStartedAt,
                     claimedOutboxIds
             ).orElse(null);
             if (claimedOutboxId == null) {
@@ -54,7 +56,7 @@ public class ReviewNotificationOutboxProcessor {
             }
 
             claimedOutboxIds.add(claimedOutboxId);
-            processSafely(claimedOutboxId);
+            processSafely(claimedOutboxId, claimedProcessingStartedAt);
         }
     }
 
@@ -76,10 +78,14 @@ public class ReviewNotificationOutboxProcessor {
         return recoveredCount;
     }
 
-    private void processSafely(Long outboxId) {
+    private void processSafely(Long outboxId, Instant claimedProcessingStartedAt) {
         reviewNotificationOutboxRepository.findById(outboxId)
                                           .ifPresentOrElse(
-                                                  outbox -> processClaimedOutboxSafely(outbox, outboxId),
+                                                  outbox -> processClaimedOutboxSafely(
+                                                          outbox,
+                                                          outboxId,
+                                                          claimedProcessingStartedAt
+                                                  ),
                                                   () -> log.warn(
                                                           "PROCESSING으로 전이된 review_notification outbox를 조회하지 못했습니다. outboxId={}",
                                                           outboxId
@@ -87,9 +93,13 @@ public class ReviewNotificationOutboxProcessor {
                                           );
     }
 
-    private void processClaimedOutboxSafely(ReviewNotificationOutbox outbox, Long outboxId) {
+    private void processClaimedOutboxSafely(
+            ReviewNotificationOutbox outbox,
+            Long outboxId,
+            Instant claimedProcessingStartedAt
+    ) {
         try {
-            processClaimedOutbox(outbox);
+            processClaimedOutbox(outbox, claimedProcessingStartedAt);
         } catch (Exception unexpected) {
             log.error(
                     "review_notification outbox 처리 중 예기치 못한 예외가 발생했습니다. outboxId={}",
@@ -99,7 +109,15 @@ public class ReviewNotificationOutboxProcessor {
         }
     }
 
-    private void processClaimedOutbox(ReviewNotificationOutbox outbox) {
+    private void processClaimedOutbox(
+            ReviewNotificationOutbox outbox,
+            Instant claimedProcessingStartedAt
+    ) {
+        if (!hasProcessingLease(outbox, claimedProcessingStartedAt)) {
+            logLeaseLost(outbox.getId(), claimedProcessingStartedAt, outbox.getProcessingStartedAt());
+            return;
+        }
+
         try {
             slackNotificationOutboxRetryTemplate.execute(context -> {
                 dispatch(outbox);
@@ -110,12 +128,20 @@ public class ReviewNotificationOutboxProcessor {
 
             markFailureStatus(outbox, exception);
             try {
-                reviewNotificationOutboxRepository.save(outbox);
-            } catch (Exception persistenceException) {
+                boolean updated = reviewNotificationOutboxRepository.saveIfProcessingLeaseMatched(
+                        outbox,
+                        claimedProcessingStartedAt
+                );
+                if (updated) {
+                    return;
+                }
+
+                logLeaseLost(outbox.getId(), claimedProcessingStartedAt, outbox.getProcessingStartedAt());
+            } catch (Exception e) {
                 log.error(
                         "review_notification outbox 실패 상태 저장에 실패했습니다. outboxId={}",
                         outbox.getId(),
-                        persistenceException
+                        e
                 );
             }
             return;
@@ -123,12 +149,20 @@ public class ReviewNotificationOutboxProcessor {
 
         outbox.markSent(clock.instant());
         try {
-            reviewNotificationOutboxRepository.save(outbox);
-        } catch (Exception exception) {
+            boolean updated = reviewNotificationOutboxRepository.saveIfProcessingLeaseMatched(
+                    outbox,
+                    claimedProcessingStartedAt
+            );
+            if (updated) {
+                return;
+            }
+
+            logLeaseLost(outbox.getId(), claimedProcessingStartedAt, outbox.getProcessingStartedAt());
+        } catch (Exception e) {
             log.error(
                     "review_notification outbox 전송은 성공했지만 SENT 상태 저장에 실패했습니다. outboxId={}",
                     outbox.getId(),
-                    exception
+                    e
             );
         }
     }
@@ -209,5 +243,31 @@ public class ReviewNotificationOutboxProcessor {
         if (processingTimeoutMs <= 0) {
             throw new IllegalArgumentException("processingTimeoutMs는 0보다 커야 합니다.");
         }
+    }
+
+    private Instant currentLeaseStartedAt() {
+        return clock.instant().truncatedTo(ChronoUnit.MICROS);
+    }
+
+    private boolean hasProcessingLease(
+            ReviewNotificationOutbox outbox,
+            Instant claimedProcessingStartedAt
+    ) {
+        Instant actualProcessingStartedAt = outbox.getProcessingStartedAt();
+
+        return claimedProcessingStartedAt.equals(actualProcessingStartedAt);
+    }
+
+    private void logLeaseLost(
+            Long outboxId,
+            Instant claimedProcessingStartedAt,
+            Instant actualProcessingStartedAt
+    ) {
+        log.warn(
+                "review_notification outbox 처리 lease를 상실해 최종 상태 저장을 건너뜁니다. outboxId={}, claimedProcessingStartedAt={}, actualProcessingStartedAt={}",
+                outboxId,
+                claimedProcessingStartedAt,
+                actualProcessingStartedAt
+        );
     }
 }
