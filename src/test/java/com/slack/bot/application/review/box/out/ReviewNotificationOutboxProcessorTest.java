@@ -18,12 +18,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
 import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
+import com.slack.bot.application.review.dto.ReviewMessageDto;
 import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
+import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxStatus;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -40,6 +42,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.retry.backoff.ExponentialBackOffPolicy;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.ResourceAccessException;
 
 @SuppressWarnings("NonAsciiCharacters")
@@ -55,6 +58,9 @@ class ReviewNotificationOutboxProcessorTest {
 
     @Mock
     ReviewNotificationOutboxRepository reviewNotificationOutboxRepository;
+
+    @Mock
+    ReviewNotificationMessageRenderer reviewNotificationMessageRenderer;
 
     ReviewNotificationOutboxProcessor processor;
 
@@ -73,6 +79,7 @@ class ReviewNotificationOutboxProcessorTest {
         processor = new ReviewNotificationOutboxProcessor(
                 fixedClock,
                 new ObjectMapper(),
+                reviewNotificationMessageRenderer,
                 createOutboxRetryTemplate(retryProperties, classifier),
                 workspaceRepository,
                 new BoxFailureReasonTruncator(),
@@ -447,6 +454,53 @@ class ReviewNotificationOutboxProcessorTest {
         verify(reviewNotificationOutboxRepository).save(claimed);
     }
 
+    @Test
+    void semantic_payload가_있으면_renderer로_최종_payload를_조립해_전송한다() throws Exception {
+        // given
+        ReviewNotificationOutbox pending = mockPending(10L);
+        ReviewNotificationOutbox claimed = spy(ReviewNotificationOutbox.builder()
+                                                                       .idempotencyKey("semantic-outbox")
+                                                                       .projectId(1L)
+                                                                       .teamId("T1")
+                                                                       .channelId("C1")
+                                                                       .payloadJson("""
+                                                                               {"repositoryName":"repo","githubPullRequestId":101,
+                                                                               "pullRequestNumber":42,"pullRequestTitle":"Fix bug",
+                                                                               "pullRequestUrl":"https://github.com/pr/1",
+                                                                               "authorGithubId":"author-gh",
+                                                                               "pendingReviewers":["reviewer-gh-1"],
+                                                                               "reviewersToMention":["reviewer-gh-1"]}
+                                                                               """)
+                                                                       .build());
+        setProcessingState(claimed, Instant.parse("2026-02-23T23:58:00Z"), 1);
+        given(reviewNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(pending));
+        given(reviewNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
+        given(reviewNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(claimed));
+        given(reviewNotificationMessageRenderer.render(claimed)).willReturn(new ReviewMessageDto(
+                new ObjectMapper().readTree("[{\"type\":\"section\"}]"),
+                new ObjectMapper().readTree("[{\"blocks\":[{\"type\":\"actions\"}]}]"),
+                "fallback"
+        ));
+
+        Workspace workspace = mock(Workspace.class);
+        given(workspace.getAccessToken()).willReturn("xoxb-test-token");
+        given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.of(workspace));
+
+        // when
+        processor.processPending(10);
+
+        // then
+        verify(reviewNotificationMessageRenderer).render(claimed);
+        verify(notificationTransportApiClient).sendBlockMessage(
+                eq("xoxb-test-token"),
+                eq("C1"),
+                any(JsonNode.class),
+                any(JsonNode.class),
+                eq("fallback")
+        );
+        verify(reviewNotificationOutboxRepository).save(claimed);
+    }
+
     private ReviewNotificationOutbox mockPending(Long id) {
         ReviewNotificationOutbox outbox = mock(ReviewNotificationOutbox.class);
         given(outbox.getId()).willReturn(id);
@@ -464,13 +518,26 @@ class ReviewNotificationOutboxProcessorTest {
                                                                   .fallbackText("fallback")
                                                                   .build();
         Instant base = Instant.parse("2026-02-24T00:00:00Z");
-        outbox.markProcessing(base.minusSeconds(120));
+        setProcessingState(outbox, base.minusSeconds(120), 1);
 
         for (int attempt = 1; attempt < processingAttempt; attempt++) {
             outbox.markRetryPending(base.minusSeconds(110 - attempt), "retry failure");
-            outbox.markProcessing(base.minusSeconds(100 - attempt));
+            setProcessingState(outbox, base.minusSeconds(100 - attempt), attempt + 1);
         }
 
         return spy(outbox);
+    }
+
+    private void setProcessingState(
+            ReviewNotificationOutbox outbox,
+            Instant processingStartedAt,
+            int processingAttempt
+    ) {
+        ReflectionTestUtils.setField(outbox, "status", ReviewNotificationOutboxStatus.PROCESSING);
+        ReflectionTestUtils.setField(outbox, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
+        ReflectionTestUtils.setField(outbox, "failedAt", null);
+        ReflectionTestUtils.setField(outbox, "failureReason", null);
+        ReflectionTestUtils.setField(outbox, "failureType", null);
     }
 }

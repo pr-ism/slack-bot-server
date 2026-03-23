@@ -33,6 +33,7 @@ import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @IntegrationTest
 @SuppressWarnings("NonAsciiCharacters")
@@ -147,9 +148,9 @@ class SlackInteractionInboxProcessorTest {
                 "{\"team\":{\"id\":\"T1\"},\"channel\":{\"id\":\"C1\"},\"user\":{\"id\":\"U1\"},\"actions\":[{\"action_id\":\"cancel_review_reservation\",\"value\":\"100\"}]}"
         );
         Instant base = clock.instant();
-        timeoutInbox.markProcessing(base.minusSeconds(120));
+        setProcessingState(timeoutInbox, base.minusSeconds(120), 1);
         timeoutInbox.markRetryPending(base.minusSeconds(110), "actualFirst failure");
-        timeoutInbox.markProcessing(base.minusSeconds(100));
+        setProcessingState(timeoutInbox, base.minusSeconds(100), 2);
         SlackInteractionInbox actualSaved = jpaSlackInteractionInboxRepository.save(timeoutInbox);
 
         // when
@@ -295,5 +296,18 @@ class SlackInteractionInboxProcessorTest {
         }
 
         return meta.toString();
+    }
+
+    private void setProcessingState(
+            SlackInteractionInbox inbox,
+            Instant processingStartedAt,
+            int processingAttempt
+    ) {
+        ReflectionTestUtils.setField(inbox, "status", SlackInteractionInboxStatus.PROCESSING);
+        ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
+        ReflectionTestUtils.setField(inbox, "failedAt", null);
+        ReflectionTestUtils.setField(inbox, "failureReason", null);
+        ReflectionTestUtils.setField(inbox, "failureType", null);
     }
 }

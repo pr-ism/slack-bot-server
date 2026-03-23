@@ -1,8 +1,11 @@
 package com.slack.bot.application.review.box.out;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.review.box.ReviewNotificationIdempotencyKeyGenerator;
 import com.slack.bot.application.review.box.ReviewNotificationIdempotencyScope;
+import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,8 +15,36 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ReviewNotificationOutboxEnqueuer {
 
+    private final ObjectMapper objectMapper;
     private final ReviewNotificationOutboxRepository reviewNotificationOutboxRepository;
     private final ReviewNotificationIdempotencyKeyGenerator idempotencyKeyGenerator;
+    private final ReviewNotificationOutboxIdempotencyPayloadEncoder idempotencyPayloadEncoder;
+
+    public void enqueueReviewNotification(
+            String sourceKey,
+            Long projectId,
+            String teamId,
+            String channelId,
+            ReviewNotificationPayload payload
+        ) {
+        validatePayload(payload);
+        String payloadJson = serializePayload(payload);
+        String idempotencyPayload = idempotencyPayloadEncoder.encode(sourceKey, projectId, teamId, channelId);
+        String idempotencyKey = idempotencyKeyGenerator.generate(
+                ReviewNotificationIdempotencyScope.REVIEW_NOTIFICATION_OUTBOX,
+                idempotencyPayload
+        );
+
+        ReviewNotificationOutbox outbox = ReviewNotificationOutbox.builder()
+                                                                  .idempotencyKey(idempotencyKey)
+                                                                  .projectId(projectId)
+                                                                  .teamId(teamId)
+                                                                  .channelId(channelId)
+                                                                  .payloadJson(payloadJson)
+                                                                  .build();
+
+        reviewNotificationOutboxRepository.enqueue(outbox);
+    }
 
     public void enqueueChannelBlocks(
             String sourceKey,
@@ -25,7 +56,7 @@ public class ReviewNotificationOutboxEnqueuer {
     ) {
         String normalizedBlocksJson = normalizeBlocks(blocks);
         String normalizedAttachmentsJson = normalizeAttachments(attachments);
-        String idempotencyPayload = idempotencyPayload(sourceKey, teamId, channelId);
+        String idempotencyPayload = idempotencyPayloadEncoder.encode(sourceKey, teamId, channelId);
         String idempotencyKey = idempotencyKeyGenerator.generate(
                 ReviewNotificationIdempotencyScope.REVIEW_NOTIFICATION_OUTBOX,
                 idempotencyPayload
@@ -51,7 +82,7 @@ public class ReviewNotificationOutboxEnqueuer {
             String fallbackText
     ) {
         String normalizedBlocksJson = normalizeBlocks(blocks);
-        String idempotencyPayload = idempotencyPayload(sourceKey, teamId, channelId);
+        String idempotencyPayload = idempotencyPayloadEncoder.encode(sourceKey, teamId, channelId);
         String idempotencyKey = idempotencyKeyGenerator.generate(
                 ReviewNotificationIdempotencyScope.REVIEW_NOTIFICATION_OUTBOX,
                 idempotencyPayload
@@ -85,23 +116,18 @@ public class ReviewNotificationOutboxEnqueuer {
         return attachments.toString();
     }
 
-    private String idempotencyPayload(String sourceKey, String teamId, String channelId) {
-        return "source=" + encodeComponent(sourceKey)
-                + "|teamId=" + encodeComponent(teamId)
-                + "|channelId=" + encodeComponent(channelId);
-    }
-
-    private String encodeComponent(String value) {
-        String normalized = nullToEmpty(value);
-
-        return normalized.length() + "#" + normalized;
-    }
-
-    private String nullToEmpty(String value) {
-        if (value == null) {
-            return "";
+    private String serializePayload(ReviewNotificationPayload payload) {
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalArgumentException("review notification payload 직렬화에 실패했습니다.", exception);
         }
-
-        return value;
     }
+
+    private void validatePayload(ReviewNotificationPayload payload) {
+        if (payload == null) {
+            throw new IllegalArgumentException("payload는 null일 수 없습니다.");
+        }
+    }
+
 }

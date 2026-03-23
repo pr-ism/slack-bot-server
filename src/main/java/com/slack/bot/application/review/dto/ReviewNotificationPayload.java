@@ -13,10 +13,19 @@ public record ReviewNotificationPayload(
         String pullRequestUrl,
         String authorGithubId,
         List<String> pendingReviewers,
-        List<String> reviewersToMention
+        List<String> reviewersToMention,
+        String reviewRoundKey
 ) {
 
     public static ReviewNotificationPayload of(ReviewAssignmentRequest request, List<String> reviewersToMention) {
+        return of(request, reviewersToMention, null);
+    }
+
+    public static ReviewNotificationPayload of(
+            ReviewAssignmentRequest request,
+            List<String> reviewersToMention,
+            String reviewRoundKey
+    ) {
         return new ReviewNotificationPayload(
                 request.repositoryName(),
                 request.githubPullRequestId(),
@@ -25,7 +34,31 @@ public record ReviewNotificationPayload(
                 request.pullRequestUrl(),
                 request.authorGithubId(),
                 mergePendingReviewers(request.pendingReviewers(), reviewersToMention),
-                reviewersToMention
+                reviewersToMention,
+                reviewRoundKey
+        );
+    }
+
+    public ReviewNotificationPayload(
+            String repositoryName,
+            Long githubPullRequestId,
+            int pullRequestNumber,
+            String pullRequestTitle,
+            String pullRequestUrl,
+            String authorGithubId,
+            List<String> pendingReviewers,
+            List<String> reviewersToMention
+    ) {
+        this(
+                repositoryName,
+                githubPullRequestId,
+                pullRequestNumber,
+                pullRequestTitle,
+                pullRequestUrl,
+                authorGithubId,
+                pendingReviewers,
+                reviewersToMention,
+                null
         );
     }
 

@@ -34,6 +34,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.retry.backoff.NoBackOffPolicy;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.ResourceAccessException;
 
 @SuppressWarnings("NonAsciiCharacters")
@@ -132,7 +133,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
                 "block-action-success",
                 "{}"
         );
-        actual.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(actual, Instant.parse("2026-02-15T00:00:00Z"), 1);
 
         given(slackInteractionInboxRepository.markProcessingIfClaimable(eq(11L), any())).willReturn(true);
         given(slackInteractionInboxRepository.findById(11L)).willReturn(Optional.of(actual));
@@ -161,7 +162,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
                 "retry-first-attempt",
                 "{}"
         );
-        actual.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(actual, Instant.parse("2026-02-15T00:00:00Z"), 1);
 
         given(slackInteractionInboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
         given(slackInteractionInboxRepository.findById(10L)).willReturn(Optional.of(actual));
@@ -192,9 +193,9 @@ class SlackInteractionInboxEntryProcessorUnitTest {
                 "retry-max-attempt",
                 "{}"
         );
-        actual.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(actual, Instant.parse("2026-02-15T00:00:00Z"), 1);
         actual.markRetryPending(Instant.parse("2026-02-15T00:01:00Z"), "previous retry failure");
-        actual.markProcessing(Instant.parse("2026-02-15T00:02:00Z"));
+        setProcessingState(actual, Instant.parse("2026-02-15T00:02:00Z"), 2);
 
         given(slackInteractionInboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
         given(slackInteractionInboxRepository.findById(10L)).willReturn(Optional.of(actual));
@@ -225,7 +226,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
                 "long-failure-reason",
                 "{}"
         );
-        actual.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(actual, Instant.parse("2026-02-15T00:00:00Z"), 1);
 
         given(slackInteractionInboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
         given(slackInteractionInboxRepository.findById(10L)).willReturn(Optional.of(actual));
@@ -256,7 +257,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
                 "empty-failure-reason",
                 "{}"
         );
-        actual.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(actual, Instant.parse("2026-02-15T00:00:00Z"), 1);
 
         given(slackInteractionInboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
         given(slackInteractionInboxRepository.findById(10L)).willReturn(Optional.of(actual));
@@ -287,7 +288,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
                 "view-submission-success",
                 "{\"type\":\"view_submission\"}"
         );
-        actual.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(actual, Instant.parse("2026-02-15T00:00:00Z"), 1);
 
         given(slackInteractionInboxRepository.markProcessingIfClaimable(eq(20L), any())).willReturn(true);
         given(slackInteractionInboxRepository.findById(20L)).willReturn(Optional.of(actual));
@@ -303,5 +304,18 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         verify(viewSubmissionInteractionCoordinator).handleEnqueued(any());
         verify(blockActionInteractionService, never()).handle(any());
         verify(slackInteractionInboxRepository).save(actual);
+    }
+
+    private void setProcessingState(
+            SlackInteractionInbox inbox,
+            Instant processingStartedAt,
+            int processingAttempt
+    ) {
+        ReflectionTestUtils.setField(inbox, "status", SlackInteractionInboxStatus.PROCESSING);
+        ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
+        ReflectionTestUtils.setField(inbox, "failedAt", null);
+        ReflectionTestUtils.setField(inbox, "failureReason", null);
+        ReflectionTestUtils.setField(inbox, "failureType", null);
     }
 }

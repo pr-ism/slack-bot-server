@@ -9,6 +9,7 @@ import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
@@ -302,39 +303,10 @@ class SlackNotificationOutboxTest {
     }
 
     @Test
-    void markProcessing_호출시_PROCESSING_상태로_변경되고_시도횟수가_증가한다() {
-        // given
-        SlackNotificationOutbox outbox = pendingOutbox();
-
-        // when
-        Instant processingStartedAt = Instant.parse("2026-02-15T00:00:00Z");
-
-        outbox.markProcessing(processingStartedAt);
-
-        // then
-        assertAll(
-                () -> assertThat(outbox.getStatus()).isEqualTo(SlackNotificationOutboxStatus.PROCESSING),
-                () -> assertThat(outbox.getProcessingStartedAt()).isEqualTo(processingStartedAt),
-                () -> assertThat(outbox.getProcessingAttempt()).isEqualTo(1)
-        );
-    }
-
-    @Test
-    void markProcessing은_processingStartedAt이_null이면_예외를_던진다() {
-        // given
-        SlackNotificationOutbox outbox = pendingOutbox();
-
-        // when & then
-        assertThatThrownBy(() -> outbox.markProcessing(null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("processingStartedAt은 비어 있을 수 없습니다.");
-    }
-
-    @Test
     void markSent_호출시_SENT_상태와_전송시각이_저장된다() {
         // given
         SlackNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
 
         // when
         Instant sentAt = Instant.parse("2026-02-15T01:00:00Z");
@@ -355,7 +327,7 @@ class SlackNotificationOutboxTest {
     void markSent는_sentAt이_null이면_예외를_던진다() {
         // given
         SlackNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
 
         // when & then
         assertThatThrownBy(() -> outbox.markSent(null))
@@ -367,7 +339,7 @@ class SlackNotificationOutboxTest {
     void markFailed_호출시_FAILED_상태와_실패정보가_저장된다() {
         // given
         SlackNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
 
         // when
         Instant failedAt = Instant.parse("2026-02-15T02:00:00Z");
@@ -387,7 +359,7 @@ class SlackNotificationOutboxTest {
     void markRetryPending_호출시_RETRY_PENDING_상태와_실패정보가_저장된다() {
         // given
         SlackNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
 
         // when
         Instant failedAt = Instant.parse("2026-02-15T03:00:00Z");
@@ -408,7 +380,7 @@ class SlackNotificationOutboxTest {
     void markRetryPending은_failureReason이_null이면_예외를_던진다() {
         // given
         SlackNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
         Instant failedAt = Instant.parse("2026-02-15T03:00:00Z");
 
         // when & then
@@ -421,7 +393,7 @@ class SlackNotificationOutboxTest {
     void markRetryPending은_failedAt이_null이면_예외를_던진다() {
         // given
         SlackNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
 
         // when & then
         assertThatThrownBy(() -> outbox.markRetryPending(null, "retry"))
@@ -433,7 +405,7 @@ class SlackNotificationOutboxTest {
     void markRetryPending은_failureReason이_공백이면_예외를_던진다() {
         // given
         SlackNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
         Instant failedAt = Instant.parse("2026-02-15T03:00:00Z");
 
         // when & then
@@ -446,7 +418,7 @@ class SlackNotificationOutboxTest {
     void markFailed는_failureReason이_null이면_예외를_던진다() {
         // given
         SlackNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
         Instant failedAt = Instant.parse("2026-02-15T02:00:00Z");
 
         // when & then
@@ -463,7 +435,7 @@ class SlackNotificationOutboxTest {
     void markFailed는_failedAt이_null이면_예외를_던진다() {
         // given
         SlackNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
 
         // when & then
         assertThatThrownBy(() -> outbox.markFailed(
@@ -479,7 +451,7 @@ class SlackNotificationOutboxTest {
     void markFailed는_failureReason이_공백이면_예외를_던진다() {
         // given
         SlackNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
         Instant failedAt = Instant.parse("2026-02-15T02:00:00Z");
 
         // when & then
@@ -496,7 +468,7 @@ class SlackNotificationOutboxTest {
     void markFailed는_failureType이_null이면_예외를_던진다() {
         // given
         SlackNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
         Instant failedAt = Instant.parse("2026-02-15T02:00:00Z");
 
         // when & then
@@ -507,26 +479,6 @@ class SlackNotificationOutboxTest {
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("failureType은 비어 있을 수 없습니다.");
-    }
-
-    @Test
-    void markProcessing은_RETRY_PENDING에서_재진입하면_이전_실패정보를_초기화한다() {
-        // given
-        SlackNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
-        outbox.markRetryPending(Instant.parse("2026-02-15T00:01:00Z"), "retry");
-
-        // when
-        outbox.markProcessing(Instant.parse("2026-02-15T00:02:00Z"));
-
-        // then
-        assertAll(
-                () -> assertThat(outbox.getStatus()).isEqualTo(SlackNotificationOutboxStatus.PROCESSING),
-                () -> assertThat(outbox.getFailedAt()).isNull(),
-                () -> assertThat(outbox.getFailureReason()).isNull(),
-                () -> assertThat(outbox.getFailureType()).isNull(),
-                () -> assertThat(outbox.getProcessingAttempt()).isEqualTo(2)
-        );
     }
 
     @Test
@@ -567,40 +519,10 @@ class SlackNotificationOutboxTest {
     }
 
     @Test
-    void SENT_상태에서_PROCESSING_전이는_불가능하다() {
-        // given
-        SlackNotificationOutbox sent = pendingOutbox();
-        sent.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
-        sent.markSent(Instant.parse("2026-02-15T01:00:00Z"));
-
-        // when & then
-        assertThatThrownBy(() -> sent.markProcessing(Instant.parse("2026-02-15T04:00:00Z")))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("PROCESSING 전이는 PENDING 또는 RETRY_PENDING 상태에서만 가능합니다.");
-    }
-
-    @Test
-    void FAILED_상태에서_PROCESSING_전이는_불가능하다() {
-        // given
-        SlackNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
-        outbox.markFailed(
-                Instant.parse("2026-02-15T01:00:00Z"),
-                "failure",
-                SlackInteractionFailureType.RETRY_EXHAUSTED
-        );
-
-        // when & then
-        assertThatThrownBy(() -> outbox.markProcessing(Instant.parse("2026-02-15T02:00:00Z")))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("PROCESSING 전이는 PENDING 또는 RETRY_PENDING 상태에서만 가능합니다.");
-    }
-
-    @Test
     void FAILED_상태에서_SENT_전이는_불가능하다() {
         // given
         SlackNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
         outbox.markFailed(
                 Instant.parse("2026-02-15T01:00:00Z"),
                 "failure",
@@ -617,7 +539,7 @@ class SlackNotificationOutboxTest {
     void FAILED_상태에서_RETRY_PENDING_전이는_불가능하다() {
         // given
         SlackNotificationOutbox outbox = pendingOutbox();
-        outbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(outbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
         outbox.markFailed(
                 Instant.parse("2026-02-15T01:00:00Z"),
                 "failure",
@@ -641,5 +563,18 @@ class SlackNotificationOutboxTest {
                                       .blocksJson("[{}]")
                                       .fallbackText("fallback")
                                       .build();
+    }
+
+    private void setProcessingState(
+            SlackNotificationOutbox outbox,
+            Instant processingStartedAt,
+            int processingAttempt
+    ) {
+        ReflectionTestUtils.setField(outbox, "status", SlackNotificationOutboxStatus.PROCESSING);
+        ReflectionTestUtils.setField(outbox, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
+        ReflectionTestUtils.setField(outbox, "failedAt", null);
+        ReflectionTestUtils.setField(outbox, "failureReason", null);
+        ReflectionTestUtils.setField(outbox, "failureType", null);
     }
 }

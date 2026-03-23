@@ -107,4 +107,44 @@ class ReviewActionMetaBuilderTest {
                 .isInstanceOf(ReviewActionMetaException.class)
                 .hasMessageContaining("github_pull_request_id는 1 이상의 정수여야 합니다.");
     }
+
+    @Test
+    void projectId가_null이면_오버로드_build는_예외가_발생한다() {
+        // given
+        ReviewNotificationPayload request = new ReviewNotificationPayload(
+                "my-repo",
+                101L,
+                1,
+                "Title",
+                "https://github.com/pr/1",
+                "author-gh",
+                List.of(),
+                List.of()
+        );
+
+        // when & then
+        assertThatThrownBy(() -> metaBuilder.build("T1", "C1", (Long) null, request))
+                .isInstanceOf(ReviewActionMetaException.class)
+                .hasMessageContaining("projectId는 1 이상의 정수여야 합니다.");
+    }
+
+    @Test
+    void projectId가_0이면_오버로드_build는_예외가_발생한다() {
+        // given
+        ReviewNotificationPayload request = new ReviewNotificationPayload(
+                "my-repo",
+                101L,
+                1,
+                "Title",
+                "https://github.com/pr/1",
+                "author-gh",
+                List.of(),
+                List.of()
+        );
+
+        // when & then
+        assertThatThrownBy(() -> metaBuilder.build("T1", "C1", 0L, request))
+                .isInstanceOf(ReviewActionMetaException.class)
+                .hasMessageContaining("projectId는 1 이상의 정수여야 합니다.");
+    }
 }

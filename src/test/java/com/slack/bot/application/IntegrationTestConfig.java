@@ -5,12 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.command.client.MemberConnectionSlackApiClient;
 import com.slack.bot.application.event.client.SlackEventApiClient;
 import com.slack.bot.application.event.dto.ChannelNameWrapper;
-import com.slack.bot.application.review.ReviewBlockCreator;
 import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
 import com.slack.bot.application.review.box.out.ReviewNotificationOutboxEnqueuer;
 import com.slack.bot.application.review.client.ReviewSlackApiClient;
 import com.slack.bot.application.review.channel.ReviewSlackChannelResolver;
-import com.slack.bot.application.review.meta.ReviewActionMetaBuilder;
 import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
 import com.slack.bot.infrastructure.review.batch.SpyReviewNotificationService;
 import java.sql.SQLException;
@@ -96,16 +94,12 @@ public class IntegrationTestConfig {
     @Bean
     @Primary
     public SpyReviewNotificationService spyReviewNotificationService(
-            ReviewBlockCreator blockCreator,
             ReviewNotificationOutboxEnqueuer reviewNotificationOutboxEnqueuer,
-            ReviewActionMetaBuilder actionMetaBuilder,
             ReviewSlackChannelResolver channelResolver,
             ReviewNotificationSourceContext reviewNotificationSourceContext
     ) {
         return new SpyReviewNotificationService(
-                blockCreator,
                 reviewNotificationOutboxEnqueuer,
-                actionMetaBuilder,
                 channelResolver,
                 reviewNotificationSourceContext
         );

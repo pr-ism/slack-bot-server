@@ -23,6 +23,7 @@ import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.util.AopTestUtils;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @IntegrationTest
 @SuppressWarnings("NonAsciiCharacters")
@@ -346,7 +347,7 @@ class SlackNotificationOutboxWriterTest {
         targetWriter().enqueueChannelText(sourceKey, teamId, channelId, text);
 
         SlackNotificationOutbox existing = awaitSingleOutbox();
-        existing.markProcessing(Instant.parse("2026-02-18T00:00:00Z"));
+        setProcessingState(existing, Instant.parse("2026-02-18T00:00:00Z"), 1);
         existing.markSent(Instant.parse("2026-02-18T00:00:01Z"));
         actualSlackNotificationOutboxRepository.save(existing);
 
@@ -378,7 +379,7 @@ class SlackNotificationOutboxWriterTest {
         targetWriter().enqueueChannelText(sourceKey, teamId, channelId, text);
 
         SlackNotificationOutbox existing = awaitSingleOutbox();
-        existing.markProcessing(Instant.parse("2026-02-18T00:00:00Z"));
+        setProcessingState(existing, Instant.parse("2026-02-18T00:00:00Z"), 1);
         actualSlackNotificationOutboxRepository.save(existing);
 
         // when
@@ -409,7 +410,7 @@ class SlackNotificationOutboxWriterTest {
         targetWriter().enqueueChannelText(sourceKey, teamId, channelId, text);
 
         SlackNotificationOutbox existing = awaitSingleOutbox();
-        existing.markProcessing(Instant.parse("2026-02-18T00:00:00Z"));
+        setProcessingState(existing, Instant.parse("2026-02-18T00:00:00Z"), 1);
         existing.markFailed(
                 Instant.parse("2026-02-18T00:00:01Z"),
                 "failure",
@@ -443,5 +444,18 @@ class SlackNotificationOutboxWriterTest {
 
     private SlackNotificationOutboxWriter targetWriter() {
         return AopTestUtils.getTargetObject(slackNotificationOutboxWriter);
+    }
+
+    private void setProcessingState(
+            SlackNotificationOutbox outbox,
+            Instant processingStartedAt,
+            int processingAttempt
+    ) {
+        ReflectionTestUtils.setField(outbox, "status", SlackNotificationOutboxStatus.PROCESSING);
+        ReflectionTestUtils.setField(outbox, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
+        ReflectionTestUtils.setField(outbox, "failedAt", null);
+        ReflectionTestUtils.setField(outbox, "failureReason", null);
+        ReflectionTestUtils.setField(outbox, "failureType", null);
     }
 }

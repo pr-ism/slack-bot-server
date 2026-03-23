@@ -5,12 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
-import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
@@ -76,54 +75,6 @@ class SlackInteractionInboxTest {
     }
 
     @Test
-    void markProcessing을_호출하면_상태가_PROCESSING으로_변경되고_시도횟수가_증가한다() {
-        // given
-        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
-                SlackInteractionInboxType.BLOCK_ACTIONS,
-                "key",
-                "{}"
-        );
-        Clock fixedClock = Clock.fixed(Instant.parse("2026-02-15T00:00:00Z"), ZoneOffset.UTC);
-
-        // when
-        inbox.markProcessing(fixedClock.instant());
-
-        // then
-        assertAll(
-                () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSING),
-                () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(inbox.getProcessingStartedAt()).isEqualTo(fixedClock.instant()),
-                () -> assertThat(inbox.getFailedAt()).isNull(),
-                () -> assertThat(inbox.getFailureReason()).isNull(),
-                () -> assertThat(inbox.getFailureType()).isNull()
-        );
-    }
-
-    @Test
-    void markProcessing은_RETRY_PENDING에서_재진입하면_이전_실패정보를_초기화한다() {
-        // given
-        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
-                SlackInteractionInboxType.BLOCK_ACTIONS,
-                "key",
-                "{}"
-        );
-        inbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
-        inbox.markRetryPending(Instant.parse("2026-02-15T00:01:00Z"), "retry");
-
-        // when
-        inbox.markProcessing(Instant.parse("2026-02-15T00:02:00Z"));
-
-        // then
-        assertAll(
-                () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSING),
-                () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(2),
-                () -> assertThat(inbox.getFailedAt()).isNull(),
-                () -> assertThat(inbox.getFailureReason()).isNull(),
-                () -> assertThat(inbox.getFailureType()).isNull()
-        );
-    }
-
-    @Test
     void markProcessed를_호출하면_처리완료_상태와_처리시각이_저장된다() {
         // given
         SlackInteractionInbox inbox = SlackInteractionInbox.pending(
@@ -131,7 +82,7 @@ class SlackInteractionInboxTest {
                 "key",
                 "{}"
         );
-        inbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(inbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
 
         // when
         Instant processedAt = Instant.parse("2026-02-15T00:01:00Z");
@@ -154,7 +105,7 @@ class SlackInteractionInboxTest {
                 "key",
                 "{}"
         );
-        inbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(inbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
 
         // when
         Instant failedAt = Instant.parse("2026-02-15T01:00:00Z");
@@ -178,7 +129,7 @@ class SlackInteractionInboxTest {
                 "key",
                 "{}"
         );
-        inbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
+        setProcessingState(inbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
 
         // when
         Instant failedAt = Instant.parse("2026-02-15T03:00:00Z");
@@ -320,38 +271,6 @@ class SlackInteractionInboxTest {
     }
 
     @Test
-    void markProcessing은_processingStartedAt이_null이면_예외를_던진다() {
-        // given
-        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
-                SlackInteractionInboxType.BLOCK_ACTIONS,
-                "key",
-                "{}"
-        );
-
-        // when & then
-        assertThatThrownBy(() -> inbox.markProcessing(null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("processingStartedAt은 비어 있을 수 없습니다.");
-    }
-
-    @Test
-    void markProcessing은_PENDING이나_RETRY_PENDING이_아니면_예외를_던진다() {
-        // given
-        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
-                SlackInteractionInboxType.BLOCK_ACTIONS,
-                "key",
-                "{}"
-        );
-        inbox.markProcessing(Instant.parse("2026-02-15T00:00:00Z"));
-        inbox.markProcessed(Instant.parse("2026-02-15T00:01:00Z"));
-
-        // when & then
-        assertThatThrownBy(() -> inbox.markProcessing(Instant.parse("2026-02-15T00:02:00Z")))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("PROCESSING 전이는 PENDING 또는 RETRY_PENDING 상태에서만 가능합니다. 현재: PROCESSED");
-    }
-
-    @Test
     void markProcessed는_PROCESSING이_아니면_예외를_던진다() {
         // given
         SlackInteractionInbox inbox = SlackInteractionInbox.pending(
@@ -399,5 +318,18 @@ class SlackInteractionInboxTest {
                 )
         ).isInstanceOf(IllegalStateException.class)
          .hasMessage("FAILED 전이는 PROCESSING 상태에서만 가능합니다. 현재: PENDING");
+    }
+
+    private void setProcessingState(
+            SlackInteractionInbox inbox,
+            Instant processingStartedAt,
+            int processingAttempt
+    ) {
+        ReflectionTestUtils.setField(inbox, "status", SlackInteractionInboxStatus.PROCESSING);
+        ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
+        ReflectionTestUtils.setField(inbox, "failedAt", null);
+        ReflectionTestUtils.setField(inbox, "failureReason", null);
+        ReflectionTestUtils.setField(inbox, "failureType", null);
     }
 }

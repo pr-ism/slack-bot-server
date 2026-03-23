@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ReviewRequestInbox extends BaseTimeEntity {
 
-    private String coalescingKey;
+    private String idempotencyKey;
 
     private String apiKey;
 
@@ -43,20 +43,20 @@ public class ReviewRequestInbox extends BaseTimeEntity {
     private ReviewRequestInboxFailureType failureType;
 
     public static ReviewRequestInbox pending(
-            String coalescingKey,
+            String idempotencyKey,
             String apiKey,
             Long githubPullRequestId,
             String requestJson,
             Instant availableAt
     ) {
-        validateCoalescingKey(coalescingKey);
+        validateIdempotencyKey(idempotencyKey);
         validateApiKey(apiKey);
         validateGithubPullRequestId(githubPullRequestId);
         validateRequestJson(requestJson);
         validateAvailableAt(availableAt);
 
         return new ReviewRequestInbox(
-                coalescingKey,
+                idempotencyKey,
                 apiKey,
                 githubPullRequestId,
                 requestJson,
@@ -66,9 +66,9 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         );
     }
 
-    private static void validateCoalescingKey(String coalescingKey) {
-        if (coalescingKey == null || coalescingKey.isBlank()) {
-            throw new IllegalArgumentException("coalescingKey는 비어 있을 수 없습니다.");
+    private static void validateIdempotencyKey(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new IllegalArgumentException("idempotencyKey는 비어 있을 수 없습니다.");
         }
     }
 
@@ -97,7 +97,7 @@ public class ReviewRequestInbox extends BaseTimeEntity {
     }
 
     private ReviewRequestInbox(
-            String coalescingKey,
+            String idempotencyKey,
             String apiKey,
             Long githubPullRequestId,
             String requestJson,
@@ -105,25 +105,13 @@ public class ReviewRequestInbox extends BaseTimeEntity {
             ReviewRequestInboxStatus status,
             int processingAttempt
     ) {
-        this.coalescingKey = coalescingKey;
+        this.idempotencyKey = idempotencyKey;
         this.apiKey = apiKey;
         this.githubPullRequestId = githubPullRequestId;
         this.requestJson = requestJson;
         this.availableAt = availableAt;
         this.status = status;
         this.processingAttempt = processingAttempt;
-    }
-
-    public void markProcessing(Instant processingStartedAt) {
-        validateProcessingStartedAt(processingStartedAt);
-        validateProcessingTransition();
-
-        this.status = ReviewRequestInboxStatus.PROCESSING;
-        this.processingStartedAt = processingStartedAt;
-        this.processingAttempt += 1;
-        this.failedAt = null;
-        this.failureReason = null;
-        this.failureType = null;
     }
 
     public void markProcessed(Instant processedAt) {
@@ -163,12 +151,6 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         this.failureType = failureType;
     }
 
-    private void validateProcessingStartedAt(Instant processingStartedAt) {
-        if (processingStartedAt == null) {
-            throw new IllegalArgumentException("processingStartedAt은 비어 있을 수 없습니다.");
-        }
-    }
-
     private void validateProcessedAt(Instant processedAt) {
         if (processedAt == null) {
             throw new IllegalArgumentException("processedAt은 비어 있을 수 없습니다.");
@@ -191,16 +173,6 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         if (failureType == null) {
             throw new IllegalArgumentException("failureType은 비어 있을 수 없습니다.");
         }
-    }
-
-    private void validateProcessingTransition() {
-        if (status == ReviewRequestInboxStatus.PENDING || status == ReviewRequestInboxStatus.RETRY_PENDING) {
-            return;
-        }
-
-        throw new IllegalStateException(
-                "PROCESSING 전이는 PENDING 또는 RETRY_PENDING 상태에서만 가능합니다. 현재: " + status
-        );
     }
 
     private void validateTransition(ReviewRequestInboxStatus expectedStatus, String targetStatus) {

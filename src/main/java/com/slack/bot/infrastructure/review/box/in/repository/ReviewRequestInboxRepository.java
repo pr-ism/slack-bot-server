@@ -8,7 +8,7 @@ import java.util.Optional;
 public interface ReviewRequestInboxRepository {
 
     void upsertPending(
-            String coalescingKey,
+            String idempotencyKey,
             String apiKey,
             Long githubPullRequestId,
             String requestJson,

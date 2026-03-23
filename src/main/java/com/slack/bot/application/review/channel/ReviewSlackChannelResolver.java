@@ -28,6 +28,11 @@ public class ReviewSlackChannelResolver {
         Channel channel = channelRepository.findByTeamId(workspace.getTeamId())
                                 .orElseThrow(() -> new ReviewChannelResolveException("채널 정보가 없습니다."));
 
-        return new SlackChannelDto(channel.getTeamId(), channel.getSlackChannelId(), workspace.getAccessToken());
+        return new SlackChannelDto(
+                project.getId(),
+                channel.getTeamId(),
+                channel.getSlackChannelId(),
+                workspace.getAccessToken()
+        );
     }
 }
