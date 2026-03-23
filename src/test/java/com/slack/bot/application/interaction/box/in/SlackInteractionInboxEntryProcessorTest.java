@@ -1,10 +1,13 @@
 package com.slack.bot.application.interaction.box.in;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,14 +25,19 @@ import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStat
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import com.slack.bot.infrastructure.interaction.box.persistence.in.JpaSlackInteractionInboxRepository;
+import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @IntegrationTest
+@MockitoSpyBean(types = SlackInteractionInboxRepository.class)
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class SlackInteractionInboxEntryProcessorTest {
@@ -65,7 +73,7 @@ class SlackInteractionInboxEntryProcessorTest {
         SlackInteractionInbox inbox = savePendingInbox(SlackInteractionInboxType.BLOCK_ACTIONS, payloadJson);
 
         // when
-        slackInteractionInboxEntryProcessor.processBlockAction(inbox);
+        slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId());
 
         // then
         SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
@@ -100,7 +108,7 @@ class SlackInteractionInboxEntryProcessorTest {
         SlackInteractionInbox inbox = savePendingInbox(SlackInteractionInboxType.BLOCK_ACTIONS, payloadJson);
 
         // when
-        slackInteractionInboxEntryProcessor.processBlockAction(inbox);
+        slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId());
 
         // then
         SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
@@ -132,7 +140,7 @@ class SlackInteractionInboxEntryProcessorTest {
         SlackInteractionInbox inbox = savePendingInbox(SlackInteractionInboxType.VIEW_SUBMISSION, payloadJson);
 
         // when
-        slackInteractionInboxEntryProcessor.processViewSubmission(inbox);
+        slackInteractionInboxEntryProcessor.processClaimedViewSubmission(inbox.getId());
 
         // then
         SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
@@ -152,7 +160,7 @@ class SlackInteractionInboxEntryProcessorTest {
         SlackInteractionInbox inbox = savePendingInbox(SlackInteractionInboxType.BLOCK_ACTIONS, "{invalid-json");
 
         // when
-        slackInteractionInboxEntryProcessor.processBlockAction(inbox);
+        slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId());
 
         // then
         SlackInteractionInbox actual = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
@@ -165,9 +173,43 @@ class SlackInteractionInboxEntryProcessorTest {
         );
     }
 
+    @Test
+    @Sql(scripts = {
+            "classpath:sql/fixtures/notification/workspace_t1.sql",
+            "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
+    })
+    void inbox_최종_저장에_실패하면_비즈니스_로직도_같이_롤백된다() throws Exception {
+        // given
+        given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U1"))
+                .willReturn("D-REVIEWER");
+        String payloadJson = objectMapper.writeValueAsString(cancelReservationPayload("100"));
+        SlackInteractionInbox inbox = savePendingInbox(SlackInteractionInboxType.BLOCK_ACTIONS, payloadJson);
+
+        doThrow(new IllegalStateException("forced save failure"))
+                .when(slackInteractionInboxRepository)
+                .save(argThat(savedInbox -> savedInbox != null && inbox.getId().equals(savedInbox.getId())));
+
+        // when & then
+        assertThatThrownBy(() -> slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId()))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("forced save failure");
+
+        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
+        ReviewReservation actualReservation = reviewReservationRepository.findById(100L).orElseThrow();
+
+        assertAll(
+                () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSING),
+                () -> assertThat(actualInbox.getProcessingAttempt()).isEqualTo(1),
+                () -> assertThat(actualReservation.getStatus()).isEqualTo(ReservationStatus.ACTIVE)
+        );
+    }
+
     private SlackInteractionInbox savePendingInbox(SlackInteractionInboxType interactionType, String payloadJson) {
         String idempotencyKey = interactionType + "-entry-" + System.nanoTime();
         SlackInteractionInbox inbox = SlackInteractionInbox.pending(interactionType, idempotencyKey, payloadJson);
+        ReflectionTestUtils.setField(inbox, "status", SlackInteractionInboxStatus.PROCESSING);
+        ReflectionTestUtils.setField(inbox, "processingStartedAt", Instant.parse("2026-02-15T00:00:00Z"));
+        ReflectionTestUtils.setField(inbox, "processingAttempt", 1);
         return slackInteractionInboxRepository.save(inbox);
     }
 

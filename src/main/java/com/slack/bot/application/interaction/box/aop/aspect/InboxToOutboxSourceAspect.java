@@ -18,12 +18,13 @@ public class InboxToOutboxSourceAspect {
     private final ProcessingSourceContext processingSourceContext;
     private final OutboxIdempotencySourceContext outboxIdempotencySourceContext;
 
-    @Around("@annotation(com.slack.bot.application.interaction.box.aop.BindInboxToOutboxSource) && args(inbox,..)")
-    public Object bindInboxSource(ProceedingJoinPoint joinPoint, SlackInteractionInbox inbox) throws Throwable {
+    @Around("@annotation(com.slack.bot.application.interaction.box.aop.BindInboxToOutboxSource)")
+    public Object bindInboxSource(ProceedingJoinPoint joinPoint) throws Throwable {
+        Long inboxId = resolveInboxId(joinPoint.getArgs());
         AtomicReference<Object> result = new AtomicReference<>();
         AtomicReference<Throwable> throwable = new AtomicReference<>();
 
-        processingSourceContext.withInboxProcessing(() -> outboxIdempotencySourceContext.withInboxSource(inbox.getId(), () -> {
+        processingSourceContext.withInboxProcessing(() -> outboxIdempotencySourceContext.withInboxSource(inboxId, () -> {
             try {
                 result.set(joinPoint.proceed());
             } catch (Throwable error) {
@@ -37,5 +38,22 @@ public class InboxToOutboxSourceAspect {
         }
 
         return result.get();
+    }
+
+    private Long resolveInboxId(Object[] args) {
+        if (args.length == 0 || args[0] == null) {
+            throw new IllegalStateException("인박스 source 바인딩 대상 인자가 없습니다.");
+        }
+
+        Object firstArgument = args[0];
+        if (firstArgument instanceof SlackInteractionInbox inbox) {
+            return inbox.getId();
+        }
+
+        if (firstArgument instanceof Long inboxId) {
+            return inboxId;
+        }
+
+        throw new IllegalStateException("인박스 source 바인딩 대상의 타입이 잘못되었습니다.");
     }
 }

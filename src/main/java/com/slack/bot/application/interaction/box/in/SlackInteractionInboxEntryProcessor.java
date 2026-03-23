@@ -3,22 +3,23 @@ package com.slack.bot.application.interaction.box.in;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interaction.BlockActionInteractionService;
-import com.slack.bot.application.interaction.box.aop.BindInboxToOutboxSource;
-import com.slack.bot.application.interaction.view.ViewSubmissionInteractionCoordinator;
 import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
+import com.slack.bot.application.interaction.box.aop.BindInboxToOutboxSource;
+import com.slack.bot.application.interaction.box.out.OutboxIdempotencySourceContext;
 import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
+import com.slack.bot.application.interaction.view.ViewSubmissionInteractionCoordinator;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import java.time.Clock;
-import java.time.Instant;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
@@ -38,41 +39,37 @@ public class SlackInteractionInboxEntryProcessor {
     private final ViewSubmissionInteractionCoordinator viewSubmissionInteractionCoordinator;
 
     @BindInboxToOutboxSource
-    public void processBlockAction(SlackInteractionInbox inbox) {
-        process(
-                inbox,
+    @Transactional
+    public void processClaimedBlockAction(Long inboxId) {
+        processClaimedInbox(
+                inboxId,
                 payload -> blockActionInteractionService.handle(payload),
                 SlackInteractionInboxType.BLOCK_ACTIONS
         );
     }
 
     @BindInboxToOutboxSource
-    public void processViewSubmission(SlackInteractionInbox inbox) {
-        process(
-                inbox,
+    @Transactional
+    public void processClaimedViewSubmission(Long inboxId) {
+        processClaimedInbox(
+                inboxId,
                 payload -> viewSubmissionInteractionCoordinator.handleEnqueued(payload),
                 SlackInteractionInboxType.VIEW_SUBMISSION
         );
     }
 
-    private void process(
-            SlackInteractionInbox inbox,
+    private void processClaimedInbox(
+            Long inboxId,
             Consumer<JsonNode> consumer,
             SlackInteractionInboxType interactionType
     ) {
-        Long inboxId = inbox.getId();
         if (inboxId == null) {
-            return;
-        }
-
-        Instant processingStartedAt = clock.instant();
-        if (!slackInteractionInboxRepository.markProcessingIfClaimable(inboxId, processingStartedAt)) {
             return;
         }
 
         slackInteractionInboxRepository.findById(inboxId)
                                        .ifPresentOrElse(
-                                               claimedInbox -> processClaimedInbox(
+                                               claimedInbox -> processInTransaction(
                                                        claimedInbox,
                                                        consumer,
                                                        interactionType
@@ -84,7 +81,7 @@ public class SlackInteractionInboxEntryProcessor {
                                        );
     }
 
-    private void processClaimedInbox(
+    private void processInTransaction(
             SlackInteractionInbox claimedInbox,
             Consumer<JsonNode> consumer,
             SlackInteractionInboxType interactionType
@@ -98,7 +95,6 @@ public class SlackInteractionInboxEntryProcessor {
             });
 
             claimedInbox.markProcessed(clock.instant());
-            slackInteractionInboxRepository.save(claimedInbox);
         } catch (Exception e) {
             log.error(
                     "{} inbox 처리에 실패했습니다. inboxId={}",
@@ -106,16 +102,16 @@ public class SlackInteractionInboxEntryProcessor {
                     claimedInbox.getId(),
                     e
             );
-
             markFailureStatus(claimedInbox, e);
-            slackInteractionInboxRepository.save(claimedInbox);
         }
+
+        slackInteractionInboxRepository.save(claimedInbox);
     }
 
-    private void markFailureStatus(SlackInteractionInbox inbox, Exception exception) {
-        String reason = resolveFailureReason(exception);
+    private void markFailureStatus(SlackInteractionInbox inbox, Exception e) {
+        String reason = resolveFailureReason(e);
 
-        if (!retryExceptionClassifier.isRetryable(exception)) {
+        if (!retryExceptionClassifier.isRetryable(e)) {
             inbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.BUSINESS_INVARIANT);
             return;
         }
@@ -128,8 +124,8 @@ public class SlackInteractionInboxEntryProcessor {
         inbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.RETRY_EXHAUSTED);
     }
 
-    private String resolveFailureReason(Exception exception) {
-        String reason = failureReasonTruncator.truncate(exception.getMessage());
+    private String resolveFailureReason(Exception e) {
+        String reason = failureReasonTruncator.truncate(e.getMessage());
 
         if (reason == null || reason.isBlank()) {
             return UNKNOWN_FAILURE_REASON;

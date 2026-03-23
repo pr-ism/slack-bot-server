@@ -5,9 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
@@ -26,12 +25,10 @@ import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxRepository;
 import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxRepository;
-import java.lang.reflect.Method;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -448,46 +445,14 @@ class ReviewRequestInboxProcessorTest {
     }
 
     @Test
-    @Sql(scripts = {
-            "classpath:sql/fixtures/review/project_t1.sql",
-            "classpath:sql/fixtures/review/workspace_t1.sql",
-            "classpath:sql/fixtures/review/channel_t1.sql",
-            "classpath:sql/fixtures/review/project_member_t1_mapped.sql"
-    })
-    void PROCESSED_저장실패후_재시도경로에서도_상태전이예외없이_저장된다() {
-        // given
-        ReviewNotificationPayload request = request(703L, "processed-save-fail");
-        reviewRequestInboxProcessor.enqueue("test-api-key", request, 0);
-
-        AtomicInteger saveCallCount = new AtomicInteger();
-        doAnswer(invocation -> {
-            ReviewRequestInbox inbox = invocation.getArgument(0);
-            if (saveCallCount.getAndIncrement() == 0 && inbox.getStatus() == ReviewRequestInboxStatus.PROCESSED) {
-                throw new RuntimeException("transient save failure");
-            }
-            return invocation.callRealMethod();
-        }).when(reviewRequestInboxRepository).save(any(ReviewRequestInbox.class));
-
-        // when
-        reviewRequestInboxProcessor.processPending(10);
-
-        // then
-        ReviewRequestInbox inbox = jpaReviewRequestInboxRepository.findAll().getFirst();
-        assertAll(
-                () -> assertThat(spyReviewNotificationService.getSendCount()).isEqualTo(1),
-                () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
-                () -> assertThat(inbox.getFailureType()).isNull()
-        );
-    }
-
-    @Test
     void PROCESSING으로_전이된_inbox를_findById로_조회못하면_예외없이_다음으로_진행한다() {
         // given
         ReviewNotificationPayload request = request(701L, "missing-claimed");
         reviewRequestInboxProcessor.enqueue("test-api-key", request, 0);
         ReviewRequestInbox saved = jpaReviewRequestInboxRepository.findAll().getFirst();
 
-        doReturn(true).when(reviewRequestInboxRepository).markProcessingIfClaimable(eq(saved.getId()), any(), any());
+        doReturn(Optional.of(saved.getId()), Optional.empty()).when(reviewRequestInboxRepository)
+                                                              .claimNextId(any(), any(), anyCollection());
         doReturn(Optional.empty()).when(reviewRequestInboxRepository).findById(saved.getId());
 
         // when
@@ -498,6 +463,38 @@ class ReviewRequestInboxProcessorTest {
         assertAll(
                 () -> assertThat(spyReviewNotificationService.getSendCount()).isZero(),
                 () -> assertThat(reloaded.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING)
+        );
+    }
+
+    @Test
+    @Sql(scripts = {
+            "classpath:sql/fixtures/review/project_t1.sql",
+            "classpath:sql/fixtures/review/workspace_t1.sql",
+            "classpath:sql/fixtures/review/channel_t1.sql",
+            "classpath:sql/fixtures/review/project_member_t1_mapped.sql"
+    })
+    void claimed_inbox_처리중_예상치못한_예외가_나도_다음_inbox는_계속_처리한다() {
+        // given
+        reviewRequestInboxProcessor.enqueue("test-api-key", request(801L, "first"), 0);
+        reviewRequestInboxProcessor.enqueue("test-api-key", request(802L, "second"), 0);
+        List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAll();
+        ReviewRequestInbox firstInbox = inboxes.get(0);
+        ReviewRequestInbox secondInbox = inboxes.get(1);
+
+        doThrow(new RuntimeException("unexpected repository failure"))
+                .when(reviewRequestInboxRepository)
+                .findById(firstInbox.getId());
+
+        // when
+        reviewRequestInboxProcessor.processPending(10);
+
+        // then
+        ReviewRequestInbox reloadedFirst = jpaReviewRequestInboxRepository.findById(firstInbox.getId()).orElseThrow();
+        ReviewRequestInbox reloadedSecond = jpaReviewRequestInboxRepository.findById(secondInbox.getId()).orElseThrow();
+        assertAll(
+                () -> assertThat(reloadedFirst.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
+                () -> assertThat(reloadedSecond.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
+                () -> assertThat(spyReviewNotificationService.getSendCount()).isEqualTo(1)
         );
     }
 
@@ -528,19 +525,4 @@ class ReviewRequestInboxProcessorTest {
         ReflectionTestUtils.setField(inbox, "failureType", null);
     }
 
-    @Test
-    void availableAt이_null이면_epochMillis는_0을_반환한다() throws Exception {
-        // given
-        Method method = ReviewRequestInboxProcessor.class.getDeclaredMethod(
-                "resolveAvailableAtEpochMillis",
-                Instant.class
-        );
-        method.setAccessible(true);
-
-        // when
-        long actual = (long) method.invoke(reviewRequestInboxProcessor, new Object[]{null});
-
-        // then
-        assertThat(actual).isZero();
-    }
 }

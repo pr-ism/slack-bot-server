@@ -10,12 +10,15 @@ import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
+import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +32,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
     );
 
     private final JPAQueryFactory queryFactory;
+    private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
     private final MysqlDuplicateKeyDetector mysqlDuplicateKeyDetector;
     private final ReviewRequestInboxCreator reviewRequestInboxCreator;
     private final JpaReviewRequestInboxRepository reviewRequestInboxJpaRepository;
@@ -68,57 +72,106 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public List<ReviewRequestInbox> findClaimable(Instant availableBeforeOrAt, int limit) {
+    @Transactional
+    public Optional<Long> claimNextId(
+            Instant processingStartedAt,
+            Instant availableBeforeOrAt,
+            Collection<Long> excludedInboxIds
+    ) {
+        validateProcessingStartedAt(processingStartedAt);
         validateAvailableAt(availableBeforeOrAt);
 
-        if (limit <= 0) {
-            return Collections.emptyList();
+        MapSqlParameterSource selectParameters = new MapSqlParameterSource()
+                .addValue(
+                        "claimableStatuses",
+                        List.of(
+                                ReviewRequestInboxStatus.PENDING.name(),
+                                ReviewRequestInboxStatus.RETRY_PENDING.name()
+                        )
+                )
+                .addValue("availableBeforeOrAt", Timestamp.from(availableBeforeOrAt));
+        addExcludedInboxIds(selectParameters, excludedInboxIds);
+
+        List<Long> claimedIds = namedParameterJdbcTemplate.query(
+                buildClaimNextIdSelectSql(excludedInboxIds),
+                selectParameters,
+                (resultSet, rowNum) -> resultSet.getLong(1)
+        );
+        if (claimedIds.isEmpty()) {
+            return Optional.empty();
         }
 
-        return queryFactory.selectFrom(reviewRequestInbox)
-                           .where(
-                                   reviewRequestInbox.status.in(CLAIMABLE_STATUSES),
-                                   reviewRequestInbox.availableAt.loe(availableBeforeOrAt)
-                           )
-                           .orderBy(reviewRequestInbox.availableAt.asc(), reviewRequestInbox.id.asc())
-                           .limit(limit)
-                           .fetch();
+        Long inboxId = claimedIds.getFirst();
+        MapSqlParameterSource updateParameters = new MapSqlParameterSource()
+                .addValue("processingStatus", ReviewRequestInboxStatus.PROCESSING.name())
+                .addValue("processingStartedAt", Timestamp.from(processingStartedAt))
+                .addValue("inboxId", inboxId);
+
+        int updatedCount = namedParameterJdbcTemplate.update(
+                """
+                    UPDATE review_request_inbox
+                    SET status = :processingStatus,
+                        processing_attempt = processing_attempt + 1,
+                        processing_started_at = :processingStartedAt,
+                        failed_at = NULL,
+                        failure_reason = NULL,
+                        failure_type = NULL
+                    WHERE id = :inboxId
+                    """,
+                updateParameters
+        );
+        if (updatedCount == 0) {
+            return Optional.empty();
+        }
+
+        return Optional.of(inboxId);
+    }
+
+    private String buildClaimNextIdSelectSql(Collection<Long> excludedInboxIds) {
+        StringBuilder sql = new StringBuilder(
+                """
+                SELECT id
+                FROM review_request_inbox
+                WHERE status IN (:claimableStatuses)
+                  AND available_at <= :availableBeforeOrAt
+                """
+        );
+
+        appendExcludedInboxIdsClause(sql, excludedInboxIds);
+        sql.append(
+                """
+                ORDER BY available_at ASC, id ASC
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+                """
+        );
+
+        return sql.toString();
+    }
+
+    private void appendExcludedInboxIdsClause(StringBuilder sql, Collection<Long> excludedInboxIds) {
+        if (excludedInboxIds == null || excludedInboxIds.isEmpty()) {
+            return;
+        }
+
+        sql.append("\n  AND id NOT IN (:excludedInboxIds)");
+    }
+
+    private void addExcludedInboxIds(
+            MapSqlParameterSource parameters,
+            Collection<Long> excludedInboxIds
+    ) {
+        if (excludedInboxIds == null || excludedInboxIds.isEmpty()) {
+            return;
+        }
+
+        parameters.addValue("excludedInboxIds", excludedInboxIds);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<ReviewRequestInbox> findById(Long inboxId) {
         return reviewRequestInboxJpaRepository.findById(inboxId);
-    }
-
-    @Override
-    @Transactional
-    public boolean markProcessingIfClaimable(Long inboxId, Instant processingStartedAt, Instant availableBeforeOrAt) {
-        validateInboxId(inboxId);
-        validateProcessingStartedAt(processingStartedAt);
-        validateAvailableAt(availableBeforeOrAt);
-
-        long updatedCount = queryFactory.update(reviewRequestInbox)
-                                        .set(reviewRequestInbox.status, ReviewRequestInboxStatus.PROCESSING)
-                                        .set(reviewRequestInbox.processingAttempt,
-                                                reviewRequestInbox.processingAttempt.add(1)
-                                        )
-                                        .set(reviewRequestInbox.processingStartedAt, processingStartedAt)
-                                        .set(reviewRequestInbox.failedAt, Expressions.nullExpression(Instant.class))
-                                        .set(reviewRequestInbox.failureReason, Expressions.nullExpression(String.class))
-                                        .set(
-                                                reviewRequestInbox.failureType,
-                                                Expressions.nullExpression(ReviewRequestInboxFailureType.class)
-                                        )
-                                        .where(
-                                                reviewRequestInbox.id.eq(inboxId),
-                                                reviewRequestInbox.status.in(CLAIMABLE_STATUSES),
-                                                reviewRequestInbox.availableAt.loe(availableBeforeOrAt)
-                                        )
-                                        .execute();
-
-        return updatedCount > 0;
     }
 
     @Override
@@ -217,12 +270,6 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                                    reviewRequestInbox.status.in(CLAIMABLE_STATUSES)
                            )
                            .execute();
-    }
-
-    private void validateInboxId(Long inboxId) {
-        if (inboxId == null) {
-            throw new IllegalArgumentException("inboxId는 비어 있을 수 없습니다.");
-        }
     }
 
     private void validateIdempotencyKey(String idempotencyKey) {

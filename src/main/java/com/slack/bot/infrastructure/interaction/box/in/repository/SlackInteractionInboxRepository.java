@@ -3,18 +3,20 @@ package com.slack.bot.infrastructure.interaction.box.in.repository;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import java.time.Instant;
-import java.util.List;
+import java.util.Collection;
 import java.util.Optional;
 
 public interface SlackInteractionInboxRepository {
 
     boolean enqueue(SlackInteractionInboxType interactionType, String idempotencyKey, String payloadJson);
 
-    List<SlackInteractionInbox> findClaimable(SlackInteractionInboxType interactionType, int limit);
+    Optional<Long> claimNextId(
+            SlackInteractionInboxType interactionType,
+            Instant processingStartedAt,
+            Collection<Long> excludedInboxIds
+    );
 
     Optional<SlackInteractionInbox> findById(Long inboxId);
-
-    boolean markProcessingIfClaimable(Long inboxId, Instant processingStartedAt);
 
     int recoverTimeoutProcessing(
             SlackInteractionInboxType interactionType,
