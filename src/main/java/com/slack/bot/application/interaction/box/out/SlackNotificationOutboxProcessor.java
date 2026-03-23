@@ -18,7 +18,8 @@ import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotifica
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.retry.support.RetryTemplate;
@@ -44,10 +45,18 @@ public class SlackNotificationOutboxProcessor {
     private final InteractionRetryExceptionClassifier retryExceptionClassifier;
 
     public void processPending(int limit) {
-        List<SlackNotificationOutbox> pendings = slackNotificationOutboxRepository.findClaimable(limit);
+        Set<Long> claimedOutboxIds = new HashSet<>();
+        for (int count = 0; count < limit; count++) {
+            Long claimedOutboxId = slackNotificationOutboxRepository.claimNextId(
+                    clock.instant(),
+                    claimedOutboxIds
+            ).orElse(null);
+            if (claimedOutboxId == null) {
+                return;
+            }
 
-        for (SlackNotificationOutbox pending : pendings) {
-            processPending(pending);
+            claimedOutboxIds.add(claimedOutboxId);
+            processClaimedOutboxSafely(claimedOutboxId);
         }
     }
 
@@ -67,16 +76,7 @@ public class SlackNotificationOutboxProcessor {
         return recoveredCount;
     }
 
-    private void processPending(SlackNotificationOutbox pending) {
-        Long outboxId = pending.getId();
-        if (outboxId == null) {
-            return;
-        }
-
-        if (!slackNotificationOutboxRepository.markProcessingIfClaimable(outboxId, clock.instant())) {
-            return;
-        }
-
+    private void processClaimedOutboxSafely(Long outboxId) {
         slackNotificationOutboxRepository.findById(outboxId)
                                          .ifPresentOrElse(
                                                  outbox -> processClaimedOutbox(outbox),

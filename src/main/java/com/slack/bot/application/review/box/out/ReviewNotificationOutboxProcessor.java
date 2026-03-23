@@ -15,7 +15,8 @@ import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.retry.support.RetryTemplate;
@@ -42,10 +43,18 @@ public class ReviewNotificationOutboxProcessor {
     private final InteractionRetryExceptionClassifier retryExceptionClassifier;
 
     public void processPending(int limit) {
-        List<ReviewNotificationOutbox> pendings = reviewNotificationOutboxRepository.findClaimable(limit);
+        Set<Long> claimedOutboxIds = new HashSet<>();
+        for (int count = 0; count < limit; count++) {
+            Long claimedOutboxId = reviewNotificationOutboxRepository.claimNextId(
+                    clock.instant(),
+                    claimedOutboxIds
+            ).orElse(null);
+            if (claimedOutboxId == null) {
+                return;
+            }
 
-        for (ReviewNotificationOutbox pending : pendings) {
-            processSafely(pending);
+            claimedOutboxIds.add(claimedOutboxId);
+            processSafely(claimedOutboxId);
         }
     }
 
@@ -67,16 +76,7 @@ public class ReviewNotificationOutboxProcessor {
         return recoveredCount;
     }
 
-    private void processSafely(ReviewNotificationOutbox pending) {
-        Long outboxId = pending.getId();
-        if (outboxId == null) {
-            return;
-        }
-
-        if (!reviewNotificationOutboxRepository.markProcessingIfClaimable(outboxId, clock.instant())) {
-            return;
-        }
-
+    private void processSafely(Long outboxId) {
         reviewNotificationOutboxRepository.findById(outboxId)
                                           .ifPresentOrElse(
                                                   outbox -> processClaimedOutboxSafely(outbox, outboxId),

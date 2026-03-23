@@ -358,12 +358,10 @@ class SlackNotificationOutboxWriterTest {
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() ->
                 assertThat(jpaSlackNotificationOutboxRepository.findAll()).hasSize(1)
         );
-        List<SlackNotificationOutbox> actual = actualSlackNotificationOutboxRepository.findClaimable(10);
         SlackNotificationOutboxStatus actualStatus = actualSlackNotificationOutboxRepository.findById(existing.getId())
                                                                                             .orElseThrow()
                                                                                             .getStatus();
         assertAll(
-                () -> assertThat(actual).isEmpty(),
                 () -> assertThat(actualStatus).isEqualTo(SlackNotificationOutboxStatus.SENT)
         );
     }
@@ -389,12 +387,10 @@ class SlackNotificationOutboxWriterTest {
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() ->
                 assertThat(jpaSlackNotificationOutboxRepository.findAll()).hasSize(1)
         );
-        List<SlackNotificationOutbox> actual = actualSlackNotificationOutboxRepository.findClaimable(10);
         SlackNotificationOutboxStatus actualStatus = actualSlackNotificationOutboxRepository.findById(existing.getId())
                                                                                             .orElseThrow()
                                                                                             .getStatus();
         assertAll(
-                () -> assertThat(actual).isEmpty(),
                 () -> assertThat(actualStatus).isEqualTo(SlackNotificationOutboxStatus.PROCESSING)
         );
     }
@@ -425,12 +421,10 @@ class SlackNotificationOutboxWriterTest {
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() ->
                 assertThat(jpaSlackNotificationOutboxRepository.findAll()).hasSize(1)
         );
-        List<SlackNotificationOutbox> actual = actualSlackNotificationOutboxRepository.findClaimable(10);
         SlackNotificationOutboxStatus actualStatus = actualSlackNotificationOutboxRepository.findById(existing.getId())
                                                                                             .orElseThrow()
                                                                                             .getStatus();
         assertAll(
-                () -> assertThat(actual).isEmpty(),
                 () -> assertThat(actualStatus).isEqualTo(SlackNotificationOutboxStatus.FAILED)
         );
     }
