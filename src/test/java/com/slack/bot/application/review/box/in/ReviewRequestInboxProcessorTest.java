@@ -371,7 +371,7 @@ class ReviewRequestInboxProcessorTest {
             "classpath:sql/fixtures/review/channel_t1.sql",
             "classpath:sql/fixtures/review/project_member_t1_mapped.sql"
     })
-    void retryable_예외가_발생하고_최대시도_미만이면_RETRY_PENDING으로_마킹된다() {
+    void retryable_예외가_발생하면_timeout_recovery_전까지_PROCESSING으로_남는다() {
         // given
         ReviewNotificationPayload request = request(601L, "retry-pending");
         reviewRequestInboxProcessor.enqueue("test-api-key", request, 0);
@@ -391,10 +391,10 @@ class ReviewRequestInboxProcessorTest {
         // then
         ReviewRequestInbox inbox = jpaReviewRequestInboxRepository.findAll().getFirst();
         assertAll(
-                () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
+                () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
                 () -> assertThat(inbox.getFailureType()).isNull(),
-                () -> assertThat(inbox.getFailureReason()).isNotBlank(),
+                () -> assertThat(inbox.getFailureReason()).isNull(),
                 () -> assertThat(jpaReviewNotificationOutboxRepository.findAll()).isEmpty()
         );
     }
@@ -406,7 +406,7 @@ class ReviewRequestInboxProcessorTest {
             "classpath:sql/fixtures/review/channel_t1.sql",
             "classpath:sql/fixtures/review/project_member_t1_mapped.sql"
     })
-    void retryable_예외가_최대시도에_도달하면_FAILED_RETRY_EXHAUSTED로_마킹된다() throws Exception {
+    void 최대시도에_도달한_retryable_예외도_timeout_recovery_전까지_PROCESSING으로_남는다() throws Exception {
         // given
         ReviewNotificationPayload request = request(602L, "retry-exhausted");
         ReviewRequestInbox inbox = ReviewRequestInbox.pending(
@@ -436,10 +436,10 @@ class ReviewRequestInboxProcessorTest {
         // then
         ReviewRequestInbox failed = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
         assertAll(
-                () -> assertThat(failed.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
+                () -> assertThat(failed.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(failed.getProcessingAttempt()).isEqualTo(2),
-                () -> assertThat(failed.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.RETRY_EXHAUSTED),
-                () -> assertThat(failed.getFailureReason()).isNotBlank(),
+                () -> assertThat(failed.getFailureType()).isNull(),
+                () -> assertThat(failed.getFailureReason()).isNull(),
                 () -> assertThat(jpaReviewNotificationOutboxRepository.findAll()).isEmpty()
         );
     }

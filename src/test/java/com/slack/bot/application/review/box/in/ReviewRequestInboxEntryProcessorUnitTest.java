@@ -1,6 +1,7 @@
 package com.slack.bot.application.review.box.in;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
@@ -105,7 +106,7 @@ class ReviewRequestInboxEntryProcessorUnitTest {
     }
 
     @Test
-    void 재시도_가능_예외이고_첫_시도면_RETRY_PENDING으로_마킹된다() {
+    void 비즈니스_구간_예외는_전파하고_실패상태를_저장하지_않는다() {
         // given
         ReviewNotificationPayload request = request(102L, "retry-first-attempt");
         ReviewRequestInbox actual = processingInbox("review-entry-retry-1", requestJson(request), 1);
@@ -115,20 +116,21 @@ class ReviewRequestInboxEntryProcessorUnitTest {
                 .given(reviewNotificationService)
                 .sendSimpleNotification(any(), any());
 
-        // when
-        reviewRequestInboxEntryProcessor.processClaimedInbox(12L);
+        // when & then
+        assertThatThrownBy(() -> reviewRequestInboxEntryProcessor.processClaimedInbox(12L))
+                .isInstanceOf(ResourceAccessException.class)
+                .hasMessageContaining("temporary network failure");
 
-        // then
         assertAll(
-                () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
+                () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
                 () -> assertThat(actual.getFailureType()).isNull()
         );
-        verify(reviewRequestInboxRepository).save(actual);
+        verify(reviewRequestInboxRepository, never()).save(actual);
     }
 
     @Test
-    void 재시도_가능_예외이고_최대_시도에_도달하면_FAILED와_RETRY_EXHAUSTED로_마킹된다() {
+    void 최대_시도에_도달한_상태여도_비즈니스_구간_예외는_전파한다() {
         // given
         ReviewNotificationPayload request = request(103L, "retry-max-attempt");
         ReviewRequestInbox actual = processingInbox("review-entry-retry-2", requestJson(request), 1);
@@ -140,28 +142,25 @@ class ReviewRequestInboxEntryProcessorUnitTest {
                 .given(reviewNotificationService)
                 .sendSimpleNotification(any(), any());
 
-        // when
-        reviewRequestInboxEntryProcessor.processClaimedInbox(13L);
+        // when & then
+        assertThatThrownBy(() -> reviewRequestInboxEntryProcessor.processClaimedInbox(13L))
+                .isInstanceOf(ResourceAccessException.class)
+                .hasMessageContaining("temporary network failure");
 
-        // then
         assertAll(
-                () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
+                () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(2),
-                () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.RETRY_EXHAUSTED)
+                () -> assertThat(actual.getFailureType()).isNull()
         );
-        verify(reviewRequestInboxRepository).save(actual);
+        verify(reviewRequestInboxRepository, never()).save(actual);
     }
 
     @Test
-    void 긴_실패사유는_잘려서_저장된다() {
+    void 긴_실패사유는_JSON_파싱_실패에서_잘려서_저장된다() {
         // given
-        ReviewNotificationPayload request = request(104L, "long-failure-reason");
-        ReviewRequestInbox actual = processingInbox("review-entry-long-failure", requestJson(request), 1);
+        ReviewRequestInbox actual = processingInbox("review-entry-long-failure", "x".repeat(600), 1);
 
         given(reviewRequestInboxRepository.findById(14L)).willReturn(Optional.of(actual));
-        willThrow(new IllegalArgumentException("x".repeat(600)))
-                .given(reviewNotificationService)
-                .sendSimpleNotification(any(), any());
 
         // when
         reviewRequestInboxEntryProcessor.processClaimedInbox(14L);
@@ -170,21 +169,18 @@ class ReviewRequestInboxEntryProcessorUnitTest {
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
                 () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE),
-                () -> assertThat(actual.getFailureReason()).hasSize(500)
+                () -> assertThat(actual.getFailureReason()).isNotBlank(),
+                () -> assertThat(actual.getFailureReason().length()).isLessThanOrEqualTo(500)
         );
         verify(reviewRequestInboxRepository).save(actual);
     }
 
     @Test
-    void 예외메시지가_비어있으면_unknown_failure로_저장된다() {
+    void JSON_파싱_예외_메시지는_실패사유로_저장된다() {
         // given
-        ReviewNotificationPayload request = request(105L, "empty-failure-reason");
-        ReviewRequestInbox actual = processingInbox("review-entry-empty-failure", requestJson(request), 1);
+        ReviewRequestInbox actual = processingInbox("review-entry-empty-failure", "{", 1);
 
         given(reviewRequestInboxRepository.findById(15L)).willReturn(Optional.of(actual));
-        willThrow(new RuntimeException())
-                .given(reviewNotificationService)
-                .sendSimpleNotification(any(), any());
 
         // when
         reviewRequestInboxEntryProcessor.processClaimedInbox(15L);
@@ -193,9 +189,78 @@ class ReviewRequestInboxEntryProcessorUnitTest {
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
                 () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE),
-                () -> assertThat(actual.getFailureReason()).isEqualTo("unknown failure")
+                () -> assertThat(actual.getFailureReason()).isNotBlank()
         );
         verify(reviewRequestInboxRepository).save(actual);
+    }
+
+    @Test
+    void retryable_예외면_markFailureStatus가_RETRY_PENDING으로_전이한다() {
+        // given
+        ReviewRequestInbox actual = processingInbox("review-entry-mark-retry", requestJson(request(106L, "retry")), 1);
+
+        // when
+        ReflectionTestUtils.invokeMethod(
+                reviewRequestInboxEntryProcessor,
+                "markFailureStatus",
+                actual,
+                new ResourceAccessException("temporary network failure")
+        );
+
+        // then
+        assertAll(
+                () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
+                () -> assertThat(actual.getFailureType()).isNull(),
+                () -> assertThat(actual.getFailureReason()).isNotBlank()
+        );
+    }
+
+    @Test
+    void retryable_예외이고_최대_시도에_도달하면_markFailureStatus가_FAILED로_전이한다() {
+        // given
+        ReviewRequestInbox actual = processingInbox("review-entry-mark-failed", requestJson(request(107L, "failed")), 2);
+
+        // when
+        ReflectionTestUtils.invokeMethod(
+                reviewRequestInboxEntryProcessor,
+                "markFailureStatus",
+                actual,
+                new ResourceAccessException("temporary network failure")
+        );
+
+        // then
+        assertAll(
+                () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
+                () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.RETRY_EXHAUSTED),
+                () -> assertThat(actual.getFailureReason()).isNotBlank()
+        );
+    }
+
+    @Test
+    void PROCESSING이_아닌_상태면_markFailureStatus는_아무것도_변경하지_않는다() {
+        // given
+        ReviewRequestInbox actual = ReviewRequestInbox.pending(
+                "review-entry-no-op",
+                "test-api-key",
+                108L,
+                requestJson(request(108L, "noop")),
+                Instant.parse("2026-02-15T00:00:00Z")
+        );
+
+        // when
+        ReflectionTestUtils.invokeMethod(
+                reviewRequestInboxEntryProcessor,
+                "markFailureStatus",
+                actual,
+                new IllegalArgumentException("invalid request")
+        );
+
+        // then
+        assertAll(
+                () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING),
+                () -> assertThat(actual.getFailureType()).isNull(),
+                () -> assertThat(actual.getFailureReason()).isNull()
+        );
     }
 
     @Test

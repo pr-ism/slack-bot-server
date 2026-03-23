@@ -13,6 +13,7 @@ import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -52,12 +53,7 @@ public class ReviewRequestInboxEntryProcessor {
     }
 
     private void processInTransaction(ReviewRequestInbox inbox) {
-        try {
-            ReviewNotificationPayload request = objectMapper.readValue(
-                    inbox.getRequestJson(),
-                    ReviewNotificationPayload.class
-            );
-
+        deserializeRequest(inbox).ifPresent(request -> {
             String sourceKey = resolveSourceKey(inbox);
             reviewNotificationSourceContext.withSourceKey(
                     sourceKey,
@@ -65,15 +61,27 @@ public class ReviewRequestInboxEntryProcessor {
             );
 
             inbox.markProcessed(clock.instant());
-        } catch (Exception exception) {
-            log.error("review_request inbox 처리에 실패했습니다. inboxId={}", inbox.getId(), exception);
-            markFailureStatus(inbox, exception);
-        }
-
-        reviewRequestInboxRepository.save(inbox);
+            reviewRequestInboxRepository.save(inbox);
+        });
     }
 
-    private void markFailureStatus(ReviewRequestInbox inbox, Exception exception) {
+    private Optional<ReviewNotificationPayload> deserializeRequest(ReviewRequestInbox inbox) {
+        try {
+            return Optional.of(
+                    objectMapper.readValue(
+                            inbox.getRequestJson(),
+                            ReviewNotificationPayload.class
+                    )
+            );
+        } catch (Exception e) {
+            log.error("review_request inbox 처리에 실패했습니다. inboxId={}", inbox.getId(), e);
+            markFailureStatus(inbox, e);
+            reviewRequestInboxRepository.save(inbox);
+            return Optional.empty();
+        }
+    }
+
+    private void markFailureStatus(ReviewRequestInbox inbox, Exception e) {
         if (inbox.getStatus() != ReviewRequestInboxStatus.PROCESSING) {
             log.warn(
                     "PROCESSING이 아닌 상태에서 실패 처리를 시도했습니다. inboxId={}, status={}",
@@ -83,9 +91,9 @@ public class ReviewRequestInboxEntryProcessor {
             return;
         }
 
-        String reason = resolveFailureReason(exception);
+        String reason = resolveFailureReason(e);
 
-        if (!retryExceptionClassifier.isRetryable(exception)) {
+        if (!retryExceptionClassifier.isRetryable(e)) {
             inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.NON_RETRYABLE);
             return;
         }
@@ -98,8 +106,8 @@ public class ReviewRequestInboxEntryProcessor {
         inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.RETRY_EXHAUSTED);
     }
 
-    private String resolveFailureReason(Exception exception) {
-        String reason = failureReasonTruncator.truncate(exception.getMessage());
+    private String resolveFailureReason(Exception e) {
+        String reason = failureReasonTruncator.truncate(e.getMessage());
 
         if (reason == null || reason.isBlank()) {
             return UNKNOWN_FAILURE_REASON;
