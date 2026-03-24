@@ -3,11 +3,13 @@ package com.slack.bot.application.review.box.in;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doReturn;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.IntegrationTest;
+import com.slack.bot.application.review.box.in.exception.ReviewRequestInboxProcessingLeaseLostException;
 import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
@@ -21,7 +23,6 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataAccessException;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -29,6 +30,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class ReviewRequestInboxEntryProcessorTest {
+
+    private static final Instant CLAIMED_PROCESSING_STARTED_AT = Instant.parse("2026-02-15T00:00:00Z");
 
     @Autowired
     ReviewRequestInboxEntryProcessor reviewRequestInboxEntryProcessor;
@@ -59,14 +62,23 @@ class ReviewRequestInboxEntryProcessorTest {
                 requestJson(request(1101L, "rollback-check"))
         );
 
-        doThrow(new IllegalStateException("forced save failure"))
+        doReturn(true)
                 .when(reviewRequestInboxRepository)
-                .save(argThat(savedInbox -> savedInbox != null && inbox.getId().equals(savedInbox.getId())));
+                .renewProcessingLease(inbox.getId(), CLAIMED_PROCESSING_STARTED_AT, CLAIMED_PROCESSING_STARTED_AT);
+        doReturn(false)
+                .when(reviewRequestInboxRepository)
+                .saveIfProcessingLeaseMatched(
+                        argThat(savedInbox -> savedInbox != null && inbox.getId().equals(savedInbox.getId())),
+                        any()
+                );
 
         // when & then
-        assertThatThrownBy(() -> reviewRequestInboxEntryProcessor.processClaimedInbox(inbox.getId()))
-                .isInstanceOf(DataAccessException.class)
-                .hasMessageContaining("forced save failure");
+        assertThatThrownBy(() -> reviewRequestInboxEntryProcessor.processClaimedInbox(
+                inbox.getId(),
+                CLAIMED_PROCESSING_STARTED_AT
+        ))
+                .isInstanceOf(ReviewRequestInboxProcessingLeaseLostException.class)
+                .hasMessageContaining("processing lease");
 
         ReviewRequestInbox actualInbox = jpaReviewRequestInboxRepository.findById(inbox.getId()).orElseThrow();
         List<ReviewNotificationOutbox> actualOutboxes = jpaReviewNotificationOutboxRepository.findAll();
@@ -87,7 +99,7 @@ class ReviewRequestInboxEntryProcessorTest {
                 Instant.parse("2026-02-15T00:00:00Z")
         );
         ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
-        ReflectionTestUtils.setField(inbox, "processingStartedAt", Instant.parse("2026-02-15T00:00:00Z"));
+        ReflectionTestUtils.setField(inbox, "processingStartedAt", CLAIMED_PROCESSING_STARTED_AT);
         ReflectionTestUtils.setField(inbox, "processingAttempt", 1);
         return jpaReviewRequestInboxRepository.save(inbox);
     }

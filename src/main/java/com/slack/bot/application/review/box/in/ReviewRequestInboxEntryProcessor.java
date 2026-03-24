@@ -1,50 +1,31 @@
 package com.slack.bot.application.review.box.in;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
-import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
-import com.slack.bot.application.review.ReviewNotificationService;
-import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
-import com.slack.bot.application.review.dto.ReviewNotificationPayload;
-import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
-import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
-import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Optional;
+import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class ReviewRequestInboxEntryProcessor {
 
-    private static final String UNKNOWN_FAILURE_REASON = "unknown failure";
-    private static final String REVIEW_REQUEST_INBOX_SOURCE_PREFIX = "REVIEW_REQUEST_INBOX";
-
     private final Clock clock;
-    private final ObjectMapper objectMapper;
-    private final ReviewNotificationService reviewNotificationService;
-    private final ReviewNotificationSourceContext reviewNotificationSourceContext;
-    private final BoxFailureReasonTruncator failureReasonTruncator;
-    private final InteractionRetryProperties interactionRetryProperties;
     private final ReviewRequestInboxRepository reviewRequestInboxRepository;
-    private final InteractionRetryExceptionClassifier retryExceptionClassifier;
+    private final ReviewRequestInboxTransactionalProcessor reviewRequestInboxTransactionalProcessor;
 
-    @Transactional
-    public void processClaimedInbox(Long inboxId) {
-        if (inboxId == null) {
+    public void processClaimedInbox(Long inboxId, Instant claimedProcessingStartedAt) {
+        if (inboxId == null || claimedProcessingStartedAt == null) {
             return;
         }
 
         reviewRequestInboxRepository.findById(inboxId)
                                     .ifPresentOrElse(
-                                            inbox -> processInTransaction(inbox),
+                                            inbox -> processClaimedInbox(inbox, claimedProcessingStartedAt),
                                             () -> log.warn(
                                                     "PROCESSING으로 전이된 review_request inbox를 조회하지 못했습니다. inboxId={}",
                                                     inboxId
@@ -52,83 +33,54 @@ public class ReviewRequestInboxEntryProcessor {
                                     );
     }
 
-    private void processInTransaction(ReviewRequestInbox inbox) {
-        deserializeRequest(inbox).ifPresent(request -> {
-            String sourceKey = resolveSourceKey(inbox);
-            reviewNotificationSourceContext.withSourceKey(
-                    sourceKey,
-                    () -> reviewNotificationService.sendSimpleNotification(inbox.getApiKey(), request)
-            );
-
-            inbox.markProcessed(clock.instant());
-            reviewRequestInboxRepository.save(inbox);
-        });
-    }
-
-    private Optional<ReviewNotificationPayload> deserializeRequest(ReviewRequestInbox inbox) {
-        try {
-            return Optional.of(
-                    objectMapper.readValue(
-                            inbox.getRequestJson(),
-                            ReviewNotificationPayload.class
-                    )
-            );
-        } catch (Exception e) {
-            log.error("review_request inbox 처리에 실패했습니다. inboxId={}", inbox.getId(), e);
-            markFailureStatus(inbox, e);
-            reviewRequestInboxRepository.save(inbox);
-            return Optional.empty();
-        }
-    }
-
-    private void markFailureStatus(ReviewRequestInbox inbox, Exception e) {
-        if (inbox.getStatus() != ReviewRequestInboxStatus.PROCESSING) {
-            log.warn(
-                    "PROCESSING이 아닌 상태에서 실패 처리를 시도했습니다. inboxId={}, status={}",
-                    inbox.getId(),
-                    inbox.getStatus()
-            );
+    private void processClaimedInbox(
+            ReviewRequestInbox inbox,
+            Instant claimedProcessingStartedAt
+    ) {
+        if (!hasProcessingLease(inbox, claimedProcessingStartedAt)) {
+            logLeaseLost(inbox.getId(), claimedProcessingStartedAt, inbox.getProcessingStartedAt());
             return;
         }
 
-        String reason = resolveFailureReason(e);
-
-        if (!retryExceptionClassifier.isRetryable(e)) {
-            inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.NON_RETRYABLE);
+        Instant renewedProcessingStartedAt = currentLeaseStartedAt();
+        boolean renewed = reviewRequestInboxRepository.renewProcessingLease(
+                inbox.getId(),
+                claimedProcessingStartedAt,
+                renewedProcessingStartedAt
+        );
+        if (!renewed) {
+            logLeaseLost(inbox.getId(), claimedProcessingStartedAt, renewedProcessingStartedAt);
             return;
         }
 
-        if (inbox.getProcessingAttempt() < interactionRetryProperties.inbox().maxAttempts()) {
-            inbox.markRetryPending(clock.instant(), reason);
-            return;
-        }
-
-        inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.RETRY_EXHAUSTED);
+        inbox.renewProcessingLease(renewedProcessingStartedAt);
+        reviewRequestInboxTransactionalProcessor.processInTransaction(
+                inbox.getId(),
+                renewedProcessingStartedAt
+        );
     }
 
-    private String resolveFailureReason(Exception e) {
-        String reason = failureReasonTruncator.truncate(e.getMessage());
-
-        if (reason == null || reason.isBlank()) {
-            return UNKNOWN_FAILURE_REASON;
-        }
-
-        return reason;
+    private Instant currentLeaseStartedAt() {
+        return clock.instant().truncatedTo(ChronoUnit.MICROS);
     }
 
-    private String resolveSourceKey(ReviewRequestInbox inbox) {
-        long availableAtEpochMillis = resolveAvailableAtEpochMillis(inbox.getAvailableAt());
-
-        return REVIEW_REQUEST_INBOX_SOURCE_PREFIX
-                + ":" + inbox.getIdempotencyKey()
-                + ":" + availableAtEpochMillis;
+    private boolean hasProcessingLease(
+            ReviewRequestInbox inbox,
+            Instant claimedProcessingStartedAt
+    ) {
+        return claimedProcessingStartedAt.equals(inbox.getProcessingStartedAt());
     }
 
-    private long resolveAvailableAtEpochMillis(Instant availableAt) {
-        if (availableAt == null) {
-            return 0L;
-        }
-
-        return availableAt.toEpochMilli();
+    private void logLeaseLost(
+            Long inboxId,
+            Instant claimedProcessingStartedAt,
+            Instant actualProcessingStartedAt
+    ) {
+        log.warn(
+                "review_request inbox 처리 lease를 상실해 처리를 건너뜁니다. inboxId={}, claimedProcessingStartedAt={}, actualProcessingStartedAt={}",
+                inboxId,
+                claimedProcessingStartedAt,
+                actualProcessingStartedAt
+        );
     }
 }

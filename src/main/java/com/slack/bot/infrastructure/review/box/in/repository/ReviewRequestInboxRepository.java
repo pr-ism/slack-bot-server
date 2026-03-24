@@ -21,6 +21,12 @@ public interface ReviewRequestInboxRepository {
             Collection<Long> excludedInboxIds
     );
 
+    boolean renewProcessingLease(
+            Long inboxId,
+            Instant currentProcessingStartedAt,
+            Instant renewedProcessingStartedAt
+    );
+
     Optional<ReviewRequestInbox> findById(Long inboxId);
 
     int recoverTimeoutProcessing(
@@ -28,6 +34,11 @@ public interface ReviewRequestInboxRepository {
             Instant failedAt,
             String failureReason,
             int maxAttempts
+    );
+
+    boolean saveIfProcessingLeaseMatched(
+            ReviewRequestInbox inbox,
+            Instant claimedProcessingStartedAt
     );
 
     ReviewRequestInbox save(ReviewRequestInbox inbox);

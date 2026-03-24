@@ -1,29 +1,16 @@
 package com.slack.bot.application.review.box.in;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
-import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
-import com.slack.bot.application.review.ReviewNotificationService;
-import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
-import com.slack.bot.application.review.dto.ReviewNotificationPayload;
-import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
-import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
-import java.lang.reflect.Method;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.List;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -33,41 +20,31 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.client.ResourceAccessException;
 
 @SuppressWarnings("NonAsciiCharacters")
 @ExtendWith(MockitoExtension.class)
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class ReviewRequestInboxEntryProcessorUnitTest {
 
-    @Mock
-    ReviewNotificationService reviewNotificationService;
+    private static final Instant CLAIMED_PROCESSING_STARTED_AT = Instant.parse("2026-02-15T00:00:00Z");
+    private static final Instant RENEWED_PROCESSING_STARTED_AT = Instant.parse("2026-02-15T00:00:05.123456Z");
 
     @Mock
     ReviewRequestInboxRepository reviewRequestInboxRepository;
 
-    ReviewRequestInboxEntryProcessor reviewRequestInboxEntryProcessor;
+    @Mock
+    ReviewRequestInboxTransactionalProcessor reviewRequestInboxTransactionalProcessor;
 
-    ReviewNotificationSourceContext reviewNotificationSourceContext;
+    ReviewRequestInboxEntryProcessor reviewRequestInboxEntryProcessor;
 
     @BeforeEach
     void setUp() {
-        InteractionRetryProperties retryProperties = new InteractionRetryProperties(
-                new InteractionRetryProperties.InboxRetryProperties(2, 100, 2.0, 1000),
-                new InteractionRetryProperties.OutboxRetryProperties(2, 100, 2.0, 1000)
-        );
-        InteractionRetryExceptionClassifier classifier = InteractionRetryExceptionClassifier.create();
-        reviewNotificationSourceContext = new ReviewNotificationSourceContext();
+        Clock fixedClock = Clock.fixed(RENEWED_PROCESSING_STARTED_AT, ZoneOffset.UTC);
 
         reviewRequestInboxEntryProcessor = new ReviewRequestInboxEntryProcessor(
-                Clock.systemUTC(),
-                new ObjectMapper(),
-                reviewNotificationService,
-                reviewNotificationSourceContext,
-                new BoxFailureReasonTruncator(),
-                retryProperties,
+                fixedClock,
                 reviewRequestInboxRepository,
-                classifier
+                reviewRequestInboxTransactionalProcessor
         );
     }
 
@@ -77,251 +54,69 @@ class ReviewRequestInboxEntryProcessorUnitTest {
         given(reviewRequestInboxRepository.findById(10L)).willReturn(Optional.empty());
 
         // when
-        reviewRequestInboxEntryProcessor.processClaimedInbox(10L);
+        reviewRequestInboxEntryProcessor.processClaimedInbox(10L, CLAIMED_PROCESSING_STARTED_AT);
 
         // then
-        verify(reviewRequestInboxRepository, never()).save(any());
-        verify(reviewNotificationService, never()).sendSimpleNotification(any(), any());
+        verify(reviewRequestInboxRepository, never()).renewProcessingLease(any(), any(), any());
+        verify(reviewRequestInboxTransactionalProcessor, never()).processInTransaction(any(), any());
     }
 
     @Test
-    void 정상처리시_알림을_전송하고_PROCESSED로_저장된다() {
+    void claim_lease가_다르면_트랜잭션_처리를_건너뛴다() {
         // given
-        ReviewNotificationPayload request = request(101L, "success");
-        ReviewRequestInbox actual = processingInbox("review-entry-success", requestJson(request), 1);
-
-        given(reviewRequestInboxRepository.findById(11L)).willReturn(Optional.of(actual));
+        ReviewRequestInbox inbox = processingInbox(11L, Instant.parse("2026-02-15T00:00:01Z"));
+        given(reviewRequestInboxRepository.findById(11L)).willReturn(Optional.of(inbox));
 
         // when
-        reviewRequestInboxEntryProcessor.processClaimedInbox(11L);
+        reviewRequestInboxEntryProcessor.processClaimedInbox(11L, CLAIMED_PROCESSING_STARTED_AT);
 
         // then
-        assertAll(
-                () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
-                () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(reviewNotificationSourceContext.currentSourceKey()).isEmpty()
-        );
-        verify(reviewNotificationService).sendSimpleNotification("test-api-key", request);
-        verify(reviewRequestInboxRepository).save(actual);
+        verify(reviewRequestInboxRepository, never()).renewProcessingLease(any(), any(), any());
+        verify(reviewRequestInboxTransactionalProcessor, never()).processInTransaction(any(), any());
     }
 
     @Test
-    void 비즈니스_구간_예외는_전파하고_실패상태를_저장하지_않는다() {
+    void lease_연장에_실패하면_트랜잭션_처리를_건너뛴다() {
         // given
-        ReviewNotificationPayload request = request(102L, "retry-first-attempt");
-        ReviewRequestInbox actual = processingInbox("review-entry-retry-1", requestJson(request), 1);
-
-        given(reviewRequestInboxRepository.findById(12L)).willReturn(Optional.of(actual));
-        willThrow(new ResourceAccessException("temporary network failure"))
-                .given(reviewNotificationService)
-                .sendSimpleNotification(any(), any());
-
-        // when & then
-        assertThatThrownBy(() -> reviewRequestInboxEntryProcessor.processClaimedInbox(12L))
-                .isInstanceOf(ResourceAccessException.class)
-                .hasMessageContaining("temporary network failure");
-
-        assertAll(
-                () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
-                () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actual.getFailureType()).isNull()
-        );
-        verify(reviewRequestInboxRepository, never()).save(actual);
-    }
-
-    @Test
-    void 최대_시도에_도달한_상태여도_비즈니스_구간_예외는_전파한다() {
-        // given
-        ReviewNotificationPayload request = request(103L, "retry-max-attempt");
-        ReviewRequestInbox actual = processingInbox("review-entry-retry-2", requestJson(request), 1);
-        actual.markRetryPending(Instant.parse("2026-02-15T00:01:00Z"), "previous retry failure");
-        setProcessingState(actual, Instant.parse("2026-02-15T00:02:00Z"), 2);
-
-        given(reviewRequestInboxRepository.findById(13L)).willReturn(Optional.of(actual));
-        willThrow(new ResourceAccessException("temporary network failure"))
-                .given(reviewNotificationService)
-                .sendSimpleNotification(any(), any());
-
-        // when & then
-        assertThatThrownBy(() -> reviewRequestInboxEntryProcessor.processClaimedInbox(13L))
-                .isInstanceOf(ResourceAccessException.class)
-                .hasMessageContaining("temporary network failure");
-
-        assertAll(
-                () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
-                () -> assertThat(actual.getProcessingAttempt()).isEqualTo(2),
-                () -> assertThat(actual.getFailureType()).isNull()
-        );
-        verify(reviewRequestInboxRepository, never()).save(actual);
-    }
-
-    @Test
-    void 긴_실패사유는_JSON_파싱_실패에서_잘려서_저장된다() {
-        // given
-        ReviewRequestInbox actual = processingInbox("review-entry-long-failure", "x".repeat(600), 1);
-
-        given(reviewRequestInboxRepository.findById(14L)).willReturn(Optional.of(actual));
+        ReviewRequestInbox inbox = processingInbox(12L, CLAIMED_PROCESSING_STARTED_AT);
+        given(reviewRequestInboxRepository.findById(12L)).willReturn(Optional.of(inbox));
+        given(reviewRequestInboxRepository.renewProcessingLease(12L, CLAIMED_PROCESSING_STARTED_AT, RENEWED_PROCESSING_STARTED_AT))
+                .willReturn(false);
 
         // when
-        reviewRequestInboxEntryProcessor.processClaimedInbox(14L);
+        reviewRequestInboxEntryProcessor.processClaimedInbox(12L, CLAIMED_PROCESSING_STARTED_AT);
 
         // then
-        assertAll(
-                () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
-                () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE),
-                () -> assertThat(actual.getFailureReason()).isNotBlank(),
-                () -> assertThat(actual.getFailureReason().length()).isLessThanOrEqualTo(500)
-        );
-        verify(reviewRequestInboxRepository).save(actual);
+        verify(reviewRequestInboxTransactionalProcessor, never()).processInTransaction(any(), any());
     }
 
     @Test
-    void JSON_파싱_예외_메시지는_실패사유로_저장된다() {
+    void lease_연장에_성공하면_갱신된_lease로_트랜잭션_처리를_위임한다() {
         // given
-        ReviewRequestInbox actual = processingInbox("review-entry-empty-failure", "{", 1);
-
-        given(reviewRequestInboxRepository.findById(15L)).willReturn(Optional.of(actual));
+        ReviewRequestInbox inbox = processingInbox(13L, CLAIMED_PROCESSING_STARTED_AT);
+        given(reviewRequestInboxRepository.findById(13L)).willReturn(Optional.of(inbox));
+        given(reviewRequestInboxRepository.renewProcessingLease(13L, CLAIMED_PROCESSING_STARTED_AT, RENEWED_PROCESSING_STARTED_AT))
+                .willReturn(true);
 
         // when
-        reviewRequestInboxEntryProcessor.processClaimedInbox(15L);
+        reviewRequestInboxEntryProcessor.processClaimedInbox(13L, CLAIMED_PROCESSING_STARTED_AT);
 
         // then
-        assertAll(
-                () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
-                () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE),
-                () -> assertThat(actual.getFailureReason()).isNotBlank()
-        );
-        verify(reviewRequestInboxRepository).save(actual);
+        verify(reviewRequestInboxTransactionalProcessor).processInTransaction(13L, RENEWED_PROCESSING_STARTED_AT);
     }
 
-    @Test
-    void retryable_예외면_markFailureStatus가_RETRY_PENDING으로_전이한다() {
-        // given
-        ReviewRequestInbox actual = processingInbox("review-entry-mark-retry", requestJson(request(106L, "retry")), 1);
-
-        // when
-        ReflectionTestUtils.invokeMethod(
-                reviewRequestInboxEntryProcessor,
-                "markFailureStatus",
-                actual,
-                new ResourceAccessException("temporary network failure")
-        );
-
-        // then
-        assertAll(
-                () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
-                () -> assertThat(actual.getFailureType()).isNull(),
-                () -> assertThat(actual.getFailureReason()).isNotBlank()
-        );
-    }
-
-    @Test
-    void retryable_예외이고_최대_시도에_도달하면_markFailureStatus가_FAILED로_전이한다() {
-        // given
-        ReviewRequestInbox actual = processingInbox("review-entry-mark-failed", requestJson(request(107L, "failed")), 2);
-
-        // when
-        ReflectionTestUtils.invokeMethod(
-                reviewRequestInboxEntryProcessor,
-                "markFailureStatus",
-                actual,
-                new ResourceAccessException("temporary network failure")
-        );
-
-        // then
-        assertAll(
-                () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
-                () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.RETRY_EXHAUSTED),
-                () -> assertThat(actual.getFailureReason()).isNotBlank()
-        );
-    }
-
-    @Test
-    void PROCESSING이_아닌_상태면_markFailureStatus는_아무것도_변경하지_않는다() {
-        // given
-        ReviewRequestInbox actual = ReviewRequestInbox.pending(
-                "review-entry-no-op",
-                "test-api-key",
-                108L,
-                requestJson(request(108L, "noop")),
-                Instant.parse("2026-02-15T00:00:00Z")
-        );
-
-        // when
-        ReflectionTestUtils.invokeMethod(
-                reviewRequestInboxEntryProcessor,
-                "markFailureStatus",
-                actual,
-                new IllegalArgumentException("invalid request")
-        );
-
-        // then
-        assertAll(
-                () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING),
-                () -> assertThat(actual.getFailureType()).isNull(),
-                () -> assertThat(actual.getFailureReason()).isNull()
-        );
-    }
-
-    @Test
-    void availableAt이_null이면_epochMillis는_0을_반환한다() throws Exception {
-        // given
-        Method method = ReviewRequestInboxEntryProcessor.class.getDeclaredMethod(
-                "resolveAvailableAtEpochMillis",
-                Instant.class
-        );
-        method.setAccessible(true);
-
-        // when
-        long actual = (long) method.invoke(reviewRequestInboxEntryProcessor, new Object[]{null});
-
-        // then
-        assertThat(actual).isZero();
-    }
-
-    private ReviewRequestInbox processingInbox(
-            String idempotencyKey,
-            String requestJson,
-            int processingAttempt
-    ) {
+    private ReviewRequestInbox processingInbox(Long inboxId, Instant processingStartedAt) {
         ReviewRequestInbox inbox = ReviewRequestInbox.pending(
-                idempotencyKey,
+                "review-entry-" + inboxId,
                 "test-api-key",
-                100L,
-                requestJson,
-                Instant.parse("2026-02-15T00:00:00Z")
+                100L + inboxId,
+                "{}",
+                CLAIMED_PROCESSING_STARTED_AT
         );
-        setProcessingState(inbox, Instant.parse("2026-02-15T00:00:00Z"), processingAttempt);
-        return inbox;
-    }
-
-    private ReviewNotificationPayload request(Long githubPullRequestId, String pullRequestTitle) {
-        return new ReviewNotificationPayload(
-                "my-repo",
-                githubPullRequestId,
-                Math.toIntExact(githubPullRequestId),
-                pullRequestTitle,
-                "https://github.com/pr/" + githubPullRequestId,
-                "author-gh",
-                List.of("reviewer-gh-1"),
-                List.of("reviewer-gh-1")
-        );
-    }
-
-    private String requestJson(ReviewNotificationPayload request) {
-        try {
-            return new ObjectMapper().writeValueAsString(request);
-        } catch (Exception exception) {
-            throw new IllegalStateException("request 직렬화에 실패했습니다.", exception);
-        }
-    }
-
-    private void setProcessingState(ReviewRequestInbox inbox, Instant processingStartedAt, int processingAttempt) {
+        ReflectionTestUtils.setField(inbox, "id", inboxId);
         ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
         ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
-        ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(inbox, "failedAt", null);
-        ReflectionTestUtils.setField(inbox, "failureReason", null);
-        ReflectionTestUtils.setField(inbox, "failureType", null);
+        ReflectionTestUtils.setField(inbox, "processingAttempt", 1);
+        return inbox;
     }
 }

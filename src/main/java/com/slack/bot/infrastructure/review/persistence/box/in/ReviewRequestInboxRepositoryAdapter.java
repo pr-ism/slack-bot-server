@@ -127,6 +127,40 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
         return Optional.of(inboxId);
     }
 
+    @Override
+    @Transactional
+    public boolean renewProcessingLease(
+            Long inboxId,
+            Instant currentProcessingStartedAt,
+            Instant renewedProcessingStartedAt
+    ) {
+        validateRenewProcessingLeaseArguments(
+                inboxId,
+                currentProcessingStartedAt,
+                renewedProcessingStartedAt
+        );
+
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("renewedProcessingStartedAt", Timestamp.from(renewedProcessingStartedAt))
+                .addValue("inboxId", inboxId)
+                .addValue("processingStatus", ReviewRequestInboxStatus.PROCESSING.name())
+                .addValue("currentProcessingStartedAt", Timestamp.from(currentProcessingStartedAt));
+
+        int updatedCount = namedParameterJdbcTemplate.update(
+                """
+                UPDATE review_request_inbox
+                SET updated_at = CURRENT_TIMESTAMP(6),
+                    processing_started_at = :renewedProcessingStartedAt
+                WHERE id = :inboxId
+                  AND status = :processingStatus
+                  AND processing_started_at = :currentProcessingStartedAt
+                """,
+                parameters
+        );
+
+        return updatedCount > 0;
+    }
+
     private String buildClaimNextIdSelectSql(Collection<Long> excludedInboxIds) {
         StringBuilder sql = new StringBuilder(
                 """
@@ -231,6 +265,45 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                                           .execute();
 
         return Math.toIntExact(exhaustedCount + recoveredCount);
+    }
+
+    @Override
+    @Transactional
+    public boolean saveIfProcessingLeaseMatched(
+            ReviewRequestInbox inbox,
+            Instant claimedProcessingStartedAt
+    ) {
+        validateSaveIfProcessingLeaseMatchedArguments(inbox, claimedProcessingStartedAt);
+
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("status", inbox.getStatus().name())
+                .addValue("processingStartedAt", toTimestamp(inbox.getProcessingStartedAt()))
+                .addValue("processedAt", toTimestamp(inbox.getProcessedAt()))
+                .addValue("failedAt", toTimestamp(inbox.getFailedAt()))
+                .addValue("failureReason", inbox.getFailureReason())
+                .addValue("failureType", resolveFailureTypeName(inbox))
+                .addValue("inboxId", inbox.getId())
+                .addValue("processingStatus", ReviewRequestInboxStatus.PROCESSING.name())
+                .addValue("claimedProcessingStartedAt", Timestamp.from(claimedProcessingStartedAt));
+
+        int updatedCount = namedParameterJdbcTemplate.update(
+                """
+                UPDATE review_request_inbox
+                SET updated_at = CURRENT_TIMESTAMP(6),
+                    status = :status,
+                    processing_started_at = :processingStartedAt,
+                    processed_at = :processedAt,
+                    failed_at = :failedAt,
+                    failure_reason = :failureReason,
+                    failure_type = :failureType
+                WHERE id = :inboxId
+                  AND status = :processingStatus
+                  AND processing_started_at = :claimedProcessingStartedAt
+                """,
+                parameters
+        );
+
+        return updatedCount > 0;
     }
 
     @Override
@@ -363,6 +436,18 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
         }
     }
 
+    private void validateRenewProcessingLeaseArguments(
+            Long inboxId,
+            Instant currentProcessingStartedAt,
+            Instant renewedProcessingStartedAt
+    ) {
+        if (inboxId == null) {
+            throw new IllegalArgumentException("inboxId는 비어 있을 수 없습니다.");
+        }
+        validateProcessingStartedAt(currentProcessingStartedAt);
+        validateProcessingStartedAt(renewedProcessingStartedAt);
+    }
+
     private void validateProcessingStartedBefore(Instant processingStartedBefore) {
         if (processingStartedBefore == null) {
             throw new IllegalArgumentException("processingStartedBefore는 비어 있을 수 없습니다.");
@@ -385,5 +470,34 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
         if (maxAttempts <= 0) {
             throw new IllegalArgumentException("maxAttempts는 0보다 커야 합니다.");
         }
+    }
+
+    private void validateSaveIfProcessingLeaseMatchedArguments(
+            ReviewRequestInbox inbox,
+            Instant claimedProcessingStartedAt
+    ) {
+        if (inbox == null) {
+            throw new IllegalArgumentException("inbox는 비어 있을 수 없습니다.");
+        }
+        if (inbox.getId() == null) {
+            throw new IllegalArgumentException("inboxId는 비어 있을 수 없습니다.");
+        }
+        validateProcessingStartedAt(claimedProcessingStartedAt);
+    }
+
+    private Timestamp toTimestamp(Instant instant) {
+        if (instant == null) {
+            return null;
+        }
+
+        return Timestamp.from(instant);
+    }
+
+    private String resolveFailureTypeName(ReviewRequestInbox inbox) {
+        if (inbox.getFailureType() == null) {
+            return null;
+        }
+
+        return inbox.getFailureType().name();
     }
 }

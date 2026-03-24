@@ -9,6 +9,7 @@ import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -47,7 +48,7 @@ public class ReviewRequestInboxProcessor {
     public void processPending(int limit) {
         Set<Long> claimedInboxIds = new HashSet<>();
         for (int count = 0; count < limit; count++) {
-            Instant claimNow = clock.instant();
+            Instant claimNow = currentLeaseStartedAt();
             Long claimedInboxId = reviewRequestInboxRepository.claimNextId(
                     claimNow,
                     claimNow,
@@ -59,7 +60,7 @@ public class ReviewRequestInboxProcessor {
             }
 
             claimedInboxIds.add(claimedInboxId);
-            processSafely(claimedInboxId);
+            processSafely(claimedInboxId, claimNow);
         }
     }
 
@@ -81,12 +82,16 @@ public class ReviewRequestInboxProcessor {
         return recoveredCount;
     }
 
-    private void processSafely(Long inboxId) {
+    private void processSafely(Long inboxId, Instant claimedProcessingStartedAt) {
         try {
-            reviewRequestInboxEntryProcessor.processClaimedInbox(inboxId);
-        } catch (Exception exception) {
-            log.error("review_request inbox 엔트리 처리 중 예상치 못한 오류가 발생했습니다. inboxId={}", inboxId, exception);
+            reviewRequestInboxEntryProcessor.processClaimedInbox(inboxId, claimedProcessingStartedAt);
+        } catch (Exception e) {
+            log.error("review_request inbox 엔트리 처리 중 예상치 못한 오류가 발생했습니다. inboxId={}", inboxId, e);
         }
+    }
+
+    private Instant currentLeaseStartedAt() {
+        return clock.instant().truncatedTo(ChronoUnit.MICROS);
     }
 
     private void validateApiKeyAndGithubPullRequestId(String apiKey, Long githubPullRequestId) {
