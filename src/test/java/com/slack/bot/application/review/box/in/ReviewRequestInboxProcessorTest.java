@@ -96,7 +96,7 @@ class ReviewRequestInboxProcessorTest {
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
             List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAll();
             List<ReviewNotificationOutbox> outboxes = jpaReviewNotificationOutboxRepository.findAll();
-            ReviewRequestInbox inbox = inboxes.getFirst();
+            ReviewRequestInbox inbox = findOnlyInbox();
 
             assertAll(
                     () -> assertThat(inboxes).hasSize(1),
@@ -132,7 +132,7 @@ class ReviewRequestInboxProcessorTest {
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
             List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAll();
             List<ReviewNotificationOutbox> outboxes = jpaReviewNotificationOutboxRepository.findAll();
-            ReviewRequestInbox inbox = inboxes.getFirst();
+            ReviewRequestInbox inbox = findOnlyInbox();
 
             assertAll(
                     () -> assertThat(inboxes).hasSize(1),
@@ -161,7 +161,7 @@ class ReviewRequestInboxProcessorTest {
         reviewRequestInboxProcessor.processPending(10);
 
         // then
-        ReviewRequestInbox inbox = jpaReviewRequestInboxRepository.findAll().getFirst();
+        ReviewRequestInbox inbox = findOnlyInbox();
         assertAll(
                 () -> assertThat(spyReviewNotificationService.getSendCount()).isZero(),
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
@@ -297,15 +297,16 @@ class ReviewRequestInboxProcessorTest {
 
         // when
         reviewRequestInboxProcessor.enqueue("test-api-key", first, 0);
-        String firstIdempotencyKey = jpaReviewRequestInboxRepository.findAll().getFirst().getIdempotencyKey();
+        String firstIdempotencyKey = findOnlyInbox().getIdempotencyKey();
         reviewRequestInboxProcessor.enqueue("test-api-key", second, 0);
 
         // then
         List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAll();
+        ReviewRequestInbox inbox = findOnlyInbox();
         assertAll(
                 () -> assertThat(inboxes).hasSize(1),
-                () -> assertThat(inboxes.getFirst().getIdempotencyKey()).hasSize(64),
-                () -> assertThat(inboxes.getFirst().getIdempotencyKey()).isEqualTo(firstIdempotencyKey)
+                () -> assertThat(inbox.getIdempotencyKey()).hasSize(64),
+                () -> assertThat(inbox.getIdempotencyKey()).isEqualTo(firstIdempotencyKey)
         );
     }
 
@@ -316,10 +317,10 @@ class ReviewRequestInboxProcessorTest {
 
         // when
         reviewRequestInboxProcessor.enqueue("test-api-key-1", request, 0);
-        String firstIdempotencyKey = jpaReviewRequestInboxRepository.findAll().getFirst().getIdempotencyKey();
+        String firstIdempotencyKey = findOnlyInbox().getIdempotencyKey();
         jpaReviewRequestInboxRepository.deleteAll();
         reviewRequestInboxProcessor.enqueue("test-api-key-2", request, 0);
-        String secondIdempotencyKey = jpaReviewRequestInboxRepository.findAll().getFirst().getIdempotencyKey();
+        String secondIdempotencyKey = findOnlyInbox().getIdempotencyKey();
 
         // then
         assertThat(firstIdempotencyKey).isNotEqualTo(secondIdempotencyKey);
@@ -333,10 +334,10 @@ class ReviewRequestInboxProcessorTest {
 
         // when
         reviewRequestInboxProcessor.enqueue("test-api-key", first, 0);
-        String firstIdempotencyKey = jpaReviewRequestInboxRepository.findAll().getFirst().getIdempotencyKey();
+        String firstIdempotencyKey = findOnlyInbox().getIdempotencyKey();
         jpaReviewRequestInboxRepository.deleteAll();
         reviewRequestInboxProcessor.enqueue("test-api-key", second, 0);
-        String secondIdempotencyKey = jpaReviewRequestInboxRepository.findAll().getFirst().getIdempotencyKey();
+        String secondIdempotencyKey = findOnlyInbox().getIdempotencyKey();
 
         // then
         assertThat(firstIdempotencyKey).isNotEqualTo(secondIdempotencyKey);
@@ -388,7 +389,7 @@ class ReviewRequestInboxProcessorTest {
         reviewRequestInboxProcessor.processPending(10);
 
         // then
-        ReviewRequestInbox inbox = jpaReviewRequestInboxRepository.findAll().getFirst();
+        ReviewRequestInbox inbox = findOnlyInbox();
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
@@ -448,7 +449,7 @@ class ReviewRequestInboxProcessorTest {
         // given
         ReviewNotificationPayload request = request(701L, "missing-claimed");
         reviewRequestInboxProcessor.enqueue("test-api-key", request, 0);
-        ReviewRequestInbox saved = jpaReviewRequestInboxRepository.findAll().getFirst();
+        ReviewRequestInbox saved = findOnlyInbox();
 
         doReturn(Optional.empty()).when(reviewRequestInboxRepository).findById(saved.getId());
 
@@ -476,9 +477,8 @@ class ReviewRequestInboxProcessorTest {
         // given
         reviewRequestInboxProcessor.enqueue("test-api-key", request(801L, "first"), 0);
         reviewRequestInboxProcessor.enqueue("test-api-key", request(802L, "second"), 0);
-        List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAll();
-        ReviewRequestInbox firstInbox = inboxes.get(0);
-        ReviewRequestInbox secondInbox = inboxes.get(1);
+        ReviewRequestInbox firstInbox = findInboxByGithubPullRequestId(801L);
+        ReviewRequestInbox secondInbox = findInboxByGithubPullRequestId(802L);
 
         doThrow(new RuntimeException("unexpected repository failure"))
                 .when(reviewRequestInboxRepository)
@@ -522,6 +522,20 @@ class ReviewRequestInboxProcessorTest {
         ReflectionTestUtils.setField(inbox, "failedAt", null);
         ReflectionTestUtils.setField(inbox, "failureReason", null);
         ReflectionTestUtils.setField(inbox, "failureType", null);
+    }
+
+    private ReviewRequestInbox findOnlyInbox() {
+        List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAll();
+        assertThat(inboxes).hasSize(1);
+        return inboxes.getFirst();
+    }
+
+    private ReviewRequestInbox findInboxByGithubPullRequestId(Long githubPullRequestId) {
+        return jpaReviewRequestInboxRepository.findAll()
+                                             .stream()
+                                             .filter(inbox -> githubPullRequestId.equals(inbox.getGithubPullRequestId()))
+                                             .findFirst()
+                                             .orElseThrow();
     }
 
 }
