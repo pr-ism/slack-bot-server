@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -451,8 +450,6 @@ class ReviewRequestInboxProcessorTest {
         reviewRequestInboxProcessor.enqueue("test-api-key", request, 0);
         ReviewRequestInbox saved = jpaReviewRequestInboxRepository.findAll().getFirst();
 
-        doReturn(Optional.of(saved.getId()), Optional.empty()).when(reviewRequestInboxRepository)
-                                                              .claimNextId(any(), any(), anyCollection());
         doReturn(Optional.empty()).when(reviewRequestInboxRepository).findById(saved.getId());
 
         // when
@@ -462,7 +459,9 @@ class ReviewRequestInboxProcessorTest {
         ReviewRequestInbox reloaded = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
         assertAll(
                 () -> assertThat(spyReviewNotificationService.getSendCount()).isZero(),
-                () -> assertThat(reloaded.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING)
+                () -> assertThat(reloaded.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
+                () -> assertThat(reloaded.getProcessingAttempt()).isEqualTo(1),
+                () -> assertThat(jpaReviewNotificationOutboxRepository.findAll()).isEmpty()
         );
     }
 
