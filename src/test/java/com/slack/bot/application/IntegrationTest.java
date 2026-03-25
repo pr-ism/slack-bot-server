@@ -26,7 +26,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-@SpringBootTest
+@SpringBootTest(properties = "app.adaptive-polling.auto-start=false")
 @Import({
         IntegrationTestConfig.class,
         IntegrationAspectTestConfig.class

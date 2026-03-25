@@ -1,9 +1,9 @@
 package com.slack.bot.application.review.box.in;
 
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 
+import com.slack.bot.application.worker.PollingHintEvent;
+import com.slack.bot.application.worker.PollingHintTarget;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -25,7 +25,12 @@ class ReviewRequestInboxWorkerTest {
 
     @BeforeEach
     void setUp() {
-        reviewRequestInboxWorker = new ReviewRequestInboxWorker(reviewRequestInboxProcessor, 30);
+        reviewRequestInboxWorker = new ReviewRequestInboxWorker(
+                reviewRequestInboxProcessor,
+                30,
+                1_000L,
+                30_000L
+        );
     }
 
     @Test
@@ -38,20 +43,14 @@ class ReviewRequestInboxWorkerTest {
     }
 
     @Test
-    void worker_실행중_예외가_발생해도_전파하지_않는다() {
-        // given
-        willThrow(new RuntimeException("worker failure"))
-                .given(reviewRequestInboxProcessor)
-                .processPending(30);
-
-        // when & then
-        assertThatCode(() -> reviewRequestInboxWorker.processPendingReviewRequestInbox())
-                .doesNotThrowAnyException();
+    void wake_up_hint와_stop은_예외없이_동작한다() {
+        reviewRequestInboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.REVIEW_REQUEST_INBOX));
+        reviewRequestInboxWorker.stop();
     }
 
     @Test
     void batchSize가_0이하면_생성자에서_예외가_발생한다() {
-        assertThatThrownBy(() -> new ReviewRequestInboxWorker(reviewRequestInboxProcessor, 0))
+        assertThatThrownBy(() -> new ReviewRequestInboxWorker(reviewRequestInboxProcessor, 0, 1_000L, 30_000L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("batchSize는 0보다 커야 합니다.");
     }

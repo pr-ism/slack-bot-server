@@ -1,9 +1,9 @@
 package com.slack.bot.application.interaction.box.out;
 
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 
+import com.slack.bot.application.worker.PollingHintEvent;
+import com.slack.bot.application.worker.PollingHintTarget;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -24,7 +24,11 @@ class SlackNotificationOutboxWorkerTest {
 
     @BeforeEach
     void setUp() {
-        slackNotificationOutboxWorker = new SlackNotificationOutboxWorker(slackNotificationOutboxProcessor);
+        slackNotificationOutboxWorker = new SlackNotificationOutboxWorker(
+                slackNotificationOutboxProcessor,
+                1_000L,
+                30_000L
+        );
     }
 
     @Test
@@ -37,15 +41,8 @@ class SlackNotificationOutboxWorkerTest {
     }
 
     @Test
-    void 워커_실행_중_예외가_발생해도_예외를_전파하지_않는다() {
-        // given
-        willThrow(new RuntimeException("worker failure"))
-                .given(slackNotificationOutboxProcessor)
-                .processPending(50);
-
-        // when & then
-        assertThatCode(() -> slackNotificationOutboxWorker.processPendingOutbox())
-                .doesNotThrowAnyException();
+    void wake_up_hint와_stop은_예외없이_동작한다() {
+        slackNotificationOutboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.INTERACTION_OUTBOX));
+        slackNotificationOutboxWorker.stop();
     }
-
 }

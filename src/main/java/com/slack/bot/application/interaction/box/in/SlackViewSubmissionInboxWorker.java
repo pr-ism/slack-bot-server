@@ -1,20 +1,81 @@
 package com.slack.bot.application.interaction.box.in;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
+import com.slack.bot.application.worker.AdaptivePollingRunner;
+import com.slack.bot.application.worker.PollingHintEvent;
+import com.slack.bot.application.worker.PollingHintTarget;
+import java.time.Duration;
+import org.springframework.context.SmartLifecycle;
+import org.springframework.context.event.EventListener;
 
-@Slf4j
-@RequiredArgsConstructor
-public class SlackViewSubmissionInboxWorker {
+public class SlackViewSubmissionInboxWorker implements SmartLifecycle {
+
+    private static final int BATCH_SIZE = 30;
+
     private final SlackInteractionInboxProcessor slackInteractionInboxProcessor;
+    private final AdaptivePollingRunner adaptivePollingRunner;
 
-    @Scheduled(fixedDelayString = "${app.interaction.inbox.view-submission.poll-delay-ms:1000}")
-    public void processViewSubmissionInbox() {
-        try {
-            slackInteractionInboxProcessor.processPendingViewSubmissions(30);
-        } catch (Exception e) {
-            log.error("view_submission inbox worker 실행에 실패했습니다.", e);
+    public SlackViewSubmissionInboxWorker(
+            SlackInteractionInboxProcessor slackInteractionInboxProcessor,
+            long pollDelayMs,
+            long pollCapMs
+    ) {
+        this(slackInteractionInboxProcessor, pollDelayMs, pollCapMs, true);
+    }
+
+    public SlackViewSubmissionInboxWorker(
+            SlackInteractionInboxProcessor slackInteractionInboxProcessor,
+            long pollDelayMs,
+            long pollCapMs,
+            boolean autoStartup
+    ) {
+        this.slackInteractionInboxProcessor = slackInteractionInboxProcessor;
+        this.adaptivePollingRunner = new AdaptivePollingRunner(
+                "view_submission inbox worker",
+                Duration.ofMillis(pollDelayMs),
+                Duration.ofMillis(pollCapMs),
+                () -> processViewSubmissionInbox(),
+                autoStartup
+        );
+    }
+
+    public int processViewSubmissionInbox() {
+        return slackInteractionInboxProcessor.processPendingViewSubmissions(BATCH_SIZE);
+    }
+
+    @EventListener
+    public void wakeUp(PollingHintEvent pollingHintEvent) {
+        if (pollingHintEvent.target() == PollingHintTarget.VIEW_SUBMISSION_INBOX) {
+            adaptivePollingRunner.wakeUp();
         }
+    }
+
+    @Override
+    public void start() {
+        adaptivePollingRunner.start();
+    }
+
+    @Override
+    public void stop() {
+        adaptivePollingRunner.stop();
+    }
+
+    @Override
+    public void stop(Runnable callback) {
+        adaptivePollingRunner.stop(callback);
+    }
+
+    @Override
+    public boolean isRunning() {
+        return adaptivePollingRunner.isRunning();
+    }
+
+    @Override
+    public boolean isAutoStartup() {
+        return adaptivePollingRunner.isAutoStartup();
+    }
+
+    @Override
+    public int getPhase() {
+        return adaptivePollingRunner.getPhase();
     }
 }

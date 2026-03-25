@@ -1,9 +1,9 @@
 package com.slack.bot.application.interaction.box.in;
 
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 
+import com.slack.bot.application.worker.PollingHintEvent;
+import com.slack.bot.application.worker.PollingHintTarget;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -24,7 +24,11 @@ class SlackBlockActionInboxWorkerTest {
 
     @BeforeEach
     void setUp() {
-        slackBlockActionInboxWorker = new SlackBlockActionInboxWorker(slackInteractionInboxProcessor);
+        slackBlockActionInboxWorker = new SlackBlockActionInboxWorker(
+                slackInteractionInboxProcessor,
+                1_000L,
+                30_000L
+        );
     }
 
     @Test
@@ -37,14 +41,8 @@ class SlackBlockActionInboxWorkerTest {
     }
 
     @Test
-    void 워커_실행_중_예외가_발생해도_예외를_전파하지_않는다() {
-        // given
-        willThrow(new RuntimeException("worker failure"))
-                .given(slackInteractionInboxProcessor)
-                .processPendingBlockActions(30);
-
-        // when & then
-        assertThatCode(() -> slackBlockActionInboxWorker.processBlockActionInbox())
-                .doesNotThrowAnyException();
+    void wake_up_hint와_stop은_예외없이_동작한다() {
+        slackBlockActionInboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.BLOCK_ACTION_INBOX));
+        slackBlockActionInboxWorker.stop();
     }
 }
