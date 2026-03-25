@@ -26,7 +26,7 @@ class AdaptivePollingRunnerTest {
         Queue<Integer> pollResults = new ArrayDeque<>(List.of(0, 0, 1, 0));
         AdaptivePollingRunner adaptivePollingRunner = new AdaptivePollingRunner(
                 "test-runner",
-                pollResults::remove,
+                () -> pollResults.remove(),
                 new AdaptivePollingBackoff(
                         Duration.ofMillis(100L),
                         Duration.ofMillis(250L),
@@ -158,6 +158,40 @@ class AdaptivePollingRunnerTest {
 
         // then
         assertThat(adaptivePollingRunner.isRunning()).isFalse();
+    }
+
+    @Test
+    void stop후_restart해도_다시_poll한다() throws Exception {
+        CountDownLatch firstPhasePolled = new CountDownLatch(1);
+        CountDownLatch secondPhasePolled = new CountDownLatch(1);
+        AtomicInteger phase = new AtomicInteger(1);
+        AdaptivePollingRunner adaptivePollingRunner = new AdaptivePollingRunner(
+                "restart-runner",
+                Duration.ofMillis(50L),
+                Duration.ofMillis(50L),
+                () -> {
+                    if (phase.get() == 1) {
+                        firstPhasePolled.countDown();
+                    } else {
+                        secondPhasePolled.countDown();
+                    }
+                    return 0;
+                }
+        );
+
+        try {
+            adaptivePollingRunner.start();
+            assertThat(firstPhasePolled.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+
+            adaptivePollingRunner.stop();
+            phase.set(2);
+
+            adaptivePollingRunner.start();
+
+            assertThat(secondPhasePolled.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+        } finally {
+            adaptivePollingRunner.stop();
+        }
     }
 
     private static final class RecordingPollingSleeper implements AdaptivePollingRunner.PollingSleeper {

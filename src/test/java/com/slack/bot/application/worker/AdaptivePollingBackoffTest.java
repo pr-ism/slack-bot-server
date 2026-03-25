@@ -2,10 +2,12 @@ package com.slack.bot.application.worker;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertAll;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -34,13 +36,15 @@ class AdaptivePollingBackoffTest {
         Duration fourthDelay = adaptivePollingBackoff.nextDelayAfterEmptyPoll();
 
         // then
-        assertThat(bounds).containsExactly(101L, 201L, 251L, 251L);
-        assertThat(firstDelay).isEqualTo(Duration.ofMillis(100L));
-        assertThat(secondDelay).isEqualTo(Duration.ofMillis(200L));
-        assertThat(thirdDelay).isEqualTo(Duration.ofMillis(250L));
-        assertThat(fourthDelay).isEqualTo(Duration.ofMillis(250L));
-        assertThat(adaptivePollingBackoff.consecutiveEmptyPolls()).isEqualTo(4);
-        assertThat(adaptivePollingBackoff.nextUpperBound()).isEqualTo(Duration.ofMillis(250L));
+        assertAll(
+                () -> assertThat(bounds).containsExactly(101L, 201L, 251L, 251L),
+                () -> assertThat(firstDelay).isEqualTo(Duration.ofMillis(100L)),
+                () -> assertThat(secondDelay).isEqualTo(Duration.ofMillis(200L)),
+                () -> assertThat(thirdDelay).isEqualTo(Duration.ofMillis(250L)),
+                () -> assertThat(fourthDelay).isEqualTo(Duration.ofMillis(250L)),
+                () -> assertThat(adaptivePollingBackoff.consecutiveEmptyPolls()).isEqualTo(4),
+                () -> assertThat(adaptivePollingBackoff.nextUpperBound()).isEqualTo(Duration.ofMillis(250L))
+        );
     }
 
     @Test
@@ -58,8 +62,10 @@ class AdaptivePollingBackoffTest {
         adaptivePollingBackoff.reset();
 
         // then
-        assertThat(adaptivePollingBackoff.consecutiveEmptyPolls()).isZero();
-        assertThat(adaptivePollingBackoff.nextUpperBound()).isEqualTo(Duration.ofMillis(100L));
+        assertAll(
+                () -> assertThat(adaptivePollingBackoff.consecutiveEmptyPolls()).isZero(),
+                () -> assertThat(adaptivePollingBackoff.nextUpperBound()).isEqualTo(Duration.ofMillis(100L))
+        );
     }
 
     @Test
@@ -93,5 +99,60 @@ class AdaptivePollingBackoffTest {
 
         // then
         assertThat(adaptivePollingBackoff.nextUpperBound()).isEqualTo(Duration.ofMillis(Long.MAX_VALUE));
+    }
+
+    @Test
+    void 소유하지_않은_스레드가_access하면_예외가_발생한다() throws Exception {
+        AdaptivePollingBackoff adaptivePollingBackoff = new AdaptivePollingBackoff(
+                Duration.ofMillis(100L),
+                Duration.ofMillis(250L),
+                boundExclusive -> 0L
+        );
+        adaptivePollingBackoff.reset();
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+
+        Thread thread = new Thread(() -> {
+            try {
+                adaptivePollingBackoff.nextDelayAfterEmptyPoll();
+            } catch (Throwable throwable) {
+                failure.set(throwable);
+            }
+        });
+
+        thread.start();
+        thread.join();
+
+        assertThat(failure.get())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("AdaptivePollingBackoff는 단일 poller 스레드에서만 접근할 수 있습니다.");
+    }
+
+    @Test
+    void 소유_스레드가_해제하면_다른_스레드가_다시_사용할_수_있다() throws Exception {
+        AdaptivePollingBackoff adaptivePollingBackoff = new AdaptivePollingBackoff(
+                Duration.ofMillis(100L),
+                Duration.ofMillis(250L),
+                boundExclusive -> boundExclusive - 1L
+        );
+        adaptivePollingBackoff.reset();
+        adaptivePollingBackoff.releaseOwnership();
+        AtomicReference<Duration> delay = new AtomicReference<>();
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+
+        Thread thread = new Thread(() -> {
+            try {
+                delay.set(adaptivePollingBackoff.nextDelayAfterEmptyPoll());
+            } catch (Throwable throwable) {
+                failure.set(throwable);
+            }
+        });
+
+        thread.start();
+        thread.join();
+
+        assertAll(
+                () -> assertThat(failure.get()).isNull(),
+                () -> assertThat(delay.get()).isEqualTo(Duration.ofMillis(100L))
+        );
     }
 }

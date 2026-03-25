@@ -105,20 +105,19 @@ public class AdaptivePollingRunner implements SmartLifecycle {
     }
 
     @Override
-    public void start() {
+    public synchronized void start() {
         if (running) {
             return;
         }
 
         running = true;
-        adaptivePollingBackoff.reset();
-        workerThread = new Thread(this::runLoop, buildThreadName());
+        workerThread = new Thread(() -> runLoop(), buildThreadName());
         workerThread.setDaemon(true);
         workerThread.start();
     }
 
     @Override
-    public void stop() {
+    public synchronized void stop() {
         if (!running) {
             return;
         }
@@ -182,8 +181,13 @@ public class AdaptivePollingRunner implements SmartLifecycle {
     }
 
     private void runLoop() {
-        while (running) {
-            runSingleCycle();
+        try {
+            adaptivePollingBackoff.reset();
+            while (running) {
+                runSingleCycle();
+            }
+        } finally {
+            adaptivePollingBackoff.releaseOwnership();
         }
     }
 

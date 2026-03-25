@@ -11,6 +11,7 @@ public class AdaptivePollingBackoff {
 
     private long nextUpperBoundMs;
     private int consecutiveEmptyPolls;
+    private Thread ownerThread;
 
     public AdaptivePollingBackoff(Duration baseDelay, Duration capDelay) {
         this(baseDelay, capDelay, boundExclusive -> ThreadLocalRandom.current().nextLong(boundExclusive));
@@ -31,10 +32,12 @@ public class AdaptivePollingBackoff {
         }
 
         this.randomSource = randomSource;
-        reset();
+        consecutiveEmptyPolls = 0;
+        nextUpperBoundMs = baseDelayMs;
     }
 
-    public Duration nextDelayAfterEmptyPoll() {
+    Duration nextDelayAfterEmptyPoll() {
+        claimOwnership();
         long currentUpperBoundMs = nextUpperBoundMs;
         consecutiveEmptyPolls++;
         nextUpperBoundMs = Math.min(capDelayMs, safeDouble(currentUpperBoundMs));
@@ -42,16 +45,33 @@ public class AdaptivePollingBackoff {
         return Duration.ofMillis(randomSource.nextLong(currentUpperBoundMs + 1L));
     }
 
-    public void reset() {
+    void reset() {
+        claimOwnership();
         consecutiveEmptyPolls = 0;
         nextUpperBoundMs = baseDelayMs;
     }
 
-    public int consecutiveEmptyPolls() {
+    void releaseOwnership() {
+        Thread currentThread = Thread.currentThread();
+        synchronized (this) {
+            if (ownerThread == null) {
+                return;
+            }
+            if (ownerThread != currentThread) {
+                throw new IllegalStateException("AdaptivePollingBackoff는 소유한 스레드만 해제할 수 있습니다.");
+            }
+
+            ownerThread = null;
+        }
+    }
+
+    int consecutiveEmptyPolls() {
+        claimOwnership();
         return consecutiveEmptyPolls;
     }
 
-    public Duration nextUpperBound() {
+    Duration nextUpperBound() {
+        claimOwnership();
         return Duration.ofMillis(nextUpperBoundMs);
     }
 
@@ -74,6 +94,20 @@ public class AdaptivePollingBackoff {
         }
 
         return value * 2L;
+    }
+
+    private void claimOwnership() {
+        Thread currentThread = Thread.currentThread();
+
+        synchronized (this) {
+            if (ownerThread == null) {
+                ownerThread = currentThread;
+                return;
+            }
+            if (ownerThread != currentThread) {
+                throw new IllegalStateException("AdaptivePollingBackoff는 단일 poller 스레드에서만 접근할 수 있습니다.");
+            }
+        }
     }
 
     @FunctionalInterface
