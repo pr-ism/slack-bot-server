@@ -1,6 +1,8 @@
 package com.slack.bot.application.worker;
 
+import static org.awaitility.Awaitility.await;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.util.ArrayDeque;
@@ -10,6 +12,7 @@ import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.IntSupplier;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -162,6 +165,7 @@ class AdaptivePollingRunnerTest {
 
     @Test
     void stop후_restart해도_다시_poll한다() throws Exception {
+        // given
         CountDownLatch firstPhasePolled = new CountDownLatch(1);
         CountDownLatch secondPhasePolled = new CountDownLatch(1);
         AtomicInteger phase = new AtomicInteger(1);
@@ -180,15 +184,143 @@ class AdaptivePollingRunnerTest {
         );
 
         try {
+            // when
             adaptivePollingRunner.start();
+
+            // then
             assertThat(firstPhasePolled.await(500L, TimeUnit.MILLISECONDS)).isTrue();
 
+            // when
+            adaptivePollingRunner.stop();
+            phase.set(2);
+            await().atMost(Duration.ofSeconds(1L)).until(() -> {
+                try {
+                    adaptivePollingRunner.start();
+                    return true;
+                } catch (IllegalStateException e) {
+                    return false;
+                }
+            });
+
+            // then
+            assertThat(secondPhasePolled.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+        } finally {
+            adaptivePollingRunner.stop();
+        }
+    }
+
+    @Test
+    void stop_timeout중에는_restart를_막고_이전_스레드_종료후에만_다시_시작한다() throws Exception {
+        // given
+        CountDownLatch firstPollStarted = new CountDownLatch(1);
+        CountDownLatch releaseFirstPoll = new CountDownLatch(1);
+        CountDownLatch secondPollStarted = new CountDownLatch(1);
+        AtomicInteger phase = new AtomicInteger(1);
+        AdaptivePollingRunner adaptivePollingRunner = new AdaptivePollingRunner(
+                "restart-after-timeout-runner",
+                () -> {
+                    if (phase.get() == 1) {
+                        firstPollStarted.countDown();
+                        try {
+                            releaseFirstPoll.await(5L, TimeUnit.SECONDS);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    } else {
+                        secondPollStarted.countDown();
+                    }
+                    return 0;
+                },
+                new AdaptivePollingBackoff(
+                        Duration.ofMillis(100L),
+                        Duration.ofMillis(100L),
+                        boundExclusive -> 0L
+                ),
+                new AdaptivePollingRunner.MonitorPollingSleeper(),
+                Duration.ofMillis(100L),
+                Duration.ofMillis(10L),
+                true
+        );
+
+        try {
+            // when
+            adaptivePollingRunner.start();
+
+            // then
+            assertThat(firstPollStarted.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+
+            // when
             adaptivePollingRunner.stop();
             phase.set(2);
 
+            // then
+            assertThatThrownBy(() -> adaptivePollingRunner.start())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("이전 poller 스레드가 아직 종료되지 않았습니다.");
+
+            // when
+            releaseFirstPoll.countDown();
+
+            // then
+            await().atMost(Duration.ofSeconds(1L)).until(() -> {
+                try {
+                    adaptivePollingRunner.start();
+                    return true;
+                } catch (IllegalStateException e) {
+                    return false;
+                }
+            });
+            assertThat(secondPollStarted.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+        } finally {
+            releaseFirstPoll.countDown();
+            adaptivePollingRunner.stop();
+        }
+    }
+
+    @Test
+    void stop_callback은_stop후_callback을_실행한다() {
+        // given
+        AtomicInteger callbackCount = new AtomicInteger();
+        AdaptivePollingRunner adaptivePollingRunner = new AdaptivePollingRunner(
+                "stop-callback-runner",
+                Duration.ofMillis(50L),
+                Duration.ofMillis(50L),
+                () -> 0
+        );
+
+        // when
+        adaptivePollingRunner.start();
+        adaptivePollingRunner.stop(() -> callbackCount.incrementAndGet());
+
+        // then
+        assertThat(callbackCount.get()).isEqualTo(1);
+    }
+
+    @Test
+    void poller_스레드에서_stop을_호출해도_예외없이_종료된다() throws Exception {
+        // given
+        CountDownLatch stopCalled = new CountDownLatch(1);
+        AtomicReference<AdaptivePollingRunner> adaptivePollingRunnerReference = new AtomicReference<>();
+        AdaptivePollingRunner adaptivePollingRunner = new AdaptivePollingRunner(
+                "self-stop-runner",
+                Duration.ofMillis(50L),
+                Duration.ofMillis(50L),
+                () -> {
+                    AdaptivePollingRunner runner = adaptivePollingRunnerReference.get();
+                    runner.stop();
+                    stopCalled.countDown();
+                    return 0;
+                }
+        );
+        adaptivePollingRunnerReference.set(adaptivePollingRunner);
+
+        try {
+            // when
             adaptivePollingRunner.start();
 
-            assertThat(secondPhasePolled.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+            // then
+            assertThat(stopCalled.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+            await().atMost(Duration.ofSeconds(1L)).until(() -> !adaptivePollingRunner.isRunning());
         } finally {
             adaptivePollingRunner.stop();
         }

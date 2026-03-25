@@ -1,9 +1,15 @@
 package com.slack.bot.application.interaction.box.out;
 
+import static org.awaitility.Awaitility.await;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 
 import com.slack.bot.application.worker.PollingHintEvent;
 import com.slack.bot.application.worker.PollingHintTarget;
+import java.time.Duration;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -27,7 +33,8 @@ class SlackNotificationOutboxWorkerTest {
         slackNotificationOutboxWorker = new SlackNotificationOutboxWorker(
                 slackNotificationOutboxProcessor,
                 1_000L,
-                30_000L
+                30_000L,
+                false
         );
     }
 
@@ -41,8 +48,78 @@ class SlackNotificationOutboxWorkerTest {
     }
 
     @Test
-    void wake_up_hint와_stop은_예외없이_동작한다() {
-        slackNotificationOutboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.INTERACTION_OUTBOX));
+    void 기본_생성자는_auto_startup을_활성화한다() {
+        // when
+        SlackNotificationOutboxWorker worker = new SlackNotificationOutboxWorker(
+                slackNotificationOutboxProcessor,
+                1_000L,
+                30_000L
+        );
+
+        // then
+        assertThat(worker.isAutoStartup()).isTrue();
+    }
+
+    @Test
+    void 매칭된_wake_up_hint만_poll을_재개한다() {
+        // given
+        AtomicInteger invocationCount = new AtomicInteger();
+        doAnswer(invocation -> {
+            invocationCount.incrementAndGet();
+            return 0;
+        }).when(slackNotificationOutboxProcessor).processPending(50);
+        slackNotificationOutboxWorker = new SlackNotificationOutboxWorker(
+                slackNotificationOutboxProcessor,
+                30_000L,
+                30_000L,
+                false
+        );
+
+        try {
+            slackNotificationOutboxWorker.start();
+            await().atMost(Duration.ofSeconds(1L)).until(() -> invocationCount.get() >= 1);
+
+            // when
+            slackNotificationOutboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.BLOCK_ACTION_INBOX));
+
+            // then
+            await().during(Duration.ofMillis(300L))
+                    .atMost(Duration.ofMillis(500L))
+                    .until(() -> invocationCount.get() == 1);
+
+            // when
+            slackNotificationOutboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.INTERACTION_OUTBOX));
+
+            // then
+            await().atMost(Duration.ofSeconds(1L)).until(() -> invocationCount.get() >= 2);
+        } finally {
+            slackNotificationOutboxWorker.stop();
+        }
+    }
+
+    @Test
+    void start와_stop은_running_상태를_변경한다() {
+        // when
+        slackNotificationOutboxWorker.start();
+        boolean runningAfterStart = slackNotificationOutboxWorker.isRunning();
         slackNotificationOutboxWorker.stop();
+
+        // then
+        assertAll(
+                () -> assertThat(runningAfterStart).isTrue(),
+                () -> assertThat(slackNotificationOutboxWorker.isRunning()).isFalse()
+        );
+    }
+
+    @Test
+    void stop_callback은_callback을_실행한다() {
+        // given
+        AtomicInteger callbackCount = new AtomicInteger();
+
+        // when
+        slackNotificationOutboxWorker.stop(() -> callbackCount.incrementAndGet());
+
+        // then
+        assertThat(callbackCount.get()).isEqualTo(1);
     }
 }

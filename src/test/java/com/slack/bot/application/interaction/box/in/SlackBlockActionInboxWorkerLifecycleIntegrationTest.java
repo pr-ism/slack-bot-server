@@ -46,7 +46,14 @@ class SlackBlockActionInboxWorkerLifecycleIntegrationTest {
 
         // when
         slackBlockActionInboxWorker.stop();
-        slackBlockActionInboxWorker.start();
+        await().atMost(Duration.ofSeconds(1L)).until(() -> {
+            try {
+                slackBlockActionInboxWorker.start();
+                return true;
+            } catch (IllegalStateException e) {
+                return false;
+            }
+        });
 
         // then
         await().atMost(Duration.ofSeconds(3L)).untilAsserted(() ->

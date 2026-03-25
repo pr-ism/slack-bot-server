@@ -13,6 +13,7 @@ public class AdaptivePollingRunner implements SmartLifecycle {
     private final AdaptivePollingBackoff adaptivePollingBackoff;
     private final PollingSleeper pollingSleeper;
     private final Duration errorDelay;
+    private final Duration stopJoinTimeout;
     private final boolean autoStartup;
 
     private volatile boolean running;
@@ -40,6 +41,7 @@ public class AdaptivePollingRunner implements SmartLifecycle {
                 new AdaptivePollingBackoff(baseDelay, capDelay),
                 new MonitorPollingSleeper(),
                 baseDelay,
+                Duration.ofSeconds(5L),
                 autoStartup
         );
     }
@@ -51,7 +53,15 @@ public class AdaptivePollingRunner implements SmartLifecycle {
             PollingSleeper pollingSleeper,
             Duration errorDelay
     ) {
-        this(runnerName, pollOperation, adaptivePollingBackoff, pollingSleeper, errorDelay, true);
+        this(
+                runnerName,
+                pollOperation,
+                adaptivePollingBackoff,
+                pollingSleeper,
+                errorDelay,
+                Duration.ofSeconds(5L),
+                true
+        );
     }
 
     AdaptivePollingRunner(
@@ -60,6 +70,7 @@ public class AdaptivePollingRunner implements SmartLifecycle {
             AdaptivePollingBackoff adaptivePollingBackoff,
             PollingSleeper pollingSleeper,
             Duration errorDelay,
+            Duration stopJoinTimeout,
             boolean autoStartup
     ) {
         if (runnerName == null || runnerName.isBlank()) {
@@ -77,12 +88,16 @@ public class AdaptivePollingRunner implements SmartLifecycle {
         if (errorDelay == null || errorDelay.toMillis() <= 0L) {
             throw new IllegalArgumentException("errorDelay는 0보다 커야 합니다.");
         }
+        if (stopJoinTimeout == null || stopJoinTimeout.isNegative()) {
+            throw new IllegalArgumentException("stopJoinTimeout은 0 이상이어야 합니다.");
+        }
 
         this.runnerName = runnerName;
         this.pollOperation = pollOperation;
         this.adaptivePollingBackoff = adaptivePollingBackoff;
         this.pollingSleeper = pollingSleeper;
         this.errorDelay = errorDelay;
+        this.stopJoinTimeout = stopJoinTimeout;
         this.autoStartup = autoStartup;
     }
 
@@ -109,6 +124,12 @@ public class AdaptivePollingRunner implements SmartLifecycle {
         if (running) {
             return;
         }
+        if (workerThread != null) {
+            if (workerThread.isAlive()) {
+                throw new IllegalStateException("이전 poller 스레드가 아직 종료되지 않았습니다.");
+            }
+            workerThread = null;
+        }
 
         running = true;
         workerThread = new Thread(() -> runLoop(), buildThreadName());
@@ -125,16 +146,23 @@ public class AdaptivePollingRunner implements SmartLifecycle {
         running = false;
         pollingSleeper.wakeUp();
         Thread threadToJoin = workerThread;
-        workerThread = null;
         if (threadToJoin == null || Thread.currentThread() == threadToJoin) {
             return;
         }
 
         try {
-            threadToJoin.join(Duration.ofSeconds(5L).toMillis());
+            threadToJoin.join(stopJoinTimeout.toMillis());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            return;
         }
+
+        if (threadToJoin.isAlive()) {
+            log.warn("{} 중지 대기 시간이 초과되었습니다.", runnerName);
+            return;
+        }
+
+        workerThread = null;
     }
 
     @Override
@@ -188,6 +216,11 @@ public class AdaptivePollingRunner implements SmartLifecycle {
             }
         } finally {
             adaptivePollingBackoff.releaseOwnership();
+            synchronized (this) {
+                if (workerThread == Thread.currentThread()) {
+                    workerThread = null;
+                }
+            }
         }
     }
 
