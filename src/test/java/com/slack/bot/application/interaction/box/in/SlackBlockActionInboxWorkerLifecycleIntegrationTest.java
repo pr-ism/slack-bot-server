@@ -1,14 +1,13 @@
 package com.slack.bot.application.interaction.box.in;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.atLeast;
-import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.doAnswer;
 
 import com.slack.bot.application.WorkerIntegrationTest;
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -34,15 +33,17 @@ class SlackBlockActionInboxWorkerLifecycleIntegrationTest {
     @Test
     void stop후_restart해도_worker가_다시_poll한다() {
         // given
-        stubEmptyPoll();
+        AtomicInteger pollCount = new AtomicInteger();
+        stubEmptyPoll(pollCount);
 
         // when
         slackBlockActionInboxWorker.start();
 
         // then
         await().atMost(Duration.ofSeconds(3L)).untilAsserted(() ->
-                verify(slackInteractionInboxProcessor, atLeastOnce()).processPendingBlockActions(anyInt())
+                assertThat(pollCount.get()).isPositive()
         );
+        int beforeRestart = pollCount.get();
 
         // when
         slackBlockActionInboxWorker.stop();
@@ -57,11 +58,14 @@ class SlackBlockActionInboxWorkerLifecycleIntegrationTest {
 
         // then
         await().atMost(Duration.ofSeconds(3L)).untilAsserted(() ->
-                verify(slackInteractionInboxProcessor, atLeast(2)).processPendingBlockActions(anyInt())
+                assertThat(pollCount.get()).isGreaterThan(beforeRestart)
         );
     }
 
-    private void stubEmptyPoll() {
-        doReturn(0).when(slackInteractionInboxProcessor).processPendingBlockActions(anyInt());
+    private void stubEmptyPoll(AtomicInteger pollCount) {
+        doAnswer(invocation -> {
+            pollCount.incrementAndGet();
+            return 0;
+        }).when(slackInteractionInboxProcessor).processPendingBlockActions(anyInt());
     }
 }
