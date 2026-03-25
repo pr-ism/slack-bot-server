@@ -410,6 +410,50 @@ class AdaptivePollingRunnerTest {
     }
 
     @Test
+    void sleeper_runtime_exception으로_worker가_죽어도_running이_정리되고_재시작할_수_있다() throws Exception {
+        // given
+        CountDownLatch firstPhasePolled = new CountDownLatch(1);
+        CountDownLatch secondPhasePolled = new CountDownLatch(1);
+        AtomicInteger phase = new AtomicInteger(1);
+        AdaptivePollingRunner adaptivePollingRunner = new AdaptivePollingRunner(
+                "runtime-failure-runner",
+                () -> {
+                    if (phase.get() == 1) {
+                        firstPhasePolled.countDown();
+                    } else {
+                        secondPhasePolled.countDown();
+                    }
+                    return 0;
+                },
+                new AdaptivePollingBackoff(
+                        Duration.ofMillis(50L),
+                        Duration.ofMillis(50L),
+                        boundExclusive -> 0L
+                ),
+                new RuntimeFailingPollingSleeper(),
+                Duration.ofMillis(50L)
+        );
+
+        try {
+            // when
+            adaptivePollingRunner.start();
+
+            // then
+            assertThat(firstPhasePolled.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+            await().atMost(Duration.ofSeconds(1L)).until(() -> !adaptivePollingRunner.isRunning());
+
+            // when
+            phase.set(2);
+            adaptivePollingRunner.start();
+
+            // then
+            assertThat(secondPhasePolled.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+        } finally {
+            adaptivePollingRunner.stop();
+        }
+    }
+
+    @Test
     void poller_스레드에서_stop을_호출해도_예외없이_종료된다() throws Exception {
         // given
         CountDownLatch stopCalled = new CountDownLatch(1);
@@ -463,6 +507,23 @@ class AdaptivePollingRunnerTest {
         @Override
         public AdaptivePollingRunner.PollingSleepResult sleep(Duration delay) throws InterruptedException {
             throw new InterruptedException("interrupted");
+        }
+
+        @Override
+        public void wakeUp() {
+        }
+    }
+
+    private static final class RuntimeFailingPollingSleeper implements AdaptivePollingRunner.PollingSleeper {
+
+        private final AtomicInteger sleepCallCount = new AtomicInteger();
+
+        @Override
+        public AdaptivePollingRunner.PollingSleepResult sleep(Duration delay) {
+            if (sleepCallCount.getAndIncrement() == 0) {
+                throw new IllegalStateException("runtime failure");
+            }
+            return AdaptivePollingRunner.PollingSleepResult.COMPLETED;
         }
 
         @Override

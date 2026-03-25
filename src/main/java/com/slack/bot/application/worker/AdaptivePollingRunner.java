@@ -204,6 +204,7 @@ public class AdaptivePollingRunner implements SmartLifecycle {
             adaptivePollingBackoff.releaseOwnership();
             synchronized (this) {
                 if (workerThread == Thread.currentThread()) {
+                    running = false;
                     workerThread = null;
                     if (!running) {
                         callbackToRun = stopCompletionCallback;
