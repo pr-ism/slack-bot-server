@@ -130,8 +130,33 @@ class ReviewRequestInboxWorkerTest {
 
     @Test
     void batchSize가_0이하면_생성자에서_예외가_발생한다() {
+        // when & then
         assertThatThrownBy(() -> new ReviewRequestInboxWorker(reviewRequestInboxProcessor, 0, 1_000L, 30_000L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("batchSize는 0보다 커야 합니다.");
+    }
+
+    @Test
+    void pollDelayMs가_0이면_생성자에서_예외가_발생한다() {
+        // when & then
+        assertThatThrownBy(() -> new ReviewRequestInboxWorker(reviewRequestInboxProcessor, 30, 0L, 30_000L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("pollDelayMs는 0보다 커야 합니다.");
+    }
+
+    @Test
+    void pollCapMs가_음수면_생성자에서_예외가_발생한다() {
+        // when & then
+        assertThatThrownBy(() -> new ReviewRequestInboxWorker(reviewRequestInboxProcessor, 30, 1_000L, -1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("pollCapMs는 0보다 커야 합니다.");
+    }
+
+    @Test
+    void pollCapMs가_pollDelayMs보다_작으면_생성자에서_예외가_발생한다() {
+        // when & then
+        assertThatThrownBy(() -> new ReviewRequestInboxWorker(reviewRequestInboxProcessor, 30, 1_000L, 999L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("pollCapMs는 pollDelayMs 이상이어야 합니다.");
     }
 }

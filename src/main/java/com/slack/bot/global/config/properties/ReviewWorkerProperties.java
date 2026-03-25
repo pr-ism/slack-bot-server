@@ -29,6 +29,10 @@ public record ReviewWorkerProperties(
             @DefaultValue("60000") long processingTimeoutMs
     ) {
 
+        public InboxProperties {
+            validatePollingProperties("inbox", pollDelayMs, pollCapMs);
+        }
+
         public InboxProperties() {
             this(1000L, 30000L, 30, 60000L);
         }
@@ -41,8 +45,24 @@ public record ReviewWorkerProperties(
             @DefaultValue("60000") long processingTimeoutMs
     ) {
 
+        public OutboxProperties {
+            validatePollingProperties("outbox", pollDelayMs, pollCapMs);
+        }
+
         public OutboxProperties() {
             this(1000L, 30000L, 50, 60000L);
+        }
+    }
+
+    private static void validatePollingProperties(String propertyName, long pollDelayMs, long pollCapMs) {
+        if (pollDelayMs <= 0L) {
+            throw new IllegalArgumentException(propertyName + ".pollDelayMs는 0보다 커야 합니다.");
+        }
+        if (pollCapMs <= 0L) {
+            throw new IllegalArgumentException(propertyName + ".pollCapMs는 0보다 커야 합니다.");
+        }
+        if (pollCapMs < pollDelayMs) {
+            throw new IllegalArgumentException(propertyName + ".pollCapMs는 pollDelayMs보다 크거나 같아야 합니다.");
         }
     }
 }

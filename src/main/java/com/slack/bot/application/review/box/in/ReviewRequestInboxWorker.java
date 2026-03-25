@@ -32,11 +32,11 @@ public class ReviewRequestInboxWorker implements SmartLifecycle {
         this(
                 reviewRequestInboxProcessor,
                 batchSize,
-                new AdaptivePollingRunner(
-                        "review_request inbox worker",
-                        Duration.ofMillis(pollDelayMs),
-                        Duration.ofMillis(pollCapMs),
-                        () -> reviewRequestInboxProcessor.processPending(batchSize),
+                createAdaptivePollingRunner(
+                        reviewRequestInboxProcessor,
+                        batchSize,
+                        pollDelayMs,
+                        pollCapMs,
                         autoStartup
                 )
         );
@@ -94,5 +94,31 @@ public class ReviewRequestInboxWorker implements SmartLifecycle {
     @Override
     public int getPhase() {
         return adaptivePollingRunner.getPhase();
+    }
+
+    private static AdaptivePollingRunner createAdaptivePollingRunner(
+            ReviewRequestInboxProcessor reviewRequestInboxProcessor,
+            int batchSize,
+            long pollDelayMs,
+            long pollCapMs,
+            boolean autoStartup
+    ) {
+        if (pollDelayMs <= 0L) {
+            throw new IllegalArgumentException("pollDelayMs는 0보다 커야 합니다.");
+        }
+        if (pollCapMs <= 0L) {
+            throw new IllegalArgumentException("pollCapMs는 0보다 커야 합니다.");
+        }
+        if (pollCapMs < pollDelayMs) {
+            throw new IllegalArgumentException("pollCapMs는 pollDelayMs 이상이어야 합니다.");
+        }
+
+        return new AdaptivePollingRunner(
+                "review_request inbox worker",
+                Duration.ofMillis(pollDelayMs),
+                Duration.ofMillis(pollCapMs),
+                () -> reviewRequestInboxProcessor.processPending(batchSize),
+                autoStartup
+        );
     }
 }
