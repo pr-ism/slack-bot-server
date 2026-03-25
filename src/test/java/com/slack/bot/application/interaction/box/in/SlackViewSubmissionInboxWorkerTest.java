@@ -1,14 +1,15 @@
 package com.slack.bot.application.interaction.box.in;
 
-import static org.awaitility.Awaitility.await;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.slack.bot.application.worker.AdaptivePollingRunner;
 import com.slack.bot.application.worker.PollingHintEvent;
 import com.slack.bot.application.worker.PollingHintTarget;
-import java.time.Duration;
+import java.lang.reflect.Field;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -63,38 +64,20 @@ class SlackViewSubmissionInboxWorkerTest {
     @Test
     void 매칭된_wake_up_hint만_poll을_재개한다() {
         // given
-        AtomicInteger invocationCount = new AtomicInteger();
-        doAnswer(invocation -> {
-            invocationCount.incrementAndGet();
-            return 0;
-        }).when(slackInteractionInboxProcessor).processPendingViewSubmissions(30);
-        slackViewSubmissionInboxWorker = new SlackViewSubmissionInboxWorker(
-                slackInteractionInboxProcessor,
-                30_000L,
-                30_000L,
-                false
-        );
+        AdaptivePollingRunner adaptivePollingRunner = mock(AdaptivePollingRunner.class);
+        replaceAdaptivePollingRunner(adaptivePollingRunner);
 
-        try {
-            slackViewSubmissionInboxWorker.start();
-            await().atMost(Duration.ofSeconds(1L)).until(() -> invocationCount.get() >= 1);
+        // when
+        slackViewSubmissionInboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.BLOCK_ACTION_INBOX));
 
-            // when
-            slackViewSubmissionInboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.BLOCK_ACTION_INBOX));
+        // then
+        verifyNoInteractions(adaptivePollingRunner);
 
-            // then
-            await().during(Duration.ofMillis(300L))
-                    .atMost(Duration.ofMillis(500L))
-                    .until(() -> invocationCount.get() == 1);
+        // when
+        slackViewSubmissionInboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.VIEW_SUBMISSION_INBOX));
 
-            // when
-            slackViewSubmissionInboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.VIEW_SUBMISSION_INBOX));
-
-            // then
-            await().atMost(Duration.ofSeconds(1L)).until(() -> invocationCount.get() >= 2);
-        } finally {
-            slackViewSubmissionInboxWorker.stop();
-        }
+        // then
+        verify(adaptivePollingRunner).wakeUp();
     }
 
     @Test
@@ -121,5 +104,15 @@ class SlackViewSubmissionInboxWorkerTest {
 
         // then
         assertThat(callbackCount.get()).isEqualTo(1);
+    }
+
+    private void replaceAdaptivePollingRunner(AdaptivePollingRunner adaptivePollingRunner) {
+        try {
+            Field field = SlackViewSubmissionInboxWorker.class.getDeclaredField("adaptivePollingRunner");
+            field.setAccessible(true);
+            field.set(slackViewSubmissionInboxWorker, adaptivePollingRunner);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("adaptivePollingRunner 교체에 실패했습니다.", e);
+        }
     }
 }

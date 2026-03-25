@@ -1,14 +1,15 @@
 package com.slack.bot.application.interaction.box.out;
 
-import static org.awaitility.Awaitility.await;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.slack.bot.application.worker.AdaptivePollingRunner;
 import com.slack.bot.application.worker.PollingHintEvent;
 import com.slack.bot.application.worker.PollingHintTarget;
-import java.time.Duration;
+import java.lang.reflect.Field;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -63,38 +64,20 @@ class SlackNotificationOutboxWorkerTest {
     @Test
     void 매칭된_wake_up_hint만_poll을_재개한다() {
         // given
-        AtomicInteger invocationCount = new AtomicInteger();
-        doAnswer(invocation -> {
-            invocationCount.incrementAndGet();
-            return 0;
-        }).when(slackNotificationOutboxProcessor).processPending(50);
-        slackNotificationOutboxWorker = new SlackNotificationOutboxWorker(
-                slackNotificationOutboxProcessor,
-                30_000L,
-                30_000L,
-                false
-        );
+        AdaptivePollingRunner adaptivePollingRunner = mock(AdaptivePollingRunner.class);
+        replaceAdaptivePollingRunner(adaptivePollingRunner);
 
-        try {
-            slackNotificationOutboxWorker.start();
-            await().atMost(Duration.ofSeconds(1L)).until(() -> invocationCount.get() >= 1);
+        // when
+        slackNotificationOutboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.BLOCK_ACTION_INBOX));
 
-            // when
-            slackNotificationOutboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.BLOCK_ACTION_INBOX));
+        // then
+        verifyNoInteractions(adaptivePollingRunner);
 
-            // then
-            await().during(Duration.ofMillis(300L))
-                    .atMost(Duration.ofMillis(500L))
-                    .until(() -> invocationCount.get() == 1);
+        // when
+        slackNotificationOutboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.INTERACTION_OUTBOX));
 
-            // when
-            slackNotificationOutboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.INTERACTION_OUTBOX));
-
-            // then
-            await().atMost(Duration.ofSeconds(1L)).until(() -> invocationCount.get() >= 2);
-        } finally {
-            slackNotificationOutboxWorker.stop();
-        }
+        // then
+        verify(adaptivePollingRunner).wakeUp();
     }
 
     @Test
@@ -121,5 +104,15 @@ class SlackNotificationOutboxWorkerTest {
 
         // then
         assertThat(callbackCount.get()).isEqualTo(1);
+    }
+
+    private void replaceAdaptivePollingRunner(AdaptivePollingRunner adaptivePollingRunner) {
+        try {
+            Field field = SlackNotificationOutboxWorker.class.getDeclaredField("adaptivePollingRunner");
+            field.setAccessible(true);
+            field.set(slackNotificationOutboxWorker, adaptivePollingRunner);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("adaptivePollingRunner 교체에 실패했습니다.", e);
+        }
     }
 }

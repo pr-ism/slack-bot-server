@@ -1,15 +1,16 @@
 package com.slack.bot.application.review.box.in;
 
-import static org.awaitility.Awaitility.await;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.slack.bot.application.worker.AdaptivePollingRunner;
 import com.slack.bot.application.worker.PollingHintEvent;
 import com.slack.bot.application.worker.PollingHintTarget;
-import java.time.Duration;
+import java.lang.reflect.Field;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -66,39 +67,20 @@ class ReviewRequestInboxWorkerTest {
     @Test
     void 매칭된_wake_up_hint만_poll을_재개한다() {
         // given
-        AtomicInteger invocationCount = new AtomicInteger();
-        doAnswer(invocation -> {
-            invocationCount.incrementAndGet();
-            return 0;
-        }).when(reviewRequestInboxProcessor).processPending(30);
-        reviewRequestInboxWorker = new ReviewRequestInboxWorker(
-                reviewRequestInboxProcessor,
-                30,
-                30_000L,
-                30_000L,
-                false
-        );
+        AdaptivePollingRunner adaptivePollingRunner = mock(AdaptivePollingRunner.class);
+        replaceAdaptivePollingRunner(adaptivePollingRunner);
 
-        try {
-            reviewRequestInboxWorker.start();
-            await().atMost(Duration.ofSeconds(1L)).until(() -> invocationCount.get() >= 1);
+        // when
+        reviewRequestInboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.REVIEW_NOTIFICATION_OUTBOX));
 
-            // when
-            reviewRequestInboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.REVIEW_NOTIFICATION_OUTBOX));
+        // then
+        verifyNoInteractions(adaptivePollingRunner);
 
-            // then
-            await().during(Duration.ofMillis(300L))
-                    .atMost(Duration.ofMillis(500L))
-                    .until(() -> invocationCount.get() == 1);
+        // when
+        reviewRequestInboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.REVIEW_REQUEST_INBOX));
 
-            // when
-            reviewRequestInboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.REVIEW_REQUEST_INBOX));
-
-            // then
-            await().atMost(Duration.ofSeconds(1L)).until(() -> invocationCount.get() >= 2);
-        } finally {
-            reviewRequestInboxWorker.stop();
-        }
+        // then
+        verify(adaptivePollingRunner).wakeUp();
     }
 
     @Test
@@ -132,5 +114,15 @@ class ReviewRequestInboxWorkerTest {
         assertThatThrownBy(() -> new ReviewRequestInboxWorker(reviewRequestInboxProcessor, 0, 1_000L, 30_000L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("batchSize는 0보다 커야 합니다.");
+    }
+
+    private void replaceAdaptivePollingRunner(AdaptivePollingRunner adaptivePollingRunner) {
+        try {
+            Field field = ReviewRequestInboxWorker.class.getDeclaredField("adaptivePollingRunner");
+            field.setAccessible(true);
+            field.set(reviewRequestInboxWorker, adaptivePollingRunner);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("adaptivePollingRunner 교체에 실패했습니다.", e);
+        }
     }
 }
