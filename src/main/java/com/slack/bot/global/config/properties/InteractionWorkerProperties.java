@@ -42,62 +42,47 @@ public record InteractionWorkerProperties(
     }
 
     public record BlockActionsProperties(
-            @DefaultValue("true") boolean workerEnabled,
             @DefaultValue("1000") long pollDelayMs,
             @DefaultValue("60000") long processingTimeoutMs,
             @DefaultValue("30000") long pollCapMs
     ) {
 
         public BlockActionsProperties() {
-            this(true, 1000L, 60000L, 30000L);
+            this(1000L, 60000L, 30000L);
         }
 
-        public BlockActionsProperties(boolean workerEnabled, long pollDelayMs) {
-            this(workerEnabled, pollDelayMs, 60000L, 30000L);
-        }
-
-        public BlockActionsProperties(boolean workerEnabled, long pollDelayMs, long processingTimeoutMs) {
-            this(workerEnabled, pollDelayMs, processingTimeoutMs, 30000L);
+        public BlockActionsProperties(long pollDelayMs, long processingTimeoutMs) {
+            this(pollDelayMs, processingTimeoutMs, 30000L);
         }
     }
 
     public record ViewSubmissionProperties(
-            @DefaultValue("true") boolean workerEnabled,
             @DefaultValue("1000") long pollDelayMs,
             @DefaultValue("60000") long processingTimeoutMs,
             @DefaultValue("30000") long pollCapMs
     ) {
 
         public ViewSubmissionProperties() {
-            this(true, 1000L, 60000L, 30000L);
+            this(1000L, 60000L, 30000L);
         }
 
-        public ViewSubmissionProperties(boolean workerEnabled, long pollDelayMs) {
-            this(workerEnabled, pollDelayMs, 60000L, 30000L);
-        }
-
-        public ViewSubmissionProperties(boolean workerEnabled, long pollDelayMs, long processingTimeoutMs) {
-            this(workerEnabled, pollDelayMs, processingTimeoutMs, 30000L);
+        public ViewSubmissionProperties(long pollDelayMs, long processingTimeoutMs) {
+            this(pollDelayMs, processingTimeoutMs, 30000L);
         }
     }
 
     public record OutboxProperties(
-            @DefaultValue("true") boolean workerEnabled,
             @DefaultValue("1000") long pollDelayMs,
             @DefaultValue("60000") long processingTimeoutMs,
             @DefaultValue("30000") long pollCapMs
     ) {
 
         public OutboxProperties() {
-            this(true, 1000L, 60000L, 30000L);
+            this(1000L, 60000L, 30000L);
         }
 
-        public OutboxProperties(boolean workerEnabled, long pollDelayMs) {
-            this(workerEnabled, pollDelayMs, 60000L, 30000L);
-        }
-
-        public OutboxProperties(boolean workerEnabled, long pollDelayMs, long processingTimeoutMs) {
-            this(workerEnabled, pollDelayMs, processingTimeoutMs, 30000L);
+        public OutboxProperties(long pollDelayMs, long processingTimeoutMs) {
+            this(pollDelayMs, processingTimeoutMs, 30000L);
         }
     }
 }

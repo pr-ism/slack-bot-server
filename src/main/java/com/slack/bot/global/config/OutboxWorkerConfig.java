@@ -8,7 +8,6 @@ import com.slack.bot.application.review.box.out.ReviewNotificationOutboxTimeoutR
 import com.slack.bot.application.review.box.out.ReviewNotificationOutboxWorker;
 import com.slack.bot.global.config.properties.InteractionWorkerProperties;
 import com.slack.bot.global.config.properties.ReviewWorkerProperties;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -18,14 +17,12 @@ public class OutboxWorkerConfig {
     @Bean
     public SlackNotificationOutboxWorker slackNotificationOutboxWorker(
             SlackNotificationOutboxProcessor slackNotificationOutboxProcessor,
-            InteractionWorkerProperties interactionWorkerProperties,
-            @Value("${app.adaptive-polling.auto-start:true}") boolean adaptivePollingAutoStart
+            InteractionWorkerProperties interactionWorkerProperties
     ) {
         return new SlackNotificationOutboxWorker(
                 slackNotificationOutboxProcessor,
                 interactionWorkerProperties.outbox().pollDelayMs(),
-                interactionWorkerProperties.outbox().pollCapMs(),
-                adaptivePollingAutoStart
+                interactionWorkerProperties.outbox().pollCapMs()
         );
     }
 
@@ -39,15 +36,13 @@ public class OutboxWorkerConfig {
     @Bean
     public ReviewNotificationOutboxWorker reviewNotificationOutboxWorker(
             ReviewNotificationOutboxProcessor reviewNotificationOutboxProcessor,
-            ReviewWorkerProperties reviewWorkerProperties,
-            @Value("${app.adaptive-polling.auto-start:true}") boolean adaptivePollingAutoStart
+            ReviewWorkerProperties reviewWorkerProperties
     ) {
         return new ReviewNotificationOutboxWorker(
                 reviewNotificationOutboxProcessor,
                 reviewWorkerProperties.outbox().batchSize(),
                 reviewWorkerProperties.outbox().pollDelayMs(),
-                reviewWorkerProperties.outbox().pollCapMs(),
-                adaptivePollingAutoStart
+                reviewWorkerProperties.outbox().pollCapMs()
         );
     }
 

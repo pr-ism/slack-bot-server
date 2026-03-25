@@ -10,7 +10,6 @@ import com.slack.bot.application.review.box.in.ReviewRequestInboxWorker;
 import com.slack.bot.application.review.box.in.ReviewRequestInboxTimeoutRecoveryWorker;
 import com.slack.bot.global.config.properties.InteractionWorkerProperties;
 import com.slack.bot.global.config.properties.ReviewWorkerProperties;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -20,14 +19,12 @@ public class InboxWorkerConfig {
     @Bean
     public SlackBlockActionInboxWorker slackBlockActionInboxWorker(
             SlackInteractionInboxProcessor slackInteractionInboxProcessor,
-            InteractionWorkerProperties interactionWorkerProperties,
-            @Value("${app.adaptive-polling.auto-start:true}") boolean adaptivePollingAutoStart
+            InteractionWorkerProperties interactionWorkerProperties
     ) {
         return new SlackBlockActionInboxWorker(
                 slackInteractionInboxProcessor,
                 interactionWorkerProperties.inbox().blockActions().pollDelayMs(),
-                interactionWorkerProperties.inbox().blockActions().pollCapMs(),
-                adaptivePollingAutoStart
+                interactionWorkerProperties.inbox().blockActions().pollCapMs()
         );
     }
 
@@ -41,14 +38,12 @@ public class InboxWorkerConfig {
     @Bean
     public SlackViewSubmissionInboxWorker slackViewSubmissionInboxWorker(
             SlackInteractionInboxProcessor slackInteractionInboxProcessor,
-            InteractionWorkerProperties interactionWorkerProperties,
-            @Value("${app.adaptive-polling.auto-start:true}") boolean adaptivePollingAutoStart
+            InteractionWorkerProperties interactionWorkerProperties
     ) {
         return new SlackViewSubmissionInboxWorker(
                 slackInteractionInboxProcessor,
                 interactionWorkerProperties.inbox().viewSubmission().pollDelayMs(),
-                interactionWorkerProperties.inbox().viewSubmission().pollCapMs(),
-                adaptivePollingAutoStart
+                interactionWorkerProperties.inbox().viewSubmission().pollCapMs()
         );
     }
 
@@ -62,15 +57,13 @@ public class InboxWorkerConfig {
     @Bean
     public ReviewRequestInboxWorker reviewRequestInboxWorker(
             ReviewRequestInboxProcessor reviewRequestInboxProcessor,
-            ReviewWorkerProperties reviewWorkerProperties,
-            @Value("${app.adaptive-polling.auto-start:true}") boolean adaptivePollingAutoStart
+            ReviewWorkerProperties reviewWorkerProperties
     ) {
         return new ReviewRequestInboxWorker(
                 reviewRequestInboxProcessor,
                 reviewWorkerProperties.inbox().batchSize(),
                 reviewWorkerProperties.inbox().pollDelayMs(),
-                reviewWorkerProperties.inbox().pollCapMs(),
-                adaptivePollingAutoStart
+                reviewWorkerProperties.inbox().pollCapMs()
         );
     }
 

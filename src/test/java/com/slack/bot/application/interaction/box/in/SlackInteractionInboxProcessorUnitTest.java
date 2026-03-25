@@ -56,8 +56,8 @@ class SlackInteractionInboxProcessorUnitTest {
         );
         InteractionWorkerProperties interactionWorkerProperties = new InteractionWorkerProperties(
                 new InteractionWorkerProperties.InboxProperties(
-                        new InteractionWorkerProperties.BlockActionsProperties(true, 200L, 60000L),
-                        new InteractionWorkerProperties.ViewSubmissionProperties(true, 200L, 60000L)
+                        new InteractionWorkerProperties.BlockActionsProperties(200L, 60000L),
+                        new InteractionWorkerProperties.ViewSubmissionProperties(200L, 60000L)
                 ),
                 new InteractionWorkerProperties.OutboxProperties()
         );

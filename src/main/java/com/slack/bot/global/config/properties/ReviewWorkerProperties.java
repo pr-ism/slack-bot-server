@@ -23,7 +23,6 @@ public record ReviewWorkerProperties(
     }
 
     public record InboxProperties(
-            @DefaultValue("true") boolean workerEnabled,
             @DefaultValue("1000") long pollDelayMs,
             @DefaultValue("30000") long pollCapMs,
             @DefaultValue("30") int batchSize,
@@ -31,12 +30,11 @@ public record ReviewWorkerProperties(
     ) {
 
         public InboxProperties() {
-            this(true, 1000L, 30000L, 30, 60000L);
+            this(1000L, 30000L, 30, 60000L);
         }
     }
 
     public record OutboxProperties(
-            @DefaultValue("true") boolean workerEnabled,
             @DefaultValue("1000") long pollDelayMs,
             @DefaultValue("30000") long pollCapMs,
             @DefaultValue("50") int batchSize,
@@ -44,7 +42,7 @@ public record ReviewWorkerProperties(
     ) {
 
         public OutboxProperties() {
-            this(true, 1000L, 30000L, 50, 60000L);
+            this(1000L, 30000L, 50, 60000L);
         }
     }
 }

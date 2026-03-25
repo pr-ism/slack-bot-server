@@ -101,17 +101,14 @@ app:
   interaction:
     inbox:
       block-actions:
-        worker-enabled: true
         poll-delay-ms: 1000
         poll-cap-ms: 30000
         processing-timeout-ms: 60000
       view-submission:
-        worker-enabled: true
         poll-delay-ms: 1000
         poll-cap-ms: 30000
         processing-timeout-ms: 60000
     outbox:
-      worker-enabled: true
       poll-delay-ms: 1000
       poll-cap-ms: 30000
       processing-timeout-ms: 60000
