@@ -28,14 +28,24 @@ public class SlackNotificationOutboxWorker implements SmartLifecycle {
             long pollCapMs,
             boolean autoStartup
     ) {
-        this.slackNotificationOutboxProcessor = slackNotificationOutboxProcessor;
-        this.adaptivePollingRunner = new AdaptivePollingRunner(
-                "interaction outbox worker",
-                Duration.ofMillis(pollDelayMs),
-                Duration.ofMillis(pollCapMs),
-                () -> processPendingOutbox(),
-                autoStartup
+        this(
+                slackNotificationOutboxProcessor,
+                new AdaptivePollingRunner(
+                        "interaction outbox worker",
+                        Duration.ofMillis(pollDelayMs),
+                        Duration.ofMillis(pollCapMs),
+                        () -> slackNotificationOutboxProcessor.processPending(BATCH_SIZE),
+                        autoStartup
+                )
         );
+    }
+
+    SlackNotificationOutboxWorker(
+            SlackNotificationOutboxProcessor slackNotificationOutboxProcessor,
+            AdaptivePollingRunner adaptivePollingRunner
+    ) {
+        this.slackNotificationOutboxProcessor = slackNotificationOutboxProcessor;
+        this.adaptivePollingRunner = adaptivePollingRunner;
     }
 
     public int processPendingOutbox() {

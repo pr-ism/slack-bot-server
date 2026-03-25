@@ -28,14 +28,24 @@ public class SlackBlockActionInboxWorker implements SmartLifecycle {
             long pollCapMs,
             boolean autoStartup
     ) {
-        this.slackInteractionInboxProcessor = slackInteractionInboxProcessor;
-        this.adaptivePollingRunner = new AdaptivePollingRunner(
-                "block_actions inbox worker",
-                Duration.ofMillis(pollDelayMs),
-                Duration.ofMillis(pollCapMs),
-                () -> processBlockActionInbox(),
-                autoStartup
+        this(
+                slackInteractionInboxProcessor,
+                new AdaptivePollingRunner(
+                        "block_actions inbox worker",
+                        Duration.ofMillis(pollDelayMs),
+                        Duration.ofMillis(pollCapMs),
+                        () -> slackInteractionInboxProcessor.processPendingBlockActions(BATCH_SIZE),
+                        autoStartup
+                )
         );
+    }
+
+    SlackBlockActionInboxWorker(
+            SlackInteractionInboxProcessor slackInteractionInboxProcessor,
+            AdaptivePollingRunner adaptivePollingRunner
+    ) {
+        this.slackInteractionInboxProcessor = slackInteractionInboxProcessor;
+        this.adaptivePollingRunner = adaptivePollingRunner;
     }
 
     public int processBlockActionInbox() {

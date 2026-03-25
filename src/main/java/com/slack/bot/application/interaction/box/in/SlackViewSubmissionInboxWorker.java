@@ -28,14 +28,24 @@ public class SlackViewSubmissionInboxWorker implements SmartLifecycle {
             long pollCapMs,
             boolean autoStartup
     ) {
-        this.slackInteractionInboxProcessor = slackInteractionInboxProcessor;
-        this.adaptivePollingRunner = new AdaptivePollingRunner(
-                "view_submission inbox worker",
-                Duration.ofMillis(pollDelayMs),
-                Duration.ofMillis(pollCapMs),
-                () -> processViewSubmissionInbox(),
-                autoStartup
+        this(
+                slackInteractionInboxProcessor,
+                new AdaptivePollingRunner(
+                        "view_submission inbox worker",
+                        Duration.ofMillis(pollDelayMs),
+                        Duration.ofMillis(pollCapMs),
+                        () -> slackInteractionInboxProcessor.processPendingViewSubmissions(BATCH_SIZE),
+                        autoStartup
+                )
         );
+    }
+
+    SlackViewSubmissionInboxWorker(
+            SlackInteractionInboxProcessor slackInteractionInboxProcessor,
+            AdaptivePollingRunner adaptivePollingRunner
+    ) {
+        this.slackInteractionInboxProcessor = slackInteractionInboxProcessor;
+        this.adaptivePollingRunner = adaptivePollingRunner;
     }
 
     public int processViewSubmissionInbox() {

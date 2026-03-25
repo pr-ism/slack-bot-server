@@ -10,7 +10,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import com.slack.bot.application.worker.AdaptivePollingRunner;
 import com.slack.bot.application.worker.PollingHintEvent;
 import com.slack.bot.application.worker.PollingHintTarget;
-import java.lang.reflect.Field;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -68,16 +67,20 @@ class ReviewRequestInboxWorkerTest {
     void 매칭된_wake_up_hint만_poll을_재개한다() {
         // given
         AdaptivePollingRunner adaptivePollingRunner = mock(AdaptivePollingRunner.class);
-        replaceAdaptivePollingRunner(adaptivePollingRunner);
+        ReviewRequestInboxWorker worker = new ReviewRequestInboxWorker(
+                reviewRequestInboxProcessor,
+                30,
+                adaptivePollingRunner
+        );
 
         // when
-        reviewRequestInboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.REVIEW_NOTIFICATION_OUTBOX));
+        worker.wakeUp(new PollingHintEvent(PollingHintTarget.REVIEW_NOTIFICATION_OUTBOX));
 
         // then
         verifyNoInteractions(adaptivePollingRunner);
 
         // when
-        reviewRequestInboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.REVIEW_REQUEST_INBOX));
+        worker.wakeUp(new PollingHintEvent(PollingHintTarget.REVIEW_REQUEST_INBOX));
 
         // then
         verify(adaptivePollingRunner).wakeUp();
@@ -110,19 +113,25 @@ class ReviewRequestInboxWorkerTest {
     }
 
     @Test
+    void start후_stop_callback은_running을_false로_내리고_callback을_1회_실행한다() {
+        // given
+        AtomicInteger callbackCount = new AtomicInteger();
+
+        // when
+        reviewRequestInboxWorker.start();
+        reviewRequestInboxWorker.stop(() -> callbackCount.incrementAndGet());
+
+        // then
+        assertAll(
+                () -> assertThat(reviewRequestInboxWorker.isRunning()).isFalse(),
+                () -> assertThat(callbackCount.get()).isEqualTo(1)
+        );
+    }
+
+    @Test
     void batchSize가_0이하면_생성자에서_예외가_발생한다() {
         assertThatThrownBy(() -> new ReviewRequestInboxWorker(reviewRequestInboxProcessor, 0, 1_000L, 30_000L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("batchSize는 0보다 커야 합니다.");
-    }
-
-    private void replaceAdaptivePollingRunner(AdaptivePollingRunner adaptivePollingRunner) {
-        try {
-            Field field = ReviewRequestInboxWorker.class.getDeclaredField("adaptivePollingRunner");
-            field.setAccessible(true);
-            field.set(reviewRequestInboxWorker, adaptivePollingRunner);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("adaptivePollingRunner 교체에 실패했습니다.", e);
-        }
     }
 }

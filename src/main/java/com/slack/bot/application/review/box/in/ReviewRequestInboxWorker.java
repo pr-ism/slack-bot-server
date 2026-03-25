@@ -29,18 +29,30 @@ public class ReviewRequestInboxWorker implements SmartLifecycle {
             long pollCapMs,
             boolean autoStartup
     ) {
+        this(
+                reviewRequestInboxProcessor,
+                batchSize,
+                new AdaptivePollingRunner(
+                        "review_request inbox worker",
+                        Duration.ofMillis(pollDelayMs),
+                        Duration.ofMillis(pollCapMs),
+                        () -> reviewRequestInboxProcessor.processPending(batchSize),
+                        autoStartup
+                )
+        );
+    }
+
+    ReviewRequestInboxWorker(
+            ReviewRequestInboxProcessor reviewRequestInboxProcessor,
+            int batchSize,
+            AdaptivePollingRunner adaptivePollingRunner
+    ) {
         if (batchSize <= 0) {
             throw new IllegalArgumentException("batchSize는 0보다 커야 합니다.");
         }
         this.reviewRequestInboxProcessor = reviewRequestInboxProcessor;
         this.batchSize = batchSize;
-        this.adaptivePollingRunner = new AdaptivePollingRunner(
-                "review_request inbox worker",
-                Duration.ofMillis(pollDelayMs),
-                Duration.ofMillis(pollCapMs),
-                () -> processPendingReviewRequestInbox(),
-                autoStartup
-        );
+        this.adaptivePollingRunner = adaptivePollingRunner;
     }
 
     public int processPendingReviewRequestInbox() {

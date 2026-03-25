@@ -9,7 +9,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import com.slack.bot.application.worker.AdaptivePollingRunner;
 import com.slack.bot.application.worker.PollingHintEvent;
 import com.slack.bot.application.worker.PollingHintTarget;
-import java.lang.reflect.Field;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -65,16 +64,19 @@ class SlackNotificationOutboxWorkerTest {
     void 매칭된_wake_up_hint만_poll을_재개한다() {
         // given
         AdaptivePollingRunner adaptivePollingRunner = mock(AdaptivePollingRunner.class);
-        replaceAdaptivePollingRunner(adaptivePollingRunner);
+        SlackNotificationOutboxWorker worker = new SlackNotificationOutboxWorker(
+                slackNotificationOutboxProcessor,
+                adaptivePollingRunner
+        );
 
         // when
-        slackNotificationOutboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.BLOCK_ACTION_INBOX));
+        worker.wakeUp(new PollingHintEvent(PollingHintTarget.BLOCK_ACTION_INBOX));
 
         // then
         verifyNoInteractions(adaptivePollingRunner);
 
         // when
-        slackNotificationOutboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.INTERACTION_OUTBOX));
+        worker.wakeUp(new PollingHintEvent(PollingHintTarget.INTERACTION_OUTBOX));
 
         // then
         verify(adaptivePollingRunner).wakeUp();
@@ -104,15 +106,5 @@ class SlackNotificationOutboxWorkerTest {
 
         // then
         assertThat(callbackCount.get()).isEqualTo(1);
-    }
-
-    private void replaceAdaptivePollingRunner(AdaptivePollingRunner adaptivePollingRunner) {
-        try {
-            Field field = SlackNotificationOutboxWorker.class.getDeclaredField("adaptivePollingRunner");
-            field.setAccessible(true);
-            field.set(slackNotificationOutboxWorker, adaptivePollingRunner);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("adaptivePollingRunner 교체에 실패했습니다.", e);
-        }
     }
 }

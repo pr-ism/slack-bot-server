@@ -9,7 +9,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import com.slack.bot.application.worker.AdaptivePollingRunner;
 import com.slack.bot.application.worker.PollingHintEvent;
 import com.slack.bot.application.worker.PollingHintTarget;
-import java.lang.reflect.Field;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -65,16 +64,19 @@ class SlackViewSubmissionInboxWorkerTest {
     void 매칭된_wake_up_hint만_poll을_재개한다() {
         // given
         AdaptivePollingRunner adaptivePollingRunner = mock(AdaptivePollingRunner.class);
-        replaceAdaptivePollingRunner(adaptivePollingRunner);
+        SlackViewSubmissionInboxWorker worker = new SlackViewSubmissionInboxWorker(
+                slackInteractionInboxProcessor,
+                adaptivePollingRunner
+        );
 
         // when
-        slackViewSubmissionInboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.BLOCK_ACTION_INBOX));
+        worker.wakeUp(new PollingHintEvent(PollingHintTarget.BLOCK_ACTION_INBOX));
 
         // then
         verifyNoInteractions(adaptivePollingRunner);
 
         // when
-        slackViewSubmissionInboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.VIEW_SUBMISSION_INBOX));
+        worker.wakeUp(new PollingHintEvent(PollingHintTarget.VIEW_SUBMISSION_INBOX));
 
         // then
         verify(adaptivePollingRunner).wakeUp();
@@ -104,15 +106,5 @@ class SlackViewSubmissionInboxWorkerTest {
 
         // then
         assertThat(callbackCount.get()).isEqualTo(1);
-    }
-
-    private void replaceAdaptivePollingRunner(AdaptivePollingRunner adaptivePollingRunner) {
-        try {
-            Field field = SlackViewSubmissionInboxWorker.class.getDeclaredField("adaptivePollingRunner");
-            field.setAccessible(true);
-            field.set(slackViewSubmissionInboxWorker, adaptivePollingRunner);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("adaptivePollingRunner 교체에 실패했습니다.", e);
-        }
     }
 }

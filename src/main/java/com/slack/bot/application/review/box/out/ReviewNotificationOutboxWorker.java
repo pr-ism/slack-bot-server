@@ -29,18 +29,30 @@ public class ReviewNotificationOutboxWorker implements SmartLifecycle {
             long pollCapMs,
             boolean autoStartup
     ) {
+        this(
+                reviewNotificationOutboxProcessor,
+                batchSize,
+                new AdaptivePollingRunner(
+                        "review_notification outbox worker",
+                        Duration.ofMillis(pollDelayMs),
+                        Duration.ofMillis(pollCapMs),
+                        () -> reviewNotificationOutboxProcessor.processPending(batchSize),
+                        autoStartup
+                )
+        );
+    }
+
+    ReviewNotificationOutboxWorker(
+            ReviewNotificationOutboxProcessor reviewNotificationOutboxProcessor,
+            int batchSize,
+            AdaptivePollingRunner adaptivePollingRunner
+    ) {
         if (batchSize <= 0) {
             throw new IllegalArgumentException("batchSize는 0보다 커야 합니다.");
         }
         this.reviewNotificationOutboxProcessor = reviewNotificationOutboxProcessor;
         this.batchSize = batchSize;
-        this.adaptivePollingRunner = new AdaptivePollingRunner(
-                "review_notification outbox worker",
-                Duration.ofMillis(pollDelayMs),
-                Duration.ofMillis(pollCapMs),
-                () -> processPendingReviewNotificationOutbox(),
-                autoStartup
-        );
+        this.adaptivePollingRunner = adaptivePollingRunner;
     }
 
     public int processPendingReviewNotificationOutbox() {

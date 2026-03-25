@@ -10,7 +10,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import com.slack.bot.application.worker.AdaptivePollingRunner;
 import com.slack.bot.application.worker.PollingHintEvent;
 import com.slack.bot.application.worker.PollingHintTarget;
-import java.lang.reflect.Field;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -68,16 +67,20 @@ class ReviewNotificationOutboxWorkerTest {
     void 매칭된_wake_up_hint만_poll을_재개한다() {
         // given
         AdaptivePollingRunner adaptivePollingRunner = mock(AdaptivePollingRunner.class);
-        replaceAdaptivePollingRunner(adaptivePollingRunner);
+        ReviewNotificationOutboxWorker worker = new ReviewNotificationOutboxWorker(
+                reviewNotificationOutboxProcessor,
+                50,
+                adaptivePollingRunner
+        );
 
         // when
-        reviewNotificationOutboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.REVIEW_REQUEST_INBOX));
+        worker.wakeUp(new PollingHintEvent(PollingHintTarget.REVIEW_REQUEST_INBOX));
 
         // then
         verifyNoInteractions(adaptivePollingRunner);
 
         // when
-        reviewNotificationOutboxWorker.wakeUp(new PollingHintEvent(PollingHintTarget.REVIEW_NOTIFICATION_OUTBOX));
+        worker.wakeUp(new PollingHintEvent(PollingHintTarget.REVIEW_NOTIFICATION_OUTBOX));
 
         // then
         verify(adaptivePollingRunner).wakeUp();
@@ -119,15 +122,5 @@ class ReviewNotificationOutboxWorkerTest {
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("batchSize는 0보다 커야 합니다.");
-    }
-
-    private void replaceAdaptivePollingRunner(AdaptivePollingRunner adaptivePollingRunner) {
-        try {
-            Field field = ReviewNotificationOutboxWorker.class.getDeclaredField("adaptivePollingRunner");
-            field.setAccessible(true);
-            field.set(reviewNotificationOutboxWorker, adaptivePollingRunner);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("adaptivePollingRunner 교체에 실패했습니다.", e);
-        }
     }
 }
