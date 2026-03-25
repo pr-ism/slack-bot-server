@@ -8,7 +8,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,6 +18,8 @@ import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
 import com.slack.bot.application.review.box.out.ReviewNotificationOutboxEnqueuer;
 import com.slack.bot.application.review.dto.ReviewNotificationPayload;
+import com.slack.bot.application.worker.PollingHintPublisher;
+import com.slack.bot.application.worker.PollingHintTarget;
 import com.slack.bot.infrastructure.review.batch.SpyReviewNotificationService;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
@@ -33,11 +37,13 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.ResourceAccessException;
 
 @IntegrationTest
+@MockitoSpyBean(types = PollingHintPublisher.class)
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class ReviewRequestInboxProcessorTest {
@@ -66,13 +72,17 @@ class ReviewRequestInboxProcessorTest {
     @Autowired
     ObjectMapper objectMapper;
 
+    @Autowired
+    PollingHintPublisher pollingHintPublisher;
+
     @BeforeEach
     void setUp() {
         reset(
                 reviewRequestInboxRepository,
                 reviewNotificationOutboxEnqueuer,
                 spyReviewNotificationService,
-                objectMapper
+                objectMapper,
+                pollingHintPublisher
         );
         spyReviewNotificationService.resetCount();
     }
@@ -259,6 +269,30 @@ class ReviewRequestInboxProcessorTest {
         assertThatThrownBy(() -> reviewRequestInboxProcessor.enqueue(" ", request, 0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("apiKey는 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void batchWindowMillis가_0이면_enqueue후_review_request_inbox_wake_up_hint를_발행한다() {
+        // given
+        ReviewNotificationPayload request = request(504L, "wake-up-now");
+
+        // when
+        reviewRequestInboxProcessor.enqueue("test-api-key", request, 0);
+
+        // then
+        verify(pollingHintPublisher).publish(PollingHintTarget.REVIEW_REQUEST_INBOX);
+    }
+
+    @Test
+    void batchWindowMillis가_0보다_크면_enqueue후_wake_up_hint를_발행하지_않는다() {
+        // given
+        ReviewNotificationPayload request = request(505L, "wake-up-later");
+
+        // when
+        reviewRequestInboxProcessor.enqueue("test-api-key", request, 1_000);
+
+        // then
+        verify(pollingHintPublisher, never()).publish(PollingHintTarget.REVIEW_REQUEST_INBOX);
     }
 
     @Test

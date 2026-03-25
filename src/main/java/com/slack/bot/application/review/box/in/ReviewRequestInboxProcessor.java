@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.review.box.ReviewNotificationIdempotencyKeyGenerator;
 import com.slack.bot.application.review.box.ReviewNotificationIdempotencyScope;
 import com.slack.bot.application.review.dto.ReviewNotificationPayload;
+import com.slack.bot.application.worker.PollingHintPublisher;
+import com.slack.bot.application.worker.PollingHintTarget;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import java.time.Clock;
@@ -31,6 +33,7 @@ public class ReviewRequestInboxProcessor {
     private final ReviewRequestInboxEntryProcessor reviewRequestInboxEntryProcessor;
     private final ReviewNotificationIdempotencyKeyGenerator idempotencyKeyGenerator;
     private final ReviewRequestInboxIdempotencyPayloadEncoder idempotencyPayloadEncoder;
+    private final PollingHintPublisher pollingHintPublisher;
     public void enqueue(String apiKey, ReviewNotificationPayload request, long batchWindowMillis) {
         validateBatchWindowMillis(batchWindowMillis);
         if (request == null) {
@@ -131,6 +134,9 @@ public class ReviewRequestInboxProcessor {
                 requestJson,
                 availableAt
         );
+        if (batchWindowMillis == 0L) {
+            pollingHintPublisher.publish(PollingHintTarget.REVIEW_REQUEST_INBOX);
+        }
     }
 
     private String serializeRequest(ReviewNotificationPayload request) {

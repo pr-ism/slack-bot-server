@@ -1,14 +1,13 @@
 package com.slack.bot.application.interaction.box;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-import com.slack.bot.application.interaction.box.in.SlackInteractionInboxProcessor;
-import com.slack.bot.application.interaction.box.out.SlackNotificationOutboxProcessor;
+import com.slack.bot.application.worker.PollingHintPublisher;
+import com.slack.bot.application.worker.PollingHintTarget;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -23,19 +22,16 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 class InteractionImmediateProcessorTest {
 
     private InteractionImmediateProcessor interactionImmediateProcessor;
-    private SlackInteractionInboxProcessor slackInteractionInboxProcessor;
-    private SlackNotificationOutboxProcessor slackNotificationOutboxProcessor;
+    private PollingHintPublisher pollingHintPublisher;
     private TaskExecutor interactionImmediateExecutor;
 
     @BeforeEach
     void setUp() {
-        slackInteractionInboxProcessor = mock(SlackInteractionInboxProcessor.class);
-        slackNotificationOutboxProcessor = mock(SlackNotificationOutboxProcessor.class);
+        pollingHintPublisher = mock(PollingHintPublisher.class);
         interactionImmediateExecutor = runnable -> runnable.run();
         interactionImmediateProcessor = new InteractionImmediateProcessor(
                 interactionImmediateExecutor,
-                slackInteractionInboxProcessor,
-                slackNotificationOutboxProcessor
+                pollingHintPublisher
         );
 
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -50,7 +46,7 @@ class InteractionImmediateProcessorTest {
         interactionImmediateProcessor.triggerBlockActionInbox();
 
         // then
-        verify(slackInteractionInboxProcessor).processPendingBlockActions(anyInt());
+        verify(pollingHintPublisher).publish(PollingHintTarget.BLOCK_ACTION_INBOX);
     }
 
     @Test
@@ -63,7 +59,7 @@ class InteractionImmediateProcessorTest {
         interactionImmediateProcessor.triggerBlockActionInbox();
 
         // then
-        verify(slackInteractionInboxProcessor, never()).processPendingBlockActions(anyInt());
+        verify(pollingHintPublisher, never()).publish(PollingHintTarget.BLOCK_ACTION_INBOX);
 
         List<TransactionSynchronization> synchronizations = TransactionSynchronizationManager.getSynchronizations();
 
@@ -71,7 +67,7 @@ class InteractionImmediateProcessorTest {
 
         synchronizations.getFirst().afterCommit();
 
-        verify(slackInteractionInboxProcessor).processPendingBlockActions(anyInt());
+        verify(pollingHintPublisher).publish(PollingHintTarget.BLOCK_ACTION_INBOX);
     }
 
     @Test
@@ -80,7 +76,7 @@ class InteractionImmediateProcessorTest {
         interactionImmediateProcessor.triggerViewSubmissionInbox();
 
         // then
-        verify(slackInteractionInboxProcessor).processPendingViewSubmissions(anyInt());
+        verify(pollingHintPublisher).publish(PollingHintTarget.VIEW_SUBMISSION_INBOX);
     }
 
     @Test
@@ -89,21 +85,21 @@ class InteractionImmediateProcessorTest {
         interactionImmediateProcessor.triggerOutbox();
 
         // then
-        verify(slackNotificationOutboxProcessor).processPending(anyInt());
+        verify(pollingHintPublisher).publish(PollingHintTarget.INTERACTION_OUTBOX);
     }
 
     @Test
     void 프로세서_실행중_예외가_발생해도_전파되지_않는다() {
         // given
         willThrow(new RuntimeException("error"))
-                .given(slackInteractionInboxProcessor)
-                .processPendingBlockActions(anyInt());
+                .given(pollingHintPublisher)
+                .publish(PollingHintTarget.BLOCK_ACTION_INBOX);
 
         // when
         interactionImmediateProcessor.triggerBlockActionInbox();
 
         // then
-        verify(slackInteractionInboxProcessor).processPendingBlockActions(anyInt());
+        verify(pollingHintPublisher).publish(PollingHintTarget.BLOCK_ACTION_INBOX);
     }
 
     @Test
@@ -114,8 +110,7 @@ class InteractionImmediateProcessorTest {
         };
         interactionImmediateProcessor = new InteractionImmediateProcessor(
                 interactionImmediateExecutor,
-                slackInteractionInboxProcessor,
-                slackNotificationOutboxProcessor
+                pollingHintPublisher
         );
 
         TransactionSynchronizationManager.initSynchronization();
@@ -127,6 +122,6 @@ class InteractionImmediateProcessorTest {
         synchronizations.getFirst().afterCommit();
 
         // then
-        verify(slackInteractionInboxProcessor, never()).processPendingBlockActions(anyInt());
+        verify(pollingHintPublisher, never()).publish(PollingHintTarget.BLOCK_ACTION_INBOX);
     }
 }
