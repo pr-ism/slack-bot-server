@@ -18,6 +18,7 @@ public class AdaptivePollingRunner implements SmartLifecycle {
 
     private volatile boolean running;
     private Thread workerThread;
+    private Runnable stopCompletionCallback;
 
     public AdaptivePollingRunner(
             String runnerName,
@@ -138,37 +139,21 @@ public class AdaptivePollingRunner implements SmartLifecycle {
     }
 
     @Override
-    public synchronized void stop() {
-        if (!running) {
-            return;
-        }
-
-        running = false;
-        pollingSleeper.wakeUp();
-        Thread threadToJoin = workerThread;
-        if (threadToJoin == null || Thread.currentThread() == threadToJoin) {
-            return;
-        }
-
-        try {
-            threadToJoin.join(stopJoinTimeout.toMillis());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return;
-        }
-
-        if (threadToJoin.isAlive()) {
-            log.warn("{} 중지 대기 시간이 초과되었습니다.", runnerName);
-            return;
-        }
-
-        workerThread = null;
+    public void stop() {
+        StopRequest stopRequest = prepareStop(null);
+        awaitThreadTermination(stopRequest.threadToJoin());
     }
 
     @Override
     public void stop(Runnable callback) {
-        stop();
-        callback.run();
+        StopRequest stopRequest = prepareStop(callback);
+        if (stopRequest.isCompletedImmediately()) {
+            runStopCompletionCallback();
+            return;
+        }
+        if (awaitThreadTermination(stopRequest.threadToJoin())) {
+            runStopCompletionCallback();
+        }
     }
 
     @Override
@@ -209,6 +194,7 @@ public class AdaptivePollingRunner implements SmartLifecycle {
     }
 
     private void runLoop() {
+        Runnable callbackToRun = null;
         try {
             adaptivePollingBackoff.reset();
             while (running) {
@@ -219,8 +205,15 @@ public class AdaptivePollingRunner implements SmartLifecycle {
             synchronized (this) {
                 if (workerThread == Thread.currentThread()) {
                     workerThread = null;
+                    if (!running) {
+                        callbackToRun = stopCompletionCallback;
+                        stopCompletionCallback = null;
+                    }
                 }
             }
+        }
+        if (callbackToRun != null) {
+            callbackToRun.run();
         }
     }
 
@@ -228,10 +221,103 @@ public class AdaptivePollingRunner implements SmartLifecycle {
         return "adaptive-poller-" + runnerName.replace(' ', '-').replace('_', '-');
     }
 
+    private StopRequest prepareStop(Runnable callback) {
+        synchronized (this) {
+            if (callback != null) {
+                registerStopCompletionCallback(callback);
+            }
+
+            Thread threadToJoin = workerThread;
+            boolean workerAlive = threadToJoin != null && threadToJoin.isAlive();
+            if (!running) {
+                if (!workerAlive) {
+                    return StopRequest.completed();
+                }
+                if (Thread.currentThread() == threadToJoin) {
+                    return StopRequest.deferred();
+                }
+                return StopRequest.awaitTermination(threadToJoin);
+            }
+
+            running = false;
+            pollingSleeper.wakeUp();
+            if (!workerAlive) {
+                return StopRequest.completed();
+            }
+            if (Thread.currentThread() == threadToJoin) {
+                return StopRequest.deferred();
+            }
+            return StopRequest.awaitTermination(threadToJoin);
+        }
+    }
+
+    private boolean awaitThreadTermination(Thread threadToJoin) {
+        if (threadToJoin == null) {
+            return false;
+        }
+
+        try {
+            threadToJoin.join(stopJoinTimeout.toMillis());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+
+        if (threadToJoin.isAlive()) {
+            log.warn("{} 중지 대기 시간이 초과되었습니다.", runnerName);
+            return false;
+        }
+
+        return true;
+    }
+
+    private synchronized void registerStopCompletionCallback(Runnable callback) {
+        if (stopCompletionCallback == null) {
+            stopCompletionCallback = callback;
+            return;
+        }
+
+        Runnable existingCallback = stopCompletionCallback;
+        stopCompletionCallback = () -> {
+            existingCallback.run();
+            callback.run();
+        };
+    }
+
+    private void runStopCompletionCallback() {
+        Runnable callbackToRun;
+        synchronized (this) {
+            callbackToRun = stopCompletionCallback;
+            stopCompletionCallback = null;
+        }
+        if (callbackToRun != null) {
+            callbackToRun.run();
+        }
+    }
+
     private enum PollCycleOutcome {
         WORK_FOUND,
         EMPTY,
         ERROR
+    }
+
+    private record StopRequest(Thread threadToJoin, boolean completedImmediately) {
+
+        private boolean isCompletedImmediately() {
+            return completedImmediately;
+        }
+
+        private static StopRequest completed() {
+            return new StopRequest(null, true);
+        }
+
+        private static StopRequest deferred() {
+            return new StopRequest(null, false);
+        }
+
+        private static StopRequest awaitTermination(Thread threadToJoin) {
+            return new StopRequest(threadToJoin, false);
+        }
     }
 
     interface PollingSleeper {
