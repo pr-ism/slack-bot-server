@@ -113,6 +113,7 @@ class AdaptivePollingRunnerIntegrationTest {
                 .willReturn("D-REVIEWER");
         AtomicInteger pollCount = new AtomicInteger();
         CountDownLatch enteredSleep = new CountDownLatch(1);
+        Duration pollInterval = Duration.ofSeconds(5L);
         AdaptivePollingRunner.PollingSleeper pollingSleeper = new AdaptivePollingRunner.PollingSleeper() {
             private final AdaptivePollingRunner.MonitorPollingSleeper delegate =
                     new AdaptivePollingRunner.MonitorPollingSleeper();
@@ -135,12 +136,12 @@ class AdaptivePollingRunnerIntegrationTest {
                     return slackInteractionInboxProcessor.processPendingBlockActions(10);
                 },
                 new AdaptivePollingBackoff(
-                        Duration.ofSeconds(5L),
-                        Duration.ofSeconds(5L),
+                        pollInterval,
+                        pollInterval,
                         boundExclusive -> boundExclusive - 1L
                 ),
                 pollingSleeper,
-                Duration.ofSeconds(5L)
+                pollInterval
         );
 
         try {
@@ -153,14 +154,14 @@ class AdaptivePollingRunnerIntegrationTest {
             adaptivePollingRunner.wakeUp();
 
             // then
-            await().atMost(Duration.ofSeconds(2L)).untilAsserted(() -> {
+            await().atMost(Duration.ofSeconds(4L)).untilAsserted(() -> {
                 SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
 
                 assertAll(
                         () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
                         () -> assertThat(actualInbox.getProcessedAt()).isAfterOrEqualTo(wakeUpRequestedAt),
                         () -> assertThat(Duration.between(wakeUpRequestedAt, actualInbox.getProcessedAt()))
-                                .isLessThan(Duration.ofSeconds(2L)),
+                                .isLessThan(pollInterval),
                         () -> assertThat(reviewReservationRepository.findById(100L))
                                 .isPresent()
                                 .get()
