@@ -20,6 +20,8 @@ import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType
 import com.slack.bot.infrastructure.interaction.box.persistence.in.JpaSlackInteractionInboxRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -105,11 +107,27 @@ class AdaptivePollingRunnerIntegrationTest {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
             "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
     })
-    void sleep중_wake_up_hint가_오면_db_polling을_조기_재개한다() {
+    void sleep중_wake_up_hint가_오면_db_polling을_조기_재개한다() throws InterruptedException {
         // given
         given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U1"))
                 .willReturn("D-REVIEWER");
         AtomicInteger pollCount = new AtomicInteger();
+        CountDownLatch enteredSleep = new CountDownLatch(1);
+        AdaptivePollingRunner.PollingSleeper pollingSleeper = new AdaptivePollingRunner.PollingSleeper() {
+            private final AdaptivePollingRunner.MonitorPollingSleeper delegate =
+                    new AdaptivePollingRunner.MonitorPollingSleeper();
+
+            @Override
+            public AdaptivePollingRunner.PollingSleepResult sleep(Duration delay) throws InterruptedException {
+                enteredSleep.countDown();
+                return delegate.sleep(delay);
+            }
+
+            @Override
+            public void wakeUp() {
+                delegate.wakeUp();
+            }
+        };
         AdaptivePollingRunner adaptivePollingRunner = new AdaptivePollingRunner(
                 "db-polling-wakeup",
                 () -> {
@@ -121,15 +139,13 @@ class AdaptivePollingRunnerIntegrationTest {
                         Duration.ofSeconds(5L),
                         boundExclusive -> boundExclusive - 1L
                 ),
-                new AdaptivePollingRunner.MonitorPollingSleeper(),
+                pollingSleeper,
                 Duration.ofSeconds(5L)
         );
 
         try {
             adaptivePollingRunner.start();
-            await().atMost(Duration.ofSeconds(3L)).untilAsserted(() ->
-                    assertThat(pollCount.get()).isGreaterThanOrEqualTo(1)
-            );
+            assertThat(enteredSleep.await(3L, TimeUnit.SECONDS)).isTrue();
             SlackInteractionInbox inbox = savePendingBlockActionInbox(cancelReservationPayload("100"));
             Instant wakeUpRequestedAt = Instant.now();
 
