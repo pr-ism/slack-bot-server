@@ -2,10 +2,13 @@ package com.slack.bot.application.interaction.box.out;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -23,7 +26,8 @@ import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxM
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import java.time.Clock;
-import java.util.List;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -41,6 +45,8 @@ import org.springframework.retry.support.RetryTemplate;
 @ExtendWith(MockitoExtension.class)
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class SlackNotificationOutboxProcessorUnitTest {
+
+    private static final Instant CLAIMED_PROCESSING_STARTED_AT = Instant.parse("2026-03-24T00:00:00.123456Z");
 
     @Mock
     NotificationTransportApiClient notificationTransportApiClient;
@@ -60,9 +66,10 @@ class SlackNotificationOutboxProcessorUnitTest {
                 new InteractionRetryProperties.OutboxRetryProperties(2, 100, 2.0, 1000)
         );
         InteractionRetryExceptionClassifier classifier = InteractionRetryExceptionClassifier.create();
+        Clock fixedClock = Clock.fixed(CLAIMED_PROCESSING_STARTED_AT, ZoneOffset.UTC);
 
         slackNotificationOutboxProcessor = new SlackNotificationOutboxProcessor(
-                Clock.systemUTC(),
+                fixedClock,
                 new ObjectMapper(),
                 createOutboxRetryTemplate(retryProperties, classifier),
                 workspaceRepository,
@@ -73,6 +80,8 @@ class SlackNotificationOutboxProcessorUnitTest {
                 slackNotificationOutboxRepository,
                 classifier
         );
+
+        lenient().when(slackNotificationOutboxRepository.renewProcessingLease(any(), any(), any())).thenReturn(true);
     }
 
     private RetryTemplate createOutboxRetryTemplate(
@@ -99,10 +108,8 @@ class SlackNotificationOutboxProcessorUnitTest {
     @Test
     void markProcessing_선점에_실패하면_처리를_건너뛴다() {
         // given
-        SlackNotificationOutbox pending = org.mockito.Mockito.mock(SlackNotificationOutbox.class);
-        given(pending.getId()).willReturn(10L);
-        given(slackNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(pending));
-        given(slackNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(false);
+        given(slackNotificationOutboxRepository.claimNextId(any(), anyCollection()))
+                .willReturn(Optional.empty());
 
         // when
         slackNotificationOutboxProcessor.processPending(10);
@@ -121,13 +128,14 @@ class SlackNotificationOutboxProcessorUnitTest {
         given(outbox.getId()).willReturn(10L);
         given(outbox.getMessageType()).willReturn(null);
         given(outbox.getTeamId()).willReturn("T1");
+        given(outbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
 
         Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
         given(workspace.getAccessToken()).willReturn("xoxb-test-token");
         given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.of(workspace));
 
-        given(slackNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(outbox));
-        given(slackNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
+        given(slackNotificationOutboxRepository.claimNextId(any(), anyCollection()))
+                .willReturn(Optional.of(10L), Optional.empty());
         given(slackNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(outbox));
 
         // when
@@ -136,7 +144,8 @@ class SlackNotificationOutboxProcessorUnitTest {
         // then
         ArgumentCaptor<String> reasonCaptor = ArgumentCaptor.forClass(String.class);
         verify(outbox).markFailed(any(), reasonCaptor.capture(), eq(SlackInteractionFailureType.BUSINESS_INVARIANT));
-        verify(slackNotificationOutboxRepository, times(1)).save(outbox);
+        verify(slackNotificationOutboxRepository, times(1))
+                .saveIfProcessingLeaseMatched(outbox, CLAIMED_PROCESSING_STARTED_AT);
         verify(notificationTransportApiClient, never()).sendMessage(anyString(), anyString(), anyString());
 
         assertThat(reasonCaptor.getValue()).isEqualTo("지원하지 않는 메시지 타입입니다: null");
@@ -145,11 +154,8 @@ class SlackNotificationOutboxProcessorUnitTest {
     @Test
     void markProcessing_성공후_outbox_재조회에_실패하면_추가_처리없이_종료한다() {
         // given
-        SlackNotificationOutbox pending = org.mockito.Mockito.mock(SlackNotificationOutbox.class);
-        given(pending.getId()).willReturn(10L);
-
-        given(slackNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(pending));
-        given(slackNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
+        given(slackNotificationOutboxRepository.claimNextId(any(), anyCollection()))
+                .willReturn(Optional.of(10L), Optional.empty());
         given(slackNotificationOutboxRepository.findById(10L)).willReturn(Optional.empty());
 
         // when
@@ -165,17 +171,17 @@ class SlackNotificationOutboxProcessorUnitTest {
     void CHANNEL_TEXT_정상처리시_전송후_SENT로_저장된다() {
         // given
         SlackNotificationOutbox outbox = org.mockito.Mockito.mock(SlackNotificationOutbox.class);
-        given(outbox.getId()).willReturn(10L);
         given(outbox.getMessageType()).willReturn(SlackNotificationOutboxMessageType.CHANNEL_TEXT);
         given(outbox.getTeamId()).willReturn("T1");
         given(outbox.getChannelId()).willReturn("C1");
         given(outbox.getText()).willReturn("hello");
+        given(outbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
 
         Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
         given(workspace.getAccessToken()).willReturn("xoxb-test-token");
         given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.of(workspace));
-        given(slackNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(outbox));
-        given(slackNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
+        given(slackNotificationOutboxRepository.claimNextId(any(), anyCollection()))
+                .willReturn(Optional.of(10L), Optional.empty());
         given(slackNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(outbox));
 
         // when
@@ -184,7 +190,67 @@ class SlackNotificationOutboxProcessorUnitTest {
         // then
         verify(notificationTransportApiClient).sendMessage("xoxb-test-token", "C1", "hello");
         verify(outbox).markSent(any());
-        verify(slackNotificationOutboxRepository).save(outbox);
+        verify(slackNotificationOutboxRepository)
+                .saveIfProcessingLeaseMatched(outbox, CLAIMED_PROCESSING_STARTED_AT);
+        verify(outbox, never()).markFailed(any(), anyString(), any());
+    }
+
+    @Test
+    void SENT_상태_저장이_lease_mismatch면_실패상태로_재마킹하지_않는다() {
+        // given
+        SlackNotificationOutbox outbox = org.mockito.Mockito.mock(SlackNotificationOutbox.class);
+        given(outbox.getId()).willReturn(10L);
+        given(outbox.getMessageType()).willReturn(SlackNotificationOutboxMessageType.CHANNEL_TEXT);
+        given(outbox.getTeamId()).willReturn("T1");
+        given(outbox.getChannelId()).willReturn("C1");
+        given(outbox.getText()).willReturn("hello");
+        given(outbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
+
+        Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
+        given(workspace.getAccessToken()).willReturn("xoxb-test-token");
+        given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.of(workspace));
+        given(slackNotificationOutboxRepository.claimNextId(any(), anyCollection()))
+                .willReturn(Optional.of(10L), Optional.empty());
+        given(slackNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(outbox));
+        given(slackNotificationOutboxRepository.saveIfProcessingLeaseMatched(outbox, CLAIMED_PROCESSING_STARTED_AT))
+                .willReturn(false);
+
+        // when
+        slackNotificationOutboxProcessor.processPending(10);
+
+        // then
+        verify(notificationTransportApiClient).sendMessage("xoxb-test-token", "C1", "hello");
+        verify(outbox).markSent(any());
+        verify(outbox, never()).markFailed(any(), anyString(), any());
+    }
+
+    @Test
+    void SENT_상태_저장에_실패해도_실패상태로_재마킹하지_않는다() {
+        // given
+        SlackNotificationOutbox outbox = org.mockito.Mockito.mock(SlackNotificationOutbox.class);
+        given(outbox.getId()).willReturn(10L);
+        given(outbox.getMessageType()).willReturn(SlackNotificationOutboxMessageType.CHANNEL_TEXT);
+        given(outbox.getTeamId()).willReturn("T1");
+        given(outbox.getChannelId()).willReturn("C1");
+        given(outbox.getText()).willReturn("hello");
+        given(outbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
+
+        Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
+        given(workspace.getAccessToken()).willReturn("xoxb-test-token");
+        given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.of(workspace));
+        given(slackNotificationOutboxRepository.claimNextId(any(), anyCollection()))
+                .willReturn(Optional.of(10L), Optional.empty());
+        given(slackNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(outbox));
+        doThrow(new RuntimeException("db failure"))
+                .when(slackNotificationOutboxRepository)
+                .saveIfProcessingLeaseMatched(outbox, CLAIMED_PROCESSING_STARTED_AT);
+
+        // when
+        slackNotificationOutboxProcessor.processPending(10);
+
+        // then
+        verify(notificationTransportApiClient).sendMessage("xoxb-test-token", "C1", "hello");
+        verify(outbox).markSent(any());
         verify(outbox, never()).markFailed(any(), anyString(), any());
     }
 
@@ -197,12 +263,13 @@ class SlackNotificationOutboxProcessorUnitTest {
         given(outbox.getTeamId()).willReturn("T1");
         given(outbox.getChannelId()).willReturn("C1");
         given(outbox.getText()).willReturn("hello");
+        given(outbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
 
         Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
         given(workspace.getAccessToken()).willReturn("xoxb-test-token");
         given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.of(workspace));
-        given(slackNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(outbox));
-        given(slackNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
+        given(slackNotificationOutboxRepository.claimNextId(any(), anyCollection()))
+                .willReturn(Optional.of(10L), Optional.empty());
         given(slackNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(outbox));
 
         RuntimeException noMessageException = new RuntimeException();
@@ -216,39 +283,113 @@ class SlackNotificationOutboxProcessorUnitTest {
         // then
         ArgumentCaptor<String> reasonCaptor = ArgumentCaptor.forClass(String.class);
         verify(outbox).markFailed(any(), reasonCaptor.capture(), eq(SlackInteractionFailureType.BUSINESS_INVARIANT));
-        verify(slackNotificationOutboxRepository).save(outbox);
+        verify(slackNotificationOutboxRepository)
+                .saveIfProcessingLeaseMatched(outbox, CLAIMED_PROCESSING_STARTED_AT);
         assertThat(reasonCaptor.getValue()).isEqualTo("unknown failure");
     }
 
     @Test
-    void 첫_pending_처리_실패가_다음_pending_처리를_막지_않는다() {
+    void 실패상태_저장이_lease_mismatch여도_예외없이_종료한다() {
         // given
-        SlackNotificationOutbox firstPending = org.mockito.Mockito.mock(SlackNotificationOutbox.class);
-        SlackNotificationOutbox firstOutbox = org.mockito.Mockito.mock(SlackNotificationOutbox.class);
-        SlackNotificationOutbox secondPending = org.mockito.Mockito.mock(SlackNotificationOutbox.class);
-        SlackNotificationOutbox secondOutbox = org.mockito.Mockito.mock(SlackNotificationOutbox.class);
+        SlackNotificationOutbox outbox = org.mockito.Mockito.mock(SlackNotificationOutbox.class);
+        given(outbox.getId()).willReturn(10L);
+        given(outbox.getMessageType()).willReturn(SlackNotificationOutboxMessageType.CHANNEL_TEXT);
+        given(outbox.getTeamId()).willReturn("T1");
+        given(outbox.getChannelId()).willReturn("C1");
+        given(outbox.getText()).willReturn("hello");
+        given(outbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
 
-        given(firstPending.getId()).willReturn(10L);
-        given(secondPending.getId()).willReturn(20L);
+        Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
+        given(workspace.getAccessToken()).willReturn("xoxb-test-token");
+        given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.of(workspace));
+        given(slackNotificationOutboxRepository.claimNextId(any(), anyCollection()))
+                .willReturn(Optional.of(10L), Optional.empty());
+        given(slackNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(outbox));
+        willThrow(new RuntimeException("dispatch failure"))
+                .given(notificationTransportApiClient)
+                .sendMessage("xoxb-test-token", "C1", "hello");
+        given(slackNotificationOutboxRepository.saveIfProcessingLeaseMatched(outbox, CLAIMED_PROCESSING_STARTED_AT))
+                .willReturn(false);
+
+        // when
+        slackNotificationOutboxProcessor.processPending(10);
+
+        // then
+        verify(outbox).markFailed(any(), anyString(), eq(SlackInteractionFailureType.BUSINESS_INVARIANT));
+    }
+
+    @Test
+    void 실패상태_저장에_실패해도_다음_outbox_처리를_계속한다() {
+        // given
+        SlackNotificationOutbox firstOutbox = org.mockito.Mockito.mock(SlackNotificationOutbox.class);
+        SlackNotificationOutbox secondOutbox = org.mockito.Mockito.mock(SlackNotificationOutbox.class);
 
         given(firstOutbox.getId()).willReturn(10L);
         given(firstOutbox.getMessageType()).willReturn(SlackNotificationOutboxMessageType.CHANNEL_TEXT);
         given(firstOutbox.getTeamId()).willReturn("T1");
         given(firstOutbox.getChannelId()).willReturn("C1");
         given(firstOutbox.getText()).willReturn("first");
+        given(firstOutbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
 
+        given(secondOutbox.getId()).willReturn(20L);
         given(secondOutbox.getMessageType()).willReturn(SlackNotificationOutboxMessageType.CHANNEL_TEXT);
         given(secondOutbox.getTeamId()).willReturn("T1");
         given(secondOutbox.getChannelId()).willReturn("C2");
         given(secondOutbox.getText()).willReturn("second");
+        given(secondOutbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
 
         Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
         given(workspace.getAccessToken()).willReturn("xoxb-test-token");
         given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.of(workspace));
 
-        given(slackNotificationOutboxRepository.findClaimable(10)).willReturn(List.of(firstPending, secondPending));
-        given(slackNotificationOutboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
-        given(slackNotificationOutboxRepository.markProcessingIfClaimable(eq(20L), any())).willReturn(true);
+        given(slackNotificationOutboxRepository.claimNextId(any(), anyCollection()))
+                .willReturn(Optional.of(10L), Optional.of(20L), Optional.empty());
+        given(slackNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(firstOutbox));
+        given(slackNotificationOutboxRepository.findById(20L)).willReturn(Optional.of(secondOutbox));
+
+        willThrow(new RuntimeException("dispatch failure"))
+                .given(notificationTransportApiClient)
+                .sendMessage("xoxb-test-token", "C1", "first");
+        doThrow(new RuntimeException("db failure"))
+                .when(slackNotificationOutboxRepository)
+                .saveIfProcessingLeaseMatched(firstOutbox, CLAIMED_PROCESSING_STARTED_AT);
+
+        // when
+        slackNotificationOutboxProcessor.processPending(10);
+
+        // then
+        verify(firstOutbox).markFailed(any(), anyString(), eq(SlackInteractionFailureType.BUSINESS_INVARIANT));
+        verify(secondOutbox).markSent(any());
+        verify(notificationTransportApiClient).sendMessage("xoxb-test-token", "C2", "second");
+        verify(slackNotificationOutboxRepository)
+                .saveIfProcessingLeaseMatched(secondOutbox, CLAIMED_PROCESSING_STARTED_AT);
+    }
+
+    @Test
+    void 첫_pending_처리_실패가_다음_pending_처리를_막지_않는다() {
+        // given
+        SlackNotificationOutbox firstOutbox = org.mockito.Mockito.mock(SlackNotificationOutbox.class);
+        SlackNotificationOutbox secondOutbox = org.mockito.Mockito.mock(SlackNotificationOutbox.class);
+
+        given(firstOutbox.getId()).willReturn(10L);
+        given(firstOutbox.getMessageType()).willReturn(SlackNotificationOutboxMessageType.CHANNEL_TEXT);
+        given(firstOutbox.getTeamId()).willReturn("T1");
+        given(firstOutbox.getChannelId()).willReturn("C1");
+        given(firstOutbox.getText()).willReturn("first");
+        given(firstOutbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
+
+        given(secondOutbox.getMessageType()).willReturn(SlackNotificationOutboxMessageType.CHANNEL_TEXT);
+        given(secondOutbox.getTeamId()).willReturn("T1");
+        given(secondOutbox.getChannelId()).willReturn("C2");
+        given(secondOutbox.getText()).willReturn("second");
+        given(secondOutbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
+
+        Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
+        given(workspace.getAccessToken()).willReturn("xoxb-test-token");
+        given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.of(workspace));
+
+        given(slackNotificationOutboxRepository.claimNextId(any(), anyCollection()))
+                .willReturn(Optional.of(10L), Optional.of(20L), Optional.empty());
         given(slackNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(firstOutbox));
         given(slackNotificationOutboxRepository.findById(20L)).willReturn(Optional.of(secondOutbox));
 
@@ -266,6 +407,47 @@ class SlackNotificationOutboxProcessorUnitTest {
         verify(secondOutbox, never()).markFailed(any(), anyString(), any());
         verify(notificationTransportApiClient).sendMessage("xoxb-test-token", "C1", "first");
         verify(notificationTransportApiClient).sendMessage("xoxb-test-token", "C2", "second");
-        verify(slackNotificationOutboxRepository, times(2)).save(any());
+        verify(slackNotificationOutboxRepository, times(2))
+                .saveIfProcessingLeaseMatched(any(), eq(CLAIMED_PROCESSING_STARTED_AT));
+    }
+
+    @Test
+    void claim_lease가_달라지면_전송을_건너뛴다() {
+        // given
+        SlackNotificationOutbox outbox = org.mockito.Mockito.mock(SlackNotificationOutbox.class);
+        given(outbox.getId()).willReturn(10L);
+        given(outbox.getProcessingStartedAt()).willReturn(Instant.parse("2026-03-24T00:00:01Z"));
+        given(slackNotificationOutboxRepository.claimNextId(any(), anyCollection()))
+                .willReturn(Optional.of(10L), Optional.empty());
+        given(slackNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(outbox));
+
+        // when
+        slackNotificationOutboxProcessor.processPending(10);
+
+        // then
+        verify(notificationTransportApiClient, never()).sendMessage(anyString(), anyString(), anyString());
+        verify(slackNotificationOutboxRepository, never())
+                .saveIfProcessingLeaseMatched(any(), any());
+    }
+
+    @Test
+    void lease_연장에_실패하면_전송을_건너뛴다() {
+        // given
+        SlackNotificationOutbox outbox = org.mockito.Mockito.mock(SlackNotificationOutbox.class);
+        given(outbox.getId()).willReturn(10L);
+        given(outbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
+        given(slackNotificationOutboxRepository.claimNextId(any(), anyCollection()))
+                .willReturn(Optional.of(10L), Optional.empty());
+        given(slackNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(outbox));
+        given(slackNotificationOutboxRepository.renewProcessingLease(any(), any(), any())).willReturn(false);
+
+        // when
+        slackNotificationOutboxProcessor.processPending(10);
+
+        // then
+        verify(notificationTransportApiClient, never()).sendMessage(anyString(), anyString(), anyString());
+        verify(outbox, never()).markSent(any());
+        verify(outbox, never()).markFailed(any(), anyString(), any());
+        verify(slackNotificationOutboxRepository, never()).saveIfProcessingLeaseMatched(any(), any());
     }
 }

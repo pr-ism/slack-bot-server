@@ -3,8 +3,6 @@ package com.slack.bot.application.interaction.box.in;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
@@ -91,31 +89,12 @@ class SlackInteractionInboxEntryProcessorUnitTest {
     }
 
     @Test
-    void markProcessing_선점에_실패하면_처리를_건너뛴다() {
+    void claimed_inbox를_조회하지_못하면_추가_처리없이_종료한다() {
         // given
-        SlackInteractionInbox pending = org.mockito.Mockito.mock(SlackInteractionInbox.class);
-        given(pending.getId()).willReturn(10L);
-        given(slackInteractionInboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(false);
-
-        // when
-        slackInteractionInboxEntryProcessor.processBlockAction(pending);
-
-        // then
-        verify(slackInteractionInboxRepository, never()).findById(anyLong());
-        verify(slackInteractionInboxRepository, never()).save(any());
-        verify(blockActionInteractionService, never()).handle(any());
-    }
-
-    @Test
-    void markProcessing_성공후_inbox_재조회에_실패하면_추가_처리없이_종료한다() {
-        // given
-        SlackInteractionInbox pending = org.mockito.Mockito.mock(SlackInteractionInbox.class);
-        given(pending.getId()).willReturn(10L);
-        given(slackInteractionInboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
         given(slackInteractionInboxRepository.findById(10L)).willReturn(Optional.empty());
 
         // when
-        slackInteractionInboxEntryProcessor.processBlockAction(pending);
+        slackInteractionInboxEntryProcessor.processClaimedBlockAction(10L);
 
         // then
         verify(slackInteractionInboxRepository, never()).save(any());
@@ -125,9 +104,6 @@ class SlackInteractionInboxEntryProcessorUnitTest {
     @Test
     void block_action_정상처리시_handle이_호출되고_PROCESSED로_저장된다() {
         // given
-        SlackInteractionInbox pending = org.mockito.Mockito.mock(SlackInteractionInbox.class);
-        given(pending.getId()).willReturn(11L);
-
         SlackInteractionInbox actual = SlackInteractionInbox.pending(
                 SlackInteractionInboxType.BLOCK_ACTIONS,
                 "block-action-success",
@@ -135,11 +111,10 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         );
         setProcessingState(actual, Instant.parse("2026-02-15T00:00:00Z"), 1);
 
-        given(slackInteractionInboxRepository.markProcessingIfClaimable(eq(11L), any())).willReturn(true);
         given(slackInteractionInboxRepository.findById(11L)).willReturn(Optional.of(actual));
 
         // when
-        slackInteractionInboxEntryProcessor.processBlockAction(pending);
+        slackInteractionInboxEntryProcessor.processClaimedBlockAction(11L);
 
         // then
         assertAll(
@@ -154,9 +129,6 @@ class SlackInteractionInboxEntryProcessorUnitTest {
     @Test
     void 재시도_가능_예외이고_첫_시도면_RETRY_PENDING으로_마킹된다() {
         // given
-        SlackInteractionInbox pending = org.mockito.Mockito.mock(SlackInteractionInbox.class);
-        given(pending.getId()).willReturn(10L);
-
         SlackInteractionInbox actual = SlackInteractionInbox.pending(
                 SlackInteractionInboxType.BLOCK_ACTIONS,
                 "retry-first-attempt",
@@ -164,14 +136,13 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         );
         setProcessingState(actual, Instant.parse("2026-02-15T00:00:00Z"), 1);
 
-        given(slackInteractionInboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
         given(slackInteractionInboxRepository.findById(10L)).willReturn(Optional.of(actual));
         willThrow(new ResourceAccessException("temporary network failure"))
                 .given(blockActionInteractionService)
                 .handle(any());
 
         // when
-        slackInteractionInboxEntryProcessor.processBlockAction(pending);
+        slackInteractionInboxEntryProcessor.processClaimedBlockAction(10L);
 
         // then
         assertAll(
@@ -185,9 +156,6 @@ class SlackInteractionInboxEntryProcessorUnitTest {
     @Test
     void 재시도_가능_예외이고_최대_시도에_도달하면_FAILED와_RETRY_EXHAUSTED로_마킹된다() {
         // given
-        SlackInteractionInbox pending = org.mockito.Mockito.mock(SlackInteractionInbox.class);
-        given(pending.getId()).willReturn(10L);
-
         SlackInteractionInbox actual = SlackInteractionInbox.pending(
                 SlackInteractionInboxType.BLOCK_ACTIONS,
                 "retry-max-attempt",
@@ -197,14 +165,13 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         actual.markRetryPending(Instant.parse("2026-02-15T00:01:00Z"), "previous retry failure");
         setProcessingState(actual, Instant.parse("2026-02-15T00:02:00Z"), 2);
 
-        given(slackInteractionInboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
         given(slackInteractionInboxRepository.findById(10L)).willReturn(Optional.of(actual));
         willThrow(new ResourceAccessException("temporary network failure"))
                 .given(blockActionInteractionService)
                 .handle(any());
 
         // when
-        slackInteractionInboxEntryProcessor.processBlockAction(pending);
+        slackInteractionInboxEntryProcessor.processClaimedBlockAction(10L);
 
         // then
         assertAll(
@@ -218,9 +185,6 @@ class SlackInteractionInboxEntryProcessorUnitTest {
     @Test
     void 긴_실패사유는_잘려서_저장된다() {
         // given
-        SlackInteractionInbox pending = org.mockito.Mockito.mock(SlackInteractionInbox.class);
-        given(pending.getId()).willReturn(10L);
-
         SlackInteractionInbox actual = SlackInteractionInbox.pending(
                 SlackInteractionInboxType.BLOCK_ACTIONS,
                 "long-failure-reason",
@@ -228,14 +192,13 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         );
         setProcessingState(actual, Instant.parse("2026-02-15T00:00:00Z"), 1);
 
-        given(slackInteractionInboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
         given(slackInteractionInboxRepository.findById(10L)).willReturn(Optional.of(actual));
         willThrow(new IllegalArgumentException("x".repeat(600)))
                 .given(blockActionInteractionService)
                 .handle(any());
 
         // when
-        slackInteractionInboxEntryProcessor.processBlockAction(pending);
+        slackInteractionInboxEntryProcessor.processClaimedBlockAction(10L);
 
         // then
         assertAll(
@@ -249,9 +212,6 @@ class SlackInteractionInboxEntryProcessorUnitTest {
     @Test
     void 예외메시지가_비어있으면_unknown_failure로_저장된다() {
         // given
-        SlackInteractionInbox pending = org.mockito.Mockito.mock(SlackInteractionInbox.class);
-        given(pending.getId()).willReturn(10L);
-
         SlackInteractionInbox actual = SlackInteractionInbox.pending(
                 SlackInteractionInboxType.BLOCK_ACTIONS,
                 "empty-failure-reason",
@@ -259,14 +219,13 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         );
         setProcessingState(actual, Instant.parse("2026-02-15T00:00:00Z"), 1);
 
-        given(slackInteractionInboxRepository.markProcessingIfClaimable(eq(10L), any())).willReturn(true);
         given(slackInteractionInboxRepository.findById(10L)).willReturn(Optional.of(actual));
         willThrow(new RuntimeException())
                 .given(blockActionInteractionService)
                 .handle(any());
 
         // when
-        slackInteractionInboxEntryProcessor.processBlockAction(pending);
+        slackInteractionInboxEntryProcessor.processClaimedBlockAction(10L);
 
         // then
         assertAll(
@@ -280,9 +239,6 @@ class SlackInteractionInboxEntryProcessorUnitTest {
     @Test
     void view_submission_정상처리시_handleEnqueued가_호출되고_PROCESSED로_저장된다() {
         // given
-        SlackInteractionInbox pending = org.mockito.Mockito.mock(SlackInteractionInbox.class);
-        given(pending.getId()).willReturn(20L);
-
         SlackInteractionInbox actual = SlackInteractionInbox.pending(
                 SlackInteractionInboxType.VIEW_SUBMISSION,
                 "view-submission-success",
@@ -290,11 +246,10 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         );
         setProcessingState(actual, Instant.parse("2026-02-15T00:00:00Z"), 1);
 
-        given(slackInteractionInboxRepository.markProcessingIfClaimable(eq(20L), any())).willReturn(true);
         given(slackInteractionInboxRepository.findById(20L)).willReturn(Optional.of(actual));
 
         // when
-        slackInteractionInboxEntryProcessor.processViewSubmission(pending);
+        slackInteractionInboxEntryProcessor.processClaimedViewSubmission(20L);
 
         // then
         assertAll(

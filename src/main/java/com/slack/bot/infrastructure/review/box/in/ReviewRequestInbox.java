@@ -126,6 +126,13 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         this.failureType = null;
     }
 
+    public void renewProcessingLease(Instant processingStartedAt) {
+        validateProcessingStartedAt(processingStartedAt);
+        validateTransition(ReviewRequestInboxStatus.PROCESSING, "PROCESSING");
+
+        this.processingStartedAt = processingStartedAt;
+    }
+
     public void markRetryPending(Instant failedAt, String failureReason) {
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
@@ -154,6 +161,12 @@ public class ReviewRequestInbox extends BaseTimeEntity {
     private void validateProcessedAt(Instant processedAt) {
         if (processedAt == null) {
             throw new IllegalArgumentException("processedAt은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateProcessingStartedAt(Instant processingStartedAt) {
+        if (processingStartedAt == null) {
+            throw new IllegalArgumentException("processingStartedAt은 비어 있을 수 없습니다.");
         }
     }
 

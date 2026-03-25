@@ -2,21 +2,16 @@ package com.slack.bot.application.review.box.in;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
-import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
 import com.slack.bot.application.review.box.ReviewNotificationIdempotencyKeyGenerator;
 import com.slack.bot.application.review.box.ReviewNotificationIdempotencyScope;
-import com.slack.bot.application.review.ReviewNotificationService;
-import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
 import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
-import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
-import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
-import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.List;
+import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -28,19 +23,14 @@ public class ReviewRequestInboxProcessor {
 
     private static final String PROCESSING_TIMEOUT_FAILURE_REASON =
             "PROCESSING 타임아웃으로 복구 처리되었습니다.";
-    private static final String UNKNOWN_FAILURE_REASON = "unknown failure";
-    private static final String REVIEW_REQUEST_INBOX_SOURCE_PREFIX = "REVIEW_REQUEST_INBOX";
 
     private final Clock clock;
     private final ObjectMapper objectMapper;
-    private final ReviewNotificationService reviewNotificationService;
-    private final ReviewNotificationSourceContext reviewNotificationSourceContext;
-    private final BoxFailureReasonTruncator failureReasonTruncator;
     private final InteractionRetryProperties interactionRetryProperties;
     private final ReviewRequestInboxRepository reviewRequestInboxRepository;
-    private final InteractionRetryExceptionClassifier retryExceptionClassifier;
-    private final ReviewRequestInboxIdempotencyPayloadEncoder idempotencyPayloadEncoder;
+    private final ReviewRequestInboxEntryProcessor reviewRequestInboxEntryProcessor;
     private final ReviewNotificationIdempotencyKeyGenerator idempotencyKeyGenerator;
+    private final ReviewRequestInboxIdempotencyPayloadEncoder idempotencyPayloadEncoder;
 
     public void enqueue(String apiKey, ReviewNotificationPayload request, long batchWindowMillis) {
         validateBatchWindowMillis(batchWindowMillis);
@@ -56,11 +46,21 @@ public class ReviewRequestInboxProcessor {
     }
 
     public void processPending(int limit) {
-        Instant now = clock.instant();
-        List<ReviewRequestInbox> pendings = reviewRequestInboxRepository.findClaimable(now, limit);
+        Set<Long> claimedInboxIds = new HashSet<>();
+        for (int count = 0; count < limit; count++) {
+            Instant claimNow = currentLeaseStartedAt();
+            Long claimedInboxId = reviewRequestInboxRepository.claimNextId(
+                    claimNow,
+                    claimNow,
+                    claimedInboxIds
+            ).orElse(null);
 
-        for (ReviewRequestInbox pending : pendings) {
-            processSafely(pending);
+            if (claimedInboxId == null) {
+                return;
+            }
+
+            claimedInboxIds.add(claimedInboxId);
+            processSafely(claimedInboxId, claimNow);
         }
     }
 
@@ -82,73 +82,16 @@ public class ReviewRequestInboxProcessor {
         return recoveredCount;
     }
 
-    private void processSafely(ReviewRequestInbox pending) {
-        Long inboxId = pending.getId();
-        if (inboxId == null) {
-            return;
-        }
-
-        Instant claimNow = clock.instant();
-        if (!reviewRequestInboxRepository.markProcessingIfClaimable(inboxId, claimNow, claimNow)) {
-            return;
-        }
-
-        reviewRequestInboxRepository.findById(inboxId)
-                                    .ifPresentOrElse(
-                                            inbox -> processClaimedInbox(inbox),
-                                            () -> log.warn(
-                                                    "PROCESSING으로 전이된 review_request inbox를 조회하지 못했습니다. inboxId={}",
-                                                    inboxId
-                                            )
-                                    );
-    }
-
-    private void processClaimedInbox(ReviewRequestInbox inbox) {
+    private void processSafely(Long inboxId, Instant claimedProcessingStartedAt) {
         try {
-            ReviewNotificationPayload request = objectMapper.readValue(
-                    inbox.getRequestJson(),
-                    ReviewNotificationPayload.class
-            );
-
-            String sourceKey = resolveSourceKey(inbox);
-            reviewNotificationSourceContext.withSourceKey(
-                    sourceKey,
-                    () -> reviewNotificationService.sendSimpleNotification(inbox.getApiKey(), request)
-            );
-
-            inbox.markProcessed(clock.instant());
-            reviewRequestInboxRepository.save(inbox);
+            reviewRequestInboxEntryProcessor.processClaimedInbox(inboxId, claimedProcessingStartedAt);
         } catch (Exception e) {
-            log.error("review_request inbox 처리에 실패했습니다. inboxId={}", inbox.getId(), e);
-
-            markFailureStatus(inbox, e);
-            reviewRequestInboxRepository.save(inbox);
+            log.error("review_request inbox 엔트리 처리 중 예상치 못한 오류가 발생했습니다. inboxId={}", inboxId, e);
         }
     }
 
-    private void markFailureStatus(ReviewRequestInbox inbox, Exception exception) {
-        if (inbox.getStatus() != ReviewRequestInboxStatus.PROCESSING) {
-            log.warn(
-                    "PROCESSING이 아닌 상태에서 실패 처리를 시도했습니다. inboxId={}, status={}",
-                    inbox.getId(),
-                    inbox.getStatus()
-            );
-            return;
-        }
-
-        String reason = resolveFailureReason(exception);
-
-        if (!retryExceptionClassifier.isRetryable(exception)) {
-            inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.NON_RETRYABLE);
-            return;
-        }
-
-        if (inbox.getProcessingAttempt() < interactionRetryProperties.inbox().maxAttempts()) {
-            inbox.markRetryPending(clock.instant(), reason);
-            return;
-        }
-
-        inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.RETRY_EXHAUSTED);
+    private Instant currentLeaseStartedAt() {
+        return clock.instant().truncatedTo(ChronoUnit.MICROS);
     }
 
     private void validateApiKeyAndGithubPullRequestId(String apiKey, Long githubPullRequestId) {
@@ -193,32 +136,6 @@ public class ReviewRequestInboxProcessor {
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("review request 직렬화에 실패했습니다.", e);
         }
-    }
-
-    private String resolveFailureReason(Exception exception) {
-        String reason = failureReasonTruncator.truncate(exception.getMessage());
-
-        if (reason == null || reason.isBlank()) {
-            return UNKNOWN_FAILURE_REASON;
-        }
-
-        return reason;
-    }
-
-    private String resolveSourceKey(ReviewRequestInbox inbox) {
-        long availableAtEpochMillis = resolveAvailableAtEpochMillis(inbox.getAvailableAt());
-
-        return REVIEW_REQUEST_INBOX_SOURCE_PREFIX
-                + ":" + inbox.getIdempotencyKey()
-                + ":" + availableAtEpochMillis;
-    }
-
-    private long resolveAvailableAtEpochMillis(Instant availableAt) {
-        if (availableAt == null) {
-            return 0L;
-        }
-
-        return availableAt.toEpochMilli();
     }
 
     private void validateBatchWindowMillis(long batchWindowMillis) {

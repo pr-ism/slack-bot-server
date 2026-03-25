@@ -5,18 +5,19 @@ import static com.slack.bot.infrastructure.interaction.box.in.QSlackInteractionI
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
-import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStatus;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
+import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,80 +25,129 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionInboxRepository {
 
-    private static final List<SlackInteractionInboxStatus> PROCESSING_CLAIMABLE_STATUSES = List.of(
-            SlackInteractionInboxStatus.PENDING,
-            SlackInteractionInboxStatus.RETRY_PENDING
-    );
-
     private final JPAQueryFactory queryFactory;
+    private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
     private final JpaSlackInteractionInboxRepository repository;
-    private final SlackInteractionInboxCreator inboxCreator;
-    private final MysqlDuplicateKeyDetector mysqlDuplicateKeyDetector;
 
     @Override
     public boolean enqueue(SlackInteractionInboxType interactionType, String idempotencyKey, String payloadJson) {
         SlackInteractionInbox inbox = SlackInteractionInbox.pending(interactionType, idempotencyKey, payloadJson);
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("interactionType", inbox.getInteractionType().name())
+                .addValue("idempotencyKey", inbox.getIdempotencyKey())
+                .addValue("payloadJson", inbox.getPayloadJson())
+                .addValue("pendingStatus", inbox.getStatus().name())
+                .addValue("processingAttempt", inbox.getProcessingAttempt());
 
-        try {
-            inboxCreator.saveNew(inbox);
-            return true;
-        } catch (DataIntegrityViolationException exception) {
-            if (mysqlDuplicateKeyDetector.isNotDuplicateKey(exception)) {
-                throw exception;
-            }
-            return false;
-        }
+        int updatedCount = namedParameterJdbcTemplate.update(
+                buildEnqueueSql(),
+                parameters
+        );
+
+        return updatedCount > 0;
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public List<SlackInteractionInbox> findClaimable(SlackInteractionInboxType interactionType, int limit) {
-        if (limit <= 0) {
-            return Collections.emptyList();
+    @Transactional
+    public Optional<Long> claimNextId(
+            SlackInteractionInboxType interactionType,
+            Instant processingStartedAt,
+            Collection<Long> excludedInboxIds
+    ) {
+        validateInteractionType(interactionType);
+        validateProcessingStartedAt(processingStartedAt);
+
+        MapSqlParameterSource selectParameters = new MapSqlParameterSource()
+                .addValue("interactionType", interactionType.name())
+                .addValue(
+                        "claimableStatuses",
+                        List.of(
+                                SlackInteractionInboxStatus.PENDING.name(),
+                                SlackInteractionInboxStatus.RETRY_PENDING.name()
+                        )
+                );
+        addExcludedInboxIds(selectParameters, excludedInboxIds);
+
+        List<Long> claimedIds = namedParameterJdbcTemplate.query(
+                buildClaimNextIdSelectSql(excludedInboxIds),
+                selectParameters,
+                (resultSet, rowNum) -> resultSet.getLong(1)
+        );
+        if (claimedIds.isEmpty()) {
+            return Optional.empty();
         }
 
-        return queryFactory
-                .selectFrom(slackInteractionInbox)
-                .where(
-                        slackInteractionInbox.interactionType.eq(interactionType),
-                        slackInteractionInbox.status.in(PROCESSING_CLAIMABLE_STATUSES)
-                )
-                .orderBy(slackInteractionInbox.id.asc())
-                .limit(limit)
-                .fetch();
+        Long inboxId = claimedIds.getFirst();
+        MapSqlParameterSource updateParameters = new MapSqlParameterSource()
+                .addValue("processingStatus", SlackInteractionInboxStatus.PROCESSING.name())
+                .addValue("processingStartedAt", Timestamp.from(processingStartedAt))
+                .addValue("inboxId", inboxId);
+
+        int updatedCount = namedParameterJdbcTemplate.update(
+                """
+                    UPDATE slack_interaction_inbox
+                    SET status = :processingStatus,
+                        processing_attempt = processing_attempt + 1,
+                        processing_started_at = :processingStartedAt,
+                        failed_at = NULL,
+                        failure_reason = NULL,
+                        failure_type = NULL
+                    WHERE id = :inboxId
+                    """,
+                updateParameters
+        );
+        if (updatedCount == 0) {
+            return Optional.empty();
+        }
+
+        return Optional.of(inboxId);
+    }
+
+    private String buildClaimNextIdSelectSql(Collection<Long> excludedInboxIds) {
+        StringBuilder sql = new StringBuilder(
+                """
+                SELECT id
+                FROM slack_interaction_inbox
+                WHERE interaction_type = :interactionType
+                  AND status IN (:claimableStatuses)
+                """
+        );
+
+        appendExcludedInboxIdsClause(sql, excludedInboxIds);
+        sql.append(
+                """
+                ORDER BY id ASC
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+                """
+        );
+
+        return sql.toString();
+    }
+
+    private void appendExcludedInboxIdsClause(StringBuilder sql, Collection<Long> excludedInboxIds) {
+        if (excludedInboxIds == null || excludedInboxIds.isEmpty()) {
+            return;
+        }
+
+        sql.append("\n  AND id NOT IN (:excludedInboxIds)");
+    }
+
+    private void addExcludedInboxIds(
+            MapSqlParameterSource parameters,
+            Collection<Long> excludedInboxIds
+    ) {
+        if (excludedInboxIds == null || excludedInboxIds.isEmpty()) {
+            return;
+        }
+
+        parameters.addValue("excludedInboxIds", excludedInboxIds);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<SlackInteractionInbox> findById(Long inboxId) {
         return repository.findById(inboxId);
-    }
-
-    @Override
-    @Transactional
-    public boolean markProcessingIfClaimable(Long inboxId, Instant processingStartedAt) {
-        validateInboxId(inboxId);
-        validateProcessingStartedAt(processingStartedAt);
-
-        long updatedCount = markAsProcessingWhenClaimable(inboxId, processingStartedAt);
-
-        return updatedCount > 0;
-    }
-
-    private long markAsProcessingWhenClaimable(Long inboxId, Instant processingStartedAt) {
-        return queryFactory
-                .update(slackInteractionInbox)
-                .set(slackInteractionInbox.status, SlackInteractionInboxStatus.PROCESSING)
-                .set(slackInteractionInbox.processingAttempt, slackInteractionInbox.processingAttempt.add(1))
-                .set(slackInteractionInbox.processingStartedAt, processingStartedAt)
-                .set(slackInteractionInbox.failedAt, Expressions.nullExpression(Instant.class))
-                .set(slackInteractionInbox.failureReason, Expressions.nullExpression(String.class))
-                .set(slackInteractionInbox.failureType, Expressions.nullExpression(SlackInteractionFailureType.class))
-                .where(
-                        slackInteractionInbox.id.eq(inboxId),
-                        slackInteractionInbox.status.in(PROCESSING_CLAIMABLE_STATUSES)
-                )
-                .execute();
     }
 
     @Override
@@ -161,9 +211,34 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
         validateMaxAttempts(maxAttempts);
     }
 
-    private void validateInboxId(Long inboxId) {
-        if (inboxId == null) {
-            throw new IllegalArgumentException("inboxId는 비어 있을 수 없습니다.");
+    protected String buildEnqueueSql() {
+        return """
+                INSERT INTO slack_interaction_inbox (
+                    created_at,
+                    updated_at,
+                    interaction_type,
+                    idempotency_key,
+                    payload_json,
+                    status,
+                    processing_attempt
+                )
+                VALUES (
+                    CURRENT_TIMESTAMP(6),
+                    CURRENT_TIMESTAMP(6),
+                    :interactionType,
+                    :idempotencyKey,
+                    :payloadJson,
+                    :pendingStatus,
+                    :processingAttempt
+                )
+                ON DUPLICATE KEY UPDATE
+                    idempotency_key = idempotency_key
+                """;
+    }
+
+    private void validateInteractionType(SlackInteractionInboxType interactionType) {
+        if (interactionType == null) {
+            throw new IllegalArgumentException("interactionType은 비어 있을 수 없습니다.");
         }
     }
 

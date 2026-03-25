@@ -2,7 +2,7 @@ package com.slack.bot.infrastructure.review.box.out.repository;
 
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import java.time.Instant;
-import java.util.List;
+import java.util.Collection;
 import java.util.Optional;
 
 public interface ReviewNotificationOutboxRepository {
@@ -11,11 +11,20 @@ public interface ReviewNotificationOutboxRepository {
 
     ReviewNotificationOutbox save(ReviewNotificationOutbox outbox);
 
+    boolean renewProcessingLease(
+            Long outboxId,
+            Instant currentProcessingStartedAt,
+            Instant renewedProcessingStartedAt
+    );
+
+    boolean saveIfProcessingLeaseMatched(
+            ReviewNotificationOutbox outbox,
+            Instant claimedProcessingStartedAt
+    );
+
     Optional<ReviewNotificationOutbox> findById(Long outboxId);
 
-    List<ReviewNotificationOutbox> findClaimable(int limit);
-
-    boolean markProcessingIfClaimable(Long outboxId, Instant processingStartedAt);
+    Optional<Long> claimNextId(Instant processingStartedAt, Collection<Long> excludedOutboxIds);
 
     int recoverTimeoutProcessing(
             Instant processingStartedBefore,

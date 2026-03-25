@@ -81,10 +81,11 @@ class SlackInteractionInboxProcessorTest {
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
             assertAll(
                     () -> assertThat(actual).isTrue(),
-                    () -> assertThat(actualSlackInteractionInboxRepository.findClaimable(
-                            SlackInteractionInboxType.BLOCK_ACTIONS,
-                            10
-                    )).isEmpty()
+                    () -> assertThat(jpaSlackInteractionInboxRepository.findAll())
+                            .hasSize(1)
+                            .first()
+                            .extracting(SlackInteractionInbox::getStatus)
+                            .isEqualTo(SlackInteractionInboxStatus.PROCESSED)
             );
             verify(notificationApiClient, times(1)).openDirectMessageChannel("xoxb-test-token", "U1");
             verify(notificationApiClient, times(1)).sendBlockMessage(

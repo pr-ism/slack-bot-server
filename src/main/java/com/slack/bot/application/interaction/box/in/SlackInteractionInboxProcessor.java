@@ -6,13 +6,13 @@ import com.slack.bot.application.interaction.box.aop.InteractionImmediateTrigger
 import com.slack.bot.application.interaction.box.aop.TriggerInteractionImmediateProcessing;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.global.config.properties.InteractionWorkerProperties;
-import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.List;
-import java.util.function.Consumer;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.function.LongConsumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -56,7 +56,7 @@ public class SlackInteractionInboxProcessor {
         processPending(
                 SlackInteractionInboxType.BLOCK_ACTIONS,
                 limit,
-                pending -> slackInteractionInboxEntryProcessor.processBlockAction(pending)
+                inboxId -> slackInteractionInboxEntryProcessor.processClaimedBlockAction(inboxId)
         );
     }
 
@@ -83,22 +83,28 @@ public class SlackInteractionInboxProcessor {
         processPending(
                 SlackInteractionInboxType.VIEW_SUBMISSION,
                 limit,
-                pending -> slackInteractionInboxEntryProcessor.processViewSubmission(pending)
+                inboxId -> slackInteractionInboxEntryProcessor.processClaimedViewSubmission(inboxId)
         );
     }
 
     private void processPending(
             SlackInteractionInboxType interactionType,
             int limit,
-            Consumer<SlackInteractionInbox> action
+            LongConsumer action
     ) {
-        List<SlackInteractionInbox> pendings = slackInteractionInboxRepository.findClaimable(
-                interactionType,
-                limit
-        );
+        Set<Long> claimedInboxIds = new HashSet<>();
+        for (int count = 0; count < limit; count++) {
+            Long claimedInboxId = slackInteractionInboxRepository.claimNextId(
+                    interactionType,
+                    clock.instant(),
+                    claimedInboxIds
+            ).orElse(null);
+            if (claimedInboxId == null) {
+                return;
+            }
 
-        for (SlackInteractionInbox pending : pendings) {
-            processSafely(pending, action, interactionType);
+            claimedInboxIds.add(claimedInboxId);
+            processSafely(claimedInboxId, action, interactionType);
         }
     }
 
@@ -134,17 +140,17 @@ public class SlackInteractionInboxProcessor {
     }
 
     private void processSafely(
-            SlackInteractionInbox pending,
-            Consumer<SlackInteractionInbox> action,
+            Long inboxId,
+            LongConsumer action,
             SlackInteractionInboxType interactionType
     ) {
         try {
-            action.accept(pending);
+            action.accept(inboxId);
         } catch (Exception e) {
             log.error(
                     "{} inbox 엔트리 처리 중 예상치 못한 오류가 발생했습니다. inboxId={}",
                     interactionType,
-                    pending.getId(),
+                    inboxId,
                     e
             );
         }

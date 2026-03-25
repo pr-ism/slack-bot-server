@@ -5,17 +5,18 @@ import static com.slack.bot.infrastructure.review.box.in.QReviewRequestInbox.rev
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
-import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
+import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,8 +30,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
     );
 
     private final JPAQueryFactory queryFactory;
-    private final MysqlDuplicateKeyDetector mysqlDuplicateKeyDetector;
-    private final ReviewRequestInboxCreator reviewRequestInboxCreator;
+    private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
     private final JpaReviewRequestInboxRepository reviewRequestInboxJpaRepository;
 
     @Override
@@ -56,69 +56,156 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                 availableAt
         );
 
-        try {
-            reviewRequestInboxCreator.saveNew(inbox);
-        } catch (DataIntegrityViolationException exception) {
-            if (mysqlDuplicateKeyDetector.isNotDuplicateKey(exception)) {
-                throw exception;
-            }
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("idempotencyKey", inbox.getIdempotencyKey())
+                .addValue("apiKey", inbox.getApiKey())
+                .addValue("githubPullRequestId", inbox.getGithubPullRequestId())
+                .addValue("requestJson", inbox.getRequestJson())
+                .addValue("availableAt", Timestamp.from(inbox.getAvailableAt()))
+                .addValue("pendingStatus", ReviewRequestInboxStatus.PENDING.name())
+                .addValue("retryPendingStatus", ReviewRequestInboxStatus.RETRY_PENDING.name());
 
-            updatePending(idempotencyKey, apiKey, githubPullRequestId, requestJson, availableAt);
-        }
+        namedParameterJdbcTemplate.update(
+                buildUpsertPendingSql(),
+                parameters
+        );
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public List<ReviewRequestInbox> findClaimable(Instant availableBeforeOrAt, int limit) {
+    @Transactional
+    public Optional<Long> claimNextId(
+            Instant processingStartedAt,
+            Instant availableBeforeOrAt,
+            Collection<Long> excludedInboxIds
+    ) {
+        validateProcessingStartedAt(processingStartedAt);
         validateAvailableAt(availableBeforeOrAt);
 
-        if (limit <= 0) {
-            return Collections.emptyList();
+        MapSqlParameterSource selectParameters = new MapSqlParameterSource()
+                .addValue(
+                        "claimableStatuses",
+                        List.of(
+                                ReviewRequestInboxStatus.PENDING.name(),
+                                ReviewRequestInboxStatus.RETRY_PENDING.name()
+                        )
+                )
+                .addValue("availableBeforeOrAt", Timestamp.from(availableBeforeOrAt));
+        addExcludedInboxIds(selectParameters, excludedInboxIds);
+
+        List<Long> claimedIds = namedParameterJdbcTemplate.query(
+                buildClaimNextIdSelectSql(excludedInboxIds),
+                selectParameters,
+                (resultSet, rowNum) -> resultSet.getLong(1)
+        );
+        if (claimedIds.isEmpty()) {
+            return Optional.empty();
         }
 
-        return queryFactory.selectFrom(reviewRequestInbox)
-                           .where(
-                                   reviewRequestInbox.status.in(CLAIMABLE_STATUSES),
-                                   reviewRequestInbox.availableAt.loe(availableBeforeOrAt)
-                           )
-                           .orderBy(reviewRequestInbox.availableAt.asc(), reviewRequestInbox.id.asc())
-                           .limit(limit)
-                           .fetch();
+        Long inboxId = claimedIds.getFirst();
+        MapSqlParameterSource updateParameters = new MapSqlParameterSource()
+                .addValue("processingStatus", ReviewRequestInboxStatus.PROCESSING.name())
+                .addValue("processingStartedAt", Timestamp.from(processingStartedAt))
+                .addValue("inboxId", inboxId);
+
+        int updatedCount = namedParameterJdbcTemplate.update(
+                """
+                    UPDATE review_request_inbox
+                    SET status = :processingStatus,
+                        processing_attempt = processing_attempt + 1,
+                        processing_started_at = :processingStartedAt,
+                        failed_at = NULL,
+                        failure_reason = NULL,
+                        failure_type = NULL
+                    WHERE id = :inboxId
+                    """,
+                updateParameters
+        );
+        if (updatedCount == 0) {
+            return Optional.empty();
+        }
+
+        return Optional.of(inboxId);
+    }
+
+    @Override
+    @Transactional
+    public boolean renewProcessingLease(
+            Long inboxId,
+            Instant currentProcessingStartedAt,
+            Instant renewedProcessingStartedAt
+    ) {
+        validateRenewProcessingLeaseArguments(
+                inboxId,
+                currentProcessingStartedAt,
+                renewedProcessingStartedAt
+        );
+
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("renewedProcessingStartedAt", Timestamp.from(renewedProcessingStartedAt))
+                .addValue("inboxId", inboxId)
+                .addValue("processingStatus", ReviewRequestInboxStatus.PROCESSING.name())
+                .addValue("currentProcessingStartedAt", Timestamp.from(currentProcessingStartedAt));
+
+        int updatedCount = namedParameterJdbcTemplate.update(
+                """
+                UPDATE review_request_inbox
+                SET updated_at = CURRENT_TIMESTAMP(6),
+                    processing_started_at = :renewedProcessingStartedAt
+                WHERE id = :inboxId
+                  AND status = :processingStatus
+                  AND processing_started_at = :currentProcessingStartedAt
+                """,
+                parameters
+        );
+
+        return updatedCount > 0;
+    }
+
+    private String buildClaimNextIdSelectSql(Collection<Long> excludedInboxIds) {
+        StringBuilder sql = new StringBuilder(
+                """
+                SELECT id
+                FROM review_request_inbox
+                WHERE status IN (:claimableStatuses)
+                  AND available_at <= :availableBeforeOrAt
+                """
+        );
+
+        appendExcludedInboxIdsClause(sql, excludedInboxIds);
+        sql.append(
+                """
+                ORDER BY available_at ASC, id ASC
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+                """
+        );
+
+        return sql.toString();
+    }
+
+    private void appendExcludedInboxIdsClause(StringBuilder sql, Collection<Long> excludedInboxIds) {
+        if (excludedInboxIds == null || excludedInboxIds.isEmpty()) {
+            return;
+        }
+
+        sql.append("\n  AND id NOT IN (:excludedInboxIds)");
+    }
+
+    private void addExcludedInboxIds(
+            MapSqlParameterSource parameters,
+            Collection<Long> excludedInboxIds
+    ) {
+        if (excludedInboxIds == null || excludedInboxIds.isEmpty()) {
+            return;
+        }
+
+        parameters.addValue("excludedInboxIds", excludedInboxIds);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<ReviewRequestInbox> findById(Long inboxId) {
         return reviewRequestInboxJpaRepository.findById(inboxId);
-    }
-
-    @Override
-    @Transactional
-    public boolean markProcessingIfClaimable(Long inboxId, Instant processingStartedAt, Instant availableBeforeOrAt) {
-        validateInboxId(inboxId);
-        validateProcessingStartedAt(processingStartedAt);
-        validateAvailableAt(availableBeforeOrAt);
-
-        long updatedCount = queryFactory.update(reviewRequestInbox)
-                                        .set(reviewRequestInbox.status, ReviewRequestInboxStatus.PROCESSING)
-                                        .set(reviewRequestInbox.processingAttempt,
-                                                reviewRequestInbox.processingAttempt.add(1)
-                                        )
-                                        .set(reviewRequestInbox.processingStartedAt, processingStartedAt)
-                                        .set(reviewRequestInbox.failedAt, Expressions.nullExpression(Instant.class))
-                                        .set(reviewRequestInbox.failureReason, Expressions.nullExpression(String.class))
-                                        .set(
-                                                reviewRequestInbox.failureType,
-                                                Expressions.nullExpression(ReviewRequestInboxFailureType.class)
-                                        )
-                                        .where(
-                                                reviewRequestInbox.id.eq(inboxId),
-                                                reviewRequestInbox.status.in(CLAIMABLE_STATUSES),
-                                                reviewRequestInbox.availableAt.loe(availableBeforeOrAt)
-                                        )
-                                        .execute();
-
-        return updatedCount > 0;
     }
 
     @Override
@@ -182,47 +269,135 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
 
     @Override
     @Transactional
+    public boolean saveIfProcessingLeaseMatched(
+            ReviewRequestInbox inbox,
+            Instant claimedProcessingStartedAt
+    ) {
+        validateSaveIfProcessingLeaseMatchedArguments(inbox, claimedProcessingStartedAt);
+
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("status", inbox.getStatus().name())
+                .addValue("processingStartedAt", toTimestamp(inbox.getProcessingStartedAt()))
+                .addValue("processedAt", toTimestamp(inbox.getProcessedAt()))
+                .addValue("failedAt", toTimestamp(inbox.getFailedAt()))
+                .addValue("failureReason", inbox.getFailureReason())
+                .addValue("failureType", resolveFailureTypeName(inbox))
+                .addValue("inboxId", inbox.getId())
+                .addValue("processingStatus", ReviewRequestInboxStatus.PROCESSING.name())
+                .addValue("claimedProcessingStartedAt", Timestamp.from(claimedProcessingStartedAt));
+
+        int updatedCount = namedParameterJdbcTemplate.update(
+                """
+                UPDATE review_request_inbox
+                SET updated_at = CURRENT_TIMESTAMP(6),
+                    status = :status,
+                    processing_started_at = :processingStartedAt,
+                    processed_at = :processedAt,
+                    failed_at = :failedAt,
+                    failure_reason = :failureReason,
+                    failure_type = :failureType
+                WHERE id = :inboxId
+                  AND status = :processingStatus
+                  AND processing_started_at = :claimedProcessingStartedAt
+                """,
+                parameters
+        );
+
+        return updatedCount > 0;
+    }
+
+    @Override
+    @Transactional
     public ReviewRequestInbox save(ReviewRequestInbox inbox) {
         return reviewRequestInboxJpaRepository.save(inbox);
     }
 
-    private long updatePending(
-            String idempotencyKey,
-            String apiKey,
-            Long githubPullRequestId,
-            String requestJson,
-            Instant availableAt
-    ) {
-        // PROCESSING / PROCESSED / FAILED는 현재 워커 전이를 보호하기 위해 재큐잉으로 덮어쓰지 않음
-        return queryFactory.update(reviewRequestInbox)
-                           .set(reviewRequestInbox.apiKey, apiKey)
-                           .set(reviewRequestInbox.githubPullRequestId, githubPullRequestId)
-                           .set(reviewRequestInbox.requestJson, requestJson)
-                           .set(reviewRequestInbox.availableAt, availableAt)
-                           .set(reviewRequestInbox.status, ReviewRequestInboxStatus.PENDING)
-                           .set(reviewRequestInbox.processingAttempt, 0)
-                           .set(
-                                   reviewRequestInbox.processingStartedAt,
-                                   Expressions.nullExpression(Instant.class)
-                           )
-                           .set(reviewRequestInbox.processedAt, Expressions.nullExpression(Instant.class))
-                           .set(reviewRequestInbox.failedAt, Expressions.nullExpression(Instant.class))
-                           .set(reviewRequestInbox.failureReason, Expressions.nullExpression(String.class))
-                           .set(
-                                   reviewRequestInbox.failureType,
-                                   Expressions.nullExpression(ReviewRequestInboxFailureType.class)
-                           )
-                           .where(
-                                   reviewRequestInbox.idempotencyKey.eq(idempotencyKey),
-                                   reviewRequestInbox.status.in(CLAIMABLE_STATUSES)
-                           )
-                           .execute();
-    }
-
-    private void validateInboxId(Long inboxId) {
-        if (inboxId == null) {
-            throw new IllegalArgumentException("inboxId는 비어 있을 수 없습니다.");
-        }
+    protected String buildUpsertPendingSql() {
+        return """
+                INSERT INTO review_request_inbox (
+                    created_at,
+                    updated_at,
+                    idempotency_key,
+                    api_key,
+                    github_pull_request_id,
+                    request_json,
+                    available_at,
+                    status,
+                    processing_attempt
+                )
+                VALUES (
+                    CURRENT_TIMESTAMP(6),
+                    CURRENT_TIMESTAMP(6),
+                    :idempotencyKey,
+                    :apiKey,
+                    :githubPullRequestId,
+                    :requestJson,
+                    :availableAt,
+                    :pendingStatus,
+                    0
+                )
+                ON DUPLICATE KEY UPDATE
+                    updated_at = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        CURRENT_TIMESTAMP(6),
+                        updated_at
+                    ),
+                    api_key = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        :apiKey,
+                        api_key
+                    ),
+                    github_pull_request_id = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        :githubPullRequestId,
+                        github_pull_request_id
+                    ),
+                    request_json = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        :requestJson,
+                        request_json
+                    ),
+                    available_at = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        :availableAt,
+                        available_at
+                    ),
+                    status = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        :pendingStatus,
+                        status
+                    ),
+                    processing_attempt = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        0,
+                        processing_attempt
+                    ),
+                    processing_started_at = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        NULL,
+                        processing_started_at
+                    ),
+                    processed_at = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        NULL,
+                        processed_at
+                    ),
+                    failed_at = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        NULL,
+                        failed_at
+                    ),
+                    failure_reason = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        NULL,
+                        failure_reason
+                    ),
+                    failure_type = IF(
+                        status IN (:pendingStatus, :retryPendingStatus),
+                        NULL,
+                        failure_type
+                    )
+                """;
     }
 
     private void validateIdempotencyKey(String idempotencyKey) {
@@ -261,6 +436,18 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
         }
     }
 
+    private void validateRenewProcessingLeaseArguments(
+            Long inboxId,
+            Instant currentProcessingStartedAt,
+            Instant renewedProcessingStartedAt
+    ) {
+        if (inboxId == null) {
+            throw new IllegalArgumentException("inboxId는 비어 있을 수 없습니다.");
+        }
+        validateProcessingStartedAt(currentProcessingStartedAt);
+        validateProcessingStartedAt(renewedProcessingStartedAt);
+    }
+
     private void validateProcessingStartedBefore(Instant processingStartedBefore) {
         if (processingStartedBefore == null) {
             throw new IllegalArgumentException("processingStartedBefore는 비어 있을 수 없습니다.");
@@ -283,5 +470,34 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
         if (maxAttempts <= 0) {
             throw new IllegalArgumentException("maxAttempts는 0보다 커야 합니다.");
         }
+    }
+
+    private void validateSaveIfProcessingLeaseMatchedArguments(
+            ReviewRequestInbox inbox,
+            Instant claimedProcessingStartedAt
+    ) {
+        if (inbox == null) {
+            throw new IllegalArgumentException("inbox는 비어 있을 수 없습니다.");
+        }
+        if (inbox.getId() == null) {
+            throw new IllegalArgumentException("inboxId는 비어 있을 수 없습니다.");
+        }
+        validateProcessingStartedAt(claimedProcessingStartedAt);
+    }
+
+    private Timestamp toTimestamp(Instant instant) {
+        if (instant == null) {
+            return null;
+        }
+
+        return Timestamp.from(instant);
+    }
+
+    private String resolveFailureTypeName(ReviewRequestInbox inbox) {
+        if (inbox.getFailureType() == null) {
+            return null;
+        }
+
+        return inbox.getFailureType().name();
     }
 }

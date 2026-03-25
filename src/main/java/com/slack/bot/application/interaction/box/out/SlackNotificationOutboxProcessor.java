@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
+import com.slack.bot.application.interaction.box.out.exception.OutboxProcessingLeaseLostException;
 import com.slack.bot.application.interaction.box.out.exception.OutboxWorkspaceNotFoundException;
 import com.slack.bot.application.interaction.box.out.exception.UnsupportedSlackNotificationOutboxMessageTypeException;
 import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
@@ -18,7 +19,10 @@ import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotifica
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.List;
+import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.retry.support.RetryTemplate;
@@ -44,10 +48,19 @@ public class SlackNotificationOutboxProcessor {
     private final InteractionRetryExceptionClassifier retryExceptionClassifier;
 
     public void processPending(int limit) {
-        List<SlackNotificationOutbox> pendings = slackNotificationOutboxRepository.findClaimable(limit);
+        Set<Long> claimedOutboxIds = new HashSet<>();
+        for (int count = 0; count < limit; count++) {
+            Instant claimedProcessingStartedAt = currentLeaseStartedAt();
+            Long claimedOutboxId = slackNotificationOutboxRepository.claimNextId(
+                    claimedProcessingStartedAt,
+                    claimedOutboxIds
+            ).orElse(null);
+            if (claimedOutboxId == null) {
+                return;
+            }
 
-        for (SlackNotificationOutbox pending : pendings) {
-            processPending(pending);
+            claimedOutboxIds.add(claimedOutboxId);
+            processClaimedOutboxSafely(claimedOutboxId, claimedProcessingStartedAt);
         }
     }
 
@@ -67,31 +80,32 @@ public class SlackNotificationOutboxProcessor {
         return recoveredCount;
     }
 
-    private void processPending(SlackNotificationOutbox pending) {
-        Long outboxId = pending.getId();
-        if (outboxId == null) {
-            return;
-        }
-
-        if (!slackNotificationOutboxRepository.markProcessingIfClaimable(outboxId, clock.instant())) {
-            return;
-        }
-
+    private void processClaimedOutboxSafely(Long outboxId, Instant claimedProcessingStartedAt) {
         slackNotificationOutboxRepository.findById(outboxId)
                                          .ifPresentOrElse(
-                                                 outbox -> processClaimedOutbox(outbox),
+                                                 outbox -> processClaimedOutbox(outbox, claimedProcessingStartedAt),
                                                  () -> logMissingOutbox(outboxId)
                                          );
     }
 
-    private void processClaimedOutbox(SlackNotificationOutbox outbox) {
+    private void processClaimedOutbox(
+            SlackNotificationOutbox outbox,
+            Instant claimedProcessingStartedAt
+    ) {
+        if (!hasProcessingLease(outbox, claimedProcessingStartedAt)) {
+            logLeaseLost(outbox.getId(), claimedProcessingStartedAt, outbox.getProcessingStartedAt());
+            return;
+        }
+
+        AtomicReference<Instant> currentProcessingStartedAt = new AtomicReference<>(claimedProcessingStartedAt);
         try {
             slackNotificationOutboxRetryTemplate.execute(context -> {
+                renewProcessingLease(outbox, currentProcessingStartedAt);
                 dispatch(outbox);
                 return null;
             });
-            outbox.markSent(clock.instant());
-            slackNotificationOutboxRepository.save(outbox);
+        } catch (OutboxProcessingLeaseLostException e) {
+            return;
         } catch (Exception e) {
             log.warn(
                     "슬랙 알림 outbox 처리에 실패했습니다. outboxId={}",
@@ -99,8 +113,60 @@ public class SlackNotificationOutboxProcessor {
                     e
             );
             markFailureStatus(outbox, e);
-            slackNotificationOutboxRepository.save(outbox);
+            persistFailureStatus(outbox, currentProcessingStartedAt.get());
+            return;
         }
+
+        outbox.markSent(clock.instant());
+        persistSentStatus(outbox, currentProcessingStartedAt.get());
+    }
+
+    private void persistSentStatus(
+            SlackNotificationOutbox outbox,
+            Instant claimedProcessingStartedAt
+    ) {
+        try {
+            boolean updated = slackNotificationOutboxRepository.saveIfProcessingLeaseMatched(
+                    outbox,
+                    claimedProcessingStartedAt
+            );
+            if (updated) {
+                return;
+            }
+        } catch (Exception e) {
+            log.error(
+                    "슬랙 알림 outbox 전송은 성공했지만 최종 상태 저장에 실패했습니다. outboxId={}",
+                    outbox.getId(),
+                    e
+            );
+            return;
+        }
+
+        logLeaseLost(outbox.getId(), claimedProcessingStartedAt, outbox.getProcessingStartedAt());
+    }
+
+    private void persistFailureStatus(
+            SlackNotificationOutbox outbox,
+            Instant claimedProcessingStartedAt
+    ) {
+        try {
+            boolean updated = slackNotificationOutboxRepository.saveIfProcessingLeaseMatched(
+                    outbox,
+                    claimedProcessingStartedAt
+            );
+            if (updated) {
+                return;
+            }
+        } catch (Exception e) {
+            log.error(
+                    "슬랙 알림 outbox 실패 상태 저장에 실패했습니다. outboxId={}",
+                    outbox.getId(),
+                    e
+            );
+            return;
+        }
+
+        logLeaseLost(outbox.getId(), claimedProcessingStartedAt, outbox.getProcessingStartedAt());
     }
 
     private void logMissingOutbox(Long outboxId) {
@@ -185,5 +251,50 @@ public class SlackNotificationOutboxProcessor {
         }
 
         return reason;
+    }
+
+    private Instant currentLeaseStartedAt() {
+        return clock.instant().truncatedTo(ChronoUnit.MICROS);
+    }
+
+    private void renewProcessingLease(
+            SlackNotificationOutbox outbox,
+            AtomicReference<Instant> currentProcessingStartedAt
+    ) {
+        Instant renewedProcessingStartedAt = currentLeaseStartedAt();
+        boolean renewed = slackNotificationOutboxRepository.renewProcessingLease(
+                outbox.getId(),
+                currentProcessingStartedAt.get(),
+                renewedProcessingStartedAt
+        );
+        if (!renewed) {
+            logLeaseLost(outbox.getId(), currentProcessingStartedAt.get(), renewedProcessingStartedAt);
+            throw new OutboxProcessingLeaseLostException("outbox processing lease를 상실했습니다.");
+        }
+
+        currentProcessingStartedAt.set(renewedProcessingStartedAt);
+        outbox.renewProcessingLease(renewedProcessingStartedAt);
+    }
+
+    private boolean hasProcessingLease(
+            SlackNotificationOutbox outbox,
+            Instant claimedProcessingStartedAt
+    ) {
+        Instant actualProcessingStartedAt = outbox.getProcessingStartedAt();
+
+        return claimedProcessingStartedAt.equals(actualProcessingStartedAt);
+    }
+
+    private void logLeaseLost(
+            Long outboxId,
+            Instant claimedProcessingStartedAt,
+            Instant actualProcessingStartedAt
+    ) {
+        log.warn(
+                "outbox 처리 lease를 상실해 최종 상태 저장을 건너뜁니다. outboxId={}, claimedProcessingStartedAt={}, actualProcessingStartedAt={}",
+                outboxId,
+                claimedProcessingStartedAt,
+                actualProcessingStartedAt
+        );
     }
 }

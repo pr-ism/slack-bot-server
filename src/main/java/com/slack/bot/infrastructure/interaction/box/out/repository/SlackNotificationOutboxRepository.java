@@ -2,7 +2,7 @@ package com.slack.bot.infrastructure.interaction.box.out.repository;
 
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import java.time.Instant;
-import java.util.List;
+import java.util.Collection;
 import java.util.Optional;
 
 public interface SlackNotificationOutboxRepository {
@@ -11,11 +11,20 @@ public interface SlackNotificationOutboxRepository {
 
     SlackNotificationOutbox save(SlackNotificationOutbox outbox);
 
+    boolean renewProcessingLease(
+            Long outboxId,
+            Instant currentProcessingStartedAt,
+            Instant renewedProcessingStartedAt
+    );
+
+    boolean saveIfProcessingLeaseMatched(
+            SlackNotificationOutbox outbox,
+            Instant claimedProcessingStartedAt
+    );
+
     Optional<SlackNotificationOutbox> findById(Long outboxId);
 
-    List<SlackNotificationOutbox> findClaimable(int limit);
-
-    boolean markProcessingIfClaimable(Long outboxId, Instant processingStartedAt);
+    Optional<Long> claimNextId(Instant processingStartedAt, Collection<Long> excludedOutboxIds);
 
     int recoverTimeoutProcessing(
             Instant processingStartedBefore,

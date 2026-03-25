@@ -1,0 +1,77 @@
+package com.slack.bot.infrastructure.review.persistence.box.in;
+
+import com.querydsl.jpa.impl.JPAQueryFactory;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+
+public class H2ReviewRequestInboxRepositoryAdapter extends ReviewRequestInboxRepositoryAdapter {
+
+    public H2ReviewRequestInboxRepositoryAdapter(
+            JPAQueryFactory queryFactory,
+            NamedParameterJdbcTemplate namedParameterJdbcTemplate,
+            JpaReviewRequestInboxRepository reviewRequestInboxJpaRepository
+    ) {
+        super(queryFactory, namedParameterJdbcTemplate, reviewRequestInboxJpaRepository);
+    }
+
+    @Override
+    protected String buildUpsertPendingSql() {
+        return """
+                MERGE INTO review_request_inbox AS target
+                USING (
+                    VALUES (
+                        :idempotencyKey,
+                        :apiKey,
+                        :githubPullRequestId,
+                        :requestJson,
+                        :availableAt,
+                        :pendingStatus
+                    )
+                ) AS source (
+                    idempotency_key,
+                    api_key,
+                    github_pull_request_id,
+                    request_json,
+                    available_at,
+                    pending_status
+                )
+                ON target.idempotency_key = source.idempotency_key
+                WHEN MATCHED AND target.status IN (:pendingStatus, :retryPendingStatus) THEN
+                    UPDATE SET
+                        updated_at = CURRENT_TIMESTAMP(6),
+                        api_key = source.api_key,
+                        github_pull_request_id = source.github_pull_request_id,
+                        request_json = source.request_json,
+                        available_at = source.available_at,
+                        status = source.pending_status,
+                        processing_attempt = 0,
+                        processing_started_at = NULL,
+                        processed_at = NULL,
+                        failed_at = NULL,
+                        failure_reason = NULL,
+                        failure_type = NULL
+                WHEN NOT MATCHED THEN
+                    INSERT (
+                        created_at,
+                        updated_at,
+                        idempotency_key,
+                        api_key,
+                        github_pull_request_id,
+                        request_json,
+                        available_at,
+                        status,
+                        processing_attempt
+                    )
+                    VALUES (
+                        CURRENT_TIMESTAMP(6),
+                        CURRENT_TIMESTAMP(6),
+                        source.idempotency_key,
+                        source.api_key,
+                        source.github_pull_request_id,
+                        source.request_json,
+                        source.available_at,
+                        source.pending_status,
+                        0
+                    )
+                """;
+    }
+}
