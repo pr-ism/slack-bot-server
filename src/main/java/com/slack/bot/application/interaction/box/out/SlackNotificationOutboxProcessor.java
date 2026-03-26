@@ -47,8 +47,9 @@ public class SlackNotificationOutboxProcessor {
     private final SlackNotificationOutboxRepository slackNotificationOutboxRepository;
     private final InteractionRetryExceptionClassifier retryExceptionClassifier;
 
-    public void processPending(int limit) {
+    public int processPending(int limit) {
         Set<Long> claimedOutboxIds = new HashSet<>();
+        int claimedCount = 0;
         for (int count = 0; count < limit; count++) {
             Instant claimedProcessingStartedAt = currentLeaseStartedAt();
             Long claimedOutboxId = slackNotificationOutboxRepository.claimNextId(
@@ -56,12 +57,15 @@ public class SlackNotificationOutboxProcessor {
                     claimedOutboxIds
             ).orElse(null);
             if (claimedOutboxId == null) {
-                return;
+                return claimedCount;
             }
 
             claimedOutboxIds.add(claimedOutboxId);
+            claimedCount++;
             processClaimedOutboxSafely(claimedOutboxId, claimedProcessingStartedAt);
         }
+
+        return claimedCount;
     }
 
     public int recoverTimeoutProcessing() {

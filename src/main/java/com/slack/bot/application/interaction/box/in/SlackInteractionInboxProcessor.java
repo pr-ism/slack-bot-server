@@ -52,8 +52,8 @@ public class SlackInteractionInboxProcessor {
         );
     }
 
-    public void processPendingBlockActions(int limit) {
-        processPending(
+    public int processPendingBlockActions(int limit) {
+        return processPending(
                 SlackInteractionInboxType.BLOCK_ACTIONS,
                 limit,
                 inboxId -> slackInteractionInboxEntryProcessor.processClaimedBlockAction(inboxId)
@@ -79,20 +79,21 @@ public class SlackInteractionInboxProcessor {
         );
     }
 
-    public void processPendingViewSubmissions(int limit) {
-        processPending(
+    public int processPendingViewSubmissions(int limit) {
+        return processPending(
                 SlackInteractionInboxType.VIEW_SUBMISSION,
                 limit,
                 inboxId -> slackInteractionInboxEntryProcessor.processClaimedViewSubmission(inboxId)
         );
     }
 
-    private void processPending(
+    private int processPending(
             SlackInteractionInboxType interactionType,
             int limit,
             LongConsumer action
     ) {
         Set<Long> claimedInboxIds = new HashSet<>();
+        int claimedCount = 0;
         for (int count = 0; count < limit; count++) {
             Long claimedInboxId = slackInteractionInboxRepository.claimNextId(
                     interactionType,
@@ -100,12 +101,15 @@ public class SlackInteractionInboxProcessor {
                     claimedInboxIds
             ).orElse(null);
             if (claimedInboxId == null) {
-                return;
+                return claimedCount;
             }
 
             claimedInboxIds.add(claimedInboxId);
+            claimedCount++;
             processSafely(claimedInboxId, action, interactionType);
         }
+
+        return claimedCount;
     }
 
     public int recoverBlockActionTimeoutProcessing() {

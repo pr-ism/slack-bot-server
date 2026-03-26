@@ -1,9 +1,15 @@
 package com.slack.bot.application.interaction.box.in;
 
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.mockito.BDDMockito.willThrow;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.slack.bot.application.worker.AdaptivePollingRunner;
+import com.slack.bot.application.worker.PollingHintEvent;
+import com.slack.bot.application.worker.PollingHintTarget;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -24,7 +30,12 @@ class SlackViewSubmissionInboxWorkerTest {
 
     @BeforeEach
     void setUp() {
-        slackViewSubmissionInboxWorker = new SlackViewSubmissionInboxWorker(slackInteractionInboxProcessor);
+        slackViewSubmissionInboxWorker = new SlackViewSubmissionInboxWorker(
+                slackInteractionInboxProcessor,
+                1_000L,
+                30_000L,
+                false
+        );
     }
 
     @Test
@@ -37,14 +48,63 @@ class SlackViewSubmissionInboxWorkerTest {
     }
 
     @Test
-    void view_submission_워커_실행_중_예외가_발생해도_예외를_전파하지_않는다() {
-        // given
-        willThrow(new RuntimeException("worker failure"))
-                .given(slackInteractionInboxProcessor)
-                .processPendingViewSubmissions(30);
+    void 기본_생성자는_auto_startup을_활성화한다() {
+        // when
+        SlackViewSubmissionInboxWorker worker = new SlackViewSubmissionInboxWorker(
+                slackInteractionInboxProcessor,
+                1_000L,
+                30_000L
+        );
 
-        // when & then
-        assertThatCode(() -> slackViewSubmissionInboxWorker.processViewSubmissionInbox())
-                .doesNotThrowAnyException();
+        // then
+        assertThat(worker.isAutoStartup()).isTrue();
+    }
+
+    @Test
+    void 매칭된_wake_up_hint만_poll을_재개한다() {
+        // given
+        AdaptivePollingRunner adaptivePollingRunner = mock(AdaptivePollingRunner.class);
+        SlackViewSubmissionInboxWorker worker = new SlackViewSubmissionInboxWorker(
+                slackInteractionInboxProcessor,
+                adaptivePollingRunner
+        );
+
+        // when
+        worker.wakeUp(new PollingHintEvent(PollingHintTarget.BLOCK_ACTION_INBOX));
+
+        // then
+        verifyNoInteractions(adaptivePollingRunner);
+
+        // when
+        worker.wakeUp(new PollingHintEvent(PollingHintTarget.VIEW_SUBMISSION_INBOX));
+
+        // then
+        verify(adaptivePollingRunner).wakeUp();
+    }
+
+    @Test
+    void start와_stop은_running_상태를_변경한다() {
+        // when
+        slackViewSubmissionInboxWorker.start();
+        boolean runningAfterStart = slackViewSubmissionInboxWorker.isRunning();
+        slackViewSubmissionInboxWorker.stop();
+
+        // then
+        assertAll(
+                () -> assertThat(runningAfterStart).isTrue(),
+                () -> assertThat(slackViewSubmissionInboxWorker.isRunning()).isFalse()
+        );
+    }
+
+    @Test
+    void stop_callback은_callback을_실행한다() {
+        // given
+        AtomicInteger callbackCount = new AtomicInteger();
+
+        // when
+        slackViewSubmissionInboxWorker.stop(() -> callbackCount.incrementAndGet());
+
+        // then
+        assertThat(callbackCount.get()).isEqualTo(1);
     }
 }

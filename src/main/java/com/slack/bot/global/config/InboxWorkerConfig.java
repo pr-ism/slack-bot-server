@@ -8,8 +8,8 @@ import com.slack.bot.application.interaction.box.in.SlackViewSubmissionInboxTime
 import com.slack.bot.application.review.box.in.ReviewRequestInboxProcessor;
 import com.slack.bot.application.review.box.in.ReviewRequestInboxWorker;
 import com.slack.bot.application.review.box.in.ReviewRequestInboxTimeoutRecoveryWorker;
+import com.slack.bot.global.config.properties.InteractionWorkerProperties;
 import com.slack.bot.global.config.properties.ReviewWorkerProperties;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -17,25 +17,18 @@ import org.springframework.context.annotation.Configuration;
 public class InboxWorkerConfig {
 
     @Bean
-    @ConditionalOnProperty(
-            prefix = "app.interaction.inbox.block-actions",
-            name = "worker-enabled",
-            havingValue = "true",
-            matchIfMissing = true
-    )
     public SlackBlockActionInboxWorker slackBlockActionInboxWorker(
-            SlackInteractionInboxProcessor slackInteractionInboxProcessor
+            SlackInteractionInboxProcessor slackInteractionInboxProcessor,
+            InteractionWorkerProperties interactionWorkerProperties
     ) {
-        return new SlackBlockActionInboxWorker(slackInteractionInboxProcessor);
+        return new SlackBlockActionInboxWorker(
+                slackInteractionInboxProcessor,
+                interactionWorkerProperties.inbox().blockActions().pollDelayMs(),
+                interactionWorkerProperties.inbox().blockActions().pollCapMs()
+        );
     }
 
     @Bean
-    @ConditionalOnProperty(
-            prefix = "app.interaction.inbox.block-actions",
-            name = "worker-enabled",
-            havingValue = "true",
-            matchIfMissing = true
-    )
     public SlackBlockActionInboxTimeoutRecoveryWorker slackBlockActionInboxTimeoutRecoveryWorker(
             SlackInteractionInboxProcessor slackInteractionInboxProcessor
     ) {
@@ -43,25 +36,18 @@ public class InboxWorkerConfig {
     }
 
     @Bean
-    @ConditionalOnProperty(
-            prefix = "app.interaction.inbox.view-submission",
-            name = "worker-enabled",
-            havingValue = "true",
-            matchIfMissing = true
-    )
     public SlackViewSubmissionInboxWorker slackViewSubmissionInboxWorker(
-            SlackInteractionInboxProcessor slackInteractionInboxProcessor
+            SlackInteractionInboxProcessor slackInteractionInboxProcessor,
+            InteractionWorkerProperties interactionWorkerProperties
     ) {
-        return new SlackViewSubmissionInboxWorker(slackInteractionInboxProcessor);
+        return new SlackViewSubmissionInboxWorker(
+                slackInteractionInboxProcessor,
+                interactionWorkerProperties.inbox().viewSubmission().pollDelayMs(),
+                interactionWorkerProperties.inbox().viewSubmission().pollCapMs()
+        );
     }
 
     @Bean
-    @ConditionalOnProperty(
-            prefix = "app.interaction.inbox.view-submission",
-            name = "worker-enabled",
-            havingValue = "true",
-            matchIfMissing = true
-    )
     public SlackViewSubmissionInboxTimeoutRecoveryWorker slackViewSubmissionInboxTimeoutRecoveryWorker(
             SlackInteractionInboxProcessor slackInteractionInboxProcessor
     ) {
@@ -69,29 +55,19 @@ public class InboxWorkerConfig {
     }
 
     @Bean
-    @ConditionalOnProperty(
-            prefix = "review.notification.inbox",
-            name = "worker-enabled",
-            havingValue = "true",
-            matchIfMissing = true
-    )
     public ReviewRequestInboxWorker reviewRequestInboxWorker(
             ReviewRequestInboxProcessor reviewRequestInboxProcessor,
             ReviewWorkerProperties reviewWorkerProperties
     ) {
         return new ReviewRequestInboxWorker(
                 reviewRequestInboxProcessor,
-                reviewWorkerProperties.inbox().batchSize()
+                reviewWorkerProperties.inbox().batchSize(),
+                reviewWorkerProperties.inbox().pollDelayMs(),
+                reviewWorkerProperties.inbox().pollCapMs()
         );
     }
 
     @Bean
-    @ConditionalOnProperty(
-            prefix = "review.notification.inbox",
-            name = "worker-enabled",
-            havingValue = "true",
-            matchIfMissing = true
-    )
     public ReviewRequestInboxTimeoutRecoveryWorker reviewRequestInboxTimeoutRecoveryWorker(
             ReviewRequestInboxProcessor reviewRequestInboxProcessor,
             ReviewWorkerProperties reviewWorkerProperties

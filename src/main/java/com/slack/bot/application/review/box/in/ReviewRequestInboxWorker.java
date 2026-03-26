@@ -1,31 +1,124 @@
 package com.slack.bot.application.review.box.in;
 
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
+import com.slack.bot.application.worker.AdaptivePollingRunner;
+import com.slack.bot.application.worker.PollingHintEvent;
+import com.slack.bot.application.worker.PollingHintTarget;
+import java.time.Duration;
+import org.springframework.context.SmartLifecycle;
+import org.springframework.context.event.EventListener;
 
-@Slf4j
-public class ReviewRequestInboxWorker {
+public class ReviewRequestInboxWorker implements SmartLifecycle {
 
     private final ReviewRequestInboxProcessor reviewRequestInboxProcessor;
     private final int batchSize;
+    private final AdaptivePollingRunner adaptivePollingRunner;
 
     public ReviewRequestInboxWorker(
             ReviewRequestInboxProcessor reviewRequestInboxProcessor,
-            int batchSize
+            int batchSize,
+            long pollDelayMs,
+            long pollCapMs
+    ) {
+        this(reviewRequestInboxProcessor, batchSize, pollDelayMs, pollCapMs, true);
+    }
+
+    public ReviewRequestInboxWorker(
+            ReviewRequestInboxProcessor reviewRequestInboxProcessor,
+            int batchSize,
+            long pollDelayMs,
+            long pollCapMs,
+            boolean autoStartup
+    ) {
+        this(
+                reviewRequestInboxProcessor,
+                batchSize,
+                createAdaptivePollingRunner(
+                        reviewRequestInboxProcessor,
+                        batchSize,
+                        pollDelayMs,
+                        pollCapMs,
+                        autoStartup
+                )
+        );
+    }
+
+    ReviewRequestInboxWorker(
+            ReviewRequestInboxProcessor reviewRequestInboxProcessor,
+            int batchSize,
+            AdaptivePollingRunner adaptivePollingRunner
     ) {
         if (batchSize <= 0) {
             throw new IllegalArgumentException("batchSize는 0보다 커야 합니다.");
         }
         this.reviewRequestInboxProcessor = reviewRequestInboxProcessor;
         this.batchSize = batchSize;
+        this.adaptivePollingRunner = adaptivePollingRunner;
     }
 
-    @Scheduled(fixedDelayString = "${review.notification.inbox.poll-delay-ms:1000}")
-    public void processPendingReviewRequestInbox() {
-        try {
-            reviewRequestInboxProcessor.processPending(batchSize);
-        } catch (Exception e) {
-            log.error("review_request inbox worker 실행에 실패했습니다.", e);
+    public int processPendingReviewRequestInbox() {
+        return reviewRequestInboxProcessor.processPending(batchSize);
+    }
+
+    @EventListener
+    public void wakeUp(PollingHintEvent pollingHintEvent) {
+        if (pollingHintEvent.target() == PollingHintTarget.REVIEW_REQUEST_INBOX) {
+            adaptivePollingRunner.wakeUp();
         }
+    }
+
+    @Override
+    public void start() {
+        adaptivePollingRunner.start();
+    }
+
+    @Override
+    public void stop() {
+        adaptivePollingRunner.stop();
+    }
+
+    @Override
+    public void stop(Runnable callback) {
+        adaptivePollingRunner.stop(callback);
+    }
+
+    @Override
+    public boolean isRunning() {
+        return adaptivePollingRunner.isRunning();
+    }
+
+    @Override
+    public boolean isAutoStartup() {
+        return adaptivePollingRunner.isAutoStartup();
+    }
+
+    @Override
+    public int getPhase() {
+        return adaptivePollingRunner.getPhase();
+    }
+
+    private static AdaptivePollingRunner createAdaptivePollingRunner(
+            ReviewRequestInboxProcessor reviewRequestInboxProcessor,
+            int batchSize,
+            long pollDelayMs,
+            long pollCapMs,
+            boolean autoStartup
+    ) {
+        if (pollDelayMs <= 0L) {
+            throw new IllegalArgumentException("pollDelayMs는 0보다 커야 합니다.");
+        }
+        if (pollCapMs <= 0L) {
+            throw new IllegalArgumentException("pollCapMs는 0보다 커야 합니다.");
+        }
+        if (pollCapMs < pollDelayMs) {
+            throw new IllegalArgumentException("pollCapMs는 pollDelayMs 이상이어야 합니다.");
+        }
+
+        return new AdaptivePollingRunner(
+                "review_request inbox worker",
+                Duration.ofMillis(pollDelayMs),
+                Duration.ofMillis(pollCapMs),
+                () -> reviewRequestInboxProcessor.processPending(batchSize),
+                autoStartup
+        );
     }
 }

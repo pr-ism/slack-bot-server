@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.review.box.ReviewNotificationIdempotencyKeyGenerator;
 import com.slack.bot.application.review.box.ReviewNotificationIdempotencyScope;
 import com.slack.bot.application.review.dto.ReviewNotificationPayload;
+import com.slack.bot.application.worker.PollingHintPublisher;
+import com.slack.bot.application.worker.PollingHintTarget;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ public class ReviewNotificationOutboxEnqueuer {
     private final ReviewNotificationOutboxRepository reviewNotificationOutboxRepository;
     private final ReviewNotificationIdempotencyKeyGenerator idempotencyKeyGenerator;
     private final ReviewNotificationOutboxIdempotencyPayloadEncoder idempotencyPayloadEncoder;
+    private final PollingHintPublisher pollingHintPublisher;
 
     public void enqueueReviewNotification(
             String sourceKey,
@@ -44,6 +47,7 @@ public class ReviewNotificationOutboxEnqueuer {
                                                                   .build();
 
         reviewNotificationOutboxRepository.enqueue(outbox);
+        pollingHintPublisher.publish(PollingHintTarget.REVIEW_NOTIFICATION_OUTBOX);
     }
 
     public void enqueueChannelBlocks(
@@ -72,6 +76,7 @@ public class ReviewNotificationOutboxEnqueuer {
                                                                   .build();
 
         reviewNotificationOutboxRepository.enqueue(outbox);
+        pollingHintPublisher.publish(PollingHintTarget.REVIEW_NOTIFICATION_OUTBOX);
     }
 
     public void enqueueChannelBlocks(
@@ -98,6 +103,7 @@ public class ReviewNotificationOutboxEnqueuer {
                                                                   .build();
 
         reviewNotificationOutboxRepository.enqueue(outbox);
+        pollingHintPublisher.publish(PollingHintTarget.REVIEW_NOTIFICATION_OUTBOX);
     }
 
     private String normalizeBlocks(JsonNode blocks) {

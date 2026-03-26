@@ -6,8 +6,8 @@ import com.slack.bot.application.interaction.box.out.SlackNotificationOutboxWork
 import com.slack.bot.application.review.box.out.ReviewNotificationOutboxProcessor;
 import com.slack.bot.application.review.box.out.ReviewNotificationOutboxTimeoutRecoveryWorker;
 import com.slack.bot.application.review.box.out.ReviewNotificationOutboxWorker;
+import com.slack.bot.global.config.properties.InteractionWorkerProperties;
 import com.slack.bot.global.config.properties.ReviewWorkerProperties;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -15,25 +15,18 @@ import org.springframework.context.annotation.Configuration;
 public class OutboxWorkerConfig {
 
     @Bean
-    @ConditionalOnProperty(
-            prefix = "app.interaction.outbox",
-            name = "worker-enabled",
-            havingValue = "true",
-            matchIfMissing = true
-    )
     public SlackNotificationOutboxWorker slackNotificationOutboxWorker(
-            SlackNotificationOutboxProcessor slackNotificationOutboxProcessor
+            SlackNotificationOutboxProcessor slackNotificationOutboxProcessor,
+            InteractionWorkerProperties interactionWorkerProperties
     ) {
-        return new SlackNotificationOutboxWorker(slackNotificationOutboxProcessor);
+        return new SlackNotificationOutboxWorker(
+                slackNotificationOutboxProcessor,
+                interactionWorkerProperties.outbox().pollDelayMs(),
+                interactionWorkerProperties.outbox().pollCapMs()
+        );
     }
 
     @Bean
-    @ConditionalOnProperty(
-            prefix = "app.interaction.outbox",
-            name = "worker-enabled",
-            havingValue = "true",
-            matchIfMissing = true
-    )
     public SlackNotificationOutboxTimeoutRecoveryWorker slackNotificationOutboxTimeoutRecoveryWorker(
             SlackNotificationOutboxProcessor slackNotificationOutboxProcessor
     ) {
@@ -41,29 +34,19 @@ public class OutboxWorkerConfig {
     }
 
     @Bean
-    @ConditionalOnProperty(
-            prefix = "review.notification.outbox",
-            name = "worker-enabled",
-            havingValue = "true",
-            matchIfMissing = true
-    )
     public ReviewNotificationOutboxWorker reviewNotificationOutboxWorker(
             ReviewNotificationOutboxProcessor reviewNotificationOutboxProcessor,
             ReviewWorkerProperties reviewWorkerProperties
     ) {
         return new ReviewNotificationOutboxWorker(
                 reviewNotificationOutboxProcessor,
-                reviewWorkerProperties.outbox().batchSize()
+                reviewWorkerProperties.outbox().batchSize(),
+                reviewWorkerProperties.outbox().pollDelayMs(),
+                reviewWorkerProperties.outbox().pollCapMs()
         );
     }
 
     @Bean
-    @ConditionalOnProperty(
-            prefix = "review.notification.outbox",
-            name = "worker-enabled",
-            havingValue = "true",
-            matchIfMissing = true
-    )
     public ReviewNotificationOutboxTimeoutRecoveryWorker reviewNotificationOutboxTimeoutRecoveryWorker(
             ReviewNotificationOutboxProcessor reviewNotificationOutboxProcessor,
             ReviewWorkerProperties reviewWorkerProperties

@@ -1,0 +1,533 @@
+package com.slack.bot.application.worker;
+
+import static org.awaitility.Awaitility.await;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.time.Duration;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.IntSupplier;
+import org.junit.jupiter.api.DisplayNameGeneration;
+import org.junit.jupiter.api.DisplayNameGenerator;
+import org.junit.jupiter.api.Test;
+
+@SuppressWarnings("NonAsciiCharacters")
+@DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
+class AdaptivePollingRunnerTest {
+
+    @Test
+    void empty_poll에만_adaptive_backoff가_적용된다() {
+        // given
+        RecordingPollingSleeper recordingPollingSleeper = new RecordingPollingSleeper();
+        Queue<Integer> pollResults = new ArrayDeque<>(List.of(0, 0, 1, 0));
+        AdaptivePollingRunner adaptivePollingRunner = new AdaptivePollingRunner(
+                "test-runner",
+                () -> pollResults.remove(),
+                new AdaptivePollingBackoff(
+                        Duration.ofMillis(100L),
+                        Duration.ofMillis(250L),
+                        boundExclusive -> boundExclusive - 1L
+                ),
+                recordingPollingSleeper,
+                Duration.ofMillis(100L)
+        );
+
+        // when
+        adaptivePollingRunner.runSingleCycle();
+        adaptivePollingRunner.runSingleCycle();
+        adaptivePollingRunner.runSingleCycle();
+        adaptivePollingRunner.runSingleCycle();
+
+        // then
+        assertThat(recordingPollingSleeper.recordedSleeps()).containsExactly(
+                Duration.ofMillis(100L),
+                Duration.ofMillis(200L),
+                Duration.ofMillis(100L)
+        );
+    }
+
+    @Test
+    void poll_error는_idle_backoff를_증가시키지_않고_base_delay로만_재시도한다() {
+        // given
+        RecordingPollingSleeper recordingPollingSleeper = new RecordingPollingSleeper();
+        Queue<Object> pollResults = new ArrayDeque<>(List.of(new RuntimeException("db"), 0));
+        AdaptivePollingRunner adaptivePollingRunner = new AdaptivePollingRunner(
+                "test-runner",
+                () -> {
+                    Object result = pollResults.remove();
+                    if (result instanceof RuntimeException runtimeException) {
+                        throw runtimeException;
+                    }
+                    return (Integer) result;
+                },
+                new AdaptivePollingBackoff(
+                        Duration.ofMillis(100L),
+                        Duration.ofMillis(250L),
+                        boundExclusive -> boundExclusive - 1L
+                ),
+                recordingPollingSleeper,
+                Duration.ofMillis(100L)
+        );
+
+        // when
+        adaptivePollingRunner.runSingleCycle();
+        adaptivePollingRunner.runSingleCycle();
+
+        // then
+        assertThat(recordingPollingSleeper.recordedSleeps()).containsExactly(
+                Duration.ofMillis(100L),
+                Duration.ofMillis(100L)
+        );
+    }
+
+    @Test
+    void sleep중_notification_hint가_오면_조기_wakeup한다() throws Exception {
+        // given
+        CountDownLatch secondPollStarted = new CountDownLatch(1);
+        AtomicInteger invocationCount = new AtomicInteger();
+        IntSupplier pollOperation = () -> {
+            int current = invocationCount.incrementAndGet();
+            if (current >= 2) {
+                secondPollStarted.countDown();
+            }
+            return 0;
+        };
+        AdaptivePollingRunner adaptivePollingRunner = new AdaptivePollingRunner(
+                "wake-up-runner",
+                Duration.ofSeconds(5L),
+                Duration.ofSeconds(5L),
+                pollOperation
+        );
+
+        try {
+            // when
+            adaptivePollingRunner.start();
+            while (invocationCount.get() == 0) {
+                Thread.onSpinWait();
+            }
+            adaptivePollingRunner.wakeUp();
+
+            // then
+            assertThat(secondPollStarted.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+        } finally {
+            adaptivePollingRunner.stop();
+        }
+    }
+
+    @Test
+    void sleep중_interrupt가_발생해도_예외를_전파하지_않는다() {
+        // given
+        AdaptivePollingRunner adaptivePollingRunner = new AdaptivePollingRunner(
+                "interrupt-runner",
+                () -> 0,
+                new AdaptivePollingBackoff(
+                        Duration.ofMillis(100L),
+                        Duration.ofMillis(100L),
+                        boundExclusive -> 0L
+                ),
+                new InterruptingPollingSleeper(),
+                Duration.ofMillis(100L)
+        );
+
+        // when
+        adaptivePollingRunner.runSingleCycle();
+
+        // then
+        assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        Thread.interrupted();
+    }
+
+    @Test
+    void stop은_not_running과_running_모두_처리한다() {
+        // given
+        AdaptivePollingRunner adaptivePollingRunner = new AdaptivePollingRunner(
+                "stop-runner",
+                Duration.ofMillis(100L),
+                Duration.ofMillis(100L),
+                () -> 0
+        );
+
+        // when
+        adaptivePollingRunner.stop();
+        adaptivePollingRunner.start();
+        adaptivePollingRunner.stop();
+
+        // then
+        assertThat(adaptivePollingRunner.isRunning()).isFalse();
+    }
+
+    @Test
+    void stop후_restart해도_다시_poll한다() throws Exception {
+        // given
+        CountDownLatch firstPhasePolled = new CountDownLatch(1);
+        CountDownLatch secondPhasePolled = new CountDownLatch(1);
+        AtomicInteger phase = new AtomicInteger(1);
+        AdaptivePollingRunner adaptivePollingRunner = new AdaptivePollingRunner(
+                "restart-runner",
+                Duration.ofMillis(50L),
+                Duration.ofMillis(50L),
+                () -> {
+                    if (phase.get() == 1) {
+                        firstPhasePolled.countDown();
+                    } else {
+                        secondPhasePolled.countDown();
+                    }
+                    return 0;
+                }
+        );
+
+        try {
+            // when
+            adaptivePollingRunner.start();
+
+            // then
+            assertThat(firstPhasePolled.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+
+            // when
+            adaptivePollingRunner.stop();
+            phase.set(2);
+            await().atMost(Duration.ofSeconds(1L)).until(() -> {
+                try {
+                    adaptivePollingRunner.start();
+                    return true;
+                } catch (IllegalStateException e) {
+                    return false;
+                }
+            });
+
+            // then
+            assertThat(secondPhasePolled.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+        } finally {
+            adaptivePollingRunner.stop();
+        }
+    }
+
+    @Test
+    void stop_timeout중에는_restart를_막고_이전_스레드_종료후에만_다시_시작한다() throws Exception {
+        // given
+        CountDownLatch firstPollStarted = new CountDownLatch(1);
+        CountDownLatch releaseFirstPoll = new CountDownLatch(1);
+        CountDownLatch secondPollStarted = new CountDownLatch(1);
+        AtomicInteger phase = new AtomicInteger(1);
+        AdaptivePollingRunner adaptivePollingRunner = new AdaptivePollingRunner(
+                "restart-after-timeout-runner",
+                () -> {
+                    if (phase.get() == 1) {
+                        firstPollStarted.countDown();
+                        try {
+                            releaseFirstPoll.await(5L, TimeUnit.SECONDS);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    } else {
+                        secondPollStarted.countDown();
+                    }
+                    return 0;
+                },
+                new AdaptivePollingBackoff(
+                        Duration.ofMillis(100L),
+                        Duration.ofMillis(100L),
+                        boundExclusive -> 0L
+                ),
+                new AdaptivePollingRunner.MonitorPollingSleeper(),
+                Duration.ofMillis(100L),
+                Duration.ofMillis(10L),
+                true
+        );
+
+        try {
+            // when
+            adaptivePollingRunner.start();
+
+            // then
+            assertThat(firstPollStarted.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+
+            // when
+            adaptivePollingRunner.stop();
+            phase.set(2);
+
+            // then
+            assertThatThrownBy(() -> adaptivePollingRunner.start())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("이전 poller 스레드가 아직 종료되지 않았습니다.");
+
+            // when
+            releaseFirstPoll.countDown();
+
+            // then
+            await().atMost(Duration.ofSeconds(1L)).until(() -> {
+                try {
+                    adaptivePollingRunner.start();
+                    return true;
+                } catch (IllegalStateException e) {
+                    return false;
+                }
+            });
+            assertThat(secondPollStarted.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+        } finally {
+            releaseFirstPoll.countDown();
+            adaptivePollingRunner.stop();
+        }
+    }
+
+    @Test
+    void stop_callback은_stop후_callback을_실행한다() {
+        // given
+        AtomicInteger callbackCount = new AtomicInteger();
+        AdaptivePollingRunner adaptivePollingRunner = new AdaptivePollingRunner(
+                "stop-callback-runner",
+                Duration.ofMillis(50L),
+                Duration.ofMillis(50L),
+                () -> 0
+        );
+
+        // when
+        adaptivePollingRunner.start();
+        adaptivePollingRunner.stop(() -> callbackCount.incrementAndGet());
+
+        // then
+        assertThat(callbackCount.get()).isEqualTo(1);
+    }
+
+    @Test
+    void stop_callback은_timeout동안_조기_실행되지_않고_스레드_종료후_실행된다() throws Exception {
+        // given
+        CountDownLatch firstPollStarted = new CountDownLatch(1);
+        CountDownLatch releaseFirstPoll = new CountDownLatch(1);
+        CountDownLatch callbackInvoked = new CountDownLatch(1);
+        AdaptivePollingRunner adaptivePollingRunner = new AdaptivePollingRunner(
+                "stop-callback-timeout-runner",
+                () -> {
+                    firstPollStarted.countDown();
+                    try {
+                        releaseFirstPoll.await(5L, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    return 0;
+                },
+                new AdaptivePollingBackoff(
+                        Duration.ofMillis(100L),
+                        Duration.ofMillis(100L),
+                        boundExclusive -> 0L
+                ),
+                new AdaptivePollingRunner.MonitorPollingSleeper(),
+                Duration.ofMillis(100L),
+                Duration.ofMillis(10L),
+                true
+        );
+
+        try {
+            // when
+            adaptivePollingRunner.start();
+
+            // then
+            assertThat(firstPollStarted.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+
+            // when
+            adaptivePollingRunner.stop(callbackInvoked::countDown);
+
+            // then
+            assertThat(callbackInvoked.await(100L, TimeUnit.MILLISECONDS)).isFalse();
+
+            // when
+            releaseFirstPoll.countDown();
+
+            // then
+            assertThat(callbackInvoked.await(1L, TimeUnit.SECONDS)).isTrue();
+        } finally {
+            releaseFirstPoll.countDown();
+            adaptivePollingRunner.stop();
+        }
+    }
+
+    @Test
+    void stop_callback은_timeout중_여러개가_등록되면_종료후_모두_실행된다() throws Exception {
+        // given
+        CountDownLatch firstPollStarted = new CountDownLatch(1);
+        CountDownLatch releaseFirstPoll = new CountDownLatch(1);
+        CountDownLatch allCallbacksInvoked = new CountDownLatch(2);
+        AtomicInteger callbackCount = new AtomicInteger();
+        AdaptivePollingRunner adaptivePollingRunner = new AdaptivePollingRunner(
+                "stop-multiple-callback-runner",
+                () -> {
+                    firstPollStarted.countDown();
+                    try {
+                        releaseFirstPoll.await(5L, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    return 0;
+                },
+                new AdaptivePollingBackoff(
+                        Duration.ofMillis(100L),
+                        Duration.ofMillis(100L),
+                        boundExclusive -> 0L
+                ),
+                new AdaptivePollingRunner.MonitorPollingSleeper(),
+                Duration.ofMillis(100L),
+                Duration.ofMillis(10L),
+                true
+        );
+
+        try {
+            // when
+            adaptivePollingRunner.start();
+
+            // then
+            assertThat(firstPollStarted.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+
+            // when
+            adaptivePollingRunner.stop(() -> {
+                callbackCount.incrementAndGet();
+                allCallbacksInvoked.countDown();
+            });
+            adaptivePollingRunner.stop(() -> {
+                callbackCount.incrementAndGet();
+                allCallbacksInvoked.countDown();
+            });
+
+            // then
+            assertThat(callbackCount.get()).isZero();
+
+            // when
+            releaseFirstPoll.countDown();
+
+            // then
+            assertThat(allCallbacksInvoked.await(1L, TimeUnit.SECONDS)).isTrue();
+            assertThat(callbackCount.get()).isEqualTo(2);
+        } finally {
+            releaseFirstPoll.countDown();
+            adaptivePollingRunner.stop();
+        }
+    }
+
+    @Test
+    void sleeper_runtime_exception으로_worker가_죽어도_running이_정리되고_재시작할_수_있다() throws Exception {
+        // given
+        CountDownLatch firstPhasePolled = new CountDownLatch(1);
+        CountDownLatch secondPhasePolled = new CountDownLatch(1);
+        AtomicInteger phase = new AtomicInteger(1);
+        AdaptivePollingRunner adaptivePollingRunner = new AdaptivePollingRunner(
+                "runtime-failure-runner",
+                () -> {
+                    if (phase.get() == 1) {
+                        firstPhasePolled.countDown();
+                    } else {
+                        secondPhasePolled.countDown();
+                    }
+                    return 0;
+                },
+                new AdaptivePollingBackoff(
+                        Duration.ofMillis(50L),
+                        Duration.ofMillis(50L),
+                        boundExclusive -> 0L
+                ),
+                new RuntimeFailingPollingSleeper(),
+                Duration.ofMillis(50L)
+        );
+
+        try {
+            // when
+            adaptivePollingRunner.start();
+
+            // then
+            assertThat(firstPhasePolled.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+            await().atMost(Duration.ofSeconds(1L)).until(() -> !adaptivePollingRunner.isRunning());
+
+            // when
+            phase.set(2);
+            adaptivePollingRunner.start();
+
+            // then
+            assertThat(secondPhasePolled.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+        } finally {
+            adaptivePollingRunner.stop();
+        }
+    }
+
+    @Test
+    void poller_스레드에서_stop을_호출해도_예외없이_종료된다() throws Exception {
+        // given
+        CountDownLatch stopCalled = new CountDownLatch(1);
+        AtomicReference<AdaptivePollingRunner> adaptivePollingRunnerReference = new AtomicReference<>();
+        AdaptivePollingRunner adaptivePollingRunner = new AdaptivePollingRunner(
+                "self-stop-runner",
+                Duration.ofMillis(50L),
+                Duration.ofMillis(50L),
+                () -> {
+                    AdaptivePollingRunner runner = adaptivePollingRunnerReference.get();
+                    runner.stop();
+                    stopCalled.countDown();
+                    return 0;
+                }
+        );
+        adaptivePollingRunnerReference.set(adaptivePollingRunner);
+
+        try {
+            // when
+            adaptivePollingRunner.start();
+
+            // then
+            assertThat(stopCalled.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+            await().atMost(Duration.ofSeconds(1L)).until(() -> !adaptivePollingRunner.isRunning());
+        } finally {
+            adaptivePollingRunner.stop();
+        }
+    }
+
+    private static final class RecordingPollingSleeper implements AdaptivePollingRunner.PollingSleeper {
+
+        private final List<Duration> recordedSleeps = new ArrayList<>();
+
+        @Override
+        public AdaptivePollingRunner.PollingSleepResult sleep(Duration delay) {
+            recordedSleeps.add(delay);
+            return AdaptivePollingRunner.PollingSleepResult.COMPLETED;
+        }
+
+        @Override
+        public void wakeUp() {
+        }
+
+        private List<Duration> recordedSleeps() {
+            return recordedSleeps;
+        }
+    }
+
+    private static final class InterruptingPollingSleeper implements AdaptivePollingRunner.PollingSleeper {
+
+        @Override
+        public AdaptivePollingRunner.PollingSleepResult sleep(Duration delay) throws InterruptedException {
+            throw new InterruptedException("interrupted");
+        }
+
+        @Override
+        public void wakeUp() {
+        }
+    }
+
+    private static final class RuntimeFailingPollingSleeper implements AdaptivePollingRunner.PollingSleeper {
+
+        private final AtomicInteger sleepCallCount = new AtomicInteger();
+
+        @Override
+        public AdaptivePollingRunner.PollingSleepResult sleep(Duration delay) {
+            if (sleepCallCount.getAndIncrement() == 0) {
+                throw new IllegalStateException("runtime failure");
+            }
+            return AdaptivePollingRunner.PollingSleepResult.COMPLETED;
+        }
+
+        @Override
+        public void wakeUp() {
+        }
+    }
+}

@@ -11,6 +11,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.review.box.ReviewNotificationIdempotencyKeyGenerator;
 import com.slack.bot.application.review.dto.ReviewNotificationPayload;
+import com.slack.bot.application.worker.PollingHintPublisher;
+import com.slack.bot.application.worker.PollingHintTarget;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
 import java.util.List;
@@ -33,6 +35,9 @@ class ReviewNotificationOutboxEnqueuerTest {
     @Mock
     ReviewNotificationOutboxRepository reviewNotificationOutboxRepository;
 
+    @Mock
+    PollingHintPublisher pollingHintPublisher;
+
     ReviewNotificationOutboxEnqueuer enqueuer;
 
     @BeforeEach
@@ -41,7 +46,8 @@ class ReviewNotificationOutboxEnqueuerTest {
                 new ObjectMapper(),
                 reviewNotificationOutboxRepository,
                 new ReviewNotificationIdempotencyKeyGenerator(),
-                new ReviewNotificationOutboxIdempotencyPayloadEncoder(new ObjectMapper())
+                new ReviewNotificationOutboxIdempotencyPayloadEncoder(new ObjectMapper()),
+                pollingHintPublisher
         );
     }
 
@@ -76,6 +82,7 @@ class ReviewNotificationOutboxEnqueuerTest {
                 () -> assertThat(actual.getBlocksJson()).isNull(),
                 () -> assertThat(actual.getIdempotencyKey()).hasSize(64)
         );
+        verify(pollingHintPublisher).publish(PollingHintTarget.REVIEW_NOTIFICATION_OUTBOX);
     }
 
     @Test
@@ -103,6 +110,7 @@ class ReviewNotificationOutboxEnqueuerTest {
                 () -> assertThat(actual.getFallbackText()).isEqualTo("fallback"),
                 () -> assertThat(actual.getIdempotencyKey()).hasSize(64)
         );
+        verify(pollingHintPublisher).publish(PollingHintTarget.REVIEW_NOTIFICATION_OUTBOX);
     }
 
     @Test
@@ -227,7 +235,8 @@ class ReviewNotificationOutboxEnqueuerTest {
                 objectMapper,
                 reviewNotificationOutboxRepository,
                 new ReviewNotificationIdempotencyKeyGenerator(),
-                new ReviewNotificationOutboxIdempotencyPayloadEncoder(objectMapper)
+                new ReviewNotificationOutboxIdempotencyPayloadEncoder(objectMapper),
+                pollingHintPublisher
         );
         ReviewNotificationPayload payload = new ReviewNotificationPayload(
                 "repo",
@@ -248,6 +257,7 @@ class ReviewNotificationOutboxEnqueuerTest {
                 .hasMessageContaining("직렬화");
 
         verify(reviewNotificationOutboxRepository, never()).enqueue(any());
+        verify(pollingHintPublisher, never()).publish(any());
     }
 
     @Test

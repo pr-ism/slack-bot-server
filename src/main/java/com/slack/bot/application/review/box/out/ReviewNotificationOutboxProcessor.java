@@ -45,8 +45,9 @@ public class ReviewNotificationOutboxProcessor {
     private final ReviewNotificationOutboxRepository reviewNotificationOutboxRepository;
     private final InteractionRetryExceptionClassifier retryExceptionClassifier;
 
-    public void processPending(int limit) {
+    public int processPending(int limit) {
         Set<Long> claimedOutboxIds = new HashSet<>();
+        int claimedCount = 0;
         for (int count = 0; count < limit; count++) {
             Instant claimedProcessingStartedAt = currentLeaseStartedAt();
             Long claimedOutboxId = reviewNotificationOutboxRepository.claimNextId(
@@ -54,12 +55,15 @@ public class ReviewNotificationOutboxProcessor {
                     claimedOutboxIds
             ).orElse(null);
             if (claimedOutboxId == null) {
-                return;
+                return claimedCount;
             }
 
             claimedOutboxIds.add(claimedOutboxId);
+            claimedCount++;
             processSafely(claimedOutboxId, claimedProcessingStartedAt);
         }
+
+        return claimedCount;
     }
 
     public int recoverTimeoutProcessing(long processingTimeoutMs) {

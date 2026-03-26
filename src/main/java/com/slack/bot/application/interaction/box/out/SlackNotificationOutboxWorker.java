@@ -1,20 +1,91 @@
 package com.slack.bot.application.interaction.box.out;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
+import com.slack.bot.application.worker.AdaptivePollingRunner;
+import com.slack.bot.application.worker.PollingHintEvent;
+import com.slack.bot.application.worker.PollingHintTarget;
+import java.time.Duration;
+import org.springframework.context.SmartLifecycle;
+import org.springframework.context.event.EventListener;
 
-@Slf4j
-@RequiredArgsConstructor
-public class SlackNotificationOutboxWorker {
+public class SlackNotificationOutboxWorker implements SmartLifecycle {
+
+    private static final int BATCH_SIZE = 50;
+
     private final SlackNotificationOutboxProcessor slackNotificationOutboxProcessor;
+    private final AdaptivePollingRunner adaptivePollingRunner;
 
-    @Scheduled(fixedDelayString = "${app.interaction.outbox.poll-delay-ms:1000}")
-    public void processPendingOutbox() {
-        try {
-            slackNotificationOutboxProcessor.processPending(50);
-        } catch (Exception e) {
-            log.error("슬랙 알림 outbox worker 실행에 실패했습니다.", e);
+    public SlackNotificationOutboxWorker(
+            SlackNotificationOutboxProcessor slackNotificationOutboxProcessor,
+            long pollDelayMs,
+            long pollCapMs
+    ) {
+        this(slackNotificationOutboxProcessor, pollDelayMs, pollCapMs, true);
+    }
+
+    public SlackNotificationOutboxWorker(
+            SlackNotificationOutboxProcessor slackNotificationOutboxProcessor,
+            long pollDelayMs,
+            long pollCapMs,
+            boolean autoStartup
+    ) {
+        this(
+                slackNotificationOutboxProcessor,
+                new AdaptivePollingRunner(
+                        "interaction outbox worker",
+                        Duration.ofMillis(pollDelayMs),
+                        Duration.ofMillis(pollCapMs),
+                        () -> slackNotificationOutboxProcessor.processPending(BATCH_SIZE),
+                        autoStartup
+                )
+        );
+    }
+
+    SlackNotificationOutboxWorker(
+            SlackNotificationOutboxProcessor slackNotificationOutboxProcessor,
+            AdaptivePollingRunner adaptivePollingRunner
+    ) {
+        this.slackNotificationOutboxProcessor = slackNotificationOutboxProcessor;
+        this.adaptivePollingRunner = adaptivePollingRunner;
+    }
+
+    public int processPendingOutbox() {
+        return slackNotificationOutboxProcessor.processPending(BATCH_SIZE);
+    }
+
+    @EventListener
+    public void wakeUp(PollingHintEvent pollingHintEvent) {
+        if (pollingHintEvent.target() == PollingHintTarget.INTERACTION_OUTBOX) {
+            adaptivePollingRunner.wakeUp();
         }
+    }
+
+    @Override
+    public void start() {
+        adaptivePollingRunner.start();
+    }
+
+    @Override
+    public void stop() {
+        adaptivePollingRunner.stop();
+    }
+
+    @Override
+    public void stop(Runnable callback) {
+        adaptivePollingRunner.stop(callback);
+    }
+
+    @Override
+    public boolean isRunning() {
+        return adaptivePollingRunner.isRunning();
+    }
+
+    @Override
+    public boolean isAutoStartup() {
+        return adaptivePollingRunner.isAutoStartup();
+    }
+
+    @Override
+    public int getPhase() {
+        return adaptivePollingRunner.getPhase();
     }
 }

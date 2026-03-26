@@ -2,17 +2,12 @@ package com.slack.bot.application;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.event.handler.SlackEventHandlerRegistry;
-import com.slack.bot.application.interaction.box.in.SlackBlockActionInboxWorker;
 import com.slack.bot.application.interaction.box.in.SlackInteractionInboxProcessor;
-import com.slack.bot.application.interaction.box.in.SlackViewSubmissionInboxWorker;
-import com.slack.bot.application.interaction.box.out.SlackNotificationOutboxWorker;
+import com.slack.bot.application.interaction.client.NotificationApiClient;
 import com.slack.bot.application.interaction.publisher.ReviewInteractionEventPublisher;
 import com.slack.bot.application.interaction.reservation.ReviewReservationCoordinator;
-import com.slack.bot.application.review.box.in.ReviewRequestInboxWorker;
-import com.slack.bot.application.review.box.out.ReviewNotificationOutboxWorker;
 import com.slack.bot.application.review.box.out.ReviewNotificationOutboxEnqueuer;
 import com.slack.bot.context.CleanupExecutionListener;
-import com.slack.bot.application.interaction.client.NotificationApiClient;
 import com.slack.bot.domain.auth.TokenDecoder;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.review.batch.SpyReviewNotificationService;
@@ -43,13 +38,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
         NotificationApiClient.class,
         NotificationTransportApiClient.class
 })
-@MockitoBean(types = {
-        SlackBlockActionInboxWorker.class,
-        SlackViewSubmissionInboxWorker.class,
-        SlackNotificationOutboxWorker.class,
-        ReviewRequestInboxWorker.class,
-        ReviewNotificationOutboxWorker.class
-})
 @MockitoSpyBean(types = {
         Clock.class,
         ReviewNotificationOutboxEnqueuer.class,
@@ -61,5 +49,5 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
         ObjectMapper.class
 })
 @TestExecutionListeners(listeners = CleanupExecutionListener.class, mergeMode = TestExecutionListeners.MergeMode.MERGE_WITH_DEFAULTS)
-public @interface IntegrationTest {
+public @interface WorkerIntegrationTest {
 }

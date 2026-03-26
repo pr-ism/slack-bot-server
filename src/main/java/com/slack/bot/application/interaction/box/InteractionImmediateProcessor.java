@@ -1,7 +1,7 @@
 package com.slack.bot.application.interaction.box;
 
-import com.slack.bot.application.interaction.box.in.SlackInteractionInboxProcessor;
-import com.slack.bot.application.interaction.box.out.SlackNotificationOutboxProcessor;
+import com.slack.bot.application.worker.PollingHintPublisher;
+import com.slack.bot.application.worker.PollingHintTarget;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.task.TaskExecutor;
@@ -13,31 +13,27 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Component
 @RequiredArgsConstructor
 public class InteractionImmediateProcessor {
-
-    private static final int IMMEDIATE_BATCH_SIZE = 1;
-
     private final TaskExecutor reviewInteractionExecutor;
-    private final SlackInteractionInboxProcessor slackInteractionInboxProcessor;
-    private final SlackNotificationOutboxProcessor slackNotificationOutboxProcessor;
+    private final PollingHintPublisher pollingHintPublisher;
 
     public void triggerBlockActionInbox() {
         runAfterCommit(
-                "block_actions 인박스 즉시 처리",
-                () -> slackInteractionInboxProcessor.processPendingBlockActions(IMMEDIATE_BATCH_SIZE)
+                "block_actions 인박스 wake-up",
+                () -> pollingHintPublisher.publish(PollingHintTarget.BLOCK_ACTION_INBOX)
         );
     }
 
     public void triggerViewSubmissionInbox() {
         runAfterCommit(
-                "view_submission 인박스 즉시 처리",
-                () -> slackInteractionInboxProcessor.processPendingViewSubmissions(IMMEDIATE_BATCH_SIZE)
+                "view_submission 인박스 wake-up",
+                () -> pollingHintPublisher.publish(PollingHintTarget.VIEW_SUBMISSION_INBOX)
         );
     }
 
     public void triggerOutbox() {
         runAfterCommit(
-                "아웃박스 즉시 처리",
-                () -> slackNotificationOutboxProcessor.processPending(IMMEDIATE_BATCH_SIZE)
+                "interaction outbox wake-up",
+                () -> pollingHintPublisher.publish(PollingHintTarget.INTERACTION_OUTBOX)
         );
     }
 
