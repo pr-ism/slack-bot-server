@@ -9,6 +9,7 @@ import com.slack.bot.application.review.box.in.exception.ReviewRequestInboxProce
 import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
+import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxHistory;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
@@ -64,8 +65,8 @@ public class ReviewRequestInboxTransactionalProcessor {
                     () -> reviewNotificationService.sendSimpleNotification(inbox.getApiKey(), request)
             );
 
-            inbox.markProcessed(clock.instant());
-            persistWithLeaseCheck(inbox, claimedProcessingStartedAt);
+            ReviewRequestInboxHistory history = inbox.markProcessed(clock.instant());
+            persistWithLeaseCheck(inbox, history, claimedProcessingStartedAt);
         });
     }
 
@@ -82,20 +83,18 @@ public class ReviewRequestInboxTransactionalProcessor {
             );
         } catch (Exception e) {
             log.error("review_request inbox 처리에 실패했습니다. inboxId={}", inbox.getId(), e);
-            markFailureStatus(inbox, e);
-            persistWithLeaseCheck(inbox, claimedProcessingStartedAt);
+            ReviewRequestInboxHistory history = markFailureStatus(inbox, e);
+            persistWithLeaseCheck(inbox, history, claimedProcessingStartedAt);
             return Optional.empty();
         }
     }
 
     private void persistWithLeaseCheck(
             ReviewRequestInbox inbox,
+            ReviewRequestInboxHistory history,
             Instant claimedProcessingStartedAt
     ) {
-        boolean updated = reviewRequestInboxRepository.saveIfProcessingLeaseMatched(
-                inbox,
-                claimedProcessingStartedAt
-        );
+        boolean updated = reviewRequestInboxRepository.saveIfProcessingLeaseMatched(inbox, history, claimedProcessingStartedAt);
         if (updated) {
             return;
         }
@@ -105,29 +104,27 @@ public class ReviewRequestInboxTransactionalProcessor {
         );
     }
 
-    private void markFailureStatus(ReviewRequestInbox inbox, Exception e) {
+    private ReviewRequestInboxHistory markFailureStatus(ReviewRequestInbox inbox, Exception e) {
         if (inbox.getStatus() != ReviewRequestInboxStatus.PROCESSING) {
             log.warn(
                     "PROCESSING이 아닌 상태에서 실패 처리를 시도했습니다. inboxId={}, status={}",
                     inbox.getId(),
                     inbox.getStatus()
             );
-            return;
+            return null;
         }
 
         String reason = resolveFailureReason(e);
 
         if (!retryExceptionClassifier.isRetryable(e)) {
-            inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.NON_RETRYABLE);
-            return;
+            return inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.NON_RETRYABLE);
         }
 
         if (inbox.getProcessingAttempt() < interactionRetryProperties.inbox().maxAttempts()) {
-            inbox.markRetryPending(clock.instant(), reason);
-            return;
+            return inbox.markRetryPending(clock.instant(), reason);
         }
 
-        inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.RETRY_EXHAUSTED);
+        return inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.RETRY_EXHAUSTED);
     }
 
     private String resolveFailureReason(Exception e) {

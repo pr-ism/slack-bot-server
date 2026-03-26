@@ -69,6 +69,7 @@ class ReviewRequestInboxEntryProcessorTest {
                 .when(reviewRequestInboxRepository)
                 .saveIfProcessingLeaseMatched(
                         argThat(savedInbox -> savedInbox != null && inbox.getId().equals(savedInbox.getId())),
+                        any(),
                         any()
                 );
 

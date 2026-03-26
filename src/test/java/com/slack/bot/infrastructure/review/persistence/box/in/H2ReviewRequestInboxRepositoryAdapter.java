@@ -8,9 +8,15 @@ public class H2ReviewRequestInboxRepositoryAdapter extends ReviewRequestInboxRep
     public H2ReviewRequestInboxRepositoryAdapter(
             JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaReviewRequestInboxRepository reviewRequestInboxJpaRepository
+            JpaReviewRequestInboxRepository reviewRequestInboxJpaRepository,
+            JpaReviewRequestInboxHistoryRepository reviewRequestInboxHistoryJpaRepository
     ) {
-        super(queryFactory, namedParameterJdbcTemplate, reviewRequestInboxJpaRepository);
+        super(
+                queryFactory,
+                namedParameterJdbcTemplate,
+                reviewRequestInboxJpaRepository,
+                reviewRequestInboxHistoryJpaRepository
+        );
     }
 
     @Override
@@ -44,11 +50,11 @@ public class H2ReviewRequestInboxRepositoryAdapter extends ReviewRequestInboxRep
                         available_at = source.available_at,
                         status = source.pending_status,
                         processing_attempt = 0,
-                        processing_started_at = NULL,
-                        processed_at = NULL,
-                        failed_at = NULL,
-                        failure_reason = NULL,
-                        failure_type = NULL
+                    processing_started_at = NULL,
+                    processed_at = NULL,
+                    failed_at = NULL,
+                    failure_reason = NULL,
+                    failure_type = NULL
                 WHEN NOT MATCHED THEN
                     INSERT (
                         created_at,

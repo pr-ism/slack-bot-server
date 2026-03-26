@@ -114,7 +114,7 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         this.processingAttempt = processingAttempt;
     }
 
-    public void markProcessed(Instant processedAt) {
+    public ReviewRequestInboxHistory markProcessed(Instant processedAt) {
         validateProcessedAt(processedAt);
         validateTransition(ReviewRequestInboxStatus.PROCESSING, "PROCESSED");
 
@@ -124,6 +124,15 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         this.failedAt = null;
         this.failureReason = null;
         this.failureType = null;
+
+        return ReviewRequestInboxHistory.completed(
+                getId(),
+                this.processingAttempt,
+                ReviewRequestInboxStatus.PROCESSED,
+                processedAt,
+                null,
+                null
+        );
     }
 
     public void renewProcessingLease(Instant processingStartedAt) {
@@ -133,7 +142,7 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         this.processingStartedAt = processingStartedAt;
     }
 
-    public void markRetryPending(Instant failedAt, String failureReason) {
+    public ReviewRequestInboxHistory markRetryPending(Instant failedAt, String failureReason) {
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
         validateTransition(ReviewRequestInboxStatus.PROCESSING, "RETRY_PENDING");
@@ -143,9 +152,22 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = null;
+
+        return ReviewRequestInboxHistory.completed(
+                getId(),
+                this.processingAttempt,
+                ReviewRequestInboxStatus.RETRY_PENDING,
+                failedAt,
+                failureReason,
+                null
+        );
     }
 
-    public void markFailed(Instant failedAt, String failureReason, ReviewRequestInboxFailureType failureType) {
+    public ReviewRequestInboxHistory markFailed(
+            Instant failedAt,
+            String failureReason,
+            ReviewRequestInboxFailureType failureType
+    ) {
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
         validateFailureType(failureType);
@@ -156,6 +178,15 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = failureType;
+
+        return ReviewRequestInboxHistory.completed(
+                getId(),
+                this.processingAttempt,
+                ReviewRequestInboxStatus.FAILED,
+                failedAt,
+                failureReason,
+                failureType
+        );
     }
 
     private void validateProcessedAt(Instant processedAt) {

@@ -183,7 +183,7 @@ class ReviewRequestInboxTest {
 
         // when
         Instant processedAt = Instant.parse("2026-02-24T00:13:00Z");
-        inbox.markProcessed(processedAt);
+        ReviewRequestInboxHistory history = inbox.markProcessed(processedAt);
 
         // then
         assertAll(
@@ -192,7 +192,10 @@ class ReviewRequestInboxTest {
                 () -> assertThat(inbox.getProcessingStartedAt()).isNull(),
                 () -> assertThat(inbox.getFailedAt()).isNull(),
                 () -> assertThat(inbox.getFailureReason()).isNull(),
-                () -> assertThat(inbox.getFailureType()).isNull()
+                () -> assertThat(inbox.getFailureType()).isNull(),
+                () -> assertThat(history).isNotNull(),
+                () -> assertThat(history.getInboxId()).isNull(),
+                () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED)
         );
     }
 
@@ -227,7 +230,7 @@ class ReviewRequestInboxTest {
 
         // when
         Instant failedAt = Instant.parse("2026-02-24T00:14:00Z");
-        inbox.markRetryPending(failedAt, "retry");
+        ReviewRequestInboxHistory history = inbox.markRetryPending(failedAt, "retry");
 
         // then
         assertAll(
@@ -235,7 +238,10 @@ class ReviewRequestInboxTest {
                 () -> assertThat(inbox.getProcessingStartedAt()).isNull(),
                 () -> assertThat(inbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(inbox.getFailureReason()).isEqualTo("retry"),
-                () -> assertThat(inbox.getFailureType()).isNull()
+                () -> assertThat(inbox.getFailureType()).isNull(),
+                () -> assertThat(history).isNotNull(),
+                () -> assertThat(history.getInboxId()).isNull(),
+                () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING)
         );
     }
 
@@ -294,7 +300,11 @@ class ReviewRequestInboxTest {
 
         // when
         Instant failedAt = Instant.parse("2026-02-24T00:15:00Z");
-        inbox.markFailed(failedAt, "failure", ReviewRequestInboxFailureType.NON_RETRYABLE);
+        ReviewRequestInboxHistory history = inbox.markFailed(
+                failedAt,
+                "failure",
+                ReviewRequestInboxFailureType.NON_RETRYABLE
+        );
 
         // then
         assertAll(
@@ -302,7 +312,10 @@ class ReviewRequestInboxTest {
                 () -> assertThat(inbox.getProcessingStartedAt()).isNull(),
                 () -> assertThat(inbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(inbox.getFailureReason()).isEqualTo("failure"),
-                () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE)
+                () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE),
+                () -> assertThat(history).isNotNull(),
+                () -> assertThat(history.getInboxId()).isNull(),
+                () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED)
         );
     }
 

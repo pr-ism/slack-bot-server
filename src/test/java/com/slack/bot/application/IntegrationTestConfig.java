@@ -26,6 +26,7 @@ import org.springframework.context.annotation.Primary;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import com.slack.bot.infrastructure.review.persistence.box.in.H2ReviewRequestInboxRepositoryAdapter;
+import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxHistoryRepository;
 import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxRepository;
 import com.slack.bot.infrastructure.review.persistence.box.out.H2ReviewNotificationOutboxRepositoryAdapter;
 import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxRepository;
@@ -192,12 +193,14 @@ public class IntegrationTestConfig {
     public ReviewRequestInboxRepository reviewRequestInboxRepository(
             JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaReviewRequestInboxRepository repository
+            JpaReviewRequestInboxRepository repository,
+            JpaReviewRequestInboxHistoryRepository historyRepository
     ) {
         return new H2ReviewRequestInboxRepositoryAdapter(
                 queryFactory,
                 namedParameterJdbcTemplate,
-                repository
+                repository,
+                historyRepository
         );
     }
 

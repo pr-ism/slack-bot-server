@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
@@ -84,7 +85,7 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
 
         // then
         verify(reviewRequestInboxRepository, never()).save(any());
-        verify(reviewRequestInboxRepository, never()).saveIfProcessingLeaseMatched(any(), any());
+        verify(reviewRequestInboxRepository, never()).saveIfProcessingLeaseMatched(any(), any(), any());
         verify(reviewNotificationService, never()).sendSimpleNotification(any(), any());
     }
 
@@ -95,7 +96,7 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
         ReviewRequestInbox actual = processingInbox("review-entry-success", requestJson(request), 1);
 
         given(reviewRequestInboxRepository.findById(11L)).willReturn(Optional.of(actual));
-        given(reviewRequestInboxRepository.saveIfProcessingLeaseMatched(actual, CLAIMED_PROCESSING_STARTED_AT))
+        given(reviewRequestInboxRepository.saveIfProcessingLeaseMatched(eq(actual), any(), eq(CLAIMED_PROCESSING_STARTED_AT)))
                 .willReturn(true);
 
         // when
@@ -108,7 +109,7 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
                 () -> assertThat(reviewNotificationSourceContext.currentSourceKey()).isEmpty()
         );
         verify(reviewNotificationService).sendSimpleNotification("test-api-key", request);
-        verify(reviewRequestInboxRepository).saveIfProcessingLeaseMatched(actual, CLAIMED_PROCESSING_STARTED_AT);
+        verify(reviewRequestInboxRepository).saveIfProcessingLeaseMatched(eq(actual), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
     }
 
     @Test
@@ -133,7 +134,7 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
                 () -> assertThat(actual.getFailureType()).isNull()
         );
         verify(reviewRequestInboxRepository, never()).save(actual);
-        verify(reviewRequestInboxRepository, never()).saveIfProcessingLeaseMatched(actual, CLAIMED_PROCESSING_STARTED_AT);
+        verify(reviewRequestInboxRepository, never()).saveIfProcessingLeaseMatched(any(), any(), any());
     }
 
     @Test
@@ -143,7 +144,7 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
         ReviewRequestInbox actual = processingInbox("review-entry-lease-lost", requestJson(request), 1);
 
         given(reviewRequestInboxRepository.findById(13L)).willReturn(Optional.of(actual));
-        given(reviewRequestInboxRepository.saveIfProcessingLeaseMatched(actual, CLAIMED_PROCESSING_STARTED_AT))
+        given(reviewRequestInboxRepository.saveIfProcessingLeaseMatched(eq(actual), any(), eq(CLAIMED_PROCESSING_STARTED_AT)))
                 .willReturn(false);
 
         // when & then
@@ -158,7 +159,7 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
         ReviewRequestInbox actual = processingInbox("review-entry-long-failure", "x".repeat(600), 1);
 
         given(reviewRequestInboxRepository.findById(14L)).willReturn(Optional.of(actual));
-        given(reviewRequestInboxRepository.saveIfProcessingLeaseMatched(actual, CLAIMED_PROCESSING_STARTED_AT))
+        given(reviewRequestInboxRepository.saveIfProcessingLeaseMatched(eq(actual), any(), eq(CLAIMED_PROCESSING_STARTED_AT)))
                 .willReturn(true);
 
         // when
@@ -171,7 +172,7 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
                 () -> assertThat(actual.getFailureReason()).isNotBlank(),
                 () -> assertThat(actual.getFailureReason().length()).isLessThanOrEqualTo(500)
         );
-        verify(reviewRequestInboxRepository).saveIfProcessingLeaseMatched(actual, CLAIMED_PROCESSING_STARTED_AT);
+        verify(reviewRequestInboxRepository).saveIfProcessingLeaseMatched(eq(actual), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
     }
 
     @Test
@@ -180,7 +181,7 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
         ReviewRequestInbox actual = processingInbox("review-entry-empty-failure", "{", 1);
 
         given(reviewRequestInboxRepository.findById(15L)).willReturn(Optional.of(actual));
-        given(reviewRequestInboxRepository.saveIfProcessingLeaseMatched(actual, CLAIMED_PROCESSING_STARTED_AT))
+        given(reviewRequestInboxRepository.saveIfProcessingLeaseMatched(eq(actual), any(), eq(CLAIMED_PROCESSING_STARTED_AT)))
                 .willReturn(true);
 
         // when
@@ -192,7 +193,7 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
                 () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE),
                 () -> assertThat(actual.getFailureReason()).isNotBlank()
         );
-        verify(reviewRequestInboxRepository).saveIfProcessingLeaseMatched(actual, CLAIMED_PROCESSING_STARTED_AT);
+        verify(reviewRequestInboxRepository).saveIfProcessingLeaseMatched(eq(actual), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
     }
 
     @Test

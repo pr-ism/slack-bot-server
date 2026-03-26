@@ -23,13 +23,16 @@ import com.slack.bot.application.worker.PollingHintTarget;
 import com.slack.bot.infrastructure.review.batch.SpyReviewNotificationService;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
+import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxHistory;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
+import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxHistoryRepository;
 import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxRepository;
 import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,6 +62,9 @@ class ReviewRequestInboxProcessorTest {
 
     @Autowired
     JpaReviewNotificationOutboxRepository jpaReviewNotificationOutboxRepository;
+
+    @Autowired
+    JpaReviewRequestInboxHistoryRepository jpaReviewRequestInboxHistoryRepository;
 
     @Autowired
     SpyReviewNotificationService spyReviewNotificationService;
@@ -209,12 +215,19 @@ class ReviewRequestInboxProcessorTest {
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
             ReviewRequestInbox processed = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
+            List<ReviewRequestInboxHistory> histories = historiesOf(saved.getId());
 
             assertAll(
                     () -> assertThat(spyReviewNotificationService.getSendCount()).isEqualTo(1),
                     () -> assertThat(processed.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
                     () -> assertThat(processed.getProcessingAttempt()).isEqualTo(2),
-                    () -> assertThat(processed.getFailureReason()).isNull()
+                    () -> assertThat(processed.getFailureReason()).isNull(),
+                    () -> assertThat(histories).hasSize(2),
+                    () -> assertThat(histories).extracting(history -> history.getStatus())
+                            .containsExactly(
+                                    ReviewRequestInboxStatus.RETRY_PENDING,
+                                    ReviewRequestInboxStatus.PROCESSED
+                            )
             );
         });
     }
@@ -281,6 +294,14 @@ class ReviewRequestInboxProcessorTest {
 
         // then
         verify(pollingHintPublisher).publish(PollingHintTarget.REVIEW_REQUEST_INBOX);
+    }
+
+    private List<ReviewRequestInboxHistory> historiesOf(Long inboxId) {
+        return jpaReviewRequestInboxHistoryRepository.findAll()
+                                                     .stream()
+                                                     .filter(history -> inboxId.equals(history.getInboxId()))
+                                                     .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))
+                                                     .toList();
     }
 
     @Test
