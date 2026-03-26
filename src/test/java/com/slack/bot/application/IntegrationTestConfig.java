@@ -13,6 +13,7 @@ import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
 import com.slack.bot.infrastructure.interaction.box.persistence.in.H2SlackInteractionInboxRepositoryAdapter;
+import com.slack.bot.infrastructure.interaction.box.persistence.in.JpaSlackInteractionInboxHistoryRepository;
 import com.slack.bot.infrastructure.interaction.box.persistence.in.JpaSlackInteractionInboxRepository;
 import com.slack.bot.infrastructure.interaction.box.persistence.out.H2SlackNotificationOutboxRepositoryAdapter;
 import com.slack.bot.infrastructure.interaction.box.persistence.out.JpaSlackNotificationOutboxRepository;
@@ -166,12 +167,14 @@ public class IntegrationTestConfig {
     public SlackInteractionInboxRepository slackInteractionInboxRepository(
             JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaSlackInteractionInboxRepository repository
+            JpaSlackInteractionInboxRepository repository,
+            JpaSlackInteractionInboxHistoryRepository historyRepository
     ) {
         return new H2SlackInteractionInboxRepositoryAdapter(
                 queryFactory,
                 namedParameterJdbcTemplate,
-                repository
+                repository,
+                historyRepository
         );
     }
 

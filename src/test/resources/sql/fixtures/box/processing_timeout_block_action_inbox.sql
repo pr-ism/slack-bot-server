@@ -8,10 +8,7 @@ INSERT INTO slack_interaction_inbox (
     status,
     processing_attempt,
     processing_started_at,
-    processed_at,
-    failed_at,
-    failure_reason,
-    failure_type
+    processed_at
 ) VALUES (
     200,
     NOW(),
@@ -22,8 +19,5 @@ INSERT INTO slack_interaction_inbox (
     'PROCESSING',
     1,
     DATEADD('MINUTE', -10, NOW()),
-    NULL,
-    NULL,
-    NULL,
     NULL
 );

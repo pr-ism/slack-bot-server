@@ -3,6 +3,7 @@ package com.slack.bot.application.interaction.box.in;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
@@ -97,7 +98,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         slackInteractionInboxEntryProcessor.processClaimedBlockAction(10L);
 
         // then
-        verify(slackInteractionInboxRepository, never()).save(any());
+        verify(slackInteractionInboxRepository, never()).save(any(), any());
         verify(blockActionInteractionService, never()).handle(any());
     }
 
@@ -123,7 +124,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         );
         verify(blockActionInteractionService).handle(any());
         verify(viewSubmissionInteractionCoordinator, never()).handleEnqueued(any());
-        verify(slackInteractionInboxRepository).save(actual);
+        verify(slackInteractionInboxRepository).save(eq(actual), any());
     }
 
     @Test
@@ -150,7 +151,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
                 () -> assertThat(actual.getFailureType()).isNull()
         );
-        verify(slackInteractionInboxRepository).save(actual);
+        verify(slackInteractionInboxRepository).save(eq(actual), any());
     }
 
     @Test
@@ -179,7 +180,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(2),
                 () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED)
         );
-        verify(slackInteractionInboxRepository).save(actual);
+        verify(slackInteractionInboxRepository).save(eq(actual), any());
     }
 
     @Test
@@ -206,7 +207,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
                 () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
                 () -> assertThat(actual.getFailureReason()).hasSize(500)
         );
-        verify(slackInteractionInboxRepository).save(actual);
+        verify(slackInteractionInboxRepository).save(eq(actual), any());
     }
 
     @Test
@@ -233,7 +234,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
                 () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
                 () -> assertThat(actual.getFailureReason()).isEqualTo("unknown failure")
         );
-        verify(slackInteractionInboxRepository).save(actual);
+        verify(slackInteractionInboxRepository).save(eq(actual), any());
     }
 
     @Test
@@ -258,7 +259,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         );
         verify(viewSubmissionInteractionCoordinator).handleEnqueued(any());
         verify(blockActionInteractionService, never()).handle(any());
-        verify(slackInteractionInboxRepository).save(actual);
+        verify(slackInteractionInboxRepository).save(eq(actual), any());
     }
 
     private void setProcessingState(

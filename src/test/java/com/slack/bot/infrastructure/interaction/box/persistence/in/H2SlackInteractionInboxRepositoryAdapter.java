@@ -8,9 +8,10 @@ public class H2SlackInteractionInboxRepositoryAdapter extends SlackInteractionIn
     public H2SlackInteractionInboxRepositoryAdapter(
             JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaSlackInteractionInboxRepository repository
+            JpaSlackInteractionInboxRepository repository,
+            JpaSlackInteractionInboxHistoryRepository historyRepository
     ) {
-        super(queryFactory, namedParameterJdbcTemplate, repository);
+        super(queryFactory, namedParameterJdbcTemplate, repository, historyRepository);
     }
 
     @Override

@@ -2,11 +2,12 @@ package com.slack.bot.infrastructure.interaction.box.persistence.in;
 
 import static com.slack.bot.infrastructure.interaction.box.in.QSlackInteractionInbox.slackInteractionInbox;
 
+import com.querydsl.core.Tuple;
 import com.querydsl.core.types.dsl.BooleanExpression;
-import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
+import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxHistory;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStatus;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
@@ -28,6 +29,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
     private final JPAQueryFactory queryFactory;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
     private final JpaSlackInteractionInboxRepository repository;
+    private final JpaSlackInteractionInboxHistoryRepository historyRepository;
 
     @Override
     public boolean enqueue(SlackInteractionInboxType interactionType, String idempotencyKey, String payloadJson) {
@@ -166,37 +168,85 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                                                                                               processingStartedBefore
                                                                                       ));
 
-        long exhaustedCount = queryFactory
-                .update(slackInteractionInbox)
-                .set(slackInteractionInbox.status, SlackInteractionInboxStatus.FAILED)
-                .set(slackInteractionInbox.processingStartedAt, Expressions.nullExpression(Instant.class))
-                .set(slackInteractionInbox.failedAt, failedAt)
-                .set(slackInteractionInbox.failureReason, failureReason)
-                .set(slackInteractionInbox.failureType, SlackInteractionFailureType.RETRY_EXHAUSTED)
+        int exhaustedCount = recoverTimeoutProcessingByStatus(
+                interactionType,
+                timeoutCondition,
+                slackInteractionInbox.processingAttempt.goe(maxAttempts),
+                SlackInteractionInboxStatus.FAILED,
+                failedAt,
+                failureReason,
+                SlackInteractionFailureType.RETRY_EXHAUSTED
+        );
+        int recoveredCount = recoverTimeoutProcessingByStatus(
+                interactionType,
+                timeoutCondition,
+                slackInteractionInbox.processingAttempt.lt(maxAttempts),
+                SlackInteractionInboxStatus.RETRY_PENDING,
+                failedAt,
+                failureReason,
+                null
+        );
+
+        return exhaustedCount + recoveredCount;
+    }
+
+    private int recoverTimeoutProcessingByStatus(
+            SlackInteractionInboxType interactionType,
+            BooleanExpression timeoutCondition,
+            BooleanExpression attemptCondition,
+            SlackInteractionInboxStatus targetStatus,
+            Instant failedAt,
+            String failureReason,
+            SlackInteractionFailureType failureType
+    ) {
+        List<Tuple> timedOutRows = queryFactory
+                .select(slackInteractionInbox.id, slackInteractionInbox.processingAttempt)
+                .from(slackInteractionInbox)
                 .where(
                         slackInteractionInbox.interactionType.eq(interactionType),
                         slackInteractionInbox.status.eq(SlackInteractionInboxStatus.PROCESSING),
                         timeoutCondition,
-                        slackInteractionInbox.processingAttempt.goe(maxAttempts)
+                        attemptCondition
                 )
-                .execute();
+                .fetch();
 
-        long recoveredCount = queryFactory
-                .update(slackInteractionInbox)
-                .set(slackInteractionInbox.status, SlackInteractionInboxStatus.RETRY_PENDING)
-                .set(slackInteractionInbox.processingStartedAt, Expressions.nullExpression(Instant.class))
-                .set(slackInteractionInbox.failedAt, failedAt)
-                .set(slackInteractionInbox.failureReason, failureReason)
-                .set(slackInteractionInbox.failureType, Expressions.nullExpression(SlackInteractionFailureType.class))
-                .where(
-                        slackInteractionInbox.interactionType.eq(interactionType),
-                        slackInteractionInbox.status.eq(SlackInteractionInboxStatus.PROCESSING),
-                        timeoutCondition,
-                        slackInteractionInbox.processingAttempt.lt(maxAttempts)
-                )
-                .execute();
+        int recoveredCount = 0;
+        for (Tuple row : timedOutRows) {
+            Long inboxId = row.get(slackInteractionInbox.id);
+            Integer processingAttempt = row.get(slackInteractionInbox.processingAttempt);
+            long updatedCount = queryFactory
+                    .update(slackInteractionInbox)
+                    .set(slackInteractionInbox.status, targetStatus)
+                    .set(slackInteractionInbox.processingStartedAt, (Instant) null)
+                    .set(slackInteractionInbox.failedAt, failedAt)
+                    .set(slackInteractionInbox.failureReason, failureReason)
+                    .set(slackInteractionInbox.failureType, failureType)
+                    .where(
+                            slackInteractionInbox.id.eq(inboxId),
+                            slackInteractionInbox.interactionType.eq(interactionType),
+                            slackInteractionInbox.status.eq(SlackInteractionInboxStatus.PROCESSING),
+                            timeoutCondition,
+                            attemptCondition
+                    )
+                    .execute();
+            if (updatedCount == 0) {
+                continue;
+            }
 
-        return Math.toIntExact(exhaustedCount + recoveredCount);
+            historyRepository.save(
+                    SlackInteractionInboxHistory.completed(
+                            inboxId,
+                            processingAttempt,
+                            targetStatus,
+                            failedAt,
+                            failureReason,
+                            failureType
+                    )
+            );
+            recoveredCount++;
+        }
+
+        return recoveredCount;
     }
 
     private void validateRecoverTimeoutProcessingArguments(
@@ -276,5 +326,16 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
     @Transactional
     public SlackInteractionInbox save(SlackInteractionInbox inbox) {
         return repository.save(inbox);
+    }
+
+    @Override
+    @Transactional
+    public SlackInteractionInbox save(SlackInteractionInbox inbox, SlackInteractionInboxHistory history) {
+        SlackInteractionInbox saved = repository.save(inbox);
+        if (history != null) {
+            historyRepository.save(history.bindInboxId(saved.getId()));
+        }
+
+        return saved;
     }
 }
