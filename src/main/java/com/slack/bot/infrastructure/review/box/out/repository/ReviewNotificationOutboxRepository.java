@@ -1,6 +1,7 @@
 package com.slack.bot.infrastructure.review.box.out.repository;
 
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
+import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxHistory;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Optional;
@@ -19,6 +20,12 @@ public interface ReviewNotificationOutboxRepository {
 
     boolean saveIfProcessingLeaseMatched(
             ReviewNotificationOutbox outbox,
+            Instant claimedProcessingStartedAt
+    );
+
+    boolean saveIfProcessingLeaseMatched(
+            ReviewNotificationOutbox outbox,
+            ReviewNotificationOutboxHistory history,
             Instant claimedProcessingStartedAt
     );
 

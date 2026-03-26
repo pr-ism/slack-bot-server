@@ -164,7 +164,7 @@ class ReviewNotificationOutboxTest {
 
         // when
         Instant sentAt = Instant.parse("2026-02-24T00:03:00Z");
-        outbox.markSent(sentAt);
+        ReviewNotificationOutboxHistory history = outbox.markSent(sentAt);
 
         // then
         assertAll(
@@ -172,7 +172,10 @@ class ReviewNotificationOutboxTest {
                 () -> assertThat(outbox.getSentAt()).isEqualTo(sentAt),
                 () -> assertThat(outbox.getFailedAt()).isNull(),
                 () -> assertThat(outbox.getFailureReason()).isNull(),
-                () -> assertThat(outbox.getFailureType()).isNull()
+                () -> assertThat(outbox.getFailureType()).isNull(),
+                () -> assertThat(history).isNotNull(),
+                () -> assertThat(history.getOutboxId()).isNull(),
+                () -> assertThat(history.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.SENT)
         );
     }
 
@@ -207,7 +210,7 @@ class ReviewNotificationOutboxTest {
 
         // when
         Instant failedAt = Instant.parse("2026-02-24T00:04:00Z");
-        outbox.markRetryPending(failedAt, "retry");
+        ReviewNotificationOutboxHistory history = outbox.markRetryPending(failedAt, "retry");
 
         // then
         assertAll(
@@ -215,7 +218,10 @@ class ReviewNotificationOutboxTest {
                 () -> assertThat(outbox.getProcessingStartedAt()).isNull(),
                 () -> assertThat(outbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(outbox.getFailureReason()).isEqualTo("retry"),
-                () -> assertThat(outbox.getFailureType()).isNull()
+                () -> assertThat(outbox.getFailureType()).isNull(),
+                () -> assertThat(history).isNotNull(),
+                () -> assertThat(history.getOutboxId()).isNull(),
+                () -> assertThat(history.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.RETRY_PENDING)
         );
     }
 
@@ -274,7 +280,11 @@ class ReviewNotificationOutboxTest {
 
         // when
         Instant failedAt = Instant.parse("2026-02-24T00:05:00Z");
-        outbox.markFailed(failedAt, "failure", SlackInteractionFailureType.RETRY_EXHAUSTED);
+        ReviewNotificationOutboxHistory history = outbox.markFailed(
+                failedAt,
+                "failure",
+                SlackInteractionFailureType.RETRY_EXHAUSTED
+        );
 
         // then
         assertAll(
@@ -282,7 +292,10 @@ class ReviewNotificationOutboxTest {
                 () -> assertThat(outbox.getProcessingStartedAt()).isNull(),
                 () -> assertThat(outbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(outbox.getFailureReason()).isEqualTo("failure"),
-                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED)
+                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
+                () -> assertThat(history).isNotNull(),
+                () -> assertThat(history.getOutboxId()).isNull(),
+                () -> assertThat(history.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.FAILED)
         );
     }
 

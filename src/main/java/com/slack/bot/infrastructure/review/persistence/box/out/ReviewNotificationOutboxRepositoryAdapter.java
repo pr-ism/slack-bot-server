@@ -2,11 +2,12 @@ package com.slack.bot.infrastructure.review.persistence.box.out;
 
 import static com.slack.bot.infrastructure.review.box.out.QReviewNotificationOutbox.reviewNotificationOutbox;
 
+import com.querydsl.core.Tuple;
 import com.querydsl.core.types.dsl.BooleanExpression;
-import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
+import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxHistory;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxStatus;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
 import java.sql.Timestamp;
@@ -27,6 +28,7 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
     private final JPAQueryFactory queryFactory;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
     private final JpaReviewNotificationOutboxRepository repository;
+    private final JpaReviewNotificationOutboxHistoryRepository historyRepository;
 
     @Override
     public boolean enqueue(ReviewNotificationOutbox outbox) {
@@ -96,6 +98,16 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
             ReviewNotificationOutbox outbox,
             Instant claimedProcessingStartedAt
     ) {
+        return saveIfProcessingLeaseMatched(outbox, null, claimedProcessingStartedAt);
+    }
+
+    @Override
+    @Transactional
+    public boolean saveIfProcessingLeaseMatched(
+            ReviewNotificationOutbox outbox,
+            ReviewNotificationOutboxHistory history,
+            Instant claimedProcessingStartedAt
+    ) {
         validateSaveIfProcessingLeaseMatchedArguments(outbox, claimedProcessingStartedAt);
 
         MapSqlParameterSource parameters = new MapSqlParameterSource()
@@ -126,7 +138,15 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                 parameters
         );
 
-        return updatedCount > 0;
+        if (updatedCount == 0) {
+            return false;
+        }
+
+        if (history != null) {
+            historyRepository.save(history.bindOutboxId(outbox.getId()));
+        }
+
+        return true;
     }
 
     @Override
@@ -243,45 +263,80 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                                                                                                   processingStartedBefore
                                                                                           ));
 
-        long exhaustedCount = queryFactory.update(reviewNotificationOutbox)
-                                          .set(reviewNotificationOutbox.status, ReviewNotificationOutboxStatus.FAILED)
-                                          .set(
-                                                  reviewNotificationOutbox.processingStartedAt,
-                                                  Expressions.nullExpression(Instant.class)
-                                          )
-                                          .set(reviewNotificationOutbox.failedAt, failedAt)
-                                          .set(reviewNotificationOutbox.failureReason, failureReason)
-                                          .set(
-                                                  reviewNotificationOutbox.failureType,
-                                                  SlackInteractionFailureType.RETRY_EXHAUSTED
-                                          )
-                                          .where(
-                                                  reviewNotificationOutbox.status.eq(ReviewNotificationOutboxStatus.PROCESSING),
-                                                  timeoutCondition,
-                                                  reviewNotificationOutbox.processingAttempt.goe(maxAttempts)
-                                          )
-                                          .execute();
+        int exhaustedCount = recoverTimeoutProcessingByStatus(
+                timeoutCondition,
+                reviewNotificationOutbox.processingAttempt.goe(maxAttempts),
+                ReviewNotificationOutboxStatus.FAILED,
+                failedAt,
+                failureReason,
+                SlackInteractionFailureType.RETRY_EXHAUSTED
+        );
+        int recoveredCount = recoverTimeoutProcessingByStatus(
+                timeoutCondition,
+                reviewNotificationOutbox.processingAttempt.lt(maxAttempts),
+                ReviewNotificationOutboxStatus.RETRY_PENDING,
+                failedAt,
+                failureReason,
+                null
+        );
 
-        long recoveredCount = queryFactory.update(reviewNotificationOutbox)
-                                          .set(reviewNotificationOutbox.status, ReviewNotificationOutboxStatus.RETRY_PENDING)
-                                          .set(
-                                                  reviewNotificationOutbox.processingStartedAt,
-                                                  Expressions.nullExpression(Instant.class)
-                                          )
-                                          .set(reviewNotificationOutbox.failedAt, failedAt)
-                                          .set(reviewNotificationOutbox.failureReason, failureReason)
-                                          .set(
-                                                  reviewNotificationOutbox.failureType,
-                                                  Expressions.nullExpression(SlackInteractionFailureType.class)
-                                          )
-                                          .where(
-                                                  reviewNotificationOutbox.status.eq(ReviewNotificationOutboxStatus.PROCESSING),
-                                                  timeoutCondition,
-                                                  reviewNotificationOutbox.processingAttempt.lt(maxAttempts)
-                                          )
-                                          .execute();
+        return exhaustedCount + recoveredCount;
+    }
 
-        return Math.toIntExact(exhaustedCount + recoveredCount);
+    private int recoverTimeoutProcessingByStatus(
+            BooleanExpression timeoutCondition,
+            BooleanExpression attemptCondition,
+            ReviewNotificationOutboxStatus targetStatus,
+            Instant failedAt,
+            String failureReason,
+            SlackInteractionFailureType failureType
+    ) {
+        List<Tuple> timedOutRows = queryFactory
+                .select(reviewNotificationOutbox.id, reviewNotificationOutbox.processingAttempt)
+                .from(reviewNotificationOutbox)
+                .where(
+                        reviewNotificationOutbox.status.eq(ReviewNotificationOutboxStatus.PROCESSING),
+                        timeoutCondition,
+                        attemptCondition
+                )
+                .fetch();
+
+        int recoveredCount = 0;
+        for (Tuple row : timedOutRows) {
+            Long outboxId = row.get(reviewNotificationOutbox.id);
+            Integer processingAttempt = row.get(reviewNotificationOutbox.processingAttempt);
+            long updatedCount = queryFactory
+                    .update(reviewNotificationOutbox)
+                    .set(reviewNotificationOutbox.status, targetStatus)
+                    .set(reviewNotificationOutbox.processingStartedAt, (Instant) null)
+                    .set(reviewNotificationOutbox.failedAt, failedAt)
+                    .set(reviewNotificationOutbox.failureReason, failureReason)
+                    .set(reviewNotificationOutbox.failureType, failureType)
+                    .where(
+                            reviewNotificationOutbox.id.eq(outboxId),
+                            reviewNotificationOutbox.status.eq(ReviewNotificationOutboxStatus.PROCESSING),
+                            timeoutCondition,
+                            attemptCondition
+                    )
+                    .execute();
+            if (updatedCount == 0) {
+                continue;
+            }
+
+            historyRepository.save(
+                    ReviewNotificationOutboxHistory.completed(
+                            outboxId,
+                            processingAttempt,
+                            targetStatus,
+                            failedAt,
+                            failureReason,
+                            failureType
+                    )
+            );
+            recoveredCount++;
+        }
+
+        return recoveredCount;
     }
 
     private void validateProcessingStartedAt(Instant processingStartedAt) {

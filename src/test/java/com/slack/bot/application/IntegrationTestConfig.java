@@ -29,6 +29,7 @@ import com.slack.bot.infrastructure.review.persistence.box.in.H2ReviewRequestInb
 import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxHistoryRepository;
 import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxRepository;
 import com.slack.bot.infrastructure.review.persistence.box.out.H2ReviewNotificationOutboxRepositoryAdapter;
+import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxHistoryRepository;
 import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxRepository;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.web.client.RestClient;
@@ -209,12 +210,14 @@ public class IntegrationTestConfig {
     public ReviewNotificationOutboxRepository reviewNotificationOutboxRepository(
             JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaReviewNotificationOutboxRepository repository
+            JpaReviewNotificationOutboxRepository repository,
+            JpaReviewNotificationOutboxHistoryRepository historyRepository
     ) {
         return new H2ReviewNotificationOutboxRepositoryAdapter(
                 queryFactory,
                 namedParameterJdbcTemplate,
-                repository
+                repository,
+                historyRepository
         );
     }
 }

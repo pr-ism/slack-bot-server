@@ -8,9 +8,10 @@ public class H2ReviewNotificationOutboxRepositoryAdapter extends ReviewNotificat
     public H2ReviewNotificationOutboxRepositoryAdapter(
             JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaReviewNotificationOutboxRepository repository
+            JpaReviewNotificationOutboxRepository repository,
+            JpaReviewNotificationOutboxHistoryRepository historyRepository
     ) {
-        super(queryFactory, namedParameterJdbcTemplate, repository);
+        super(queryFactory, namedParameterJdbcTemplate, repository, historyRepository);
     }
 
     @Override

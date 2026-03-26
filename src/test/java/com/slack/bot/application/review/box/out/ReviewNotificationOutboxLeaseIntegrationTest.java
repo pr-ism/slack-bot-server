@@ -13,10 +13,14 @@ import static org.mockito.Mockito.verify;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
+import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxHistory;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxStatus;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
+import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxHistoryRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -42,6 +46,9 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
 
     @Autowired
     Clock clock;
+
+    @Autowired
+    JpaReviewNotificationOutboxHistoryRepository jpaReviewNotificationOutboxHistoryRepository;
 
     @BeforeEach
     void setUp() {
@@ -112,12 +119,15 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
 
         // then
         ReviewNotificationOutbox actual = reviewNotificationOutboxRepository.findById(outbox.getId()).orElseThrow();
+        List<ReviewNotificationOutboxHistory> histories = historiesOf(outbox.getId());
 
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(1),
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.RETRY_PENDING),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actual.getFailureReason()).isNotBlank()
+                () -> assertThat(actual.getFailureReason()).isNotBlank(),
+                () -> assertThat(histories).hasSize(1),
+                () -> assertThat(histories.getFirst().getStatus()).isEqualTo(ReviewNotificationOutboxStatus.RETRY_PENDING)
         );
         verify(notificationTransportApiClient, never()).sendBlockMessage(
                 anyString(),
@@ -136,5 +146,13 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
                                        .blocksJson("[]")
                                        .fallbackText("fallback")
                                        .build();
+    }
+
+    private List<ReviewNotificationOutboxHistory> historiesOf(Long outboxId) {
+        return jpaReviewNotificationOutboxHistoryRepository.findAll()
+                                                           .stream()
+                                                           .filter(history -> outboxId.equals(history.getOutboxId()))
+                                                           .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))
+                                                           .toList();
     }
 }

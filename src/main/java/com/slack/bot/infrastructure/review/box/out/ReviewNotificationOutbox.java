@@ -79,7 +79,7 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
         this.processingAttempt = 0;
     }
 
-    public void markSent(Instant sentAt) {
+    public ReviewNotificationOutboxHistory markSent(Instant sentAt) {
         validateSentAt(sentAt);
         validateTransition(ReviewNotificationOutboxStatus.PROCESSING, "SENT");
 
@@ -88,6 +88,15 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
         this.failedAt = null;
         this.failureReason = null;
         this.failureType = null;
+
+        return ReviewNotificationOutboxHistory.completed(
+                getId(),
+                this.processingAttempt,
+                ReviewNotificationOutboxStatus.SENT,
+                sentAt,
+                null,
+                null
+        );
     }
 
     public void renewProcessingLease(Instant processingStartedAt) {
@@ -97,7 +106,7 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
         this.processingStartedAt = processingStartedAt;
     }
 
-    public void markRetryPending(Instant failedAt, String failureReason) {
+    public ReviewNotificationOutboxHistory markRetryPending(Instant failedAt, String failureReason) {
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
         validateTransition(ReviewNotificationOutboxStatus.PROCESSING, "RETRY_PENDING");
@@ -107,9 +116,22 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = null;
+
+        return ReviewNotificationOutboxHistory.completed(
+                getId(),
+                this.processingAttempt,
+                ReviewNotificationOutboxStatus.RETRY_PENDING,
+                failedAt,
+                failureReason,
+                null
+        );
     }
 
-    public void markFailed(Instant failedAt, String failureReason, SlackInteractionFailureType failureType) {
+    public ReviewNotificationOutboxHistory markFailed(
+            Instant failedAt,
+            String failureReason,
+            SlackInteractionFailureType failureType
+    ) {
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
         validateFailureType(failureType);
@@ -120,6 +142,15 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = failureType;
+
+        return ReviewNotificationOutboxHistory.completed(
+                getId(),
+                this.processingAttempt,
+                ReviewNotificationOutboxStatus.FAILED,
+                failedAt,
+                failureReason,
+                failureType
+        );
     }
 
     private void validateTransition(ReviewNotificationOutboxStatus expectedStatus, String targetStatus) {
