@@ -80,7 +80,7 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
         this.processingAttempt = 0;
     }
 
-    public void markSent(Instant sentAt) {
+    public SlackNotificationOutboxHistory markSent(Instant sentAt) {
         validateTransition(SlackNotificationOutboxStatus.PROCESSING, "SENT");
         validateSentAt(sentAt);
 
@@ -89,6 +89,15 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
         this.failedAt = null;
         this.failureReason = null;
         this.failureType = null;
+
+        return SlackNotificationOutboxHistory.completed(
+                getId(),
+                this.processingAttempt,
+                SlackNotificationOutboxStatus.SENT,
+                sentAt,
+                null,
+                null
+        );
     }
 
     public void renewProcessingLease(Instant processingStartedAt) {
@@ -98,7 +107,7 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
         this.processingStartedAt = processingStartedAt;
     }
 
-    public void markRetryPending(Instant failedAt, String failureReason) {
+    public SlackNotificationOutboxHistory markRetryPending(Instant failedAt, String failureReason) {
         validateTransition(SlackNotificationOutboxStatus.PROCESSING, "RETRY_PENDING");
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
@@ -108,9 +117,18 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = null;
+
+        return SlackNotificationOutboxHistory.completed(
+                getId(),
+                this.processingAttempt,
+                SlackNotificationOutboxStatus.RETRY_PENDING,
+                failedAt,
+                failureReason,
+                null
+        );
     }
 
-    public void markFailed(
+    public SlackNotificationOutboxHistory markFailed(
             Instant failedAt,
             String failureReason,
             SlackInteractionFailureType failureType
@@ -121,9 +139,19 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
         validateFailureType(failureType);
 
         this.status = SlackNotificationOutboxStatus.FAILED;
+        this.processingStartedAt = null;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = failureType;
+
+        return SlackNotificationOutboxHistory.completed(
+                getId(),
+                this.processingAttempt,
+                SlackNotificationOutboxStatus.FAILED,
+                failedAt,
+                failureReason,
+                failureType
+        );
     }
 
     private void validateTransition(SlackNotificationOutboxStatus expected, String targetStatus) {

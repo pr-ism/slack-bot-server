@@ -310,8 +310,7 @@ class SlackNotificationOutboxTest {
 
         // when
         Instant sentAt = Instant.parse("2026-02-15T01:00:00Z");
-
-        outbox.markSent(sentAt);
+        SlackNotificationOutboxHistory history = outbox.markSent(sentAt);
 
         // then
         assertAll(
@@ -319,7 +318,10 @@ class SlackNotificationOutboxTest {
                 () -> assertThat(outbox.getSentAt()).isEqualTo(sentAt),
                 () -> assertThat(outbox.getFailedAt()).isNull(),
                 () -> assertThat(outbox.getFailureReason()).isNull(),
-                () -> assertThat(outbox.getFailureType()).isNull()
+                () -> assertThat(outbox.getFailureType()).isNull(),
+                () -> assertThat(history).isNotNull(),
+                () -> assertThat(history.getOutboxId()).isNull(),
+                () -> assertThat(history.getStatus()).isEqualTo(SlackNotificationOutboxStatus.SENT)
         );
     }
 
@@ -343,15 +345,21 @@ class SlackNotificationOutboxTest {
 
         // when
         Instant failedAt = Instant.parse("2026-02-15T02:00:00Z");
-
-        outbox.markFailed(failedAt, "failure", SlackInteractionFailureType.RETRY_EXHAUSTED);
+        SlackNotificationOutboxHistory history = outbox.markFailed(
+                failedAt,
+                "failure",
+                SlackInteractionFailureType.RETRY_EXHAUSTED
+        );
 
         // then
         assertAll(
                 () -> assertThat(outbox.getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED),
                 () -> assertThat(outbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(outbox.getFailureReason()).isEqualTo("failure"),
-                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED)
+                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
+                () -> assertThat(history).isNotNull(),
+                () -> assertThat(history.getOutboxId()).isNull(),
+                () -> assertThat(history.getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED)
         );
     }
 
@@ -363,8 +371,7 @@ class SlackNotificationOutboxTest {
 
         // when
         Instant failedAt = Instant.parse("2026-02-15T03:00:00Z");
-
-        outbox.markRetryPending(failedAt, "retry");
+        SlackNotificationOutboxHistory history = outbox.markRetryPending(failedAt, "retry");
 
         // then
         assertAll(
@@ -372,7 +379,10 @@ class SlackNotificationOutboxTest {
                 () -> assertThat(outbox.getProcessingStartedAt()).isNull(),
                 () -> assertThat(outbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(outbox.getFailureReason()).isEqualTo("retry"),
-                () -> assertThat(outbox.getFailureType()).isNull()
+                () -> assertThat(outbox.getFailureType()).isNull(),
+                () -> assertThat(history).isNotNull(),
+                () -> assertThat(history.getOutboxId()).isNull(),
+                () -> assertThat(history.getStatus()).isEqualTo(SlackNotificationOutboxStatus.RETRY_PENDING)
         );
     }
 

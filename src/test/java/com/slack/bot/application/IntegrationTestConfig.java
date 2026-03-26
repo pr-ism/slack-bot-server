@@ -16,6 +16,7 @@ import com.slack.bot.infrastructure.interaction.box.persistence.in.H2SlackIntera
 import com.slack.bot.infrastructure.interaction.box.persistence.in.JpaSlackInteractionInboxHistoryRepository;
 import com.slack.bot.infrastructure.interaction.box.persistence.in.JpaSlackInteractionInboxRepository;
 import com.slack.bot.infrastructure.interaction.box.persistence.out.H2SlackNotificationOutboxRepositoryAdapter;
+import com.slack.bot.infrastructure.interaction.box.persistence.out.JpaSlackNotificationOutboxHistoryRepository;
 import com.slack.bot.infrastructure.interaction.box.persistence.out.JpaSlackNotificationOutboxRepository;
 import com.slack.bot.infrastructure.review.batch.SpyReviewNotificationService;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
@@ -183,12 +184,14 @@ public class IntegrationTestConfig {
     public SlackNotificationOutboxRepository slackNotificationOutboxRepository(
             JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaSlackNotificationOutboxRepository repository
+            JpaSlackNotificationOutboxRepository repository,
+            JpaSlackNotificationOutboxHistoryRepository historyRepository
     ) {
         return new H2SlackNotificationOutboxRepositoryAdapter(
                 queryFactory,
                 namedParameterJdbcTemplate,
-                repository
+                repository,
+                historyRepository
         );
     }
 

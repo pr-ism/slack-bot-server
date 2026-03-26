@@ -14,6 +14,7 @@ import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.global.config.properties.InteractionWorkerProperties;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
+import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxHistory;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
@@ -116,22 +117,24 @@ public class SlackNotificationOutboxProcessor {
                     outbox.getId(),
                     e
             );
-            markFailureStatus(outbox, e);
-            persistFailureStatus(outbox, currentProcessingStartedAt.get());
+            SlackNotificationOutboxHistory history = markFailureStatus(outbox, e);
+            persistFailureStatus(outbox, history, currentProcessingStartedAt.get());
             return;
         }
 
-        outbox.markSent(clock.instant());
-        persistSentStatus(outbox, currentProcessingStartedAt.get());
+        SlackNotificationOutboxHistory history = outbox.markSent(clock.instant());
+        persistSentStatus(outbox, history, currentProcessingStartedAt.get());
     }
 
     private void persistSentStatus(
             SlackNotificationOutbox outbox,
+            SlackNotificationOutboxHistory history,
             Instant claimedProcessingStartedAt
     ) {
         try {
             boolean updated = slackNotificationOutboxRepository.saveIfProcessingLeaseMatched(
                     outbox,
+                    history,
                     claimedProcessingStartedAt
             );
             if (updated) {
@@ -151,11 +154,13 @@ public class SlackNotificationOutboxProcessor {
 
     private void persistFailureStatus(
             SlackNotificationOutbox outbox,
+            SlackNotificationOutboxHistory history,
             Instant claimedProcessingStartedAt
     ) {
         try {
             boolean updated = slackNotificationOutboxRepository.saveIfProcessingLeaseMatched(
                     outbox,
+                    history,
                     claimedProcessingStartedAt
             );
             if (updated) {
@@ -231,20 +236,18 @@ public class SlackNotificationOutboxProcessor {
         return workspace.getAccessToken();
     }
 
-    private void markFailureStatus(SlackNotificationOutbox outbox, Exception exception) {
+    private SlackNotificationOutboxHistory markFailureStatus(SlackNotificationOutbox outbox, Exception exception) {
         String reason = resolveFailureReason(exception);
 
         if (!retryExceptionClassifier.isRetryable(exception)) {
-            outbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.BUSINESS_INVARIANT);
-            return;
+            return outbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.BUSINESS_INVARIANT);
         }
 
         if (outbox.getProcessingAttempt() < interactionRetryProperties.outbox().maxAttempts()) {
-            outbox.markRetryPending(clock.instant(), reason);
-            return;
+            return outbox.markRetryPending(clock.instant(), reason);
         }
 
-        outbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.RETRY_EXHAUSTED);
+        return outbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.RETRY_EXHAUSTED);
     }
 
     private String resolveFailureReason(Exception exception) {
