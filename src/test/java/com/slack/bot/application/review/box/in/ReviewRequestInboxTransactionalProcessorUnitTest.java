@@ -131,7 +131,7 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actual.getFailureType()).isNull()
+                () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE)
         );
         verify(reviewRequestInboxRepository, never()).save(actual);
         verify(reviewRequestInboxRepository, never()).saveIfProcessingLeaseMatched(any(), any(), any());
@@ -212,7 +212,7 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
         // then
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
-                () -> assertThat(actual.getFailureType()).isNull(),
+                () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
                 () -> assertThat(actual.getFailureReason()).isNotBlank()
         );
     }
@@ -260,8 +260,8 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
         // then
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING),
-                () -> assertThat(actual.getFailureType()).isNull(),
-                () -> assertThat(actual.getFailureReason()).isNull()
+                () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
+                () -> assertThat(actual.getFailureReason()).isEqualTo(ReviewRequestInbox.NO_FAILURE_REASON)
         );
     }
 

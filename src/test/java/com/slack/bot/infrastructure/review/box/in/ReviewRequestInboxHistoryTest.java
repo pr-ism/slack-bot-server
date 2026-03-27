@@ -22,7 +22,7 @@ class ReviewRequestInboxHistoryTest {
                 ReviewRequestInboxStatus.RETRY_PENDING,
                 Instant.parse("2026-03-27T00:00:00Z"),
                 "failure",
-                null
+                ReviewRequestInboxFailureType.NONE
         );
 
         // then
@@ -64,8 +64,8 @@ class ReviewRequestInboxHistoryTest {
                 1,
                 ReviewRequestInboxStatus.PROCESSED,
                 Instant.parse("2026-03-27T00:00:00Z"),
-                null,
-                null
+                ReviewRequestInbox.NO_FAILURE_REASON,
+                ReviewRequestInboxFailureType.NONE
         );
 
         // when & then

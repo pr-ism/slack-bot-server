@@ -27,7 +27,8 @@ class ReviewRequestInboxTest {
                 () -> assertThat(inbox.getRequestJson()).isEqualTo("{\"githubPullRequestId\":42}"),
                 () -> assertThat(inbox.getAvailableAt()).isEqualTo(Instant.parse("2026-02-24T00:00:00Z")),
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING),
-                () -> assertThat(inbox.getProcessingAttempt()).isZero()
+                () -> assertThat(inbox.getProcessingAttempt()).isZero(),
+                () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE)
         );
     }
 
@@ -190,12 +191,13 @@ class ReviewRequestInboxTest {
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
                 () -> assertThat(inbox.getProcessedAt()).isEqualTo(processedAt),
                 () -> assertThat(inbox.getProcessingStartedAt()).isNull(),
-                () -> assertThat(inbox.getFailedAt()).isNull(),
-                () -> assertThat(inbox.getFailureReason()).isNull(),
-                () -> assertThat(inbox.getFailureType()).isNull(),
+                () -> assertThat(inbox.getFailedAt()).isEqualTo(ReviewRequestInbox.NO_FAILURE_AT),
+                () -> assertThat(inbox.getFailureReason()).isEqualTo(ReviewRequestInbox.NO_FAILURE_REASON),
+                () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
                 () -> assertThat(history).isNotNull(),
                 () -> assertThat(history.getInboxId()).isNull(),
-                () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED)
+                () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
+                () -> assertThat(history.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE)
         );
     }
 
@@ -238,10 +240,11 @@ class ReviewRequestInboxTest {
                 () -> assertThat(inbox.getProcessingStartedAt()).isNull(),
                 () -> assertThat(inbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(inbox.getFailureReason()).isEqualTo("retry"),
-                () -> assertThat(inbox.getFailureType()).isNull(),
+                () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
                 () -> assertThat(history).isNotNull(),
                 () -> assertThat(history.getInboxId()).isNull(),
-                () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING)
+                () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
+                () -> assertThat(history.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE)
         );
     }
 
@@ -368,15 +371,21 @@ class ReviewRequestInboxTest {
     }
 
     @Test
-    void markFailed는_failureType이_null이면_예외를_던진다() {
+    void markFailed는_failureType이_NONE이면_예외를_던진다() {
         // given
         ReviewRequestInbox inbox = pendingInbox();
         setProcessingState(inbox, Instant.parse("2026-02-24T00:10:00Z"), 1);
 
         // when & then
-        assertThatThrownBy(() -> inbox.markFailed(Instant.parse("2026-02-24T00:15:00Z"), "failure", null))
+        assertThatThrownBy(
+                () -> inbox.markFailed(
+                        Instant.parse("2026-02-24T00:15:00Z"),
+                        "failure",
+                        ReviewRequestInboxFailureType.NONE
+                )
+        )
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("failureType은 비어 있을 수 없습니다.");
+                .hasMessage("failureType은 NONE일 수 없습니다.");
     }
 
     @Test
@@ -410,8 +419,8 @@ class ReviewRequestInboxTest {
         ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
         ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
         ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(inbox, "failedAt", null);
-        ReflectionTestUtils.setField(inbox, "failureReason", null);
-        ReflectionTestUtils.setField(inbox, "failureType", null);
+        ReflectionTestUtils.setField(inbox, "failedAt", ReviewRequestInbox.NO_FAILURE_AT);
+        ReflectionTestUtils.setField(inbox, "failureReason", ReviewRequestInbox.NO_FAILURE_REASON);
+        ReflectionTestUtils.setField(inbox, "failureType", ReviewRequestInboxFailureType.NONE);
     }
 }

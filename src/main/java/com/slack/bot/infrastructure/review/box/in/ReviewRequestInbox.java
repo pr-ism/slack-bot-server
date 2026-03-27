@@ -16,6 +16,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ReviewRequestInbox extends BaseTimeEntity {
 
+    public static final Instant NO_FAILURE_AT = Instant.EPOCH;
+
+    public static final String NO_FAILURE_REASON = "";
+
     private String idempotencyKey;
 
     private String apiKey;
@@ -112,6 +116,9 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         this.availableAt = availableAt;
         this.status = status;
         this.processingAttempt = processingAttempt;
+        this.failedAt = NO_FAILURE_AT;
+        this.failureReason = NO_FAILURE_REASON;
+        this.failureType = ReviewRequestInboxFailureType.NONE;
     }
 
     public ReviewRequestInboxHistory markProcessed(Instant processedAt) {
@@ -121,17 +128,17 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         this.status = ReviewRequestInboxStatus.PROCESSED;
         this.processingStartedAt = null;
         this.processedAt = processedAt;
-        this.failedAt = null;
-        this.failureReason = null;
-        this.failureType = null;
+        this.failedAt = NO_FAILURE_AT;
+        this.failureReason = NO_FAILURE_REASON;
+        this.failureType = ReviewRequestInboxFailureType.NONE;
 
         return ReviewRequestInboxHistory.completed(
                 getId(),
                 this.processingAttempt,
                 ReviewRequestInboxStatus.PROCESSED,
                 processedAt,
-                null,
-                null
+                NO_FAILURE_REASON,
+                ReviewRequestInboxFailureType.NONE
         );
     }
 
@@ -151,7 +158,7 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         this.processingStartedAt = null;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
-        this.failureType = null;
+        this.failureType = ReviewRequestInboxFailureType.NONE;
 
         return ReviewRequestInboxHistory.completed(
                 getId(),
@@ -159,7 +166,7 @@ public class ReviewRequestInbox extends BaseTimeEntity {
                 ReviewRequestInboxStatus.RETRY_PENDING,
                 failedAt,
                 failureReason,
-                null
+                ReviewRequestInboxFailureType.NONE
         );
     }
 
@@ -214,8 +221,8 @@ public class ReviewRequestInbox extends BaseTimeEntity {
     }
 
     private void validateFailureType(ReviewRequestInboxFailureType failureType) {
-        if (failureType == null) {
-            throw new IllegalArgumentException("failureType은 비어 있을 수 없습니다.");
+        if (failureType == null || failureType == ReviewRequestInboxFailureType.NONE) {
+            throw new IllegalArgumentException("failureType은 NONE일 수 없습니다.");
         }
     }
 

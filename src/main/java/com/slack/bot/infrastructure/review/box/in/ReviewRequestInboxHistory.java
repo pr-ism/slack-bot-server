@@ -130,7 +130,8 @@ public class ReviewRequestInboxHistory extends BaseTimeEntity {
             ReviewRequestInboxFailureType failureType
     ) {
         if (status == ReviewRequestInboxStatus.PROCESSED) {
-            if (failureReason != null || failureType != null) {
+            if (!ReviewRequestInbox.NO_FAILURE_REASON.equals(failureReason)
+                    || failureType != ReviewRequestInboxFailureType.NONE) {
                 throw new IllegalArgumentException("PROCESSED history에는 실패 정보가 없어야 합니다.");
             }
             return;
@@ -139,10 +140,10 @@ public class ReviewRequestInboxHistory extends BaseTimeEntity {
         if (failureReason == null || failureReason.isBlank()) {
             throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
         }
-        if (status == ReviewRequestInboxStatus.FAILED && failureType == null) {
+        if (status == ReviewRequestInboxStatus.FAILED && failureType == ReviewRequestInboxFailureType.NONE) {
             throw new IllegalArgumentException("FAILED history에는 failureType이 필요합니다.");
         }
-        if (status == ReviewRequestInboxStatus.RETRY_PENDING && failureType != null) {
+        if (status == ReviewRequestInboxStatus.RETRY_PENDING && failureType != ReviewRequestInboxFailureType.NONE) {
             throw new IllegalArgumentException("RETRY_PENDING history에는 failureType이 없어야 합니다.");
         }
     }

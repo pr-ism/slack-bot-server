@@ -65,7 +65,10 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                 .addValue("requestJson", inbox.getRequestJson())
                 .addValue("availableAt", Timestamp.from(inbox.getAvailableAt()))
                 .addValue("pendingStatus", ReviewRequestInboxStatus.PENDING.name())
-                .addValue("retryPendingStatus", ReviewRequestInboxStatus.RETRY_PENDING.name());
+                .addValue("retryPendingStatus", ReviewRequestInboxStatus.RETRY_PENDING.name())
+                .addValue("noFailureAt", Timestamp.from(ReviewRequestInbox.NO_FAILURE_AT))
+                .addValue("noFailureReason", ReviewRequestInbox.NO_FAILURE_REASON)
+                .addValue("noneFailureType", ReviewRequestInboxFailureType.NONE.name());
 
         namedParameterJdbcTemplate.update(
                 buildUpsertPendingSql(),
@@ -115,12 +118,15 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                     SET status = :processingStatus,
                         processing_attempt = processing_attempt + 1,
                         processing_started_at = :processingStartedAt,
-                        failed_at = NULL,
-                        failure_reason = NULL,
-                        failure_type = NULL
+                        failed_at = :noFailureAt,
+                        failure_reason = :noFailureReason,
+                        failure_type = :noneFailureType
                     WHERE id = :inboxId
                     """,
                 updateParameters
+                        .addValue("noFailureAt", Timestamp.from(ReviewRequestInbox.NO_FAILURE_AT))
+                        .addValue("noFailureReason", ReviewRequestInbox.NO_FAILURE_REASON)
+                        .addValue("noneFailureType", ReviewRequestInboxFailureType.NONE.name())
         );
         if (updatedCount == 0) {
             return Optional.empty();
@@ -242,7 +248,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                 ReviewRequestInboxStatus.RETRY_PENDING,
                 failedAt,
                 failureReason,
-                null
+                ReviewRequestInboxFailureType.NONE
         );
 
         return exhaustedCount + recoveredCount;
@@ -439,17 +445,17 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                     ),
                     failed_at = IF(
                         status IN (:pendingStatus, :retryPendingStatus),
-                        NULL,
+                        :noFailureAt,
                         failed_at
                     ),
                     failure_reason = IF(
                         status IN (:pendingStatus, :retryPendingStatus),
-                        NULL,
+                        :noFailureReason,
                         failure_reason
                     ),
                     failure_type = IF(
                         status IN (:pendingStatus, :retryPendingStatus),
-                        NULL,
+                        :noneFailureType,
                         failure_type
                     )
                 """;
@@ -550,7 +556,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
 
     private String resolveFailureTypeName(ReviewRequestInbox inbox) {
         if (inbox.getFailureType() == null) {
-            return null;
+            return ReviewRequestInboxFailureType.NONE.name();
         }
 
         return inbox.getFailureType().name();
