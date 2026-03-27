@@ -171,7 +171,7 @@ public class ReviewRequestRoundCoordinator {
                                       .stream()
                                       .filter(roundReviewer -> roundReviewer.isReviewed())
                                       .map(roundReviewer -> roundReviewer.getReviewerGithubId())
-                                      .collect(Collectors.toCollection(LinkedHashSet::new));
+                                      .collect(Collectors.toCollection(() -> new LinkedHashSet<>()));
     }
 
     private boolean upsertReviewer(

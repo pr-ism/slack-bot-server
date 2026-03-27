@@ -15,7 +15,9 @@ import com.slack.bot.application.interaction.block.BlockActionType;
 import com.slack.bot.application.interaction.box.ProcessingSourceContext;
 import com.slack.bot.application.interaction.client.NotificationApiClient;
 import com.slack.bot.domain.reservation.ReservationStatus;
+import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.repository.ReviewReservationRepository;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -65,7 +67,7 @@ class BlockActionInteractionServiceTest {
                         any(),
                         any()
                 );
-        var actual = actualReviewReservationRepository.findById(100L);
+        Optional<ReviewReservation> actual = actualReviewReservationRepository.findById(100L);
         assertThat(actual)
                         .isPresent()
                         .get()
@@ -95,7 +97,7 @@ class BlockActionInteractionServiceTest {
                         any(),
                         any()
                 );
-        var actual = actualReviewReservationRepository.findById(100L);
+        Optional<ReviewReservation> actual = actualReviewReservationRepository.findById(100L);
         assertThat(actual)
                         .isPresent()
                         .get()
