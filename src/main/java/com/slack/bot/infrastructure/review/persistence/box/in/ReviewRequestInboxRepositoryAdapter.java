@@ -242,6 +242,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                 ReviewRequestInboxStatus.FAILED,
                 failedAt,
                 failureReason,
+                ReviewRequestInboxFailureType.RETRY_EXHAUSTED,
                 ReviewRequestInboxFailureType.RETRY_EXHAUSTED
         );
         int recoveredCount = recoverTimeoutProcessingByStatus(
@@ -250,7 +251,8 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                 ReviewRequestInboxStatus.RETRY_PENDING,
                 failedAt,
                 failureReason,
-                ReviewRequestInboxFailureType.NONE
+                ReviewRequestInboxFailureType.NONE,
+                ReviewRequestInboxFailureType.PROCESSING_TIMEOUT
         );
 
         return exhaustedCount + recoveredCount;
@@ -262,7 +264,8 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
             ReviewRequestInboxStatus targetStatus,
             Instant failedAt,
             String failureReason,
-            ReviewRequestInboxFailureType failureType
+            ReviewRequestInboxFailureType snapshotFailureType,
+            ReviewRequestInboxFailureType historyFailureType
     ) {
         List<Tuple> timedOutRows = queryFactory
                 .select(reviewRequestInbox.id, reviewRequestInbox.processingAttempt)
@@ -288,7 +291,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                     .set(reviewRequestInbox.processedAt, FailureSnapshotDefaults.NO_PROCESSED_AT)
                     .set(reviewRequestInbox.failedAt, failedAt)
                     .set(reviewRequestInbox.failureReason, failureReason)
-                    .set(reviewRequestInbox.failureType, failureType)
+                    .set(reviewRequestInbox.failureType, snapshotFailureType)
                     .where(
                             reviewRequestInbox.id.eq(inboxId),
                             reviewRequestInbox.status.eq(ReviewRequestInboxStatus.PROCESSING),
@@ -307,7 +310,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                             targetStatus,
                             failedAt,
                             failureReason,
-                            failureType
+                            historyFailureType
                     )
             );
             recoveredCount++;

@@ -7,6 +7,7 @@ import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
+import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxHistory;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import java.time.Instant;
@@ -26,6 +27,9 @@ class ReviewRequestInboxRepositoryAdapterTest {
 
     @Autowired
     JpaReviewRequestInboxRepository jpaReviewRequestInboxRepository;
+
+    @Autowired
+    JpaReviewRequestInboxHistoryRepository jpaReviewRequestInboxHistoryRepository;
 
     @Test
     void 신규_upsertPending은_failure_snapshot을_sentinel값으로_저장한다() {
@@ -134,6 +138,42 @@ class ReviewRequestInboxRepositoryAdapterTest {
         );
     }
 
+    @Test
+    void PROCESSING_타임아웃을_RETRY_PENDING으로_복구하면_history에는_PROCESSING_TIMEOUT을_남긴다() {
+        // given
+        ReviewRequestInbox inbox = ReviewRequestInbox.pending(
+                "api-key:44",
+                "api-key",
+                44L,
+                "{\"pullRequestTitle\":\"old\"}",
+                Instant.parse("2026-02-24T00:00:00Z")
+        );
+        setProcessingState(inbox, Instant.parse("2026-02-24T00:01:00Z"), 1);
+        ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
+        Instant failedAt = Instant.parse("2026-02-24T00:05:00Z");
+
+        // when
+        int recoveredCount = reviewRequestInboxRepository.recoverTimeoutProcessing(
+                Instant.parse("2026-02-24T00:02:00Z"),
+                failedAt,
+                "timeout",
+                3
+        );
+
+        // then
+        ReviewRequestInbox actual = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
+        ReviewRequestInboxHistory history = findLatestHistory(saved.getId());
+        assertAll(
+                () -> assertThat(recoveredCount).isEqualTo(1),
+                () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
+                () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
+                () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
+                () -> assertThat(history.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.PROCESSING_TIMEOUT),
+                () -> assertThat(history.getFailureReason()).isEqualTo("timeout"),
+                () -> assertThat(history.getCompletedAt()).isEqualTo(failedAt)
+        );
+    }
+
     private void setProcessingState(ReviewRequestInbox inbox, Instant processingStartedAt, int processingAttempt) {
         ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
         ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
@@ -152,5 +192,24 @@ class ReviewRequestInboxRepositoryAdapterTest {
         }
 
         throw new IllegalArgumentException("해당 idempotencyKey의 inbox가 없습니다.");
+    }
+
+    private ReviewRequestInboxHistory findLatestHistory(Long inboxId) {
+        ReviewRequestInboxHistory latestHistory = null;
+
+        for (ReviewRequestInboxHistory history : jpaReviewRequestInboxHistoryRepository.findAll()) {
+            if (!inboxId.equals(history.getInboxId())) {
+                continue;
+            }
+            if (latestHistory == null || history.getCreatedAt().isAfter(latestHistory.getCreatedAt())) {
+                latestHistory = history;
+            }
+        }
+
+        if (latestHistory == null) {
+            throw new IllegalArgumentException("해당 inboxId의 history가 없습니다.");
+        }
+
+        return latestHistory;
     }
 }

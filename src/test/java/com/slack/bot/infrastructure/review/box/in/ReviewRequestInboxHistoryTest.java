@@ -74,4 +74,23 @@ class ReviewRequestInboxHistoryTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("history inboxId를 다른 값으로 변경할 수 없습니다.");
     }
+
+    @Test
+    void RETRY_PENDING_history는_PROCESSING_TIMEOUT_failureType을_허용한다() {
+        // when
+        ReviewRequestInboxHistory history = ReviewRequestInboxHistory.completed(
+                10L,
+                1,
+                ReviewRequestInboxStatus.RETRY_PENDING,
+                Instant.parse("2026-03-27T00:00:00Z"),
+                "timeout",
+                ReviewRequestInboxFailureType.PROCESSING_TIMEOUT
+        );
+
+        // then
+        assertAll(
+                () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
+                () -> assertThat(history.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.PROCESSING_TIMEOUT)
+        );
+    }
 }
