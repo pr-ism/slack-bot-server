@@ -13,6 +13,7 @@ import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxR
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -175,6 +176,51 @@ class ReviewRequestInboxRepositoryAdapterTest {
                 () -> assertThat(history.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.PROCESSING_TIMEOUT),
                 () -> assertThat(history.getFailureReason()).isEqualTo("timeout"),
                 () -> assertThat(history.getCompletedAt()).isEqualTo(failedAt)
+        );
+    }
+
+    @Test
+    void PROCESSING_타임아웃_복구는_배치_크기만큼만_처리한다() {
+        // given
+        Instant base = Instant.parse("2026-02-24T00:10:00Z");
+        List<Long> inboxIds = new java.util.ArrayList<>();
+        for (int index = 0; index < 101; index++) {
+            ReviewRequestInbox inbox = ReviewRequestInbox.pending(
+                    "api-key:batch:" + index,
+                    "api-key",
+                    1000L + index,
+                    "{\"pullRequestTitle\":\"batch-" + index + "\"}",
+                    Instant.parse("2026-02-24T00:00:00Z")
+            );
+            setProcessingState(inbox, base.minusSeconds(120L + index), 1);
+            ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
+            inboxIds.add(saved.getId());
+        }
+
+        // when
+        int recoveredCount = reviewRequestInboxRepository.recoverTimeoutProcessing(
+                base.minusSeconds(60),
+                base,
+                "timeout",
+                3
+        );
+
+        // then
+        List<ReviewRequestInbox> actualInboxes = inboxIds.stream()
+                                                         .map(inboxId -> jpaReviewRequestInboxRepository.findById(inboxId).orElseThrow())
+                                                         .toList();
+        List<ReviewRequestInboxHistory> actualHistories = jpaReviewRequestInboxHistoryRepository.findAll();
+        assertAll(
+                () -> assertThat(recoveredCount).isEqualTo(100),
+                () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == ReviewRequestInboxStatus.RETRY_PENDING)
+                        .hasSize(100),
+                () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == ReviewRequestInboxStatus.PROCESSING)
+                        .hasSize(1),
+                () -> assertThat(actualHistories).filteredOn(history -> history.getStatus() == ReviewRequestInboxStatus.RETRY_PENDING)
+                        .hasSize(100),
+                () -> assertThat(actualHistories).filteredOn(
+                        history -> history.getFailureType() == ReviewRequestInboxFailureType.PROCESSING_TIMEOUT
+                ).hasSize(100)
         );
     }
 
