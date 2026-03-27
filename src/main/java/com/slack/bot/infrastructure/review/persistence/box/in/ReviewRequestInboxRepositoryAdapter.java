@@ -5,6 +5,7 @@ import static com.slack.bot.infrastructure.review.box.in.QReviewRequestInbox.rev
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxHistory;
@@ -66,8 +67,8 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                 .addValue("availableAt", Timestamp.from(inbox.getAvailableAt()))
                 .addValue("pendingStatus", ReviewRequestInboxStatus.PENDING.name())
                 .addValue("retryPendingStatus", ReviewRequestInboxStatus.RETRY_PENDING.name())
-                .addValue("noFailureAt", Timestamp.from(ReviewRequestInbox.NO_FAILURE_AT))
-                .addValue("noFailureReason", ReviewRequestInbox.NO_FAILURE_REASON)
+                .addValue("noFailureAt", Timestamp.from(FailureSnapshotDefaults.NO_FAILURE_AT))
+                .addValue("noFailureReason", FailureSnapshotDefaults.NO_FAILURE_REASON)
                 .addValue("noneFailureType", ReviewRequestInboxFailureType.NONE.name());
 
         namedParameterJdbcTemplate.update(
@@ -124,8 +125,8 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                     WHERE id = :inboxId
                     """,
                 updateParameters
-                        .addValue("noFailureAt", Timestamp.from(ReviewRequestInbox.NO_FAILURE_AT))
-                        .addValue("noFailureReason", ReviewRequestInbox.NO_FAILURE_REASON)
+                        .addValue("noFailureAt", Timestamp.from(FailureSnapshotDefaults.NO_FAILURE_AT))
+                        .addValue("noFailureReason", FailureSnapshotDefaults.NO_FAILURE_REASON)
                         .addValue("noneFailureType", ReviewRequestInboxFailureType.NONE.name())
         );
         if (updatedCount == 0) {

@@ -1,6 +1,7 @@
 package com.slack.bot.infrastructure.review.box.in;
 
 import com.slack.bot.domain.common.BaseTimeEntity;
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -130,7 +131,7 @@ public class ReviewRequestInboxHistory extends BaseTimeEntity {
             ReviewRequestInboxFailureType failureType
     ) {
         if (status == ReviewRequestInboxStatus.PROCESSED) {
-            if (!ReviewRequestInbox.NO_FAILURE_REASON.equals(failureReason)
+            if (!FailureSnapshotDefaults.NO_FAILURE_REASON.equals(failureReason)
                     || failureType != ReviewRequestInboxFailureType.NONE) {
                 throw new IllegalArgumentException("PROCESSED history에는 실패 정보가 없어야 합니다.");
             }

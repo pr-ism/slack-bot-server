@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -317,8 +318,8 @@ class SlackNotificationOutboxTest {
         assertAll(
                 () -> assertThat(outbox.getStatus()).isEqualTo(SlackNotificationOutboxStatus.SENT),
                 () -> assertThat(outbox.getSentAt()).isEqualTo(sentAt),
-                () -> assertThat(outbox.getFailedAt()).isEqualTo(SlackNotificationOutbox.NO_FAILURE_AT),
-                () -> assertThat(outbox.getFailureReason()).isEqualTo(SlackNotificationOutbox.NO_FAILURE_REASON),
+                () -> assertThat(outbox.getFailedAt()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_AT),
+                () -> assertThat(outbox.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
                 () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE),
                 () -> assertThat(history).isNotNull(),
                 () -> assertThat(history.getOutboxId()).isNull(),
@@ -586,8 +587,8 @@ class SlackNotificationOutboxTest {
         ReflectionTestUtils.setField(outbox, "status", SlackNotificationOutboxStatus.PROCESSING);
         ReflectionTestUtils.setField(outbox, "processingStartedAt", processingStartedAt);
         ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(outbox, "failedAt", SlackNotificationOutbox.NO_FAILURE_AT);
-        ReflectionTestUtils.setField(outbox, "failureReason", SlackNotificationOutbox.NO_FAILURE_REASON);
+        ReflectionTestUtils.setField(outbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
+        ReflectionTestUtils.setField(outbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
         ReflectionTestUtils.setField(outbox, "failureType", SlackInteractionFailureType.NONE);
     }
 }

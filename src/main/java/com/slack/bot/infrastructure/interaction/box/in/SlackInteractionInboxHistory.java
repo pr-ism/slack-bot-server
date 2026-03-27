@@ -1,6 +1,7 @@
 package com.slack.bot.infrastructure.interaction.box.in;
 
 import com.slack.bot.domain.common.BaseTimeEntity;
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -131,7 +132,7 @@ public class SlackInteractionInboxHistory extends BaseTimeEntity {
             SlackInteractionFailureType failureType
     ) {
         if (status == SlackInteractionInboxStatus.PROCESSED) {
-            if (!SlackInteractionInbox.NO_FAILURE_REASON.equals(failureReason)
+            if (!FailureSnapshotDefaults.NO_FAILURE_REASON.equals(failureReason)
                     || failureType != SlackInteractionFailureType.NONE) {
                 throw new IllegalArgumentException("PROCESSED history에는 실패 정보가 없어야 합니다.");
             }

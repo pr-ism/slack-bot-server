@@ -5,6 +5,7 @@ import static com.slack.bot.infrastructure.interaction.box.in.QSlackInteractionI
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxHistory;
@@ -40,8 +41,8 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                 .addValue("payloadJson", inbox.getPayloadJson())
                 .addValue("pendingStatus", inbox.getStatus().name())
                 .addValue("processingAttempt", inbox.getProcessingAttempt())
-                .addValue("noFailureAt", Timestamp.from(SlackInteractionInbox.NO_FAILURE_AT))
-                .addValue("noFailureReason", SlackInteractionInbox.NO_FAILURE_REASON)
+                .addValue("noFailureAt", Timestamp.from(FailureSnapshotDefaults.NO_FAILURE_AT))
+                .addValue("noFailureReason", FailureSnapshotDefaults.NO_FAILURE_REASON)
                 .addValue("noneFailureType", SlackInteractionFailureType.NONE.name());
 
         int updatedCount = namedParameterJdbcTemplate.update(
@@ -100,8 +101,8 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                     WHERE id = :inboxId
                     """,
                 updateParameters
-                        .addValue("noFailureAt", Timestamp.from(SlackInteractionInbox.NO_FAILURE_AT))
-                        .addValue("noFailureReason", SlackInteractionInbox.NO_FAILURE_REASON)
+                        .addValue("noFailureAt", Timestamp.from(FailureSnapshotDefaults.NO_FAILURE_AT))
+                        .addValue("noFailureReason", FailureSnapshotDefaults.NO_FAILURE_REASON)
                         .addValue("noneFailureType", SlackInteractionFailureType.NONE.name())
         );
         if (updatedCount == 0) {

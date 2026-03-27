@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -64,7 +65,7 @@ class ReviewRequestInboxHistoryTest {
                 1,
                 ReviewRequestInboxStatus.PROCESSED,
                 Instant.parse("2026-03-27T00:00:00Z"),
-                ReviewRequestInbox.NO_FAILURE_REASON,
+                FailureSnapshotDefaults.NO_FAILURE_REASON,
                 ReviewRequestInboxFailureType.NONE
         );
 

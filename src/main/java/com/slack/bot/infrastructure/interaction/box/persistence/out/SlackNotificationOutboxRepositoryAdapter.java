@@ -5,6 +5,7 @@ import static com.slack.bot.infrastructure.interaction.box.out.QSlackNotificatio
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxHistory;
@@ -43,8 +44,8 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                 .addValue("fallbackText", outbox.getFallbackText())
                 .addValue("pendingStatus", outbox.getStatus().name())
                 .addValue("processingAttempt", outbox.getProcessingAttempt())
-                .addValue("noFailureAt", Timestamp.from(SlackNotificationOutbox.NO_FAILURE_AT))
-                .addValue("noFailureReason", SlackNotificationOutbox.NO_FAILURE_REASON)
+                .addValue("noFailureAt", Timestamp.from(FailureSnapshotDefaults.NO_FAILURE_AT))
+                .addValue("noFailureReason", FailureSnapshotDefaults.NO_FAILURE_REASON)
                 .addValue("noneFailureType", SlackInteractionFailureType.NONE.name());
 
         int updatedCount = namedParameterJdbcTemplate.update(
@@ -200,8 +201,8 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                 WHERE id = :outboxId
                 """,
                 updateParameters
-                        .addValue("noFailureAt", Timestamp.from(SlackNotificationOutbox.NO_FAILURE_AT))
-                        .addValue("noFailureReason", SlackNotificationOutbox.NO_FAILURE_REASON)
+                        .addValue("noFailureAt", Timestamp.from(FailureSnapshotDefaults.NO_FAILURE_AT))
+                        .addValue("noFailureReason", FailureSnapshotDefaults.NO_FAILURE_REASON)
                         .addValue("noneFailureType", SlackInteractionFailureType.NONE.name())
         );
         if (updatedCount == 0) {

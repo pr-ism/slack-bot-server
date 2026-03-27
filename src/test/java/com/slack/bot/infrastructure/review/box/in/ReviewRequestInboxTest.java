@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -191,8 +192,8 @@ class ReviewRequestInboxTest {
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
                 () -> assertThat(inbox.getProcessedAt()).isEqualTo(processedAt),
                 () -> assertThat(inbox.getProcessingStartedAt()).isNull(),
-                () -> assertThat(inbox.getFailedAt()).isEqualTo(ReviewRequestInbox.NO_FAILURE_AT),
-                () -> assertThat(inbox.getFailureReason()).isEqualTo(ReviewRequestInbox.NO_FAILURE_REASON),
+                () -> assertThat(inbox.getFailedAt()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_AT),
+                () -> assertThat(inbox.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
                 () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
                 () -> assertThat(history).isNotNull(),
                 () -> assertThat(history.getInboxId()).isNull(),
@@ -419,8 +420,8 @@ class ReviewRequestInboxTest {
         ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
         ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
         ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(inbox, "failedAt", ReviewRequestInbox.NO_FAILURE_AT);
-        ReflectionTestUtils.setField(inbox, "failureReason", ReviewRequestInbox.NO_FAILURE_REASON);
+        ReflectionTestUtils.setField(inbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
+        ReflectionTestUtils.setField(inbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
         ReflectionTestUtils.setField(inbox, "failureType", ReviewRequestInboxFailureType.NONE);
     }
 }

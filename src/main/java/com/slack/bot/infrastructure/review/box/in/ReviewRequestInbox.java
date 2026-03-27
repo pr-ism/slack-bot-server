@@ -1,6 +1,7 @@
 package com.slack.bot.infrastructure.review.box.in;
 
 import com.slack.bot.domain.common.BaseTimeEntity;
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -15,10 +16,6 @@ import lombok.NoArgsConstructor;
 @Table(name = "review_request_inbox")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ReviewRequestInbox extends BaseTimeEntity {
-
-    public static final Instant NO_FAILURE_AT = Instant.EPOCH;
-
-    public static final String NO_FAILURE_REASON = "";
 
     private String idempotencyKey;
 
@@ -116,8 +113,8 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         this.availableAt = availableAt;
         this.status = status;
         this.processingAttempt = processingAttempt;
-        this.failedAt = NO_FAILURE_AT;
-        this.failureReason = NO_FAILURE_REASON;
+        this.failedAt = FailureSnapshotDefaults.NO_FAILURE_AT;
+        this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
         this.failureType = ReviewRequestInboxFailureType.NONE;
     }
 
@@ -128,8 +125,8 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         this.status = ReviewRequestInboxStatus.PROCESSED;
         this.processingStartedAt = null;
         this.processedAt = processedAt;
-        this.failedAt = NO_FAILURE_AT;
-        this.failureReason = NO_FAILURE_REASON;
+        this.failedAt = FailureSnapshotDefaults.NO_FAILURE_AT;
+        this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
         this.failureType = ReviewRequestInboxFailureType.NONE;
 
         return ReviewRequestInboxHistory.completed(
@@ -137,7 +134,7 @@ public class ReviewRequestInbox extends BaseTimeEntity {
                 this.processingAttempt,
                 ReviewRequestInboxStatus.PROCESSED,
                 processedAt,
-                NO_FAILURE_REASON,
+                FailureSnapshotDefaults.NO_FAILURE_REASON,
                 ReviewRequestInboxFailureType.NONE
         );
     }

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -65,7 +66,7 @@ class SlackInteractionInboxHistoryTest {
                 1,
                 SlackInteractionInboxStatus.PROCESSED,
                 Instant.parse("2026-03-27T00:00:00Z"),
-                SlackInteractionInbox.NO_FAILURE_REASON,
+                FailureSnapshotDefaults.NO_FAILURE_REASON,
                 SlackInteractionFailureType.NONE
         );
 

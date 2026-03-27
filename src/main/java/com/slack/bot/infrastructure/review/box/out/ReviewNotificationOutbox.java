@@ -1,6 +1,7 @@
 package com.slack.bot.infrastructure.review.box.out;
 
 import com.slack.bot.domain.common.BaseTimeEntity;
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -17,10 +18,6 @@ import lombok.NoArgsConstructor;
 @Table(name = "review_notification_outbox")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ReviewNotificationOutbox extends BaseTimeEntity {
-
-    public static final Instant NO_FAILURE_AT = Instant.EPOCH;
-
-    public static final String NO_FAILURE_REASON = "";
 
     private String idempotencyKey;
 
@@ -81,8 +78,8 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
         this.fallbackText = fallbackText;
         this.status = ReviewNotificationOutboxStatus.PENDING;
         this.processingAttempt = 0;
-        this.failedAt = NO_FAILURE_AT;
-        this.failureReason = NO_FAILURE_REASON;
+        this.failedAt = FailureSnapshotDefaults.NO_FAILURE_AT;
+        this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
         this.failureType = SlackInteractionFailureType.NONE;
     }
 
@@ -92,8 +89,8 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
 
         this.status = ReviewNotificationOutboxStatus.SENT;
         this.sentAt = sentAt;
-        this.failedAt = NO_FAILURE_AT;
-        this.failureReason = NO_FAILURE_REASON;
+        this.failedAt = FailureSnapshotDefaults.NO_FAILURE_AT;
+        this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
         this.failureType = SlackInteractionFailureType.NONE;
 
         return ReviewNotificationOutboxHistory.completed(
@@ -101,7 +98,7 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
                 this.processingAttempt,
                 ReviewNotificationOutboxStatus.SENT,
                 sentAt,
-                NO_FAILURE_REASON,
+                FailureSnapshotDefaults.NO_FAILURE_REASON,
                 SlackInteractionFailureType.NONE
         );
     }

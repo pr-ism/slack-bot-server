@@ -20,6 +20,7 @@ import com.slack.bot.application.review.box.out.ReviewNotificationOutboxEnqueuer
 import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.application.worker.PollingHintPublisher;
 import com.slack.bot.application.worker.PollingHintTarget;
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.review.batch.SpyReviewNotificationService;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
@@ -221,7 +222,7 @@ class ReviewRequestInboxProcessorTest {
                     () -> assertThat(spyReviewNotificationService.getSendCount()).isEqualTo(1),
                     () -> assertThat(processed.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
                     () -> assertThat(processed.getProcessingAttempt()).isEqualTo(2),
-                    () -> assertThat(processed.getFailureReason()).isEqualTo(ReviewRequestInbox.NO_FAILURE_REASON),
+                    () -> assertThat(processed.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
                     () -> assertThat(histories).hasSize(2),
                     () -> assertThat(histories).extracting(history -> history.getStatus())
                             .containsExactly(
@@ -449,7 +450,7 @@ class ReviewRequestInboxProcessorTest {
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
                 () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
-                () -> assertThat(inbox.getFailureReason()).isEqualTo(ReviewRequestInbox.NO_FAILURE_REASON),
+                () -> assertThat(inbox.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
                 () -> assertThat(jpaReviewNotificationOutboxRepository.findAll()).isEmpty()
         );
     }
@@ -494,7 +495,7 @@ class ReviewRequestInboxProcessorTest {
                 () -> assertThat(failed.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(failed.getProcessingAttempt()).isEqualTo(2),
                 () -> assertThat(failed.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
-                () -> assertThat(failed.getFailureReason()).isEqualTo(ReviewRequestInbox.NO_FAILURE_REASON),
+                () -> assertThat(failed.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
                 () -> assertThat(jpaReviewNotificationOutboxRepository.findAll()).isEmpty()
         );
     }
@@ -574,8 +575,8 @@ class ReviewRequestInboxProcessorTest {
         ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
         ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
         ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(inbox, "failedAt", ReviewRequestInbox.NO_FAILURE_AT);
-        ReflectionTestUtils.setField(inbox, "failureReason", ReviewRequestInbox.NO_FAILURE_REASON);
+        ReflectionTestUtils.setField(inbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
+        ReflectionTestUtils.setField(inbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
         ReflectionTestUtils.setField(inbox, "failureType", ReviewRequestInboxFailureType.NONE);
     }
 
