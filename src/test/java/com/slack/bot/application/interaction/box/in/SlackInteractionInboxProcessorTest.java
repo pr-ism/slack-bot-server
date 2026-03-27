@@ -15,6 +15,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interaction.block.BlockActionType;
 import com.slack.bot.application.interaction.client.NotificationApiClient;
+import com.slack.bot.application.worker.PollingHintPublisher;
+import com.slack.bot.application.worker.PollingHintTarget;
 import com.slack.bot.domain.reservation.ReservationStatus;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.repository.ReviewReservationRepository;
@@ -37,10 +39,12 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @IntegrationTest
+@MockitoSpyBean(types = PollingHintPublisher.class)
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class SlackInteractionInboxProcessorTest {
@@ -68,6 +72,9 @@ class SlackInteractionInboxProcessorTest {
 
     @Autowired
     Clock clock;
+
+    @Autowired
+    PollingHintPublisher pollingHintPublisher;
 
     @Test
     @Sql(scripts = {
@@ -148,6 +155,7 @@ class SlackInteractionInboxProcessorTest {
                     any(),
                     any()
             );
+            verify(pollingHintPublisher).publish(PollingHintTarget.BLOCK_ACTION_INBOX);
         });
     }
 

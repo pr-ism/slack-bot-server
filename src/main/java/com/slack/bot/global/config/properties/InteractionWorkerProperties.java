@@ -44,38 +44,60 @@ public record InteractionWorkerProperties(
     public record BlockActionsProperties(
             @DefaultValue("1000") long pollDelayMs,
             @DefaultValue("60000") long processingTimeoutMs,
-            @DefaultValue("30000") long pollCapMs
+            @DefaultValue("30000") long pollCapMs,
+            @DefaultValue("100") int timeoutRecoveryBatchSize
     ) {
 
         public BlockActionsProperties {
-            validatePollingProperties("blockActions", pollDelayMs, processingTimeoutMs, pollCapMs);
+            validateInboxPollingProperties(
+                    "blockActions",
+                    pollDelayMs,
+                    processingTimeoutMs,
+                    pollCapMs,
+                    timeoutRecoveryBatchSize
+            );
         }
 
         public BlockActionsProperties() {
-            this(1000L, 60000L, 30000L);
+            this(1000L, 60000L, 30000L, 100);
         }
 
         public BlockActionsProperties(long pollDelayMs, long processingTimeoutMs) {
-            this(pollDelayMs, processingTimeoutMs, 30000L);
+            this(pollDelayMs, processingTimeoutMs, 30000L, 100);
+        }
+
+        public BlockActionsProperties(long pollDelayMs, long processingTimeoutMs, long pollCapMs) {
+            this(pollDelayMs, processingTimeoutMs, pollCapMs, 100);
         }
     }
 
     public record ViewSubmissionProperties(
             @DefaultValue("1000") long pollDelayMs,
             @DefaultValue("60000") long processingTimeoutMs,
-            @DefaultValue("30000") long pollCapMs
+            @DefaultValue("30000") long pollCapMs,
+            @DefaultValue("100") int timeoutRecoveryBatchSize
     ) {
 
         public ViewSubmissionProperties {
-            validatePollingProperties("viewSubmission", pollDelayMs, processingTimeoutMs, pollCapMs);
+            validateInboxPollingProperties(
+                    "viewSubmission",
+                    pollDelayMs,
+                    processingTimeoutMs,
+                    pollCapMs,
+                    timeoutRecoveryBatchSize
+            );
         }
 
         public ViewSubmissionProperties() {
-            this(1000L, 60000L, 30000L);
+            this(1000L, 60000L, 30000L, 100);
         }
 
         public ViewSubmissionProperties(long pollDelayMs, long processingTimeoutMs) {
-            this(pollDelayMs, processingTimeoutMs, 30000L);
+            this(pollDelayMs, processingTimeoutMs, 30000L, 100);
+        }
+
+        public ViewSubmissionProperties(long pollDelayMs, long processingTimeoutMs, long pollCapMs) {
+            this(pollDelayMs, processingTimeoutMs, pollCapMs, 100);
         }
     }
 
@@ -98,6 +120,27 @@ public record InteractionWorkerProperties(
         }
     }
 
+    private static void validateInboxPollingProperties(
+            String propertyName,
+            long pollDelayMs,
+            long processingTimeoutMs,
+            long pollCapMs,
+            int timeoutRecoveryBatchSize
+    ) {
+        if (pollDelayMs <= 0L) {
+            throw new IllegalArgumentException(propertyName + ".pollDelayMs는 0보다 커야 합니다.");
+        }
+        if (processingTimeoutMs <= 0L) {
+            throw new IllegalArgumentException(propertyName + ".processingTimeoutMs는 0보다 커야 합니다.");
+        }
+        if (pollCapMs < pollDelayMs) {
+            throw new IllegalArgumentException(propertyName + ".pollCapMs는 pollDelayMs보다 크거나 같아야 합니다.");
+        }
+        if (timeoutRecoveryBatchSize <= 0) {
+            throw new IllegalArgumentException(propertyName + ".timeoutRecoveryBatchSize는 0보다 커야 합니다.");
+        }
+    }
+
     private static void validatePollingProperties(
             String propertyName,
             long pollDelayMs,
@@ -109,6 +152,9 @@ public record InteractionWorkerProperties(
         }
         if (processingTimeoutMs <= 0L) {
             throw new IllegalArgumentException(propertyName + ".processingTimeoutMs는 0보다 커야 합니다.");
+        }
+        if (pollCapMs <= 0L) {
+            throw new IllegalArgumentException(propertyName + ".pollCapMs는 0보다 커야 합니다.");
         }
         if (pollCapMs < pollDelayMs) {
             throw new IllegalArgumentException(propertyName + ".pollCapMs는 pollDelayMs보다 크거나 같아야 합니다.");

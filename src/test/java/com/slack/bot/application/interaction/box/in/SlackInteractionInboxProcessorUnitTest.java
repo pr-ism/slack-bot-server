@@ -9,9 +9,12 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 
 import com.slack.bot.application.interaction.box.SlackInteractionIdempotencyKeyGenerator;
 import com.slack.bot.application.interaction.box.SlackInteractionIdempotencyScope;
+import com.slack.bot.application.worker.PollingHintPublisher;
+import com.slack.bot.application.worker.PollingHintTarget;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.global.config.properties.InteractionWorkerProperties;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
@@ -33,6 +36,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class SlackInteractionInboxProcessorUnitTest {
 
+    private static final int BLOCK_ACTION_RECOVERY_BATCH_SIZE = 41;
+    private static final int VIEW_SUBMISSION_RECOVERY_BATCH_SIZE = 42;
+
     @Mock
     SlackInteractionInboxRepository slackInteractionInboxRepository;
 
@@ -45,6 +51,9 @@ class SlackInteractionInboxProcessorUnitTest {
     @Mock
     SlackInteractionInboxEntryProcessor slackInteractionInboxEntryProcessor;
 
+    @Mock
+    PollingHintPublisher pollingHintPublisher;
+
     SlackInteractionInboxProcessor slackInteractionInboxProcessor;
 
     @BeforeEach
@@ -56,8 +65,18 @@ class SlackInteractionInboxProcessorUnitTest {
         );
         InteractionWorkerProperties interactionWorkerProperties = new InteractionWorkerProperties(
                 new InteractionWorkerProperties.InboxProperties(
-                        new InteractionWorkerProperties.BlockActionsProperties(200L, 60000L),
-                        new InteractionWorkerProperties.ViewSubmissionProperties(200L, 60000L)
+                        new InteractionWorkerProperties.BlockActionsProperties(
+                                200L,
+                                60000L,
+                                30000L,
+                                BLOCK_ACTION_RECOVERY_BATCH_SIZE
+                        ),
+                        new InteractionWorkerProperties.ViewSubmissionProperties(
+                                200L,
+                                60000L,
+                                30000L,
+                                VIEW_SUBMISSION_RECOVERY_BATCH_SIZE
+                        )
                 ),
                 new InteractionWorkerProperties.OutboxProperties()
         );
@@ -69,8 +88,82 @@ class SlackInteractionInboxProcessorUnitTest {
                 slackInteractionInboxRepository,
                 idempotencyPayloadEncoder,
                 idempotencyKeyGenerator,
-                slackInteractionInboxEntryProcessor
+                slackInteractionInboxEntryProcessor,
+                pollingHintPublisher
         );
+    }
+
+    @Test
+    void block_action_timeout_복구시_배치_크기를_전달하고_polling_hint를_발행한다() {
+        // given
+        given(slackInteractionInboxRepository.recoverTimeoutProcessing(
+                eq(SlackInteractionInboxType.BLOCK_ACTIONS),
+                any(),
+                any(),
+                any(),
+                eq(2),
+                eq(BLOCK_ACTION_RECOVERY_BATCH_SIZE)
+        )).willReturn(3);
+
+        // when
+        slackInteractionInboxProcessor.recoverBlockActionTimeoutProcessing();
+
+        // then
+        verify(slackInteractionInboxRepository).recoverTimeoutProcessing(
+                eq(SlackInteractionInboxType.BLOCK_ACTIONS),
+                any(),
+                any(),
+                any(),
+                eq(2),
+                eq(BLOCK_ACTION_RECOVERY_BATCH_SIZE)
+        );
+        verify(pollingHintPublisher).publish(PollingHintTarget.BLOCK_ACTION_INBOX);
+    }
+
+    @Test
+    void view_submission_timeout_복구시_배치_크기를_전달하고_polling_hint를_발행한다() {
+        // given
+        given(slackInteractionInboxRepository.recoverTimeoutProcessing(
+                eq(SlackInteractionInboxType.VIEW_SUBMISSION),
+                any(),
+                any(),
+                any(),
+                eq(2),
+                eq(VIEW_SUBMISSION_RECOVERY_BATCH_SIZE)
+        )).willReturn(2);
+
+        // when
+        slackInteractionInboxProcessor.recoverViewSubmissionTimeoutProcessing();
+
+        // then
+        verify(slackInteractionInboxRepository).recoverTimeoutProcessing(
+                eq(SlackInteractionInboxType.VIEW_SUBMISSION),
+                any(),
+                any(),
+                any(),
+                eq(2),
+                eq(VIEW_SUBMISSION_RECOVERY_BATCH_SIZE)
+        );
+        verify(pollingHintPublisher).publish(PollingHintTarget.VIEW_SUBMISSION_INBOX);
+    }
+
+    @Test
+    void view_submission_timeout_복구건이_없으면_polling_hint를_발행하지_않는다() {
+        // given
+        given(slackInteractionInboxRepository.recoverTimeoutProcessing(
+                eq(SlackInteractionInboxType.VIEW_SUBMISSION),
+                any(),
+                any(),
+                any(),
+                eq(2),
+                eq(VIEW_SUBMISSION_RECOVERY_BATCH_SIZE)
+        )).willReturn(0);
+
+        // when
+        slackInteractionInboxProcessor.recoverViewSubmissionTimeoutProcessing();
+
+        // then
+        verify(pollingHintPublisher, never()).publish(PollingHintTarget.VIEW_SUBMISSION_INBOX);
     }
 
     @Test

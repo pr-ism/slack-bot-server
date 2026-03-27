@@ -32,8 +32,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionInboxRepository {
 
-    private static final long TIMEOUT_RECOVERY_BATCH_SIZE = 100L;
-
     private final JPAQueryFactory queryFactory;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
     private final JpaSlackInteractionInboxRepository repository;
@@ -177,9 +175,16 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
             Instant processingStartedBefore,
             Instant failedAt,
             String failureReason,
-            int maxAttempts
+            int maxAttempts,
+            int recoveryBatchSize
     ) {
-        validateRecoverTimeoutProcessingArguments(processingStartedBefore, failedAt, failureReason, maxAttempts);
+        validateRecoverTimeoutProcessingArguments(
+                processingStartedBefore,
+                failedAt,
+                failureReason,
+                maxAttempts,
+                recoveryBatchSize
+        );
 
         BooleanExpression timeoutCondition = slackInteractionInbox.processingStartedAt.lt(processingStartedBefore);
 
@@ -190,7 +195,8 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                 SlackInteractionInboxStatus.FAILED,
                 failedAt,
                 failureReason,
-                SlackInteractionFailureType.RETRY_EXHAUSTED
+                SlackInteractionFailureType.RETRY_EXHAUSTED,
+                recoveryBatchSize
         );
         int recoveredCount = recoverTimeoutProcessingByStatus(
                 interactionType,
@@ -199,7 +205,8 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                 SlackInteractionInboxStatus.RETRY_PENDING,
                 failedAt,
                 failureReason,
-                SlackInteractionFailureType.NONE
+                SlackInteractionFailureType.NONE,
+                recoveryBatchSize
         );
 
         return exhaustedCount + recoveredCount;
@@ -212,7 +219,8 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
             SlackInteractionInboxStatus targetStatus,
             Instant failedAt,
             String failureReason,
-            SlackInteractionFailureType failureType
+            SlackInteractionFailureType failureType,
+            int recoveryBatchSize
     ) {
         List<Tuple> timedOutRows = queryFactory
                 .select(slackInteractionInbox.id, slackInteractionInbox.processingAttempt)
@@ -224,7 +232,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                         attemptCondition
                 )
                 .orderBy(slackInteractionInbox.processingStartedAt.asc(), slackInteractionInbox.id.asc())
-                .limit(TIMEOUT_RECOVERY_BATCH_SIZE)
+                .limit(recoveryBatchSize)
                 .fetch();
 
         if (timedOutRows.isEmpty()) {
@@ -347,12 +355,14 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
             Instant processingStartedBefore,
             Instant failedAt,
             String failureReason,
-            int maxAttempts
+            int maxAttempts,
+            int recoveryBatchSize
     ) {
         validateProcessingStartedBefore(processingStartedBefore);
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
         validateMaxAttempts(maxAttempts);
+        validateRecoveryBatchSize(recoveryBatchSize);
     }
 
     protected String buildEnqueueSql() {
@@ -423,6 +433,12 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
     private void validateMaxAttempts(int maxAttempts) {
         if (maxAttempts <= 0) {
             throw new IllegalArgumentException("maxAttempts는 0보다 커야 합니다.");
+        }
+    }
+
+    private void validateRecoveryBatchSize(int recoveryBatchSize) {
+        if (recoveryBatchSize <= 0) {
+            throw new IllegalArgumentException("recoveryBatchSize는 0보다 커야 합니다.");
         }
     }
 
