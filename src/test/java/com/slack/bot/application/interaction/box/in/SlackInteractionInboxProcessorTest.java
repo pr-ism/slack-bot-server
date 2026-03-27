@@ -180,6 +180,39 @@ class SlackInteractionInboxProcessorTest {
     }
 
     @Test
+    void PROCESSING_타임아웃_block_actions_inbox_복구는_배치_크기만큼만_처리한다() {
+        // given
+        Instant base = clock.instant();
+        for (int index = 0; index < 101; index++) {
+            SlackInteractionInbox timeoutInbox = SlackInteractionInbox.pending(
+                    SlackInteractionInboxType.BLOCK_ACTIONS,
+                    "BLOCK-ACTION-TIMEOUT-BATCH-" + index,
+                    "{\"type\":\"block_actions\",\"actions\":[]}"
+            );
+            setProcessingState(timeoutInbox, base.minusSeconds(120L + index), 1);
+            jpaSlackInteractionInboxRepository.save(timeoutInbox);
+        }
+
+        // when
+        int recoveredCount = slackInteractionInboxProcessor.recoverBlockActionTimeoutProcessing();
+
+        // then
+        List<SlackInteractionInbox> actualInboxes = jpaSlackInteractionInboxRepository.findAll();
+        List<SlackInteractionInboxHistory> actualHistories = jpaSlackInteractionInboxHistoryRepository.findAll();
+
+        assertAll(
+                () -> assertThat(recoveredCount).isEqualTo(100),
+                () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == SlackInteractionInboxStatus.RETRY_PENDING)
+                        .hasSize(100),
+                () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == SlackInteractionInboxStatus.PROCESSING)
+                        .hasSize(1),
+                () -> assertThat(actualHistories).hasSize(100),
+                () -> assertThat(actualHistories).extracting(history -> history.getStatus())
+                        .containsOnly(SlackInteractionInboxStatus.RETRY_PENDING)
+        );
+    }
+
+    @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
             "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
