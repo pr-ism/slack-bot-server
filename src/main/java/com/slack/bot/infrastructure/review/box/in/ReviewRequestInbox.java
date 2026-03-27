@@ -113,6 +113,8 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         this.availableAt = availableAt;
         this.status = status;
         this.processingAttempt = processingAttempt;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.processedAt = FailureSnapshotDefaults.NO_PROCESSED_AT;
         this.failedAt = FailureSnapshotDefaults.NO_FAILURE_AT;
         this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
         this.failureType = ReviewRequestInboxFailureType.NONE;
@@ -123,7 +125,7 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         validateTransition(ReviewRequestInboxStatus.PROCESSING, "PROCESSED");
 
         this.status = ReviewRequestInboxStatus.PROCESSED;
-        this.processingStartedAt = null;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
         this.processedAt = processedAt;
         this.failedAt = FailureSnapshotDefaults.NO_FAILURE_AT;
         this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
@@ -152,7 +154,8 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         validateTransition(ReviewRequestInboxStatus.PROCESSING, "RETRY_PENDING");
 
         this.status = ReviewRequestInboxStatus.RETRY_PENDING;
-        this.processingStartedAt = null;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.processedAt = FailureSnapshotDefaults.NO_PROCESSED_AT;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = ReviewRequestInboxFailureType.NONE;
@@ -178,7 +181,8 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         validateTransition(ReviewRequestInboxStatus.PROCESSING, "FAILED");
 
         this.status = ReviewRequestInboxStatus.FAILED;
-        this.processingStartedAt = null;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.processedAt = FailureSnapshotDefaults.NO_PROCESSED_AT;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = failureType;

@@ -67,6 +67,8 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                 .addValue("availableAt", Timestamp.from(inbox.getAvailableAt()))
                 .addValue("pendingStatus", ReviewRequestInboxStatus.PENDING.name())
                 .addValue("retryPendingStatus", ReviewRequestInboxStatus.RETRY_PENDING.name())
+                .addValue("noProcessingStartedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT))
+                .addValue("noProcessedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSED_AT))
                 .addValue("noFailureAt", Timestamp.from(FailureSnapshotDefaults.NO_FAILURE_AT))
                 .addValue("noFailureReason", FailureSnapshotDefaults.NO_FAILURE_REASON)
                 .addValue("noneFailureType", ReviewRequestInboxFailureType.NONE.name());
@@ -119,12 +121,14 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                     SET status = :processingStatus,
                         processing_attempt = processing_attempt + 1,
                         processing_started_at = :processingStartedAt,
+                        processed_at = :noProcessedAt,
                         failed_at = :noFailureAt,
                         failure_reason = :noFailureReason,
                         failure_type = :noneFailureType
                     WHERE id = :inboxId
                     """,
                 updateParameters
+                        .addValue("noProcessedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSED_AT))
                         .addValue("noFailureAt", Timestamp.from(FailureSnapshotDefaults.NO_FAILURE_AT))
                         .addValue("noFailureReason", FailureSnapshotDefaults.NO_FAILURE_REASON)
                         .addValue("noneFailureType", ReviewRequestInboxFailureType.NONE.name())
@@ -230,10 +234,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
         validateFailureReason(failureReason);
         validateMaxAttempts(maxAttempts);
 
-        BooleanExpression timeoutCondition = reviewRequestInbox.processingStartedAt.isNull()
-                                                                                     .or(reviewRequestInbox.processingStartedAt.lt(
-                                                                                             processingStartedBefore
-                                                                                     ));
+        BooleanExpression timeoutCondition = reviewRequestInbox.processingStartedAt.lt(processingStartedBefore);
 
         int exhaustedCount = recoverTimeoutProcessingByStatus(
                 timeoutCondition,
@@ -280,7 +281,11 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
             long updatedCount = queryFactory
                     .update(reviewRequestInbox)
                     .set(reviewRequestInbox.status, targetStatus)
-                    .set(reviewRequestInbox.processingStartedAt, (Instant) null)
+                    .set(
+                            reviewRequestInbox.processingStartedAt,
+                            FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
+                    )
+                    .set(reviewRequestInbox.processedAt, FailureSnapshotDefaults.NO_PROCESSED_AT)
                     .set(reviewRequestInbox.failedAt, failedAt)
                     .set(reviewRequestInbox.failureReason, failureReason)
                     .set(reviewRequestInbox.failureType, failureType)
@@ -436,12 +441,12 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                     ),
                     processing_started_at = IF(
                         status IN (:pendingStatus, :retryPendingStatus),
-                        NULL,
+                        :noProcessingStartedAt,
                         processing_started_at
                     ),
                     processed_at = IF(
                         status IN (:pendingStatus, :retryPendingStatus),
-                        NULL,
+                        :noProcessedAt,
                         processed_at
                     ),
                     failed_at = IF(
@@ -548,18 +553,10 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
     }
 
     private Timestamp toTimestamp(Instant instant) {
-        if (instant == null) {
-            return null;
-        }
-
         return Timestamp.from(instant);
     }
 
     private String resolveFailureTypeName(ReviewRequestInbox inbox) {
-        if (inbox.getFailureType() == null) {
-            return ReviewRequestInboxFailureType.NONE.name();
-        }
-
         return inbox.getFailureType().name();
     }
 }

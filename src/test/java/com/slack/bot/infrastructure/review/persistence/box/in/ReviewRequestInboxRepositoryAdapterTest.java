@@ -92,7 +92,10 @@ class ReviewRequestInboxRepositoryAdapterTest {
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING),
                 () -> assertThat(actual.getProcessingAttempt()).isZero(),
-                () -> assertThat(actual.getProcessingStartedAt()).isNull(),
+                () -> assertThat(actual.getProcessingStartedAt()).isEqualTo(
+                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
+                ),
+                () -> assertThat(actual.getProcessedAt()).isEqualTo(FailureSnapshotDefaults.NO_PROCESSED_AT),
                 () -> assertThat(actual.getFailedAt()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_AT),
                 () -> assertThat(actual.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
                 () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
@@ -104,6 +107,7 @@ class ReviewRequestInboxRepositoryAdapterTest {
     private void setProcessingState(ReviewRequestInbox inbox, Instant processingStartedAt, int processingAttempt) {
         ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
         ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(inbox, "processedAt", FailureSnapshotDefaults.NO_PROCESSED_AT);
         ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
         ReflectionTestUtils.setField(inbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
         ReflectionTestUtils.setField(inbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);

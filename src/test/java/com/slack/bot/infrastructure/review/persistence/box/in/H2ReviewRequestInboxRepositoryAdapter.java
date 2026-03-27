@@ -50,8 +50,8 @@ public class H2ReviewRequestInboxRepositoryAdapter extends ReviewRequestInboxRep
                         available_at = source.available_at,
                         status = source.pending_status,
                         processing_attempt = 0,
-                        processing_started_at = NULL,
-                        processed_at = NULL,
+                        processing_started_at = :noProcessingStartedAt,
+                        processed_at = :noProcessedAt,
                         failed_at = :noFailureAt,
                         failure_reason = :noFailureReason,
                         failure_type = :noneFailureType
@@ -66,6 +66,8 @@ public class H2ReviewRequestInboxRepositoryAdapter extends ReviewRequestInboxRep
                         available_at,
                         status,
                         processing_attempt,
+                        processing_started_at,
+                        processed_at,
                         failed_at,
                         failure_reason,
                         failure_type
@@ -80,6 +82,8 @@ public class H2ReviewRequestInboxRepositoryAdapter extends ReviewRequestInboxRep
                         source.available_at,
                         source.pending_status,
                         0,
+                        :noProcessingStartedAt,
+                        :noProcessedAt,
                         :noFailureAt,
                         :noFailureReason,
                         :noneFailureType

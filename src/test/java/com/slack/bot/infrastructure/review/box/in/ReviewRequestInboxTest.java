@@ -191,7 +191,9 @@ class ReviewRequestInboxTest {
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
                 () -> assertThat(inbox.getProcessedAt()).isEqualTo(processedAt),
-                () -> assertThat(inbox.getProcessingStartedAt()).isNull(),
+                () -> assertThat(inbox.getProcessingStartedAt()).isEqualTo(
+                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
+                ),
                 () -> assertThat(inbox.getFailedAt()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_AT),
                 () -> assertThat(inbox.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
                 () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
@@ -238,7 +240,10 @@ class ReviewRequestInboxTest {
         // then
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
-                () -> assertThat(inbox.getProcessingStartedAt()).isNull(),
+                () -> assertThat(inbox.getProcessingStartedAt()).isEqualTo(
+                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
+                ),
+                () -> assertThat(inbox.getProcessedAt()).isEqualTo(FailureSnapshotDefaults.NO_PROCESSED_AT),
                 () -> assertThat(inbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(inbox.getFailureReason()).isEqualTo("retry"),
                 () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
@@ -313,7 +318,10 @@ class ReviewRequestInboxTest {
         // then
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
-                () -> assertThat(inbox.getProcessingStartedAt()).isNull(),
+                () -> assertThat(inbox.getProcessingStartedAt()).isEqualTo(
+                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
+                ),
+                () -> assertThat(inbox.getProcessedAt()).isEqualTo(FailureSnapshotDefaults.NO_PROCESSED_AT),
                 () -> assertThat(inbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(inbox.getFailureReason()).isEqualTo("failure"),
                 () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE),
@@ -419,6 +427,7 @@ class ReviewRequestInboxTest {
     private void setProcessingState(ReviewRequestInbox inbox, Instant processingStartedAt, int processingAttempt) {
         ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
         ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(inbox, "processedAt", FailureSnapshotDefaults.NO_PROCESSED_AT);
         ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
         ReflectionTestUtils.setField(inbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
         ReflectionTestUtils.setField(inbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
