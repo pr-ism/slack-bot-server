@@ -11,6 +11,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 
 import com.slack.bot.application.IntegrationTest;
+import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxHistory;
@@ -89,7 +90,7 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.SENT),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actual.getFailureType()).isNull()
+                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
         );
         verify(notificationTransportApiClient).sendBlockMessage(
                 anyString(),

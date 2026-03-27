@@ -18,6 +18,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ReviewNotificationOutbox extends BaseTimeEntity {
 
+    public static final Instant NO_FAILURE_AT = Instant.EPOCH;
+
+    public static final String NO_FAILURE_REASON = "";
+
     private String idempotencyKey;
 
     private Long projectId;
@@ -77,6 +81,9 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
         this.fallbackText = fallbackText;
         this.status = ReviewNotificationOutboxStatus.PENDING;
         this.processingAttempt = 0;
+        this.failedAt = NO_FAILURE_AT;
+        this.failureReason = NO_FAILURE_REASON;
+        this.failureType = SlackInteractionFailureType.NONE;
     }
 
     public ReviewNotificationOutboxHistory markSent(Instant sentAt) {
@@ -85,17 +92,17 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
 
         this.status = ReviewNotificationOutboxStatus.SENT;
         this.sentAt = sentAt;
-        this.failedAt = null;
-        this.failureReason = null;
-        this.failureType = null;
+        this.failedAt = NO_FAILURE_AT;
+        this.failureReason = NO_FAILURE_REASON;
+        this.failureType = SlackInteractionFailureType.NONE;
 
         return ReviewNotificationOutboxHistory.completed(
                 getId(),
                 this.processingAttempt,
                 ReviewNotificationOutboxStatus.SENT,
                 sentAt,
-                null,
-                null
+                NO_FAILURE_REASON,
+                SlackInteractionFailureType.NONE
         );
     }
 
@@ -115,7 +122,7 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
         this.processingStartedAt = null;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
-        this.failureType = null;
+        this.failureType = SlackInteractionFailureType.NONE;
 
         return ReviewNotificationOutboxHistory.completed(
                 getId(),
@@ -123,7 +130,7 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
                 ReviewNotificationOutboxStatus.RETRY_PENDING,
                 failedAt,
                 failureReason,
-                null
+                SlackInteractionFailureType.NONE
         );
     }
 
@@ -231,8 +238,8 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
     }
 
     private void validateFailureType(SlackInteractionFailureType failureType) {
-        if (failureType == null) {
-            throw new IllegalArgumentException("failureType은 비어 있을 수 없습니다.");
+        if (failureType == null || failureType == SlackInteractionFailureType.NONE) {
+            throw new IllegalArgumentException("failureType은 NONE일 수 없습니다.");
         }
     }
 }

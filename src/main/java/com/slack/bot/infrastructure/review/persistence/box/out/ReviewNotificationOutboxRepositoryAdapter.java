@@ -42,7 +42,10 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                 .addValue("attachmentsJson", outbox.getAttachmentsJson())
                 .addValue("fallbackText", outbox.getFallbackText())
                 .addValue("pendingStatus", outbox.getStatus().name())
-                .addValue("processingAttempt", outbox.getProcessingAttempt());
+                .addValue("processingAttempt", outbox.getProcessingAttempt())
+                .addValue("noFailureAt", Timestamp.from(ReviewNotificationOutbox.NO_FAILURE_AT))
+                .addValue("noFailureReason", ReviewNotificationOutbox.NO_FAILURE_REASON)
+                .addValue("noneFailureType", SlackInteractionFailureType.NONE.name());
 
         int updatedCount = namedParameterJdbcTemplate.update(
                 buildEnqueueSql(),
@@ -191,12 +194,15 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                 SET status = :processingStatus,
                     processing_started_at = :processingStartedAt,
                     processing_attempt = processing_attempt + 1,
-                    failed_at = NULL,
-                    failure_reason = NULL,
-                    failure_type = NULL
+                    failed_at = :noFailureAt,
+                    failure_reason = :noFailureReason,
+                    failure_type = :noneFailureType
                 WHERE id = :outboxId
                 """,
                 updateParameters
+                        .addValue("noFailureAt", Timestamp.from(ReviewNotificationOutbox.NO_FAILURE_AT))
+                        .addValue("noFailureReason", ReviewNotificationOutbox.NO_FAILURE_REASON)
+                        .addValue("noneFailureType", SlackInteractionFailureType.NONE.name())
         );
         if (updatedCount == 0) {
             return Optional.empty();
@@ -277,7 +283,7 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                 ReviewNotificationOutboxStatus.RETRY_PENDING,
                 failedAt,
                 failureReason,
-                null
+                SlackInteractionFailureType.NONE
         );
 
         return exhaustedCount + recoveredCount;
@@ -390,7 +396,8 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                     attachments_json,
                     fallback_text,
                     status,
-                    processing_attempt
+                    processing_attempt,
+                    failure_type
                 )
                 VALUES (
                     CURRENT_TIMESTAMP(6),
@@ -404,7 +411,8 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                     :attachmentsJson,
                     :fallbackText,
                     :pendingStatus,
-                    :processingAttempt
+                    :processingAttempt,
+                    :noneFailureType
                 )
                 ON DUPLICATE KEY UPDATE
                     idempotency_key = idempotency_key
@@ -439,7 +447,7 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
 
     private String resolveFailureTypeName(ReviewNotificationOutbox outbox) {
         if (outbox.getFailureType() == null) {
-            return null;
+            return SlackInteractionFailureType.NONE.name();
         }
 
         return outbox.getFailureType().name();
