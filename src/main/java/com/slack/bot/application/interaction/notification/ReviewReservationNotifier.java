@@ -222,10 +222,7 @@ public class ReviewReservationNotifier {
     }
 
     private String buildReservationEphemeralText(ReviewReservation reservation, String headerText) {
-        String title = reservation.getReservationPullRequest().getPullRequestTitle();
-        String prLine = (title != null && !title.isBlank())
-                ? title
-                : "PR #" + reservation.getReservationPullRequest().getPullRequestNumber();
+        String prLine = resolveReservationPullRequestLine(reservation);
         ZonedDateTime when = reservation.getScheduledAt().atZone(clock.getZone());
         String scheduledAtText = String.format(
                 "%d년 %d월 %d일 %02d시 %02d분",
@@ -237,5 +234,15 @@ public class ReviewReservationNotifier {
         );
 
         return headerText + "\n" + prLine + "\n리뷰 시작 시간: " + scheduledAtText;
+    }
+
+    private String resolveReservationPullRequestLine(ReviewReservation reservation) {
+        String title = reservation.getReservationPullRequest().getPullRequestTitle();
+
+        if (title == null || title.isBlank()) {
+            return "PR #" + reservation.getReservationPullRequest().getPullRequestNumber();
+        }
+
+        return title;
     }
 }
