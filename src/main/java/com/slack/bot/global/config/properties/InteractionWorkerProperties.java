@@ -104,19 +104,30 @@ public record InteractionWorkerProperties(
     public record OutboxProperties(
             @DefaultValue("1000") long pollDelayMs,
             @DefaultValue("60000") long processingTimeoutMs,
-            @DefaultValue("30000") long pollCapMs
+            @DefaultValue("30000") long pollCapMs,
+            @DefaultValue("100") int timeoutRecoveryBatchSize
     ) {
 
         public OutboxProperties {
-            validatePollingProperties("outbox", pollDelayMs, processingTimeoutMs, pollCapMs);
+            validateInboxPollingProperties(
+                    "outbox",
+                    pollDelayMs,
+                    processingTimeoutMs,
+                    pollCapMs,
+                    timeoutRecoveryBatchSize
+            );
         }
 
         public OutboxProperties() {
-            this(1000L, 60000L, 30000L);
+            this(1000L, 60000L, 30000L, 100);
         }
 
         public OutboxProperties(long pollDelayMs, long processingTimeoutMs) {
-            this(pollDelayMs, processingTimeoutMs, 30000L);
+            this(pollDelayMs, processingTimeoutMs, 30000L, 100);
+        }
+
+        public OutboxProperties(long pollDelayMs, long processingTimeoutMs, long pollCapMs) {
+            this(pollDelayMs, processingTimeoutMs, pollCapMs, 100);
         }
     }
 

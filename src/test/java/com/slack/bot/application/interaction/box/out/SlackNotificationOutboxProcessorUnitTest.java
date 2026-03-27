@@ -16,6 +16,8 @@ import static org.mockito.Mockito.verify;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
 import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
+import com.slack.bot.application.worker.PollingHintPublisher;
+import com.slack.bot.application.worker.PollingHintTarget;
 import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
@@ -47,6 +49,7 @@ import org.springframework.retry.support.RetryTemplate;
 class SlackNotificationOutboxProcessorUnitTest {
 
     private static final Instant CLAIMED_PROCESSING_STARTED_AT = Instant.parse("2026-03-24T00:00:00.123456Z");
+    private static final int OUTBOX_RECOVERY_BATCH_SIZE = 37;
 
     @Mock
     NotificationTransportApiClient notificationTransportApiClient;
@@ -56,6 +59,9 @@ class SlackNotificationOutboxProcessorUnitTest {
 
     @Mock
     WorkspaceRepository workspaceRepository;
+
+    @Mock
+    PollingHintPublisher pollingHintPublisher;
 
     SlackNotificationOutboxProcessor slackNotificationOutboxProcessor;
 
@@ -75,7 +81,16 @@ class SlackNotificationOutboxProcessorUnitTest {
                 workspaceRepository,
                 new BoxFailureReasonTruncator(),
                 retryProperties,
-                new InteractionWorkerProperties(),
+                new InteractionWorkerProperties(
+                        new InteractionWorkerProperties.InboxProperties(),
+                        new InteractionWorkerProperties.OutboxProperties(
+                                1_000L,
+                                60_000L,
+                                30_000L,
+                                OUTBOX_RECOVERY_BATCH_SIZE
+                        )
+                ),
+                pollingHintPublisher,
                 notificationTransportApiClient,
                 slackNotificationOutboxRepository,
                 classifier
@@ -103,6 +118,49 @@ class SlackNotificationOutboxProcessorUnitTest {
         retryTemplate.setBackOffPolicy(backOffPolicy);
 
         return retryTemplate;
+    }
+
+    @Test
+    void processing_timeout_복구시_batch_size를_전달하고_polling_hint를_발행한다() {
+        // given
+        given(slackNotificationOutboxRepository.recoverTimeoutProcessing(
+                any(),
+                any(),
+                anyString(),
+                eq(2),
+                eq(OUTBOX_RECOVERY_BATCH_SIZE)
+        )).willReturn(3);
+
+        // when
+        slackNotificationOutboxProcessor.recoverTimeoutProcessing();
+
+        // then
+        verify(slackNotificationOutboxRepository).recoverTimeoutProcessing(
+                any(),
+                any(),
+                anyString(),
+                eq(2),
+                eq(OUTBOX_RECOVERY_BATCH_SIZE)
+        );
+        verify(pollingHintPublisher).publish(PollingHintTarget.INTERACTION_OUTBOX);
+    }
+
+    @Test
+    void processing_timeout_복구건이_없으면_polling_hint를_발행하지_않는다() {
+        // given
+        given(slackNotificationOutboxRepository.recoverTimeoutProcessing(
+                any(),
+                any(),
+                anyString(),
+                eq(2),
+                eq(OUTBOX_RECOVERY_BATCH_SIZE)
+        )).willReturn(0);
+
+        // when
+        slackNotificationOutboxProcessor.recoverTimeoutProcessing();
+
+        // then
+        verify(pollingHintPublisher, never()).publish(PollingHintTarget.INTERACTION_OUTBOX);
     }
 
     @Test

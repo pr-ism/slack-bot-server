@@ -90,17 +90,28 @@ class InteractionWorkerPropertiesTest {
     void outbox_properties는_유효한_polling_설정을_생성한다() {
         // when
         InteractionWorkerProperties.OutboxProperties properties =
-                new InteractionWorkerProperties.OutboxProperties(1_000L, 60_000L, 30_000L);
+                new InteractionWorkerProperties.OutboxProperties(1_000L, 60_000L, 30_000L, 50);
 
         // then
-        assertThat(properties.pollCapMs()).isEqualTo(30_000L);
+        assertAll(
+                () -> assertThat(properties.pollCapMs()).isEqualTo(30_000L),
+                () -> assertThat(properties.timeoutRecoveryBatchSize()).isEqualTo(50)
+        );
     }
 
     @Test
     void outbox_properties는_processing_timeout이_0이하면_예외를_던진다() {
         // when & then
-        assertThatThrownBy(() -> new InteractionWorkerProperties.OutboxProperties(1_000L, 0L, 30_000L))
+        assertThatThrownBy(() -> new InteractionWorkerProperties.OutboxProperties(1_000L, 0L, 30_000L, 100))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("outbox.processingTimeoutMs는 0보다 커야 합니다.");
+    }
+
+    @Test
+    void outbox_properties는_timeout_recovery_batch_size가_0이하면_예외를_던진다() {
+        // when & then
+        assertThatThrownBy(() -> new InteractionWorkerProperties.OutboxProperties(1_000L, 60_000L, 30_000L, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("outbox.timeoutRecoveryBatchSize는 0보다 커야 합니다.");
     }
 }

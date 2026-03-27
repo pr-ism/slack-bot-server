@@ -12,6 +12,8 @@ import static org.mockito.Mockito.verify;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interaction.client.exception.SlackBotMessageDispatchException;
+import com.slack.bot.application.worker.PollingHintPublisher;
+import com.slack.bot.application.worker.PollingHintTarget;
 import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
@@ -32,10 +34,12 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @IntegrationTest
+@MockitoSpyBean(types = PollingHintPublisher.class)
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class SlackNotificationOutboxProcessorTest {
@@ -57,6 +61,9 @@ class SlackNotificationOutboxProcessorTest {
 
     @Autowired
     Clock clock;
+
+    @Autowired
+    PollingHintPublisher pollingHintPublisher;
 
     @Test
     @Sql(scripts = "/sql/fixtures/box/out/pending_outbox.sql")
@@ -155,6 +162,7 @@ class SlackNotificationOutboxProcessorTest {
                                                                               .orElseThrow();
 
             verify(notificationTransportApiClient).sendMessage("xoxb-test-token", "C1", "hello-timeout-200");
+            verify(pollingHintPublisher).publish(PollingHintTarget.INTERACTION_OUTBOX);
             assertAll(
                     () -> assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.SENT),
                     () -> assertThat(actual.getProcessingAttempt()).isEqualTo(2)
