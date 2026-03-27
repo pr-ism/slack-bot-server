@@ -79,6 +79,8 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
         this.fallbackText = fallbackText;
         this.status = SlackNotificationOutboxStatus.PENDING;
         this.processingAttempt = 0;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.sentAt = FailureSnapshotDefaults.NO_SENT_AT;
         this.failedAt = FailureSnapshotDefaults.NO_FAILURE_AT;
         this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
         this.failureType = SlackInteractionFailureType.NONE;
@@ -89,6 +91,7 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
         validateSentAt(sentAt);
 
         this.status = SlackNotificationOutboxStatus.SENT;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
         this.sentAt = sentAt;
         this.failedAt = FailureSnapshotDefaults.NO_FAILURE_AT;
         this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
@@ -117,7 +120,8 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
         validateFailureReason(failureReason);
 
         this.status = SlackNotificationOutboxStatus.RETRY_PENDING;
-        this.processingStartedAt = null;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.sentAt = FailureSnapshotDefaults.NO_SENT_AT;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = SlackInteractionFailureType.NONE;
@@ -143,7 +147,8 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
         validateFailureType(failureType);
 
         this.status = SlackNotificationOutboxStatus.FAILED;
-        this.processingStartedAt = null;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.sentAt = FailureSnapshotDefaults.NO_SENT_AT;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = failureType;

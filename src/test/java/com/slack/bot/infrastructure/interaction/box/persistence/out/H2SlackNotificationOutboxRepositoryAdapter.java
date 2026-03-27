@@ -30,6 +30,8 @@ public class H2SlackNotificationOutboxRepositoryAdapter extends SlackNotificatio
                         :fallbackText,
                         :pendingStatus,
                         :processingAttempt,
+                        :noProcessingStartedAt,
+                        :noSentAt,
                         :noFailureAt,
                         :noFailureReason,
                         :noneFailureType
@@ -45,6 +47,8 @@ public class H2SlackNotificationOutboxRepositoryAdapter extends SlackNotificatio
                     fallback_text,
                     status,
                     processing_attempt,
+                    processing_started_at,
+                    sent_at,
                     failed_at,
                     failure_reason,
                     failure_type
@@ -64,6 +68,8 @@ public class H2SlackNotificationOutboxRepositoryAdapter extends SlackNotificatio
                         fallback_text,
                         status,
                         processing_attempt,
+                        processing_started_at,
+                        sent_at,
                         failed_at,
                         failure_reason,
                         failure_type
@@ -81,6 +87,8 @@ public class H2SlackNotificationOutboxRepositoryAdapter extends SlackNotificatio
                         source.fallback_text,
                         source.status,
                         source.processing_attempt,
+                        source.processing_started_at,
+                        source.sent_at,
                         source.failed_at,
                         source.failure_reason,
                         source.failure_type
