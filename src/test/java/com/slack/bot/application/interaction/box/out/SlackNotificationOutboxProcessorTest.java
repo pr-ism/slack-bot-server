@@ -196,6 +196,48 @@ class SlackNotificationOutboxProcessorTest {
     }
 
     @Test
+    @Sql(scripts = "/sql/fixtures/notification/workspace_t1.sql")
+    void PROCESSING_타임아웃_outbox_복구는_배치_크기만큼만_처리한다() {
+        // given
+        Instant base = clock.instant();
+        List<Long> outboxIds = new java.util.ArrayList<>();
+        for (int index = 0; index < 101; index++) {
+            SlackNotificationOutbox timeoutOutbox = SlackNotificationOutbox.builder()
+                                                                           .messageType(SlackNotificationOutboxMessageType.CHANNEL_TEXT)
+                                                                           .idempotencyKey("OUTBOX-TIMEOUT-BATCH-" + index)
+                                                                           .teamId("T1")
+                                                                           .channelId("C1")
+                                                                           .text("hello-timeout-batch-" + index)
+                                                                           .build();
+            setProcessingState(timeoutOutbox, base.minusSeconds(120L + index), 1);
+            SlackNotificationOutbox saved = slackNotificationOutboxRepository.save(timeoutOutbox);
+            outboxIds.add(saved.getId());
+        }
+
+        // when
+        int recoveredCount = slackNotificationOutboxProcessor.recoverTimeoutProcessing();
+
+        // then
+        List<SlackNotificationOutbox> actualOutboxes = outboxIds.stream()
+                                                                .map(outboxId -> slackNotificationOutboxRepository.findById(
+                                                                        outboxId
+                                                                ).orElseThrow())
+                                                                .toList();
+        List<SlackNotificationOutboxHistory> actualHistories = jpaSlackNotificationOutboxHistoryRepository.findAll();
+
+        assertAll(
+                () -> assertThat(recoveredCount).isEqualTo(100),
+                () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == SlackNotificationOutboxStatus.RETRY_PENDING)
+                        .hasSize(100),
+                () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == SlackNotificationOutboxStatus.PROCESSING)
+                        .hasSize(1),
+                () -> assertThat(actualHistories).hasSize(100),
+                () -> assertThat(actualHistories).extracting(history -> history.getStatus())
+                        .containsOnly(SlackNotificationOutboxStatus.RETRY_PENDING)
+        );
+    }
+
+    @Test
     @Sql(scripts = "/sql/fixtures/box/out/pending_outbox.sql")
     void CHANNEL_BLOCKS_outbox는_채널_블록을_전송한다() {
         // given
