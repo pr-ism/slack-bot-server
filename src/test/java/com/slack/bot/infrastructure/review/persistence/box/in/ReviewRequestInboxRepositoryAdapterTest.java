@@ -28,6 +28,36 @@ class ReviewRequestInboxRepositoryAdapterTest {
     JpaReviewRequestInboxRepository jpaReviewRequestInboxRepository;
 
     @Test
+    void 신규_upsertPending은_failure_snapshot을_sentinel값으로_저장한다() {
+        // given
+        Instant availableAt = Instant.parse("2026-02-24T00:00:00Z");
+
+        // when
+        reviewRequestInboxRepository.upsertPending(
+                "api-key:41",
+                "api-key",
+                41L,
+                "{\"pullRequestTitle\":\"new\"}",
+                availableAt
+        );
+
+        // then
+        ReviewRequestInbox actual = findByIdempotencyKey("api-key:41");
+        assertAll(
+                () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING),
+                () -> assertThat(actual.getProcessingAttempt()).isZero(),
+                () -> assertThat(actual.getProcessingStartedAt()).isEqualTo(
+                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
+                ),
+                () -> assertThat(actual.getProcessedAt()).isEqualTo(FailureSnapshotDefaults.NO_PROCESSED_AT),
+                () -> assertThat(actual.getFailedAt()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_AT),
+                () -> assertThat(actual.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
+                () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
+                () -> assertThat(actual.getAvailableAt()).isEqualTo(availableAt)
+        );
+    }
+
+    @Test
     void PROCESSING_상태면_upsertPending이_행을_덮어쓰지_않는다() {
         // given
         Instant oldAvailableAt = Instant.parse("2026-02-24T00:00:00Z");
@@ -112,5 +142,15 @@ class ReviewRequestInboxRepositoryAdapterTest {
         ReflectionTestUtils.setField(inbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
         ReflectionTestUtils.setField(inbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
         ReflectionTestUtils.setField(inbox, "failureType", ReviewRequestInboxFailureType.NONE);
+    }
+
+    private ReviewRequestInbox findByIdempotencyKey(String idempotencyKey) {
+        for (ReviewRequestInbox inbox : jpaReviewRequestInboxRepository.findAll()) {
+            if (idempotencyKey.equals(inbox.getIdempotencyKey())) {
+                return inbox;
+            }
+        }
+
+        throw new IllegalArgumentException("해당 idempotencyKey의 inbox가 없습니다.");
     }
 }

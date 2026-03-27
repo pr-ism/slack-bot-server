@@ -390,7 +390,12 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                     request_json,
                     available_at,
                     status,
-                    processing_attempt
+                    processing_attempt,
+                    processing_started_at,
+                    processed_at,
+                    failed_at,
+                    failure_reason,
+                    failure_type
                 )
                 VALUES (
                     CURRENT_TIMESTAMP(6),
@@ -401,7 +406,12 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                     :requestJson,
                     :availableAt,
                     :pendingStatus,
-                    0
+                    0,
+                    :noProcessingStartedAt,
+                    :noProcessedAt,
+                    :noFailureAt,
+                    :noFailureReason,
+                    :noneFailureType
                 )
                 ON DUPLICATE KEY UPDATE
                     updated_at = IF(
