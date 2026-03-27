@@ -11,6 +11,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 
 import com.slack.bot.application.IntegrationTest;
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
@@ -29,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @IntegrationTest
 @MockitoSpyBean(types = ReviewNotificationOutboxRepository.class)
@@ -139,6 +141,48 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
         );
     }
 
+    @Test
+    @Sql(scripts = "classpath:sql/fixtures/review/workspace_t1.sql")
+    void review_outbox_timeout_recovery는_배치_크기만큼만_처리한다() {
+        // given
+        Instant base = Instant.parse("2026-03-24T00:10:00Z");
+        List<Long> outboxIds = new java.util.ArrayList<>();
+        for (int index = 0; index < 101; index++) {
+            ReviewNotificationOutbox outbox = pendingOutbox("review-timeout-batch-" + index);
+            setProcessingState(outbox, base.minusSeconds(120L + index), 1);
+            ReviewNotificationOutbox saved = reviewNotificationOutboxRepository.save(outbox);
+            outboxIds.add(saved.getId());
+        }
+
+        // when
+        int recoveredCount = reviewNotificationOutboxProcessor.recoverTimeoutProcessing(60_000L);
+
+        // then
+        List<ReviewNotificationOutbox> actualOutboxes = outboxIds.stream()
+                                                                 .map(outboxId -> reviewNotificationOutboxRepository.findById(
+                                                                         outboxId
+                                                                 ).orElseThrow())
+                                                                 .toList();
+        List<ReviewNotificationOutboxHistory> actualHistories = jpaReviewNotificationOutboxHistoryRepository.findAll();
+
+        assertAll(
+                () -> assertThat(recoveredCount).isEqualTo(100),
+                () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == ReviewNotificationOutboxStatus.RETRY_PENDING)
+                        .hasSize(100),
+                () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == ReviewNotificationOutboxStatus.PROCESSING)
+                        .hasSize(1),
+                () -> assertThat(actualHistories).filteredOn(history -> history.getStatus() == ReviewNotificationOutboxStatus.RETRY_PENDING)
+                        .hasSize(100)
+        );
+        verify(notificationTransportApiClient, never()).sendBlockMessage(
+                anyString(),
+                anyString(),
+                any(),
+                any(),
+                anyString()
+        );
+    }
+
     private ReviewNotificationOutbox pendingOutbox(String idempotencyKey) {
         return ReviewNotificationOutbox.builder()
                                        .idempotencyKey(idempotencyKey)
@@ -155,5 +199,19 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
                                                            .filter(history -> outboxId.equals(history.getOutboxId()))
                                                            .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))
                                                            .toList();
+    }
+
+    private void setProcessingState(
+            ReviewNotificationOutbox outbox,
+            Instant processingStartedAt,
+            int processingAttempt
+    ) {
+        ReflectionTestUtils.setField(outbox, "status", ReviewNotificationOutboxStatus.PROCESSING);
+        ReflectionTestUtils.setField(outbox, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(outbox, "sentAt", FailureSnapshotDefaults.NO_SENT_AT);
+        ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
+        ReflectionTestUtils.setField(outbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
+        ReflectionTestUtils.setField(outbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
+        ReflectionTestUtils.setField(outbox, "failureType", SlackInteractionFailureType.NONE);
     }
 }
