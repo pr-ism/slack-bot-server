@@ -75,4 +75,19 @@ class ReviewNotificationOutboxHistoryTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("history outboxId를 다른 값으로 변경할 수 없습니다.");
     }
+
+    @Test
+    void FAILED_history는_failureType이_null이면_생성할_수_없다() {
+        // when & then
+        assertThatThrownBy(() -> ReviewNotificationOutboxHistory.completed(
+                10L,
+                1,
+                ReviewNotificationOutboxStatus.FAILED,
+                Instant.parse("2026-03-27T00:00:00Z"),
+                "failure",
+                null
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("FAILED history에는 failureType이 필요합니다.");
+    }
 }
