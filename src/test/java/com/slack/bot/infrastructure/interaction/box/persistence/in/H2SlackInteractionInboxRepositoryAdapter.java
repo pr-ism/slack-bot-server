@@ -25,6 +25,8 @@ public class H2SlackInteractionInboxRepositoryAdapter extends SlackInteractionIn
                         :payloadJson,
                         :pendingStatus,
                         :processingAttempt,
+                        :noProcessingStartedAt,
+                        :noProcessedAt,
                         :noFailureAt,
                         :noFailureReason,
                         :noneFailureType
@@ -35,6 +37,8 @@ public class H2SlackInteractionInboxRepositoryAdapter extends SlackInteractionIn
                     payload_json,
                     status,
                     processing_attempt,
+                    processing_started_at,
+                    processed_at,
                     failed_at,
                     failure_reason,
                     failure_type
@@ -49,6 +53,8 @@ public class H2SlackInteractionInboxRepositoryAdapter extends SlackInteractionIn
                         payload_json,
                         status,
                         processing_attempt,
+                        processing_started_at,
+                        processed_at,
                         failed_at,
                         failure_reason,
                         failure_type
@@ -61,6 +67,8 @@ public class H2SlackInteractionInboxRepositoryAdapter extends SlackInteractionIn
                         source.payload_json,
                         source.status,
                         source.processing_attempt,
+                        source.processing_started_at,
+                        source.processed_at,
                         source.failed_at,
                         source.failure_reason,
                         source.failure_type

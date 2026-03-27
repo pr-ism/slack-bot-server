@@ -41,6 +41,8 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                 .addValue("payloadJson", inbox.getPayloadJson())
                 .addValue("pendingStatus", inbox.getStatus().name())
                 .addValue("processingAttempt", inbox.getProcessingAttempt())
+                .addValue("noProcessingStartedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT))
+                .addValue("noProcessedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSED_AT))
                 .addValue("noFailureAt", Timestamp.from(FailureSnapshotDefaults.NO_FAILURE_AT))
                 .addValue("noFailureReason", FailureSnapshotDefaults.NO_FAILURE_REASON)
                 .addValue("noneFailureType", SlackInteractionFailureType.NONE.name());
@@ -95,12 +97,14 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                     SET status = :processingStatus,
                         processing_attempt = processing_attempt + 1,
                         processing_started_at = :processingStartedAt,
+                        processed_at = :noProcessedAt,
                         failed_at = :noFailureAt,
                         failure_reason = :noFailureReason,
                         failure_type = :noneFailureType
                     WHERE id = :inboxId
                     """,
                 updateParameters
+                        .addValue("noProcessedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSED_AT))
                         .addValue("noFailureAt", Timestamp.from(FailureSnapshotDefaults.NO_FAILURE_AT))
                         .addValue("noFailureReason", FailureSnapshotDefaults.NO_FAILURE_REASON)
                         .addValue("noneFailureType", SlackInteractionFailureType.NONE.name())
@@ -170,10 +174,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
     ) {
         validateRecoverTimeoutProcessingArguments(processingStartedBefore, failedAt, failureReason, maxAttempts);
 
-        BooleanExpression timeoutCondition = slackInteractionInbox.processingStartedAt.isNull()
-                                                                                      .or(slackInteractionInbox.processingStartedAt.lt(
-                                                                                              processingStartedBefore
-                                                                                      ));
+        BooleanExpression timeoutCondition = slackInteractionInbox.processingStartedAt.lt(processingStartedBefore);
 
         int exhaustedCount = recoverTimeoutProcessingByStatus(
                 interactionType,
@@ -224,7 +225,11 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
             long updatedCount = queryFactory
                     .update(slackInteractionInbox)
                     .set(slackInteractionInbox.status, targetStatus)
-                    .set(slackInteractionInbox.processingStartedAt, (Instant) null)
+                    .set(
+                            slackInteractionInbox.processingStartedAt,
+                            FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
+                    )
+                    .set(slackInteractionInbox.processedAt, FailureSnapshotDefaults.NO_PROCESSED_AT)
                     .set(slackInteractionInbox.failedAt, failedAt)
                     .set(slackInteractionInbox.failureReason, failureReason)
                     .set(slackInteractionInbox.failureType, failureType)
@@ -278,6 +283,10 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                     payload_json,
                     status,
                     processing_attempt,
+                    processing_started_at,
+                    processed_at,
+                    failed_at,
+                    failure_reason,
                     failure_type
                 )
                 VALUES (
@@ -288,6 +297,10 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                     :payloadJson,
                     :pendingStatus,
                     :processingAttempt,
+                    :noProcessingStartedAt,
+                    :noProcessedAt,
+                    :noFailureAt,
+                    :noFailureReason,
                     :noneFailureType
                 )
                 ON DUPLICATE KEY UPDATE

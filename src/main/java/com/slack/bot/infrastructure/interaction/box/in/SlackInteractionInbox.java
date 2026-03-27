@@ -89,6 +89,8 @@ public class SlackInteractionInbox extends BaseTimeEntity {
         this.payloadJson = payloadJson;
         this.status = status;
         this.processingAttempt = processingAttempt;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.processedAt = FailureSnapshotDefaults.NO_PROCESSED_AT;
         this.failedAt = FailureSnapshotDefaults.NO_FAILURE_AT;
         this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
         this.failureType = SlackInteractionFailureType.NONE;
@@ -99,7 +101,7 @@ public class SlackInteractionInbox extends BaseTimeEntity {
         validateTransition(SlackInteractionInboxStatus.PROCESSING, "PROCESSED");
 
         this.status = SlackInteractionInboxStatus.PROCESSED;
-        this.processingStartedAt = null;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
         this.processedAt = processedAt;
         this.failedAt = FailureSnapshotDefaults.NO_FAILURE_AT;
         this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
@@ -121,7 +123,8 @@ public class SlackInteractionInbox extends BaseTimeEntity {
         validateTransition(SlackInteractionInboxStatus.PROCESSING, "RETRY_PENDING");
 
         this.status = SlackInteractionInboxStatus.RETRY_PENDING;
-        this.processingStartedAt = null;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.processedAt = FailureSnapshotDefaults.NO_PROCESSED_AT;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = SlackInteractionFailureType.NONE;
@@ -147,7 +150,8 @@ public class SlackInteractionInbox extends BaseTimeEntity {
         validateTransition(SlackInteractionInboxStatus.PROCESSING, "FAILED");
 
         this.status = SlackInteractionInboxStatus.FAILED;
-        this.processingStartedAt = null;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.processedAt = FailureSnapshotDefaults.NO_PROCESSED_AT;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = failureType;
