@@ -11,6 +11,8 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 
 import com.slack.bot.application.IntegrationTest;
+import com.slack.bot.application.worker.PollingHintPublisher;
+import com.slack.bot.application.worker.PollingHintTarget;
 import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
@@ -34,6 +36,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 @IntegrationTest
 @MockitoSpyBean(types = ReviewNotificationOutboxRepository.class)
+@MockitoSpyBean(types = PollingHintPublisher.class)
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class ReviewNotificationOutboxLeaseIntegrationTest {
@@ -52,6 +55,9 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
 
     @Autowired
     JpaReviewNotificationOutboxHistoryRepository jpaReviewNotificationOutboxHistoryRepository;
+
+    @Autowired
+    PollingHintPublisher pollingHintPublisher;
 
     @BeforeEach
     void setUp() {
@@ -132,6 +138,7 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
                 () -> assertThat(histories).hasSize(1),
                 () -> assertThat(histories.getFirst().getStatus()).isEqualTo(ReviewNotificationOutboxStatus.RETRY_PENDING)
         );
+        verify(pollingHintPublisher).publish(PollingHintTarget.REVIEW_NOTIFICATION_OUTBOX);
         verify(notificationTransportApiClient, never()).sendBlockMessage(
                 anyString(),
                 anyString(),

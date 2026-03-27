@@ -43,15 +43,16 @@ public record ReviewWorkerProperties(
             @DefaultValue("1000") long pollDelayMs,
             @DefaultValue("30000") long pollCapMs,
             @DefaultValue("50") int batchSize,
-            @DefaultValue("60000") long processingTimeoutMs
+            @DefaultValue("60000") long processingTimeoutMs,
+            @DefaultValue("100") int timeoutRecoveryBatchSize
     ) {
 
         public OutboxProperties {
-            validatePollingProperties("outbox", pollDelayMs, pollCapMs);
+            validatePollingProperties("outbox", pollDelayMs, pollCapMs, timeoutRecoveryBatchSize);
         }
 
         public OutboxProperties() {
-            this(1000L, 30000L, 50, 60000L);
+            this(1000L, 30000L, 50, 60000L, 100);
         }
     }
 

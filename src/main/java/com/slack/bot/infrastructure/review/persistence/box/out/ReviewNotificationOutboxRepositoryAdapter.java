@@ -31,8 +31,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotificationOutboxRepository {
 
-    private static final long TIMEOUT_RECOVERY_BATCH_SIZE = 100L;
-
     private final JPAQueryFactory queryFactory;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
     private final JpaReviewNotificationOutboxRepository repository;
@@ -269,12 +267,14 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
             Instant processingStartedBefore,
             Instant failedAt,
             String failureReason,
-            int maxAttempts
+            int maxAttempts,
+            int recoveryBatchSize
     ) {
         validateProcessingStartedBefore(processingStartedBefore);
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
         validateMaxAttempts(maxAttempts);
+        validateRecoveryBatchSize(recoveryBatchSize);
 
         BooleanExpression timeoutCondition = reviewNotificationOutbox.processingStartedAt.lt(processingStartedBefore);
 
@@ -284,7 +284,8 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                 ReviewNotificationOutboxStatus.FAILED,
                 failedAt,
                 failureReason,
-                SlackInteractionFailureType.RETRY_EXHAUSTED
+                SlackInteractionFailureType.RETRY_EXHAUSTED,
+                recoveryBatchSize
         );
         int recoveredCount = recoverTimeoutProcessingByStatus(
                 timeoutCondition,
@@ -292,7 +293,8 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                 ReviewNotificationOutboxStatus.RETRY_PENDING,
                 failedAt,
                 failureReason,
-                SlackInteractionFailureType.NONE
+                SlackInteractionFailureType.NONE,
+                recoveryBatchSize
         );
 
         return exhaustedCount + recoveredCount;
@@ -304,7 +306,8 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
             ReviewNotificationOutboxStatus targetStatus,
             Instant failedAt,
             String failureReason,
-            SlackInteractionFailureType failureType
+            SlackInteractionFailureType failureType,
+            int recoveryBatchSize
     ) {
         List<Tuple> timedOutRows = queryFactory
                 .select(reviewNotificationOutbox.id, reviewNotificationOutbox.processingAttempt)
@@ -315,7 +318,7 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                         attemptCondition
                 )
                 .orderBy(reviewNotificationOutbox.processingStartedAt.asc(), reviewNotificationOutbox.id.asc())
-                .limit(TIMEOUT_RECOVERY_BATCH_SIZE)
+                .limit(recoveryBatchSize)
                 .fetch();
 
         if (timedOutRows.isEmpty()) {
@@ -529,6 +532,12 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
     private void validateMaxAttempts(int maxAttempts) {
         if (maxAttempts <= 0) {
             throw new IllegalArgumentException("maxAttempts는 0보다 커야 합니다.");
+        }
+    }
+
+    private void validateRecoveryBatchSize(int recoveryBatchSize) {
+        if (recoveryBatchSize <= 0) {
+            throw new IllegalArgumentException("recoveryBatchSize는 0보다 커야 합니다.");
         }
     }
 

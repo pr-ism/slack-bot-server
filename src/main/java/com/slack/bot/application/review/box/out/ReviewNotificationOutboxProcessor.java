@@ -7,9 +7,12 @@ import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
 import com.slack.bot.application.interaction.box.out.exception.OutboxProcessingLeaseLostException;
 import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
 import com.slack.bot.application.review.dto.ReviewMessageDto;
+import com.slack.bot.application.worker.PollingHintPublisher;
+import com.slack.bot.application.worker.PollingHintTarget;
 import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
+import com.slack.bot.global.config.properties.ReviewWorkerProperties;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
@@ -42,6 +45,8 @@ public class ReviewNotificationOutboxProcessor {
     private final WorkspaceRepository workspaceRepository;
     private final BoxFailureReasonTruncator failureReasonTruncator;
     private final InteractionRetryProperties interactionRetryProperties;
+    private final ReviewWorkerProperties reviewWorkerProperties;
+    private final PollingHintPublisher pollingHintPublisher;
     private final NotificationTransportApiClient notificationTransportApiClient;
     private final ReviewNotificationOutboxRepository reviewNotificationOutboxRepository;
     private final InteractionRetryExceptionClassifier retryExceptionClassifier;
@@ -75,10 +80,12 @@ public class ReviewNotificationOutboxProcessor {
                 now.minusMillis(processingTimeoutMs),
                 now,
                 PROCESSING_TIMEOUT_FAILURE_REASON,
-                interactionRetryProperties.outbox().maxAttempts()
+                interactionRetryProperties.outbox().maxAttempts(),
+                reviewWorkerProperties.outbox().timeoutRecoveryBatchSize()
         );
 
         if (recoveredCount > 0) {
+            pollingHintPublisher.publish(PollingHintTarget.REVIEW_NOTIFICATION_OUTBOX);
             log.warn("review_notification outbox PROCESSING 고착 건을 복구했습니다. count={}", recoveredCount);
         }
 
