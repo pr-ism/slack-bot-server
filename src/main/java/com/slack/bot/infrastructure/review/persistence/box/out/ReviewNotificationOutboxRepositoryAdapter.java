@@ -44,6 +44,8 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                 .addValue("fallbackText", outbox.getFallbackText())
                 .addValue("pendingStatus", outbox.getStatus().name())
                 .addValue("processingAttempt", outbox.getProcessingAttempt())
+                .addValue("noProcessingStartedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT))
+                .addValue("noSentAt", Timestamp.from(FailureSnapshotDefaults.NO_SENT_AT))
                 .addValue("noFailureAt", Timestamp.from(FailureSnapshotDefaults.NO_FAILURE_AT))
                 .addValue("noFailureReason", FailureSnapshotDefaults.NO_FAILURE_REASON)
                 .addValue("noneFailureType", SlackInteractionFailureType.NONE.name());
@@ -195,12 +197,14 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                 SET status = :processingStatus,
                     processing_started_at = :processingStartedAt,
                     processing_attempt = processing_attempt + 1,
+                    sent_at = :noSentAt,
                     failed_at = :noFailureAt,
                     failure_reason = :noFailureReason,
                     failure_type = :noneFailureType
                 WHERE id = :outboxId
                 """,
                 updateParameters
+                        .addValue("noSentAt", Timestamp.from(FailureSnapshotDefaults.NO_SENT_AT))
                         .addValue("noFailureAt", Timestamp.from(FailureSnapshotDefaults.NO_FAILURE_AT))
                         .addValue("noFailureReason", FailureSnapshotDefaults.NO_FAILURE_REASON)
                         .addValue("noneFailureType", SlackInteractionFailureType.NONE.name())
@@ -265,10 +269,7 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
         validateFailureReason(failureReason);
         validateMaxAttempts(maxAttempts);
 
-        BooleanExpression timeoutCondition = reviewNotificationOutbox.processingStartedAt.isNull()
-                                                                                          .or(reviewNotificationOutbox.processingStartedAt.lt(
-                                                                                                  processingStartedBefore
-                                                                                          ));
+        BooleanExpression timeoutCondition = reviewNotificationOutbox.processingStartedAt.lt(processingStartedBefore);
 
         int exhaustedCount = recoverTimeoutProcessingByStatus(
                 timeoutCondition,
@@ -315,7 +316,11 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
             long updatedCount = queryFactory
                     .update(reviewNotificationOutbox)
                     .set(reviewNotificationOutbox.status, targetStatus)
-                    .set(reviewNotificationOutbox.processingStartedAt, (Instant) null)
+                    .set(
+                            reviewNotificationOutbox.processingStartedAt,
+                            FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
+                    )
+                    .set(reviewNotificationOutbox.sentAt, FailureSnapshotDefaults.NO_SENT_AT)
                     .set(reviewNotificationOutbox.failedAt, failedAt)
                     .set(reviewNotificationOutbox.failureReason, failureReason)
                     .set(reviewNotificationOutbox.failureType, failureType)
@@ -398,6 +403,10 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                     fallback_text,
                     status,
                     processing_attempt,
+                    processing_started_at,
+                    sent_at,
+                    failed_at,
+                    failure_reason,
                     failure_type
                 )
                 VALUES (
@@ -413,6 +422,10 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                     :fallbackText,
                     :pendingStatus,
                     :processingAttempt,
+                    :noProcessingStartedAt,
+                    :noSentAt,
+                    :noFailureAt,
+                    :noFailureReason,
                     :noneFailureType
                 )
                 ON DUPLICATE KEY UPDATE
@@ -439,18 +452,10 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
     }
 
     private Timestamp toTimestamp(Instant instant) {
-        if (instant == null) {
-            return null;
-        }
-
         return Timestamp.from(instant);
     }
 
     private String resolveFailureTypeName(ReviewNotificationOutbox outbox) {
-        if (outbox.getFailureType() == null) {
-            return SlackInteractionFailureType.NONE.name();
-        }
-
         return outbox.getFailureType().name();
     }
 }

@@ -78,6 +78,8 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
         this.fallbackText = fallbackText;
         this.status = ReviewNotificationOutboxStatus.PENDING;
         this.processingAttempt = 0;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.sentAt = FailureSnapshotDefaults.NO_SENT_AT;
         this.failedAt = FailureSnapshotDefaults.NO_FAILURE_AT;
         this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
         this.failureType = SlackInteractionFailureType.NONE;
@@ -88,6 +90,7 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
         validateTransition(ReviewNotificationOutboxStatus.PROCESSING, "SENT");
 
         this.status = ReviewNotificationOutboxStatus.SENT;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
         this.sentAt = sentAt;
         this.failedAt = FailureSnapshotDefaults.NO_FAILURE_AT;
         this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
@@ -116,7 +119,8 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
         validateTransition(ReviewNotificationOutboxStatus.PROCESSING, "RETRY_PENDING");
 
         this.status = ReviewNotificationOutboxStatus.RETRY_PENDING;
-        this.processingStartedAt = null;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.sentAt = FailureSnapshotDefaults.NO_SENT_AT;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = SlackInteractionFailureType.NONE;
@@ -142,7 +146,8 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
         validateTransition(ReviewNotificationOutboxStatus.PROCESSING, "FAILED");
 
         this.status = ReviewNotificationOutboxStatus.FAILED;
-        this.processingStartedAt = null;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.sentAt = FailureSnapshotDefaults.NO_SENT_AT;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = failureType;
