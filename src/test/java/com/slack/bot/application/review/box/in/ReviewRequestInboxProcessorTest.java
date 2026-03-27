@@ -230,6 +230,7 @@ class ReviewRequestInboxProcessorTest {
                                     ReviewRequestInboxStatus.PROCESSED
                             )
             );
+            verify(pollingHintPublisher).publish(PollingHintTarget.REVIEW_REQUEST_INBOX);
         });
     }
 

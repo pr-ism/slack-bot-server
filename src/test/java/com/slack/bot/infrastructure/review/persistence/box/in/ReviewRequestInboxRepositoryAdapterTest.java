@@ -161,7 +161,8 @@ class ReviewRequestInboxRepositoryAdapterTest {
                 Instant.parse("2026-02-24T00:02:00Z"),
                 failedAt,
                 "timeout",
-                3
+                3,
+                100
         );
 
         // then
@@ -202,7 +203,8 @@ class ReviewRequestInboxRepositoryAdapterTest {
                 base.minusSeconds(60),
                 base,
                 "timeout",
-                3
+                3,
+                100
         );
 
         // then

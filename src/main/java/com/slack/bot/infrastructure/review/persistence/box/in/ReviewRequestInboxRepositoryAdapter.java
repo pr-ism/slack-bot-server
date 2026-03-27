@@ -35,8 +35,6 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
             ReviewRequestInboxStatus.PENDING,
             ReviewRequestInboxStatus.RETRY_PENDING
     );
-    private static final long TIMEOUT_RECOVERY_BATCH_SIZE = 100L;
-
     private final JPAQueryFactory queryFactory;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
     private final JpaReviewRequestInboxRepository reviewRequestInboxJpaRepository;
@@ -233,12 +231,14 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
             Instant processingStartedBefore,
             Instant failedAt,
             String failureReason,
-            int maxAttempts
+            int maxAttempts,
+            int recoveryBatchSize
     ) {
         validateProcessingStartedBefore(processingStartedBefore);
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
         validateMaxAttempts(maxAttempts);
+        validateRecoveryBatchSize(recoveryBatchSize);
 
         BooleanExpression timeoutCondition = reviewRequestInbox.processingStartedAt.lt(processingStartedBefore);
 
@@ -249,7 +249,8 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                 failedAt,
                 failureReason,
                 ReviewRequestInboxFailureType.RETRY_EXHAUSTED,
-                ReviewRequestInboxFailureType.RETRY_EXHAUSTED
+                ReviewRequestInboxFailureType.RETRY_EXHAUSTED,
+                recoveryBatchSize
         );
         int recoveredCount = recoverTimeoutProcessingByStatus(
                 timeoutCondition,
@@ -258,7 +259,8 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                 failedAt,
                 failureReason,
                 ReviewRequestInboxFailureType.NONE,
-                ReviewRequestInboxFailureType.PROCESSING_TIMEOUT
+                ReviewRequestInboxFailureType.PROCESSING_TIMEOUT,
+                recoveryBatchSize
         );
 
         return exhaustedCount + recoveredCount;
@@ -271,7 +273,8 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
             Instant failedAt,
             String failureReason,
             ReviewRequestInboxFailureType snapshotFailureType,
-            ReviewRequestInboxFailureType historyFailureType
+            ReviewRequestInboxFailureType historyFailureType,
+            int recoveryBatchSize
     ) {
         List<Tuple> timedOutRows = queryFactory
                 .select(reviewRequestInbox.id, reviewRequestInbox.processingAttempt)
@@ -282,7 +285,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                         attemptCondition
                 )
                 .orderBy(reviewRequestInbox.processingStartedAt.asc(), reviewRequestInbox.id.asc())
-                .limit(TIMEOUT_RECOVERY_BATCH_SIZE)
+                .limit(recoveryBatchSize)
                 .fetch();
 
         if (timedOutRows.isEmpty()) {
@@ -629,6 +632,12 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
     private void validateMaxAttempts(int maxAttempts) {
         if (maxAttempts <= 0) {
             throw new IllegalArgumentException("maxAttempts는 0보다 커야 합니다.");
+        }
+    }
+
+    private void validateRecoveryBatchSize(int recoveryBatchSize) {
+        if (recoveryBatchSize <= 0) {
+            throw new IllegalArgumentException("recoveryBatchSize는 0보다 커야 합니다.");
         }
     }
 
