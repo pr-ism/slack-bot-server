@@ -11,6 +11,8 @@ import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxHistory;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -151,6 +153,7 @@ class ReviewRequestInboxRepositoryAdapterTest {
         setProcessingState(inbox, Instant.parse("2026-02-24T00:01:00Z"), 1);
         ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
         Instant failedAt = Instant.parse("2026-02-24T00:05:00Z");
+        LocalDateTime expectedUpdatedAt = LocalDateTime.ofInstant(failedAt, ZoneOffset.UTC);
 
         // when
         int recoveredCount = reviewRequestInboxRepository.recoverTimeoutProcessing(
@@ -167,6 +170,7 @@ class ReviewRequestInboxRepositoryAdapterTest {
                 () -> assertThat(recoveredCount).isEqualTo(1),
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
                 () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
+                () -> assertThat(actual.getUpdatedAt()).isEqualTo(expectedUpdatedAt),
                 () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
                 () -> assertThat(history.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.PROCESSING_TIMEOUT),
                 () -> assertThat(history.getFailureReason()).isEqualTo("timeout"),

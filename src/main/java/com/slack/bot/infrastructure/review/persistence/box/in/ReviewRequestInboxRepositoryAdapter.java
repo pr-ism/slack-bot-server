@@ -13,6 +13,8 @@ import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -284,6 +286,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
             long updatedCount = queryFactory
                     .update(reviewRequestInbox)
                     .set(reviewRequestInbox.status, targetStatus)
+                    .set(reviewRequestInbox.updatedAt, LocalDateTime.ofInstant(failedAt, ZoneOffset.UTC))
                     .set(
                             reviewRequestInbox.processingStartedAt,
                             FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
