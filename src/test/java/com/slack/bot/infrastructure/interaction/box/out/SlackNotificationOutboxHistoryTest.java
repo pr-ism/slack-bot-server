@@ -23,7 +23,7 @@ class SlackNotificationOutboxHistoryTest {
                 SlackNotificationOutboxStatus.RETRY_PENDING,
                 Instant.parse("2026-03-27T00:00:00Z"),
                 "failure",
-                null
+                SlackInteractionFailureType.NONE
         );
 
         // then
@@ -65,8 +65,8 @@ class SlackNotificationOutboxHistoryTest {
                 1,
                 SlackNotificationOutboxStatus.SENT,
                 Instant.parse("2026-03-27T00:00:00Z"),
-                null,
-                null
+                SlackNotificationOutbox.NO_FAILURE_REASON,
+                SlackInteractionFailureType.NONE
         );
 
         // when & then

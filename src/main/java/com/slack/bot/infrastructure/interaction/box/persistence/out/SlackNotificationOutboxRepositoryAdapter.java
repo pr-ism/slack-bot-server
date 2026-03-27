@@ -42,7 +42,10 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                 .addValue("blocksJson", outbox.getBlocksJson())
                 .addValue("fallbackText", outbox.getFallbackText())
                 .addValue("pendingStatus", outbox.getStatus().name())
-                .addValue("processingAttempt", outbox.getProcessingAttempt());
+                .addValue("processingAttempt", outbox.getProcessingAttempt())
+                .addValue("noFailureAt", Timestamp.from(SlackNotificationOutbox.NO_FAILURE_AT))
+                .addValue("noFailureReason", SlackNotificationOutbox.NO_FAILURE_REASON)
+                .addValue("noneFailureType", SlackInteractionFailureType.NONE.name());
 
         int updatedCount = namedParameterJdbcTemplate.update(
                 buildEnqueueSql(),
@@ -191,12 +194,15 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                 SET status = :processingStatus,
                     processing_started_at = :processingStartedAt,
                     processing_attempt = processing_attempt + 1,
-                    failed_at = NULL,
-                    failure_reason = NULL,
-                    failure_type = NULL
+                    failed_at = :noFailureAt,
+                    failure_reason = :noFailureReason,
+                    failure_type = :noneFailureType
                 WHERE id = :outboxId
                 """,
                 updateParameters
+                        .addValue("noFailureAt", Timestamp.from(SlackNotificationOutbox.NO_FAILURE_AT))
+                        .addValue("noFailureReason", SlackNotificationOutbox.NO_FAILURE_REASON)
+                        .addValue("noneFailureType", SlackInteractionFailureType.NONE.name())
         );
         if (updatedCount == 0) {
             return Optional.empty();
@@ -274,7 +280,7 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                 SlackNotificationOutboxStatus.RETRY_PENDING,
                 failedAt,
                 failureReason,
-                null
+                SlackInteractionFailureType.NONE
         );
 
         return exhaustedCount + recoveredCount;
@@ -362,7 +368,8 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                     blocks_json,
                     fallback_text,
                     status,
-                    processing_attempt
+                    processing_attempt,
+                    failure_type
                 )
                 VALUES (
                     CURRENT_TIMESTAMP(6),
@@ -376,7 +383,8 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                     :blocksJson,
                     :fallbackText,
                     :pendingStatus,
-                    :processingAttempt
+                    :processingAttempt,
+                    :noneFailureType
                 )
                 ON DUPLICATE KEY UPDATE
                     idempotency_key = idempotency_key
@@ -448,7 +456,7 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
 
     private String resolveFailureTypeName(SlackNotificationOutbox outbox) {
         if (outbox.getFailureType() == null) {
-            return null;
+            return SlackInteractionFailureType.NONE.name();
         }
 
         return outbox.getFailureType().name();

@@ -131,7 +131,8 @@ public class SlackNotificationOutboxHistory extends BaseTimeEntity {
             SlackInteractionFailureType failureType
     ) {
         if (status == SlackNotificationOutboxStatus.SENT) {
-            if (failureReason != null || failureType != null) {
+            if (!SlackNotificationOutbox.NO_FAILURE_REASON.equals(failureReason)
+                    || failureType != SlackInteractionFailureType.NONE) {
                 throw new IllegalArgumentException("SENT history에는 실패 정보가 없어야 합니다.");
             }
             return;
@@ -140,10 +141,10 @@ public class SlackNotificationOutboxHistory extends BaseTimeEntity {
         if (failureReason == null || failureReason.isBlank()) {
             throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
         }
-        if (status == SlackNotificationOutboxStatus.FAILED && failureType == null) {
+        if (status == SlackNotificationOutboxStatus.FAILED && failureType == SlackInteractionFailureType.NONE) {
             throw new IllegalArgumentException("FAILED history에는 failureType이 필요합니다.");
         }
-        if (status == SlackNotificationOutboxStatus.RETRY_PENDING && failureType != null) {
+        if (status == SlackNotificationOutboxStatus.RETRY_PENDING && failureType != SlackInteractionFailureType.NONE) {
             throw new IllegalArgumentException("RETRY_PENDING history에는 failureType이 없어야 합니다.");
         }
     }

@@ -18,6 +18,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SlackNotificationOutbox extends BaseTimeEntity {
 
+    public static final Instant NO_FAILURE_AT = Instant.EPOCH;
+
+    public static final String NO_FAILURE_REASON = "";
+
     @Enumerated(EnumType.STRING)
     private SlackNotificationOutboxMessageType messageType;
 
@@ -78,6 +82,9 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
         this.fallbackText = fallbackText;
         this.status = SlackNotificationOutboxStatus.PENDING;
         this.processingAttempt = 0;
+        this.failedAt = NO_FAILURE_AT;
+        this.failureReason = NO_FAILURE_REASON;
+        this.failureType = SlackInteractionFailureType.NONE;
     }
 
     public SlackNotificationOutboxHistory markSent(Instant sentAt) {
@@ -86,17 +93,17 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
 
         this.status = SlackNotificationOutboxStatus.SENT;
         this.sentAt = sentAt;
-        this.failedAt = null;
-        this.failureReason = null;
-        this.failureType = null;
+        this.failedAt = NO_FAILURE_AT;
+        this.failureReason = NO_FAILURE_REASON;
+        this.failureType = SlackInteractionFailureType.NONE;
 
         return SlackNotificationOutboxHistory.completed(
                 getId(),
                 this.processingAttempt,
                 SlackNotificationOutboxStatus.SENT,
                 sentAt,
-                null,
-                null
+                NO_FAILURE_REASON,
+                SlackInteractionFailureType.NONE
         );
     }
 
@@ -116,7 +123,7 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
         this.processingStartedAt = null;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
-        this.failureType = null;
+        this.failureType = SlackInteractionFailureType.NONE;
 
         return SlackNotificationOutboxHistory.completed(
                 getId(),
@@ -124,7 +131,7 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
                 SlackNotificationOutboxStatus.RETRY_PENDING,
                 failedAt,
                 failureReason,
-                null
+                SlackInteractionFailureType.NONE
         );
     }
 
@@ -269,8 +276,8 @@ public class SlackNotificationOutbox extends BaseTimeEntity {
     }
 
     private void validateFailureType(SlackInteractionFailureType failureType) {
-        if (failureType == null) {
-            throw new IllegalArgumentException("failureType은 비어 있을 수 없습니다.");
+        if (failureType == null || failureType == SlackInteractionFailureType.NONE) {
+            throw new IllegalArgumentException("failureType은 NONE일 수 없습니다.");
         }
     }
 }

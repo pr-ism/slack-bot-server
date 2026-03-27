@@ -31,7 +31,8 @@ class SlackNotificationOutboxTest {
                 () -> assertThat(actual.getBlocksJson()).isEqualTo("[{}]"),
                 () -> assertThat(actual.getFallbackText()).isEqualTo("fallback"),
                 () -> assertThat(actual.getTeamId()).isEqualTo("T1"),
-                () -> assertThat(actual.getIdempotencyKey()).isEqualTo("key")
+                () -> assertThat(actual.getIdempotencyKey()).isEqualTo("key"),
+                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
         );
     }
 
@@ -316,12 +317,13 @@ class SlackNotificationOutboxTest {
         assertAll(
                 () -> assertThat(outbox.getStatus()).isEqualTo(SlackNotificationOutboxStatus.SENT),
                 () -> assertThat(outbox.getSentAt()).isEqualTo(sentAt),
-                () -> assertThat(outbox.getFailedAt()).isNull(),
-                () -> assertThat(outbox.getFailureReason()).isNull(),
-                () -> assertThat(outbox.getFailureType()).isNull(),
+                () -> assertThat(outbox.getFailedAt()).isEqualTo(SlackNotificationOutbox.NO_FAILURE_AT),
+                () -> assertThat(outbox.getFailureReason()).isEqualTo(SlackNotificationOutbox.NO_FAILURE_REASON),
+                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE),
                 () -> assertThat(history).isNotNull(),
                 () -> assertThat(history.getOutboxId()).isNull(),
-                () -> assertThat(history.getStatus()).isEqualTo(SlackNotificationOutboxStatus.SENT)
+                () -> assertThat(history.getStatus()).isEqualTo(SlackNotificationOutboxStatus.SENT),
+                () -> assertThat(history.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
         );
     }
 
@@ -379,10 +381,11 @@ class SlackNotificationOutboxTest {
                 () -> assertThat(outbox.getProcessingStartedAt()).isNull(),
                 () -> assertThat(outbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(outbox.getFailureReason()).isEqualTo("retry"),
-                () -> assertThat(outbox.getFailureType()).isNull(),
+                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE),
                 () -> assertThat(history).isNotNull(),
                 () -> assertThat(history.getOutboxId()).isNull(),
-                () -> assertThat(history.getStatus()).isEqualTo(SlackNotificationOutboxStatus.RETRY_PENDING)
+                () -> assertThat(history.getStatus()).isEqualTo(SlackNotificationOutboxStatus.RETRY_PENDING),
+                () -> assertThat(history.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
         );
     }
 
@@ -475,7 +478,7 @@ class SlackNotificationOutboxTest {
     }
 
     @Test
-    void markFailed는_failureType이_null이면_예외를_던진다() {
+    void markFailed는_failureType이_NONE이면_예외를_던진다() {
         // given
         SlackNotificationOutbox outbox = pendingOutbox();
         setProcessingState(outbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
@@ -485,10 +488,10 @@ class SlackNotificationOutboxTest {
         assertThatThrownBy(() -> outbox.markFailed(
                 failedAt,
                 "failure",
-                null
+                SlackInteractionFailureType.NONE
         ))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("failureType은 비어 있을 수 없습니다.");
+                .hasMessage("failureType은 NONE일 수 없습니다.");
     }
 
     @Test
@@ -583,8 +586,8 @@ class SlackNotificationOutboxTest {
         ReflectionTestUtils.setField(outbox, "status", SlackNotificationOutboxStatus.PROCESSING);
         ReflectionTestUtils.setField(outbox, "processingStartedAt", processingStartedAt);
         ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(outbox, "failedAt", null);
-        ReflectionTestUtils.setField(outbox, "failureReason", null);
-        ReflectionTestUtils.setField(outbox, "failureType", null);
+        ReflectionTestUtils.setField(outbox, "failedAt", SlackNotificationOutbox.NO_FAILURE_AT);
+        ReflectionTestUtils.setField(outbox, "failureReason", SlackNotificationOutbox.NO_FAILURE_REASON);
+        ReflectionTestUtils.setField(outbox, "failureType", SlackInteractionFailureType.NONE);
     }
 }

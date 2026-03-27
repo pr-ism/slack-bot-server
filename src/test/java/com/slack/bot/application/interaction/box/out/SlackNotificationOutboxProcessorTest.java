@@ -326,8 +326,8 @@ class SlackNotificationOutboxProcessorTest {
         ReflectionTestUtils.setField(outbox, "status", SlackNotificationOutboxStatus.PROCESSING);
         ReflectionTestUtils.setField(outbox, "processingStartedAt", processingStartedAt);
         ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(outbox, "failedAt", null);
-        ReflectionTestUtils.setField(outbox, "failureReason", null);
-        ReflectionTestUtils.setField(outbox, "failureType", null);
+        ReflectionTestUtils.setField(outbox, "failedAt", SlackNotificationOutbox.NO_FAILURE_AT);
+        ReflectionTestUtils.setField(outbox, "failureReason", SlackNotificationOutbox.NO_FAILURE_REASON);
+        ReflectionTestUtils.setField(outbox, "failureType", SlackInteractionFailureType.NONE);
     }
 }
