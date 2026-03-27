@@ -23,7 +23,7 @@ class SlackInteractionInboxHistoryTest {
                 SlackInteractionInboxStatus.RETRY_PENDING,
                 Instant.parse("2026-03-27T00:00:00Z"),
                 "failure",
-                null
+                SlackInteractionFailureType.NONE
         );
 
         // then
@@ -65,8 +65,8 @@ class SlackInteractionInboxHistoryTest {
                 1,
                 SlackInteractionInboxStatus.PROCESSED,
                 Instant.parse("2026-03-27T00:00:00Z"),
-                null,
-                null
+                SlackInteractionInbox.NO_FAILURE_REASON,
+                SlackInteractionFailureType.NONE
         );
 
         // when & then

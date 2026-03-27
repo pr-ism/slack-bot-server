@@ -39,7 +39,10 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                 .addValue("idempotencyKey", inbox.getIdempotencyKey())
                 .addValue("payloadJson", inbox.getPayloadJson())
                 .addValue("pendingStatus", inbox.getStatus().name())
-                .addValue("processingAttempt", inbox.getProcessingAttempt());
+                .addValue("processingAttempt", inbox.getProcessingAttempt())
+                .addValue("noFailureAt", Timestamp.from(SlackInteractionInbox.NO_FAILURE_AT))
+                .addValue("noFailureReason", SlackInteractionInbox.NO_FAILURE_REASON)
+                .addValue("noneFailureType", SlackInteractionFailureType.NONE.name());
 
         int updatedCount = namedParameterJdbcTemplate.update(
                 buildEnqueueSql(),
@@ -91,12 +94,15 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                     SET status = :processingStatus,
                         processing_attempt = processing_attempt + 1,
                         processing_started_at = :processingStartedAt,
-                        failed_at = NULL,
-                        failure_reason = NULL,
-                        failure_type = NULL
+                        failed_at = :noFailureAt,
+                        failure_reason = :noFailureReason,
+                        failure_type = :noneFailureType
                     WHERE id = :inboxId
                     """,
                 updateParameters
+                        .addValue("noFailureAt", Timestamp.from(SlackInteractionInbox.NO_FAILURE_AT))
+                        .addValue("noFailureReason", SlackInteractionInbox.NO_FAILURE_REASON)
+                        .addValue("noneFailureType", SlackInteractionFailureType.NONE.name())
         );
         if (updatedCount == 0) {
             return Optional.empty();
@@ -184,7 +190,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                 SlackInteractionInboxStatus.RETRY_PENDING,
                 failedAt,
                 failureReason,
-                null
+                SlackInteractionFailureType.NONE
         );
 
         return exhaustedCount + recoveredCount;
@@ -270,7 +276,8 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                     idempotency_key,
                     payload_json,
                     status,
-                    processing_attempt
+                    processing_attempt,
+                    failure_type
                 )
                 VALUES (
                     CURRENT_TIMESTAMP(6),
@@ -279,7 +286,8 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                     :idempotencyKey,
                     :payloadJson,
                     :pendingStatus,
-                    :processingAttempt
+                    :processingAttempt,
+                    :noneFailureType
                 )
                 ON DUPLICATE KEY UPDATE
                     idempotency_key = idempotency_key

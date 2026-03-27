@@ -149,7 +149,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actual.getFailureType()).isNull()
+                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
         );
         verify(slackInteractionInboxRepository).save(eq(actual), any());
     }
@@ -270,8 +270,8 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         ReflectionTestUtils.setField(inbox, "status", SlackInteractionInboxStatus.PROCESSING);
         ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
         ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(inbox, "failedAt", null);
-        ReflectionTestUtils.setField(inbox, "failureReason", null);
-        ReflectionTestUtils.setField(inbox, "failureType", null);
+        ReflectionTestUtils.setField(inbox, "failedAt", SlackInteractionInbox.NO_FAILURE_AT);
+        ReflectionTestUtils.setField(inbox, "failureReason", SlackInteractionInbox.NO_FAILURE_REASON);
+        ReflectionTestUtils.setField(inbox, "failureType", SlackInteractionFailureType.NONE);
     }
 }
