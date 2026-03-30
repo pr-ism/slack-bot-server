@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -275,22 +274,10 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                 recoveryBatchSize
         );
 
-        List<TimeoutRecoveryTarget> timedOutRows = queryFactory
-                .select(slackNotificationOutbox.id, slackNotificationOutbox.processingAttempt)
-                .from(slackNotificationOutbox)
-                .where(
-                        slackNotificationOutbox.status.eq(SlackNotificationOutboxStatus.PROCESSING),
-                        slackNotificationOutbox.processingStartedAt.lt(processingStartedBefore)
-                )
-                .orderBy(slackNotificationOutbox.processingStartedAt.asc(), slackNotificationOutbox.id.asc())
-                .limit(recoveryBatchSize)
-                .fetch()
-                .stream()
-                .map(row -> new TimeoutRecoveryTarget(
-                        row.get(slackNotificationOutbox.id),
-                        row.get(slackNotificationOutbox.processingAttempt)
-                ))
-                .toList();
+        List<TimeoutRecoveryTarget> timedOutRows = selectTimeoutRecoveryTargets(
+                processingStartedBefore,
+                recoveryBatchSize
+        );
 
         if (timedOutRows.isEmpty()) {
             return 0;
@@ -341,51 +328,25 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
             return 0;
         }
 
-        List<Long> recoveredOutboxIds = namedParameterJdbcTemplate.query(
-                """
-                SELECT id
-                FROM slack_notification_outbox
-                WHERE id IN (:outboxIds)
-                  AND updated_at = :recoveryUpdatedAt
-                  AND processing_started_at = :noProcessingStartedAt
-                """,
-                new MapSqlParameterSource()
-                        .addValue("outboxIds", outboxIds)
-                        .addValue("recoveryUpdatedAt", Timestamp.valueOf(recoveryUpdatedAt))
-                        .addValue("noProcessingStartedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT)),
-                (resultSet, rowNum) -> resultSet.getLong(1)
-        );
-        if (recoveredOutboxIds.isEmpty()) {
-            return 0;
-        }
-
         batchInsertTimeoutRecoveryHistory(
                 timedOutRows,
-                recoveredOutboxIds,
                 failedAt,
                 failureReason,
                 maxAttempts
         );
 
-        return recoveredOutboxIds.size();
+        return Math.toIntExact(updatedCount);
     }
 
     private void batchInsertTimeoutRecoveryHistory(
             List<TimeoutRecoveryTarget> timedOutRows,
-            List<Long> recoveredOutboxIds,
             Instant failedAt,
             String failureReason,
             int maxAttempts
     ) {
-        Set<Long> recoveredOutboxIdSet = Set.copyOf(recoveredOutboxIds);
         List<MapSqlParameterSource> batchParameters = new ArrayList<>();
 
         for (TimeoutRecoveryTarget row : timedOutRows) {
-            Long outboxId = row.outboxId();
-            if (!recoveredOutboxIdSet.contains(outboxId)) {
-                continue;
-            }
-
             SlackNotificationOutboxStatus targetStatus = resolveTimeoutRecoveryStatus(
                     row.processingAttempt(),
                     maxAttempts
@@ -397,7 +358,7 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
             batchParameters.add(new MapSqlParameterSource()
                     .addValue("createdAt", Timestamp.from(failedAt))
                     .addValue("updatedAt", Timestamp.from(failedAt))
-                    .addValue("outboxId", outboxId)
+                    .addValue("outboxId", row.outboxId())
                     .addValue("processingAttempt", row.processingAttempt())
                     .addValue("status", targetStatus.name())
                     .addValue("completedAt", Timestamp.from(failedAt))
@@ -432,6 +393,38 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
         );
     }
 
+    private List<TimeoutRecoveryTarget> selectTimeoutRecoveryTargets(
+            Instant processingStartedBefore,
+            int recoveryBatchSize
+    ) {
+        return namedParameterJdbcTemplate.query(
+                buildTimeoutRecoverySelectSql(recoveryBatchSize),
+                new MapSqlParameterSource()
+                        .addValue("processingStatus", SlackNotificationOutboxStatus.PROCESSING.name())
+                        .addValue("processingStartedBefore", Timestamp.from(processingStartedBefore)),
+                (resultSet, rowNum) -> new TimeoutRecoveryTarget(
+                        resultSet.getLong("id"),
+                        resultSet.getInt("processing_attempt")
+                )
+        );
+    }
+
+    private String buildTimeoutRecoverySelectSql(int recoveryBatchSize) {
+        StringBuilder sql = new StringBuilder(
+                """
+                SELECT id, processing_attempt
+                FROM slack_notification_outbox
+                WHERE status = :processingStatus
+                  AND processing_started_at < :processingStartedBefore
+                ORDER BY processing_started_at ASC, id ASC
+                LIMIT 
+                """
+        );
+        sql.append(recoveryBatchSize);
+        sql.append("\nFOR UPDATE SKIP LOCKED");
+        return sql.toString();
+    }
+
     private SlackNotificationOutboxStatus resolveTimeoutRecoveryStatus(int processingAttempt, int maxAttempts) {
         if (processingAttempt >= maxAttempts) {
             return SlackNotificationOutboxStatus.FAILED;
@@ -445,7 +438,7 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
             return SlackInteractionFailureType.RETRY_EXHAUSTED;
         }
 
-        return SlackInteractionFailureType.NONE;
+        return SlackInteractionFailureType.PROCESSING_TIMEOUT;
     }
 
     private record TimeoutRecoveryTarget(Long outboxId, Integer processingAttempt) {
