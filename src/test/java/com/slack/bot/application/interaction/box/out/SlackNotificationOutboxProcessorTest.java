@@ -246,6 +246,65 @@ class SlackNotificationOutboxProcessorTest {
     }
 
     @Test
+    @Sql(scripts = "/sql/fixtures/notification/workspace_t1.sql")
+    void PROCESSING_타임아웃_outbox_복구는_재시도_가능과_소진건을_합쳐_배치_크기만큼만_처리한다() {
+        // given
+        Instant base = clock.instant();
+        List<Long> outboxIds = new java.util.ArrayList<>();
+        for (int index = 0; index < 50; index++) {
+            SlackNotificationOutbox retryableOutbox = SlackNotificationOutbox.builder()
+                                                                             .messageType(SlackNotificationOutboxMessageType.CHANNEL_TEXT)
+                                                                             .idempotencyKey("OUTBOX-TIMEOUT-MIXED-RETRY-" + index)
+                                                                             .teamId("T1")
+                                                                             .channelId("C1")
+                                                                             .text("hello-timeout-mixed-retry-" + index)
+                                                                             .build();
+            setProcessingState(retryableOutbox, base.minusSeconds(200L + index), 1);
+            SlackNotificationOutbox saved = slackNotificationOutboxRepository.save(retryableOutbox);
+            outboxIds.add(saved.getId());
+        }
+        for (int index = 0; index < 51; index++) {
+            SlackNotificationOutbox exhaustedOutbox = SlackNotificationOutbox.builder()
+                                                                             .messageType(SlackNotificationOutboxMessageType.CHANNEL_TEXT)
+                                                                             .idempotencyKey("OUTBOX-TIMEOUT-MIXED-FAILED-" + index)
+                                                                             .teamId("T1")
+                                                                             .channelId("C1")
+                                                                             .text("hello-timeout-mixed-failed-" + index)
+                                                                             .build();
+            setProcessingState(exhaustedOutbox, base.minusSeconds(100L + index), 2);
+            SlackNotificationOutbox saved = slackNotificationOutboxRepository.save(exhaustedOutbox);
+            outboxIds.add(saved.getId());
+        }
+
+        // when
+        int recoveredCount = slackNotificationOutboxProcessor.recoverTimeoutProcessing();
+
+        // then
+        List<SlackNotificationOutbox> actualOutboxes = outboxIds.stream()
+                                                                .map(outboxId -> slackNotificationOutboxRepository.findById(
+                                                                        outboxId
+                                                                ).orElseThrow())
+                                                                .toList();
+        List<SlackNotificationOutboxHistory> actualHistories = jpaSlackNotificationOutboxHistoryRepository.findAll();
+
+        assertAll(
+                () -> assertThat(recoveredCount).isEqualTo(100),
+                () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == SlackNotificationOutboxStatus.RETRY_PENDING)
+                        .hasSize(50),
+                () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == SlackNotificationOutboxStatus.FAILED)
+                        .hasSize(50),
+                () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == SlackNotificationOutboxStatus.PROCESSING)
+                        .hasSize(1),
+                () -> assertThat(actualHistories).filteredOn(
+                        history -> history.getFailureType() == SlackInteractionFailureType.NONE
+                ).hasSize(50),
+                () -> assertThat(actualHistories).filteredOn(
+                        history -> history.getFailureType() == SlackInteractionFailureType.RETRY_EXHAUSTED
+                ).hasSize(50)
+        );
+    }
+
+    @Test
     @Sql(scripts = "/sql/fixtures/box/out/pending_outbox.sql")
     void CHANNEL_BLOCKS_outbox는_채널_블록을_전송한다() {
         // given
