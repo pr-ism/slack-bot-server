@@ -226,6 +226,70 @@ class ReviewRequestInboxRepositoryAdapterTest {
         );
     }
 
+    @Test
+    void PROCESSING_타임아웃_복구는_재시도_가능과_소진건을_합쳐_배치_크기만큼만_처리한다() {
+        // given
+        Instant base = Instant.parse("2026-02-24T00:20:00Z");
+        List<Long> inboxIds = new java.util.ArrayList<>();
+
+        for (int index = 0; index < 50; index++) {
+            ReviewRequestInbox retryableInbox = ReviewRequestInbox.pending(
+                    "api-key:mixed:retry:" + index,
+                    "api-key",
+                    2000L + index,
+                    "{\"pullRequestTitle\":\"retry-" + index + "\"}",
+                    Instant.parse("2026-02-24T00:00:00Z")
+            );
+            setProcessingState(retryableInbox, base.minusSeconds(200L + index), 1);
+            ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(retryableInbox);
+            inboxIds.add(saved.getId());
+        }
+
+        for (int index = 0; index < 51; index++) {
+            ReviewRequestInbox exhaustedInbox = ReviewRequestInbox.pending(
+                    "api-key:mixed:failed:" + index,
+                    "api-key",
+                    3000L + index,
+                    "{\"pullRequestTitle\":\"failed-" + index + "\"}",
+                    Instant.parse("2026-02-24T00:00:00Z")
+            );
+            setProcessingState(exhaustedInbox, base.minusSeconds(100L + index), 3);
+            ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(exhaustedInbox);
+            inboxIds.add(saved.getId());
+        }
+
+        // when
+        int recoveredCount = reviewRequestInboxRepository.recoverTimeoutProcessing(
+                base.minusSeconds(60),
+                base,
+                "timeout",
+                3,
+                100
+        );
+
+        // then
+        List<ReviewRequestInbox> actualInboxes = inboxIds.stream()
+                                                         .map(inboxId -> jpaReviewRequestInboxRepository.findById(inboxId).orElseThrow())
+                                                         .toList();
+        List<ReviewRequestInboxHistory> actualHistories = jpaReviewRequestInboxHistoryRepository.findAll();
+
+        assertAll(
+                () -> assertThat(recoveredCount).isEqualTo(100),
+                () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == ReviewRequestInboxStatus.RETRY_PENDING)
+                        .hasSize(50),
+                () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == ReviewRequestInboxStatus.FAILED)
+                        .hasSize(50),
+                () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == ReviewRequestInboxStatus.PROCESSING)
+                        .hasSize(1),
+                () -> assertThat(actualHistories).filteredOn(
+                        history -> history.getFailureType() == ReviewRequestInboxFailureType.PROCESSING_TIMEOUT
+                ).hasSize(50),
+                () -> assertThat(actualHistories).filteredOn(
+                        history -> history.getFailureType() == ReviewRequestInboxFailureType.RETRY_EXHAUSTED
+                ).hasSize(50)
+        );
+    }
+
     private void setProcessingState(ReviewRequestInbox inbox, Instant processingStartedAt, int processingAttempt) {
         ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
         ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
