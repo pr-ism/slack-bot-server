@@ -190,6 +190,60 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
         );
     }
 
+    @Test
+    @Sql(scripts = "classpath:sql/fixtures/review/workspace_t1.sql")
+    void review_outbox_timeout_recovery는_재시도_가능과_소진건을_합쳐_배치_크기만큼만_처리한다() {
+        // given
+        Instant base = Instant.parse("2026-03-24T00:20:00Z");
+        List<Long> outboxIds = new java.util.ArrayList<>();
+        for (int index = 0; index < 50; index++) {
+            ReviewNotificationOutbox retryableOutbox = pendingOutbox("review-timeout-mixed-retry-" + index);
+            setProcessingState(retryableOutbox, base.minusSeconds(200L + index), 1);
+            ReviewNotificationOutbox saved = reviewNotificationOutboxRepository.save(retryableOutbox);
+            outboxIds.add(saved.getId());
+        }
+        for (int index = 0; index < 51; index++) {
+            ReviewNotificationOutbox exhaustedOutbox = pendingOutbox("review-timeout-mixed-failed-" + index);
+            setProcessingState(exhaustedOutbox, base.minusSeconds(100L + index), 2);
+            ReviewNotificationOutbox saved = reviewNotificationOutboxRepository.save(exhaustedOutbox);
+            outboxIds.add(saved.getId());
+        }
+
+        // when
+        int recoveredCount = reviewNotificationOutboxProcessor.recoverTimeoutProcessing(60_000L);
+
+        // then
+        List<ReviewNotificationOutbox> actualOutboxes = outboxIds.stream()
+                                                                 .map(outboxId -> reviewNotificationOutboxRepository.findById(
+                                                                         outboxId
+                                                                 ).orElseThrow())
+                                                                 .toList();
+        List<ReviewNotificationOutboxHistory> actualHistories = jpaReviewNotificationOutboxHistoryRepository.findAll();
+
+        assertAll(
+                () -> assertThat(recoveredCount).isEqualTo(100),
+                () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == ReviewNotificationOutboxStatus.RETRY_PENDING)
+                        .hasSize(50),
+                () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == ReviewNotificationOutboxStatus.FAILED)
+                        .hasSize(50),
+                () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == ReviewNotificationOutboxStatus.PROCESSING)
+                        .hasSize(1),
+                () -> assertThat(actualHistories).filteredOn(
+                        history -> history.getFailureType() == SlackInteractionFailureType.NONE
+                ).hasSize(50),
+                () -> assertThat(actualHistories).filteredOn(
+                        history -> history.getFailureType() == SlackInteractionFailureType.RETRY_EXHAUSTED
+                ).hasSize(50)
+        );
+        verify(notificationTransportApiClient, never()).sendBlockMessage(
+                anyString(),
+                anyString(),
+                any(),
+                any(),
+                anyString()
+        );
+    }
+
     private ReviewNotificationOutbox pendingOutbox(String idempotencyKey) {
         return ReviewNotificationOutbox.builder()
                                        .idempotencyKey(idempotencyKey)
