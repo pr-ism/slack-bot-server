@@ -50,6 +50,14 @@ class ReviewWorkerPropertiesTest {
     }
 
     @Test
+    void inbox_properties는_processing_timeout이_0이면_예외를_던진다() {
+        // when & then
+        assertThatThrownBy(() -> new ReviewWorkerProperties.InboxProperties(1_000L, 30_000L, 30, 0L, 100))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("inbox.processingTimeoutMs는 0보다 커야 합니다.");
+    }
+
+    @Test
     void inbox_properties는_timeout_recovery_batch_size가_0이면_예외를_던진다() {
         // when & then
         assertThatThrownBy(() -> new ReviewWorkerProperties.InboxProperties(1_000L, 30_000L, 30, 60_000L, 0))
@@ -76,6 +84,14 @@ class ReviewWorkerPropertiesTest {
         assertThatThrownBy(() -> new ReviewWorkerProperties.OutboxProperties(1_000L, 999L, 50, 60_000L, 100))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("outbox.pollCapMs는 pollDelayMs보다 크거나 같아야 합니다.");
+    }
+
+    @Test
+    void outbox_properties는_processing_timeout이_0이면_예외를_던진다() {
+        // when & then
+        assertThatThrownBy(() -> new ReviewWorkerProperties.OutboxProperties(1_000L, 30_000L, 50, 0L, 100))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("outbox.processingTimeoutMs는 0보다 커야 합니다.");
     }
 
     @Test

@@ -31,7 +31,13 @@ public record ReviewWorkerProperties(
     ) {
 
         public InboxProperties {
-            validatePollingProperties("inbox", pollDelayMs, pollCapMs, timeoutRecoveryBatchSize);
+            validateWorkerProperties(
+                    "inbox",
+                    pollDelayMs,
+                    pollCapMs,
+                    processingTimeoutMs,
+                    timeoutRecoveryBatchSize
+            );
         }
 
         public InboxProperties() {
@@ -48,7 +54,13 @@ public record ReviewWorkerProperties(
     ) {
 
         public OutboxProperties {
-            validatePollingProperties("outbox", pollDelayMs, pollCapMs, timeoutRecoveryBatchSize);
+            validateWorkerProperties(
+                    "outbox",
+                    pollDelayMs,
+                    pollCapMs,
+                    processingTimeoutMs,
+                    timeoutRecoveryBatchSize
+            );
         }
 
         public OutboxProperties() {
@@ -68,13 +80,17 @@ public record ReviewWorkerProperties(
         }
     }
 
-    private static void validatePollingProperties(
+    private static void validateWorkerProperties(
             String propertyName,
             long pollDelayMs,
             long pollCapMs,
+            long processingTimeoutMs,
             int timeoutRecoveryBatchSize
     ) {
         validatePollingProperties(propertyName, pollDelayMs, pollCapMs);
+        if (processingTimeoutMs <= 0L) {
+            throw new IllegalArgumentException(propertyName + ".processingTimeoutMs는 0보다 커야 합니다.");
+        }
         if (timeoutRecoveryBatchSize <= 0) {
             throw new IllegalArgumentException(propertyName + ".timeoutRecoveryBatchSize는 0보다 커야 합니다.");
         }
