@@ -2,7 +2,6 @@ package com.slack.bot.infrastructure.review.persistence.box.in;
 
 import static com.slack.bot.infrastructure.review.box.in.QReviewRequestInbox.reviewRequestInbox;
 
-import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
@@ -31,7 +30,6 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
             ReviewRequestInboxStatus.PENDING,
             ReviewRequestInboxStatus.RETRY_PENDING
     );
-    private final JPAQueryFactory queryFactory;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
     private final JpaReviewRequestInboxRepository reviewRequestInboxJpaRepository;
     private final JpaReviewRequestInboxHistoryRepository reviewRequestInboxHistoryJpaRepository;

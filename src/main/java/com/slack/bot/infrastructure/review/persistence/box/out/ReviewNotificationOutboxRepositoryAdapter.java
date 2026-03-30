@@ -2,7 +2,6 @@ package com.slack.bot.infrastructure.review.persistence.box.out;
 
 import static com.slack.bot.infrastructure.review.box.out.QReviewNotificationOutbox.reviewNotificationOutbox;
 
-import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
@@ -27,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotificationOutboxRepository {
 
-    private final JPAQueryFactory queryFactory;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
     private final JpaReviewNotificationOutboxRepository repository;
     private final JpaReviewNotificationOutboxHistoryRepository historyRepository;

@@ -1,17 +1,15 @@
 package com.slack.bot.infrastructure.review.persistence.box.out;
 
-import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 public class H2ReviewNotificationOutboxRepositoryAdapter extends ReviewNotificationOutboxRepositoryAdapter {
 
     public H2ReviewNotificationOutboxRepositoryAdapter(
-            JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
             JpaReviewNotificationOutboxRepository repository,
             JpaReviewNotificationOutboxHistoryRepository historyRepository
     ) {
-        super(queryFactory, namedParameterJdbcTemplate, repository, historyRepository);
+        super(namedParameterJdbcTemplate, repository, historyRepository);
     }
 
     @Override

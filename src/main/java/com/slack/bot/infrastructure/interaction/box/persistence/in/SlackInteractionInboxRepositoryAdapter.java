@@ -2,7 +2,6 @@ package com.slack.bot.infrastructure.interaction.box.persistence.in;
 
 import static com.slack.bot.infrastructure.interaction.box.in.QSlackInteractionInbox.slackInteractionInbox;
 
-import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
@@ -28,7 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionInboxRepository {
 
-    private final JPAQueryFactory queryFactory;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
     private final JpaSlackInteractionInboxRepository repository;
     private final JpaSlackInteractionInboxHistoryRepository historyRepository;

@@ -1,17 +1,15 @@
 package com.slack.bot.infrastructure.interaction.box.persistence.out;
 
-import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 public class H2SlackNotificationOutboxRepositoryAdapter extends SlackNotificationOutboxRepositoryAdapter {
 
     public H2SlackNotificationOutboxRepositoryAdapter(
-            JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
             JpaSlackNotificationOutboxRepository repository,
             JpaSlackNotificationOutboxHistoryRepository historyRepository
     ) {
-        super(queryFactory, namedParameterJdbcTemplate, repository, historyRepository);
+        super(namedParameterJdbcTemplate, repository, historyRepository);
     }
 
     @Override
