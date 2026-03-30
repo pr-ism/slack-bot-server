@@ -18,7 +18,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -183,23 +182,11 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                 recoveryBatchSize
         );
 
-        List<TimeoutRecoveryTarget> timedOutRows = queryFactory
-                .select(slackInteractionInbox.id, slackInteractionInbox.processingAttempt)
-                .from(slackInteractionInbox)
-                .where(
-                        slackInteractionInbox.interactionType.eq(interactionType),
-                        slackInteractionInbox.status.eq(SlackInteractionInboxStatus.PROCESSING),
-                        slackInteractionInbox.processingStartedAt.lt(processingStartedBefore)
-                )
-                .orderBy(slackInteractionInbox.processingStartedAt.asc(), slackInteractionInbox.id.asc())
-                .limit(recoveryBatchSize)
-                .fetch()
-                .stream()
-                .map(row -> new TimeoutRecoveryTarget(
-                        row.get(slackInteractionInbox.id),
-                        row.get(slackInteractionInbox.processingAttempt)
-                ))
-                .toList();
+        List<TimeoutRecoveryTarget> timedOutRows = selectTimeoutRecoveryTargets(
+                interactionType,
+                processingStartedBefore,
+                recoveryBatchSize
+        );
 
         if (timedOutRows.isEmpty()) {
             return 0;
@@ -252,53 +239,25 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
             return 0;
         }
 
-        List<Long> recoveredInboxIds = namedParameterJdbcTemplate.query(
-                """
-                SELECT id
-                FROM slack_interaction_inbox
-                WHERE id IN (:inboxIds)
-                  AND interaction_type = :interactionType
-                  AND updated_at = :recoveryUpdatedAt
-                  AND processing_started_at = :noProcessingStartedAt
-                """,
-                new MapSqlParameterSource()
-                        .addValue("inboxIds", inboxIds)
-                        .addValue("interactionType", interactionType.name())
-                        .addValue("recoveryUpdatedAt", Timestamp.valueOf(recoveryUpdatedAt))
-                        .addValue("noProcessingStartedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT)),
-                (resultSet, rowNum) -> resultSet.getLong(1)
-        );
-        if (recoveredInboxIds.isEmpty()) {
-            return 0;
-        }
-
         batchInsertTimeoutRecoveryHistory(
                 timedOutRows,
-                recoveredInboxIds,
                 failedAt,
                 failureReason,
                 maxAttempts
         );
 
-        return recoveredInboxIds.size();
+        return Math.toIntExact(updatedCount);
     }
 
     private void batchInsertTimeoutRecoveryHistory(
             List<TimeoutRecoveryTarget> timedOutRows,
-            List<Long> recoveredInboxIds,
             Instant failedAt,
             String failureReason,
             int maxAttempts
     ) {
-        Set<Long> recoveredInboxIdSet = Set.copyOf(recoveredInboxIds);
         List<MapSqlParameterSource> batchParameters = new ArrayList<>();
 
         for (TimeoutRecoveryTarget row : timedOutRows) {
-            Long inboxId = row.inboxId();
-            if (!recoveredInboxIdSet.contains(inboxId)) {
-                continue;
-            }
-
             SlackInteractionInboxStatus targetStatus = resolveTimeoutRecoveryStatus(
                     row.processingAttempt(),
                     maxAttempts
@@ -310,7 +269,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
             batchParameters.add(new MapSqlParameterSource()
                     .addValue("createdAt", Timestamp.from(failedAt))
                     .addValue("updatedAt", Timestamp.from(failedAt))
-                    .addValue("inboxId", inboxId)
+                    .addValue("inboxId", row.inboxId())
                     .addValue("processingAttempt", row.processingAttempt())
                     .addValue("status", targetStatus.name())
                     .addValue("completedAt", Timestamp.from(failedAt))
@@ -345,6 +304,41 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
         );
     }
 
+    private List<TimeoutRecoveryTarget> selectTimeoutRecoveryTargets(
+            SlackInteractionInboxType interactionType,
+            Instant processingStartedBefore,
+            int recoveryBatchSize
+    ) {
+        return namedParameterJdbcTemplate.query(
+                buildTimeoutRecoverySelectSql(recoveryBatchSize),
+                new MapSqlParameterSource()
+                        .addValue("interactionType", interactionType.name())
+                        .addValue("processingStatus", SlackInteractionInboxStatus.PROCESSING.name())
+                        .addValue("processingStartedBefore", Timestamp.from(processingStartedBefore)),
+                (resultSet, rowNum) -> new TimeoutRecoveryTarget(
+                        resultSet.getLong("id"),
+                        resultSet.getInt("processing_attempt")
+                )
+        );
+    }
+
+    private String buildTimeoutRecoverySelectSql(int recoveryBatchSize) {
+        StringBuilder sql = new StringBuilder(
+                """
+                SELECT id, processing_attempt
+                FROM slack_interaction_inbox
+                WHERE interaction_type = :interactionType
+                  AND status = :processingStatus
+                  AND processing_started_at < :processingStartedBefore
+                ORDER BY processing_started_at ASC, id ASC
+                LIMIT 
+                """
+        );
+        sql.append(recoveryBatchSize);
+        sql.append("\nFOR UPDATE SKIP LOCKED");
+        return sql.toString();
+    }
+
     private SlackInteractionInboxStatus resolveTimeoutRecoveryStatus(int processingAttempt, int maxAttempts) {
         if (processingAttempt >= maxAttempts) {
             return SlackInteractionInboxStatus.FAILED;
@@ -358,7 +352,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
             return SlackInteractionFailureType.RETRY_EXHAUSTED;
         }
 
-        return SlackInteractionFailureType.NONE;
+        return SlackInteractionFailureType.PROCESSING_TIMEOUT;
     }
 
     private record TimeoutRecoveryTarget(Long inboxId, Integer processingAttempt) {

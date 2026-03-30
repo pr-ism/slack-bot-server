@@ -75,4 +75,23 @@ class SlackInteractionInboxHistoryTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("history inboxId를 다른 값으로 변경할 수 없습니다.");
     }
+
+    @Test
+    void RETRY_PENDING_history는_PROCESSING_TIMEOUT_failureType을_허용한다() {
+        // when
+        SlackInteractionInboxHistory history = SlackInteractionInboxHistory.completed(
+                10L,
+                1,
+                SlackInteractionInboxStatus.RETRY_PENDING,
+                Instant.parse("2026-03-27T00:00:00Z"),
+                "timeout",
+                SlackInteractionFailureType.PROCESSING_TIMEOUT
+        );
+
+        // then
+        assertAll(
+                () -> assertThat(history.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
+                () -> assertThat(history.getFailureType()).isEqualTo(SlackInteractionFailureType.PROCESSING_TIMEOUT)
+        );
+    }
 }
