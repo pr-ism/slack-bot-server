@@ -149,7 +149,7 @@ public class SlackInteractionInboxProcessor {
     }
 
     private int resolveTimeoutRecoveryBatchSize(SlackInteractionInboxType interactionType) {
-        if (interactionType == SlackInteractionInboxType.BLOCK_ACTIONS) {
+        if (interactionType.isBlockActions()) {
             return interactionWorkerProperties.inbox().blockActions().timeoutRecoveryBatchSize();
         }
 
@@ -157,7 +157,7 @@ public class SlackInteractionInboxProcessor {
     }
 
     private PollingHintTarget resolvePollingHintTarget(SlackInteractionInboxType interactionType) {
-        if (interactionType == SlackInteractionInboxType.BLOCK_ACTIONS) {
+        if (interactionType.isBlockActions()) {
             return PollingHintTarget.BLOCK_ACTION_INBOX;
         }
 
