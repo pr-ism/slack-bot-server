@@ -173,6 +173,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
             int recoveryBatchSize
     ) {
         validateRecoverTimeoutProcessingArguments(
+                interactionType,
                 processingStartedBefore,
                 failedAt,
                 failureReason,
@@ -357,12 +358,14 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
     }
 
     private void validateRecoverTimeoutProcessingArguments(
+            SlackInteractionInboxType interactionType,
             Instant processingStartedBefore,
             Instant failedAt,
             String failureReason,
             int maxAttempts,
             int recoveryBatchSize
     ) {
+        validateInteractionType(interactionType);
         validateProcessingStartedBefore(processingStartedBefore);
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
