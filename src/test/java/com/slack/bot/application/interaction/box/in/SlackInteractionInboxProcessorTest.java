@@ -221,6 +221,53 @@ class SlackInteractionInboxProcessorTest {
     }
 
     @Test
+    void PROCESSING_타임아웃_block_actions_inbox_복구는_재시도_가능과_소진건을_합쳐_배치_크기만큼만_처리한다() {
+        // given
+        Instant base = clock.instant();
+        for (int index = 0; index < 50; index++) {
+            SlackInteractionInbox retryableInbox = SlackInteractionInbox.pending(
+                    SlackInteractionInboxType.BLOCK_ACTIONS,
+                    "BLOCK-ACTION-TIMEOUT-MIXED-RETRY-" + index,
+                    "{\"type\":\"block_actions\",\"actions\":[]}"
+            );
+            setProcessingState(retryableInbox, base.minusSeconds(200L + index), 1);
+            jpaSlackInteractionInboxRepository.save(retryableInbox);
+        }
+        for (int index = 0; index < 51; index++) {
+            SlackInteractionInbox exhaustedInbox = SlackInteractionInbox.pending(
+                    SlackInteractionInboxType.BLOCK_ACTIONS,
+                    "BLOCK-ACTION-TIMEOUT-MIXED-FAILED-" + index,
+                    "{\"type\":\"block_actions\",\"actions\":[]}"
+            );
+            setProcessingState(exhaustedInbox, base.minusSeconds(100L + index), 2);
+            jpaSlackInteractionInboxRepository.save(exhaustedInbox);
+        }
+
+        // when
+        int recoveredCount = slackInteractionInboxProcessor.recoverBlockActionTimeoutProcessing();
+
+        // then
+        List<SlackInteractionInbox> actualInboxes = jpaSlackInteractionInboxRepository.findAll();
+        List<SlackInteractionInboxHistory> actualHistories = jpaSlackInteractionInboxHistoryRepository.findAll();
+
+        assertAll(
+                () -> assertThat(recoveredCount).isEqualTo(100),
+                () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == SlackInteractionInboxStatus.RETRY_PENDING)
+                        .hasSize(50),
+                () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == SlackInteractionInboxStatus.FAILED)
+                        .hasSize(50),
+                () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == SlackInteractionInboxStatus.PROCESSING)
+                        .hasSize(1),
+                () -> assertThat(actualHistories).filteredOn(
+                        history -> history.getFailureType() == SlackInteractionFailureType.NONE
+                ).hasSize(50),
+                () -> assertThat(actualHistories).filteredOn(
+                        history -> history.getFailureType() == SlackInteractionFailureType.RETRY_EXHAUSTED
+                ).hasSize(50)
+        );
+    }
+
+    @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
             "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
