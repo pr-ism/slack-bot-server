@@ -413,7 +413,7 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                 WHERE status = :processingStatus
                   AND processing_started_at < :processingStartedBefore
                 ORDER BY processing_started_at ASC, id ASC
-                LIMIT 
+                LIMIT
                 """
         );
         sql.append(recoveryBatchSize);
