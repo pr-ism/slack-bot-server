@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -237,22 +236,10 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
         validateMaxAttempts(maxAttempts);
         validateRecoveryBatchSize(recoveryBatchSize);
 
-        List<TimeoutRecoveryTarget> timedOutRows = queryFactory
-                .select(reviewRequestInbox.id, reviewRequestInbox.processingAttempt)
-                .from(reviewRequestInbox)
-                .where(
-                        reviewRequestInbox.status.eq(ReviewRequestInboxStatus.PROCESSING),
-                        reviewRequestInbox.processingStartedAt.lt(processingStartedBefore)
-                )
-                .orderBy(reviewRequestInbox.processingStartedAt.asc(), reviewRequestInbox.id.asc())
-                .limit(recoveryBatchSize)
-                .fetch()
-                .stream()
-                .map(row -> new TimeoutRecoveryTarget(
-                        row.get(reviewRequestInbox.id),
-                        row.get(reviewRequestInbox.processingAttempt)
-                ))
-                .toList();
+        List<TimeoutRecoveryTarget> timedOutRows = selectTimeoutRecoveryTargets(
+                processingStartedBefore,
+                recoveryBatchSize
+        );
 
         if (timedOutRows.isEmpty()) {
             return 0;
@@ -303,51 +290,25 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
             return 0;
         }
 
-        List<Long> recoveredInboxIds = namedParameterJdbcTemplate.query(
-                """
-                SELECT id
-                FROM review_request_inbox
-                WHERE id IN (:inboxIds)
-                  AND updated_at = :recoveryUpdatedAt
-                  AND processing_started_at = :noProcessingStartedAt
-                """,
-                new MapSqlParameterSource()
-                        .addValue("inboxIds", inboxIds)
-                        .addValue("recoveryUpdatedAt", Timestamp.valueOf(recoveryUpdatedAt))
-                        .addValue("noProcessingStartedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT)),
-                (resultSet, rowNum) -> resultSet.getLong(1)
-        );
-        if (recoveredInboxIds.isEmpty()) {
-            return 0;
-        }
-
         batchInsertTimeoutRecoveryHistory(
                 timedOutRows,
-                recoveredInboxIds,
                 failedAt,
                 failureReason,
                 maxAttempts
         );
 
-        return recoveredInboxIds.size();
+        return Math.toIntExact(updatedCount);
     }
 
     private void batchInsertTimeoutRecoveryHistory(
             List<TimeoutRecoveryTarget> timedOutRows,
-            List<Long> recoveredInboxIds,
             Instant failedAt,
             String failureReason,
             int maxAttempts
     ) {
-        Set<Long> recoveredInboxIdSet = Set.copyOf(recoveredInboxIds);
         List<MapSqlParameterSource> batchParameters = new ArrayList<>();
 
         for (TimeoutRecoveryTarget row : timedOutRows) {
-            Long inboxId = row.inboxId();
-            if (!recoveredInboxIdSet.contains(inboxId)) {
-                continue;
-            }
-
             ReviewRequestInboxStatus targetStatus = resolveTimeoutRecoveryStatus(row.processingAttempt(), maxAttempts);
             ReviewRequestInboxFailureType historyFailureType = resolveTimeoutRecoveryHistoryFailureType(
                     row.processingAttempt(),
@@ -356,7 +317,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
             batchParameters.add(new MapSqlParameterSource()
                     .addValue("createdAt", Timestamp.from(failedAt))
                     .addValue("updatedAt", Timestamp.from(failedAt))
-                    .addValue("inboxId", inboxId)
+                    .addValue("inboxId", row.inboxId())
                     .addValue("processingAttempt", row.processingAttempt())
                     .addValue("status", targetStatus.name())
                     .addValue("completedAt", Timestamp.from(failedAt))
@@ -389,6 +350,38 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                 """,
                 batchParameters.toArray(new MapSqlParameterSource[0])
         );
+    }
+
+    private List<TimeoutRecoveryTarget> selectTimeoutRecoveryTargets(
+            Instant processingStartedBefore,
+            int recoveryBatchSize
+    ) {
+        return namedParameterJdbcTemplate.query(
+                buildTimeoutRecoverySelectSql(recoveryBatchSize),
+                new MapSqlParameterSource()
+                        .addValue("processingStatus", ReviewRequestInboxStatus.PROCESSING.name())
+                        .addValue("processingStartedBefore", Timestamp.from(processingStartedBefore)),
+                (resultSet, rowNum) -> new TimeoutRecoveryTarget(
+                        resultSet.getLong("id"),
+                        resultSet.getInt("processing_attempt")
+                )
+        );
+    }
+
+    private String buildTimeoutRecoverySelectSql(int recoveryBatchSize) {
+        StringBuilder sql = new StringBuilder(
+                """
+                SELECT id, processing_attempt
+                FROM review_request_inbox
+                WHERE status = :processingStatus
+                  AND processing_started_at < :processingStartedBefore
+                ORDER BY processing_started_at ASC, id ASC
+                LIMIT 
+                """
+        );
+        sql.append(recoveryBatchSize);
+        sql.append("\nFOR UPDATE SKIP LOCKED");
+        return sql.toString();
     }
 
     private ReviewRequestInboxStatus resolveTimeoutRecoveryStatus(int processingAttempt, int maxAttempts) {

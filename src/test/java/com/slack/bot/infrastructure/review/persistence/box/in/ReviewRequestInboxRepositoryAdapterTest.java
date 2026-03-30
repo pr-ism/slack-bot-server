@@ -14,11 +14,20 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @IntegrationTest
 @SuppressWarnings("NonAsciiCharacters")
@@ -33,6 +42,12 @@ class ReviewRequestInboxRepositoryAdapterTest {
 
     @Autowired
     JpaReviewRequestInboxHistoryRepository jpaReviewRequestInboxHistoryRepository;
+
+    @Autowired
+    NamedParameterJdbcTemplate namedParameterJdbcTemplate;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
     @Test
     void 신규_upsertPending은_failure_snapshot을_sentinel값으로_저장한다() {
@@ -290,6 +305,65 @@ class ReviewRequestInboxRepositoryAdapterTest {
         );
     }
 
+    @Test
+    void 잠겨있는_PROCESSING_타임아웃_행은_recovery에서_건너뛴다() throws Exception {
+        // given
+        ReviewRequestInbox inbox = ReviewRequestInbox.pending(
+                "api-key:locked",
+                "api-key",
+                9000L,
+                "{\"pullRequestTitle\":\"locked\"}",
+                Instant.parse("2026-02-24T00:00:00Z")
+        );
+        setProcessingState(inbox, Instant.parse("2026-02-24T00:01:00Z"), 1);
+        ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
+        CountDownLatch lockAcquired = new CountDownLatch(1);
+        CountDownLatch releaseLock = new CountDownLatch(1);
+
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        try {
+            Future<?> lockFuture = executorService.submit(() -> {
+                new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                    namedParameterJdbcTemplate.query(
+                            """
+                            SELECT id
+                            FROM review_request_inbox
+                            WHERE id = :inboxId
+                            FOR UPDATE
+                            """,
+                            new MapSqlParameterSource().addValue("inboxId", saved.getId()),
+                            (resultSet, rowNum) -> resultSet.getLong(1)
+                    );
+                    lockAcquired.countDown();
+                    awaitLatch(releaseLock);
+                });
+            });
+            awaitLatch(lockAcquired);
+
+            // when
+            int skippedCount = reviewRequestInboxRepository.recoverTimeoutProcessing(
+                    Instant.parse("2026-02-24T00:02:00Z"),
+                    Instant.parse("2026-02-24T00:05:00Z"),
+                    "timeout",
+                    3,
+                    100
+            );
+
+            // then
+            ReviewRequestInbox lockedInbox = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
+            assertAll(
+                    () -> assertThat(skippedCount).isZero(),
+                    () -> assertThat(lockedInbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
+                    () -> assertThat(jpaReviewRequestInboxHistoryRepository.findAll()).isEmpty()
+            );
+
+            releaseLock.countDown();
+            lockFuture.get(5, TimeUnit.SECONDS);
+        } finally {
+            executorService.shutdownNow();
+        }
+    }
+
     private void setProcessingState(ReviewRequestInbox inbox, Instant processingStartedAt, int processingAttempt) {
         ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
         ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
@@ -327,5 +401,17 @@ class ReviewRequestInboxRepositoryAdapterTest {
         }
 
         return latestHistory;
+    }
+
+    private void awaitLatch(CountDownLatch latch) {
+        try {
+            boolean completed = latch.await(5, TimeUnit.SECONDS);
+            if (!completed) {
+                throw new IllegalStateException("락 대기 중 시간이 초과되었습니다.");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("락 대기 중 인터럽트가 발생했습니다.", e);
+        }
     }
 }
