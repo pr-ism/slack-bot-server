@@ -8,9 +8,10 @@ public class H2SlackNotificationOutboxRepositoryAdapter extends SlackNotificatio
     public H2SlackNotificationOutboxRepositoryAdapter(
             JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaSlackNotificationOutboxRepository repository
+            JpaSlackNotificationOutboxRepository repository,
+            JpaSlackNotificationOutboxHistoryRepository historyRepository
     ) {
-        super(queryFactory, namedParameterJdbcTemplate, repository);
+        super(queryFactory, namedParameterJdbcTemplate, repository, historyRepository);
     }
 
     @Override
@@ -28,7 +29,12 @@ public class H2SlackNotificationOutboxRepositoryAdapter extends SlackNotificatio
                         :blocksJson,
                         :fallbackText,
                         :pendingStatus,
-                        :processingAttempt
+                        :processingAttempt,
+                        :noProcessingStartedAt,
+                        :noSentAt,
+                        :noFailureAt,
+                        :noFailureReason,
+                        :noneFailureType
                     )
                 ) AS source (
                     message_type,
@@ -40,7 +46,12 @@ public class H2SlackNotificationOutboxRepositoryAdapter extends SlackNotificatio
                     blocks_json,
                     fallback_text,
                     status,
-                    processing_attempt
+                    processing_attempt,
+                    processing_started_at,
+                    sent_at,
+                    failed_at,
+                    failure_reason,
+                    failure_type
                 )
                 ON target.idempotency_key = source.idempotency_key
                 WHEN NOT MATCHED THEN
@@ -56,7 +67,12 @@ public class H2SlackNotificationOutboxRepositoryAdapter extends SlackNotificatio
                         blocks_json,
                         fallback_text,
                         status,
-                        processing_attempt
+                        processing_attempt,
+                        processing_started_at,
+                        sent_at,
+                        failed_at,
+                        failure_reason,
+                        failure_type
                     )
                     VALUES (
                         CURRENT_TIMESTAMP(6),
@@ -70,7 +86,12 @@ public class H2SlackNotificationOutboxRepositoryAdapter extends SlackNotificatio
                         source.blocks_json,
                         source.fallback_text,
                         source.status,
-                        source.processing_attempt
+                        source.processing_attempt,
+                        source.processing_started_at,
+                        source.sent_at,
+                        source.failed_at,
+                        source.failure_reason,
+                        source.failure_type
                     )
                 """;
     }

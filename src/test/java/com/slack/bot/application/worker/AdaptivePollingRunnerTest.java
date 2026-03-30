@@ -3,6 +3,7 @@ package com.slack.bot.application.worker;
 import static org.awaitility.Awaitility.await;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertAll;
 
 import java.time.Duration;
 import java.util.ArrayDeque;
@@ -186,11 +187,7 @@ class AdaptivePollingRunnerTest {
         try {
             // when
             adaptivePollingRunner.start();
-
-            // then
-            assertThat(firstPhasePolled.await(500L, TimeUnit.MILLISECONDS)).isTrue();
-
-            // when
+            boolean firstPhaseStarted = firstPhasePolled.await(500L, TimeUnit.MILLISECONDS);
             adaptivePollingRunner.stop();
             phase.set(2);
             await().atMost(Duration.ofSeconds(1L)).until(() -> {
@@ -201,9 +198,13 @@ class AdaptivePollingRunnerTest {
                     return false;
                 }
             });
+            boolean secondPhaseStarted = secondPhasePolled.await(500L, TimeUnit.MILLISECONDS);
 
             // then
-            assertThat(secondPhasePolled.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+            assertAll(
+                    () -> assertThat(firstPhaseStarted).isTrue(),
+                    () -> assertThat(secondPhaseStarted).isTrue()
+            );
         } finally {
             adaptivePollingRunner.stop();
         }
@@ -245,23 +246,16 @@ class AdaptivePollingRunnerTest {
         try {
             // when
             adaptivePollingRunner.start();
-
-            // then
-            assertThat(firstPollStarted.await(500L, TimeUnit.MILLISECONDS)).isTrue();
-
-            // when
+            boolean firstPollDidStart = firstPollStarted.await(500L, TimeUnit.MILLISECONDS);
             adaptivePollingRunner.stop();
             phase.set(2);
-
-            // then
-            assertThatThrownBy(() -> adaptivePollingRunner.start())
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasMessage("이전 poller 스레드가 아직 종료되지 않았습니다.");
-
-            // when
+            IllegalStateException restartFailure = null;
+            try {
+                adaptivePollingRunner.start();
+            } catch (IllegalStateException e) {
+                restartFailure = e;
+            }
             releaseFirstPoll.countDown();
-
-            // then
             await().atMost(Duration.ofSeconds(1L)).until(() -> {
                 try {
                     adaptivePollingRunner.start();
@@ -270,7 +264,16 @@ class AdaptivePollingRunnerTest {
                     return false;
                 }
             });
-            assertThat(secondPollStarted.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+            boolean secondPollDidStart = secondPollStarted.await(500L, TimeUnit.MILLISECONDS);
+
+            // then
+            IllegalStateException actualRestartFailure = restartFailure;
+            assertAll(
+                    () -> assertThat(firstPollDidStart).isTrue(),
+                    () -> assertThat(actualRestartFailure).isNotNull(),
+                    () -> assertThat(actualRestartFailure).hasMessage("이전 poller 스레드가 아직 종료되지 않았습니다."),
+                    () -> assertThat(secondPollDidStart).isTrue()
+            );
         } finally {
             releaseFirstPoll.countDown();
             adaptivePollingRunner.stop();
@@ -327,21 +330,18 @@ class AdaptivePollingRunnerTest {
         try {
             // when
             adaptivePollingRunner.start();
-
-            // then
-            assertThat(firstPollStarted.await(500L, TimeUnit.MILLISECONDS)).isTrue();
-
-            // when
-            adaptivePollingRunner.stop(callbackInvoked::countDown);
-
-            // then
-            assertThat(callbackInvoked.await(100L, TimeUnit.MILLISECONDS)).isFalse();
-
-            // when
+            boolean firstPollDidStart = firstPollStarted.await(500L, TimeUnit.MILLISECONDS);
+            adaptivePollingRunner.stop(() -> callbackInvoked.countDown());
+            boolean callbackInvokedBeforeWorkerStopped = callbackInvoked.await(100L, TimeUnit.MILLISECONDS);
             releaseFirstPoll.countDown();
+            boolean callbackInvokedAfterWorkerStopped = callbackInvoked.await(1L, TimeUnit.SECONDS);
 
             // then
-            assertThat(callbackInvoked.await(1L, TimeUnit.SECONDS)).isTrue();
+            assertAll(
+                    () -> assertThat(firstPollDidStart).isTrue(),
+                    () -> assertThat(callbackInvokedBeforeWorkerStopped).isFalse(),
+                    () -> assertThat(callbackInvokedAfterWorkerStopped).isTrue()
+            );
         } finally {
             releaseFirstPoll.countDown();
             adaptivePollingRunner.stop();
@@ -380,11 +380,7 @@ class AdaptivePollingRunnerTest {
         try {
             // when
             adaptivePollingRunner.start();
-
-            // then
-            assertThat(firstPollStarted.await(500L, TimeUnit.MILLISECONDS)).isTrue();
-
-            // when
+            boolean firstPollDidStart = firstPollStarted.await(500L, TimeUnit.MILLISECONDS);
             adaptivePollingRunner.stop(() -> {
                 callbackCount.incrementAndGet();
                 allCallbacksInvoked.countDown();
@@ -393,16 +389,18 @@ class AdaptivePollingRunnerTest {
                 callbackCount.incrementAndGet();
                 allCallbacksInvoked.countDown();
             });
-
-            // then
-            assertThat(callbackCount.get()).isZero();
-
-            // when
+            int callbackCountBeforeWorkerStopped = callbackCount.get();
             releaseFirstPoll.countDown();
+            boolean allCallbacksCompleted = allCallbacksInvoked.await(1L, TimeUnit.SECONDS);
+            int callbackCountAfterWorkerStopped = callbackCount.get();
 
             // then
-            assertThat(allCallbacksInvoked.await(1L, TimeUnit.SECONDS)).isTrue();
-            assertThat(callbackCount.get()).isEqualTo(2);
+            assertAll(
+                    () -> assertThat(firstPollDidStart).isTrue(),
+                    () -> assertThat(callbackCountBeforeWorkerStopped).isZero(),
+                    () -> assertThat(allCallbacksCompleted).isTrue(),
+                    () -> assertThat(callbackCountAfterWorkerStopped).isEqualTo(2)
+            );
         } finally {
             releaseFirstPoll.countDown();
             adaptivePollingRunner.stop();
@@ -437,17 +435,17 @@ class AdaptivePollingRunnerTest {
         try {
             // when
             adaptivePollingRunner.start();
-
-            // then
-            assertThat(firstPhasePolled.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+            boolean firstPhaseStarted = firstPhasePolled.await(500L, TimeUnit.MILLISECONDS);
             await().atMost(Duration.ofSeconds(1L)).until(() -> !adaptivePollingRunner.isRunning());
-
-            // when
             phase.set(2);
             adaptivePollingRunner.start();
+            boolean secondPhaseStarted = secondPhasePolled.await(500L, TimeUnit.MILLISECONDS);
 
             // then
-            assertThat(secondPhasePolled.await(500L, TimeUnit.MILLISECONDS)).isTrue();
+            assertAll(
+                    () -> assertThat(firstPhaseStarted).isTrue(),
+                    () -> assertThat(secondPhaseStarted).isTrue()
+            );
         } finally {
             adaptivePollingRunner.stop();
         }

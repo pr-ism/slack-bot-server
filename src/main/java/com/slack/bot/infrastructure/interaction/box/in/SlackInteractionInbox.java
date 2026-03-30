@@ -1,6 +1,7 @@
 package com.slack.bot.infrastructure.interaction.box.in;
 
 import com.slack.bot.domain.common.BaseTimeEntity;
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -88,33 +89,57 @@ public class SlackInteractionInbox extends BaseTimeEntity {
         this.payloadJson = payloadJson;
         this.status = status;
         this.processingAttempt = processingAttempt;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.processedAt = FailureSnapshotDefaults.NO_PROCESSED_AT;
+        this.failedAt = FailureSnapshotDefaults.NO_FAILURE_AT;
+        this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
+        this.failureType = SlackInteractionFailureType.NONE;
     }
 
-    public void markProcessed(Instant processedAt) {
+    public SlackInteractionInboxHistory markProcessed(Instant processedAt) {
         validateProcessedAt(processedAt);
         validateTransition(SlackInteractionInboxStatus.PROCESSING, "PROCESSED");
 
         this.status = SlackInteractionInboxStatus.PROCESSED;
-        this.processingStartedAt = null;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
         this.processedAt = processedAt;
-        this.failureReason = null;
-        this.failureType = null;
-        this.failedAt = null;
+        this.failedAt = FailureSnapshotDefaults.NO_FAILURE_AT;
+        this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
+        this.failureType = SlackInteractionFailureType.NONE;
+
+        return SlackInteractionInboxHistory.completed(
+                getId(),
+                this.processingAttempt,
+                SlackInteractionInboxStatus.PROCESSED,
+                processedAt,
+                FailureSnapshotDefaults.NO_FAILURE_REASON,
+                SlackInteractionFailureType.NONE
+        );
     }
 
-    public void markRetryPending(Instant failedAt, String failureReason) {
+    public SlackInteractionInboxHistory markRetryPending(Instant failedAt, String failureReason) {
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
         validateTransition(SlackInteractionInboxStatus.PROCESSING, "RETRY_PENDING");
 
         this.status = SlackInteractionInboxStatus.RETRY_PENDING;
-        this.processingStartedAt = null;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.processedAt = FailureSnapshotDefaults.NO_PROCESSED_AT;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
-        this.failureType = null;
+        this.failureType = SlackInteractionFailureType.NONE;
+
+        return SlackInteractionInboxHistory.completed(
+                getId(),
+                this.processingAttempt,
+                SlackInteractionInboxStatus.RETRY_PENDING,
+                failedAt,
+                failureReason,
+                SlackInteractionFailureType.NONE
+        );
     }
 
-    public void markFailed(
+    public SlackInteractionInboxHistory markFailed(
             Instant failedAt,
             String failureReason,
             SlackInteractionFailureType failureType
@@ -125,10 +150,20 @@ public class SlackInteractionInbox extends BaseTimeEntity {
         validateTransition(SlackInteractionInboxStatus.PROCESSING, "FAILED");
 
         this.status = SlackInteractionInboxStatus.FAILED;
-        this.processingStartedAt = null;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.processedAt = FailureSnapshotDefaults.NO_PROCESSED_AT;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = failureType;
+
+        return SlackInteractionInboxHistory.completed(
+                getId(),
+                this.processingAttempt,
+                SlackInteractionInboxStatus.FAILED,
+                failedAt,
+                failureReason,
+                failureType
+        );
     }
 
     private void validateProcessedAt(Instant processedAt) {
@@ -150,8 +185,8 @@ public class SlackInteractionInbox extends BaseTimeEntity {
     }
 
     private void validateFailureType(SlackInteractionFailureType failureType) {
-        if (failureType == null) {
-            throw new IllegalArgumentException("failureType은 비어 있을 수 없습니다.");
+        if (failureType == null || failureType == SlackInteractionFailureType.NONE) {
+            throw new IllegalArgumentException("failureType은 NONE일 수 없습니다.");
         }
     }
 

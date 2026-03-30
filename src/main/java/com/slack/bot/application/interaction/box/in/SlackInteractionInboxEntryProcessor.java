@@ -5,12 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interaction.BlockActionInteractionService;
 import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
 import com.slack.bot.application.interaction.box.aop.BindInboxToOutboxSource;
-import com.slack.bot.application.interaction.box.out.OutboxIdempotencySourceContext;
 import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
 import com.slack.bot.application.interaction.view.ViewSubmissionInteractionCoordinator;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
+import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxHistory;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import java.time.Clock;
@@ -86,6 +86,8 @@ public class SlackInteractionInboxEntryProcessor {
             Consumer<JsonNode> consumer,
             SlackInteractionInboxType interactionType
     ) {
+        SlackInteractionInboxHistory history;
+
         try {
             JsonNode payload = objectMapper.readTree(claimedInbox.getPayloadJson());
 
@@ -94,7 +96,7 @@ public class SlackInteractionInboxEntryProcessor {
                 return null;
             });
 
-            claimedInbox.markProcessed(clock.instant());
+            history = claimedInbox.markProcessed(clock.instant());
         } catch (Exception e) {
             log.error(
                     "{} inbox 처리에 실패했습니다. inboxId={}",
@@ -102,26 +104,24 @@ public class SlackInteractionInboxEntryProcessor {
                     claimedInbox.getId(),
                     e
             );
-            markFailureStatus(claimedInbox, e);
+            history = markFailureStatus(claimedInbox, e);
         }
 
-        slackInteractionInboxRepository.save(claimedInbox);
+        slackInteractionInboxRepository.save(claimedInbox, history);
     }
 
-    private void markFailureStatus(SlackInteractionInbox inbox, Exception e) {
+    private SlackInteractionInboxHistory markFailureStatus(SlackInteractionInbox inbox, Exception e) {
         String reason = resolveFailureReason(e);
 
         if (!retryExceptionClassifier.isRetryable(e)) {
-            inbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.BUSINESS_INVARIANT);
-            return;
+            return inbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.BUSINESS_INVARIANT);
         }
 
         if (inbox.getProcessingAttempt() < interactionRetryProperties.inbox().maxAttempts()) {
-            inbox.markRetryPending(clock.instant(), reason);
-            return;
+            return inbox.markRetryPending(clock.instant(), reason);
         }
 
-        inbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.RETRY_EXHAUSTED);
+        return inbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.RETRY_EXHAUSTED);
     }
 
     private String resolveFailureReason(Exception e) {

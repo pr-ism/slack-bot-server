@@ -2,15 +2,19 @@ package com.slack.bot.infrastructure.review.persistence.box.in;
 
 import static com.slack.bot.infrastructure.review.box.in.QReviewRequestInbox.reviewRequestInbox;
 
+import com.querydsl.core.Tuple;
 import com.querydsl.core.types.dsl.BooleanExpression;
-import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
+import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxHistory;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -32,6 +36,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
     private final JPAQueryFactory queryFactory;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
     private final JpaReviewRequestInboxRepository reviewRequestInboxJpaRepository;
+    private final JpaReviewRequestInboxHistoryRepository reviewRequestInboxHistoryJpaRepository;
 
     @Override
     @Transactional
@@ -63,7 +68,12 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                 .addValue("requestJson", inbox.getRequestJson())
                 .addValue("availableAt", Timestamp.from(inbox.getAvailableAt()))
                 .addValue("pendingStatus", ReviewRequestInboxStatus.PENDING.name())
-                .addValue("retryPendingStatus", ReviewRequestInboxStatus.RETRY_PENDING.name());
+                .addValue("retryPendingStatus", ReviewRequestInboxStatus.RETRY_PENDING.name())
+                .addValue("noProcessingStartedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT))
+                .addValue("noProcessedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSED_AT))
+                .addValue("noFailureAt", Timestamp.from(FailureSnapshotDefaults.NO_FAILURE_AT))
+                .addValue("noFailureReason", FailureSnapshotDefaults.NO_FAILURE_REASON)
+                .addValue("noneFailureType", ReviewRequestInboxFailureType.NONE.name());
 
         namedParameterJdbcTemplate.update(
                 buildUpsertPendingSql(),
@@ -113,12 +123,17 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                     SET status = :processingStatus,
                         processing_attempt = processing_attempt + 1,
                         processing_started_at = :processingStartedAt,
-                        failed_at = NULL,
-                        failure_reason = NULL,
-                        failure_type = NULL
+                        processed_at = :noProcessedAt,
+                        failed_at = :noFailureAt,
+                        failure_reason = :noFailureReason,
+                        failure_type = :noneFailureType
                     WHERE id = :inboxId
                     """,
                 updateParameters
+                        .addValue("noProcessedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSED_AT))
+                        .addValue("noFailureAt", Timestamp.from(FailureSnapshotDefaults.NO_FAILURE_AT))
+                        .addValue("noFailureReason", FailureSnapshotDefaults.NO_FAILURE_REASON)
+                        .addValue("noneFailureType", ReviewRequestInboxFailureType.NONE.name())
         );
         if (updatedCount == 0) {
             return Optional.empty();
@@ -221,56 +236,106 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
         validateFailureReason(failureReason);
         validateMaxAttempts(maxAttempts);
 
-        BooleanExpression timeoutCondition = reviewRequestInbox.processingStartedAt.isNull()
-                                                                                     .or(reviewRequestInbox.processingStartedAt.lt(
-                                                                                             processingStartedBefore
-                                                                                     ));
+        BooleanExpression timeoutCondition = reviewRequestInbox.processingStartedAt.lt(processingStartedBefore);
 
-        long exhaustedCount = queryFactory.update(reviewRequestInbox)
-                                          .set(reviewRequestInbox.status, ReviewRequestInboxStatus.FAILED)
-                                          .set(
-                                                  reviewRequestInbox.processingStartedAt,
-                                                  Expressions.nullExpression(Instant.class)
-                                          )
-                                          .set(reviewRequestInbox.failedAt, failedAt)
-                                          .set(reviewRequestInbox.failureReason, failureReason)
-                                          .set(
-                                                  reviewRequestInbox.failureType,
-                                                  ReviewRequestInboxFailureType.RETRY_EXHAUSTED
-                                          )
-                                          .where(
-                                                  reviewRequestInbox.status.eq(ReviewRequestInboxStatus.PROCESSING),
-                                                  timeoutCondition,
-                                                  reviewRequestInbox.processingAttempt.goe(maxAttempts)
-                                          )
-                                          .execute();
+        int exhaustedCount = recoverTimeoutProcessingByStatus(
+                timeoutCondition,
+                reviewRequestInbox.processingAttempt.goe(maxAttempts),
+                ReviewRequestInboxStatus.FAILED,
+                failedAt,
+                failureReason,
+                ReviewRequestInboxFailureType.RETRY_EXHAUSTED,
+                ReviewRequestInboxFailureType.RETRY_EXHAUSTED
+        );
+        int recoveredCount = recoverTimeoutProcessingByStatus(
+                timeoutCondition,
+                reviewRequestInbox.processingAttempt.lt(maxAttempts),
+                ReviewRequestInboxStatus.RETRY_PENDING,
+                failedAt,
+                failureReason,
+                ReviewRequestInboxFailureType.NONE,
+                ReviewRequestInboxFailureType.PROCESSING_TIMEOUT
+        );
 
-        long recoveredCount = queryFactory.update(reviewRequestInbox)
-                                          .set(reviewRequestInbox.status, ReviewRequestInboxStatus.RETRY_PENDING)
-                                          .set(
-                                                  reviewRequestInbox.processingStartedAt,
-                                                  Expressions.nullExpression(Instant.class)
-                                          )
-                                          .set(reviewRequestInbox.failedAt, failedAt)
-                                          .set(reviewRequestInbox.failureReason, failureReason)
-                                          .set(
-                                                  reviewRequestInbox.failureType,
-                                                  Expressions.nullExpression(ReviewRequestInboxFailureType.class)
-                                          )
-                                          .where(
-                                                  reviewRequestInbox.status.eq(ReviewRequestInboxStatus.PROCESSING),
-                                                  timeoutCondition,
-                                                  reviewRequestInbox.processingAttempt.lt(maxAttempts)
-                                          )
-                                          .execute();
+        return exhaustedCount + recoveredCount;
+    }
 
-        return Math.toIntExact(exhaustedCount + recoveredCount);
+    private int recoverTimeoutProcessingByStatus(
+            BooleanExpression timeoutCondition,
+            BooleanExpression attemptCondition,
+            ReviewRequestInboxStatus targetStatus,
+            Instant failedAt,
+            String failureReason,
+            ReviewRequestInboxFailureType snapshotFailureType,
+            ReviewRequestInboxFailureType historyFailureType
+    ) {
+        List<Tuple> timedOutRows = queryFactory
+                .select(reviewRequestInbox.id, reviewRequestInbox.processingAttempt)
+                .from(reviewRequestInbox)
+                .where(
+                        reviewRequestInbox.status.eq(ReviewRequestInboxStatus.PROCESSING),
+                        timeoutCondition,
+                        attemptCondition
+                )
+                .fetch();
+
+        int recoveredCount = 0;
+        for (Tuple row : timedOutRows) {
+            Long inboxId = row.get(reviewRequestInbox.id);
+            Integer processingAttempt = row.get(reviewRequestInbox.processingAttempt);
+            long updatedCount = queryFactory
+                    .update(reviewRequestInbox)
+                    .set(reviewRequestInbox.status, targetStatus)
+                    .set(reviewRequestInbox.updatedAt, LocalDateTime.ofInstant(failedAt, ZoneOffset.UTC))
+                    .set(
+                            reviewRequestInbox.processingStartedAt,
+                            FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
+                    )
+                    .set(reviewRequestInbox.processedAt, FailureSnapshotDefaults.NO_PROCESSED_AT)
+                    .set(reviewRequestInbox.failedAt, failedAt)
+                    .set(reviewRequestInbox.failureReason, failureReason)
+                    .set(reviewRequestInbox.failureType, snapshotFailureType)
+                    .where(
+                            reviewRequestInbox.id.eq(inboxId),
+                            reviewRequestInbox.status.eq(ReviewRequestInboxStatus.PROCESSING),
+                            timeoutCondition,
+                            attemptCondition
+                    )
+                    .execute();
+            if (updatedCount == 0) {
+                continue;
+            }
+
+            reviewRequestInboxHistoryJpaRepository.save(
+                    ReviewRequestInboxHistory.completed(
+                            inboxId,
+                            processingAttempt,
+                            targetStatus,
+                            failedAt,
+                            failureReason,
+                            historyFailureType
+                    )
+            );
+            recoveredCount++;
+        }
+
+        return recoveredCount;
     }
 
     @Override
     @Transactional
     public boolean saveIfProcessingLeaseMatched(
             ReviewRequestInbox inbox,
+            Instant claimedProcessingStartedAt
+    ) {
+        return saveIfProcessingLeaseMatched(inbox, null, claimedProcessingStartedAt);
+    }
+
+    @Override
+    @Transactional
+    public boolean saveIfProcessingLeaseMatched(
+            ReviewRequestInbox inbox,
+            ReviewRequestInboxHistory history,
             Instant claimedProcessingStartedAt
     ) {
         validateSaveIfProcessingLeaseMatchedArguments(inbox, claimedProcessingStartedAt);
@@ -303,7 +368,15 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                 parameters
         );
 
-        return updatedCount > 0;
+        if (updatedCount == 0) {
+            return false;
+        }
+
+        if (history != null) {
+            reviewRequestInboxHistoryJpaRepository.save(history.bindInboxId(inbox.getId()));
+        }
+
+        return true;
     }
 
     @Override
@@ -323,7 +396,12 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                     request_json,
                     available_at,
                     status,
-                    processing_attempt
+                    processing_attempt,
+                    processing_started_at,
+                    processed_at,
+                    failed_at,
+                    failure_reason,
+                    failure_type
                 )
                 VALUES (
                     CURRENT_TIMESTAMP(6),
@@ -334,7 +412,12 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                     :requestJson,
                     :availableAt,
                     :pendingStatus,
-                    0
+                    0,
+                    :noProcessingStartedAt,
+                    :noProcessedAt,
+                    :noFailureAt,
+                    :noFailureReason,
+                    :noneFailureType
                 )
                 ON DUPLICATE KEY UPDATE
                     updated_at = IF(
@@ -374,27 +457,27 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                     ),
                     processing_started_at = IF(
                         status IN (:pendingStatus, :retryPendingStatus),
-                        NULL,
+                        :noProcessingStartedAt,
                         processing_started_at
                     ),
                     processed_at = IF(
                         status IN (:pendingStatus, :retryPendingStatus),
-                        NULL,
+                        :noProcessedAt,
                         processed_at
                     ),
                     failed_at = IF(
                         status IN (:pendingStatus, :retryPendingStatus),
-                        NULL,
+                        :noFailureAt,
                         failed_at
                     ),
                     failure_reason = IF(
                         status IN (:pendingStatus, :retryPendingStatus),
-                        NULL,
+                        :noFailureReason,
                         failure_reason
                     ),
                     failure_type = IF(
                         status IN (:pendingStatus, :retryPendingStatus),
-                        NULL,
+                        :noneFailureType,
                         failure_type
                     )
                 """;
@@ -486,18 +569,10 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
     }
 
     private Timestamp toTimestamp(Instant instant) {
-        if (instant == null) {
-            return null;
-        }
-
         return Timestamp.from(instant);
     }
 
     private String resolveFailureTypeName(ReviewRequestInbox inbox) {
-        if (inbox.getFailureType() == null) {
-            return null;
-        }
-
         return inbox.getFailureType().name();
     }
 }

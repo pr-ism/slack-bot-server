@@ -21,32 +21,44 @@ public record CorsProperties(
             );
         }
 
-        allowedOrigins = (allowedOrigins == null || allowedOrigins.isEmpty())
-                ? List.of("http://localhost:3000")
-                : List.copyOf(allowedOrigins);
+        if (allowedOrigins == null || allowedOrigins.isEmpty()) {
+            allowedOrigins = List.of("http://localhost:3000");
+        } else {
+            allowedOrigins = List.copyOf(allowedOrigins);
+        }
 
-        allowedOriginPatterns = (allowedOriginPatterns == null)
-                ? List.of()
-                : List.copyOf(allowedOriginPatterns);
+        if (allowedOriginPatterns == null) {
+            allowedOriginPatterns = List.of();
+        } else {
+            allowedOriginPatterns = List.copyOf(allowedOriginPatterns);
+        }
 
-        allowedMethods = (allowedMethods == null || allowedMethods.isEmpty())
-                ? List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-                : List.copyOf(allowedMethods);
+        if (allowedMethods == null || allowedMethods.isEmpty()) {
+            allowedMethods = List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
+        } else {
+            allowedMethods = List.copyOf(allowedMethods);
+        }
 
-        allowedHeaders = (allowedHeaders == null || allowedHeaders.isEmpty())
-                ? List.of(
-                        "Authorization",
-                        "Content-Type",
-                        "Accept",
-                        "Cache-Control"
-                )
-                : List.copyOf(allowedHeaders);
+        if (allowedHeaders == null || allowedHeaders.isEmpty()) {
+            allowedHeaders = List.of(
+                    "Authorization",
+                    "Content-Type",
+                    "Accept",
+                    "Cache-Control"
+            );
+        } else {
+            allowedHeaders = List.copyOf(allowedHeaders);
+        }
 
-        exposedHeaders = (exposedHeaders == null)
-                ? List.of()
-                : List.copyOf(exposedHeaders);
+        if (exposedHeaders == null) {
+            exposedHeaders = List.of();
+        } else {
+            exposedHeaders = List.copyOf(exposedHeaders);
+        }
 
-        maxAge = (maxAge == null) ? 3600L : maxAge;
+        if (maxAge == null) {
+            maxAge = 3600L;
+        }
     }
 
     public boolean hasOriginPatterns() {

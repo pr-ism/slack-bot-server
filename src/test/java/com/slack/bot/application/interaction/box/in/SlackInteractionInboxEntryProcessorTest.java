@@ -21,11 +21,15 @@ import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.repository.ReviewReservationRepository;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
+import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxHistory;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStatus;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
+import com.slack.bot.infrastructure.interaction.box.persistence.in.JpaSlackInteractionInboxHistoryRepository;
 import com.slack.bot.infrastructure.interaction.box.persistence.in.JpaSlackInteractionInboxRepository;
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -50,6 +54,9 @@ class SlackInteractionInboxEntryProcessorTest {
 
     @Autowired
     JpaSlackInteractionInboxRepository jpaSlackInteractionInboxRepository;
+
+    @Autowired
+    JpaSlackInteractionInboxHistoryRepository jpaSlackInteractionInboxHistoryRepository;
 
     @Autowired
     ReviewReservationRepository reviewReservationRepository;
@@ -187,7 +194,10 @@ class SlackInteractionInboxEntryProcessorTest {
 
         doThrow(new IllegalStateException("forced save failure"))
                 .when(slackInteractionInboxRepository)
-                .save(argThat(savedInbox -> savedInbox != null && inbox.getId().equals(savedInbox.getId())));
+                .save(
+                        argThat(savedInbox -> savedInbox != null && inbox.getId().equals(savedInbox.getId())),
+                        any()
+                );
 
         // when & then
         assertThatThrownBy(() -> slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId()))
@@ -201,6 +211,55 @@ class SlackInteractionInboxEntryProcessorTest {
                 () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSING),
                 () -> assertThat(actualInbox.getProcessingAttempt()).isEqualTo(1),
                 () -> assertThat(actualReservation.getStatus()).isEqualTo(ReservationStatus.ACTIVE)
+        );
+    }
+
+    @Test
+    @Sql(scripts = {
+            "classpath:sql/fixtures/notification/workspace_t1.sql",
+            "classpath:sql/fixtures/reservation/project_123.sql",
+            "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
+    })
+    void block_actions_엔트리_비즈니스_실패시_history가_저장된다() throws Exception {
+        // given
+        given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U1"))
+                .willReturn("D-REVIEWER");
+        doThrow(new IllegalStateException("forced notification failure"))
+                .when(notificationApiClient)
+                .sendBlockMessage(
+                        eq("xoxb-test-token"),
+                        eq("D-REVIEWER"),
+                        any(),
+                        any()
+                );
+        String payloadJson = objectMapper.writeValueAsString(openReviewSchedulerPayload(metaJsonWithProjectId("123")));
+        SlackInteractionInbox inbox = savePendingInbox(SlackInteractionInboxType.BLOCK_ACTIONS, payloadJson);
+
+        // when
+        slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId());
+
+        // then
+        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
+        List<SlackInteractionInboxHistory> histories = historiesOf(inbox.getId());
+        Optional<ReviewReservation> actualReservation = reviewReservationRepository.findById(100L);
+
+        assertAll(
+                () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
+                () -> assertThat(actualInbox.getProcessingAttempt()).isEqualTo(1),
+                () -> assertThat(actualInbox.getFailureType()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
+                () -> assertThat(histories).hasSize(1),
+                () -> assertThat(histories.getFirst().getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
+                () -> assertThat(histories.getFirst().getFailureType())
+                        .isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
+                () -> assertThat(actualReservation).isPresent(),
+                () -> assertThat(actualReservation.get().getStatus()).isEqualTo(ReservationStatus.ACTIVE)
+        );
+        verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1");
+        verify(notificationApiClient).sendBlockMessage(
+                eq("xoxb-test-token"),
+                eq("D-REVIEWER"),
+                any(),
+                any()
         );
     }
 
@@ -278,5 +337,13 @@ class SlackInteractionInboxEntryProcessorTest {
                                       .put("author_github_id", "author-gh")
                                       .put("author_slack_id", "U_AUTHOR");
         return meta.toString();
+    }
+
+    private List<SlackInteractionInboxHistory> historiesOf(Long inboxId) {
+        return jpaSlackInteractionInboxHistoryRepository.findAll()
+                                                        .stream()
+                                                        .filter(history -> inboxId.equals(history.getInboxId()))
+                                                        .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))
+                                                        .toList();
     }
 }

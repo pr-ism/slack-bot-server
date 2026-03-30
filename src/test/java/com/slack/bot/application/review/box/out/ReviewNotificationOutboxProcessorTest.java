@@ -24,6 +24,7 @@ import com.slack.bot.application.review.dto.ReviewMessageDto;
 import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
@@ -155,7 +156,7 @@ class ReviewNotificationOutboxProcessorTest {
 
         // then
         verify(reviewNotificationOutboxRepository, never()).findById(anyLong());
-        verify(reviewNotificationOutboxRepository, never()).saveIfProcessingLeaseMatched(any(), any());
+        verify(reviewNotificationOutboxRepository, never()).saveIfProcessingLeaseMatched(any(), any(), any());
     }
 
     @Test
@@ -169,7 +170,7 @@ class ReviewNotificationOutboxProcessorTest {
         processor.processPending(10);
 
         // then
-        verify(reviewNotificationOutboxRepository, never()).saveIfProcessingLeaseMatched(any(), any());
+        verify(reviewNotificationOutboxRepository, never()).saveIfProcessingLeaseMatched(any(), any(), any());
     }
 
     @Test
@@ -191,7 +192,7 @@ class ReviewNotificationOutboxProcessorTest {
         // then
         verify(notificationTransportApiClient, never())
                 .sendBlockMessage(anyString(), anyString(), any(), any(), anyString());
-        verify(reviewNotificationOutboxRepository, never()).saveIfProcessingLeaseMatched(any(), any());
+        verify(reviewNotificationOutboxRepository, never()).saveIfProcessingLeaseMatched(any(), any(), any());
     }
 
     @Test
@@ -211,7 +212,7 @@ class ReviewNotificationOutboxProcessorTest {
                 .sendBlockMessage(anyString(), anyString(), any(), any(), anyString());
         verify(claimed, never()).markSent(any());
         verify(claimed, never()).markFailed(any(), anyString(), any());
-        verify(reviewNotificationOutboxRepository, never()).saveIfProcessingLeaseMatched(any(), any());
+        verify(reviewNotificationOutboxRepository, never()).saveIfProcessingLeaseMatched(any(), any(), any());
     }
 
     @Test
@@ -239,7 +240,7 @@ class ReviewNotificationOutboxProcessorTest {
         );
         verify(claimed).markSent(any());
         verify(reviewNotificationOutboxRepository)
-                .saveIfProcessingLeaseMatched(claimed, CLAIMED_PROCESSING_STARTED_AT);
+                .saveIfProcessingLeaseMatched(eq(claimed), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
     }
 
     @Test
@@ -256,7 +257,7 @@ class ReviewNotificationOutboxProcessorTest {
 
         doThrow(new RuntimeException("db failure"))
                 .when(reviewNotificationOutboxRepository)
-                .saveIfProcessingLeaseMatched(claimed, CLAIMED_PROCESSING_STARTED_AT);
+                .saveIfProcessingLeaseMatched(eq(claimed), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
 
         // when
         processor.processPending(10);
@@ -303,7 +304,7 @@ class ReviewNotificationOutboxProcessorTest {
         // then
         verify(claimed).markFailed(any(), anyString(), eq(SlackInteractionFailureType.BUSINESS_INVARIANT));
         verify(reviewNotificationOutboxRepository)
-                .saveIfProcessingLeaseMatched(claimed, CLAIMED_PROCESSING_STARTED_AT);
+                .saveIfProcessingLeaseMatched(eq(claimed), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
     }
 
     @Test
@@ -326,7 +327,7 @@ class ReviewNotificationOutboxProcessorTest {
                 .sendBlockMessage(eq("xoxb-test-token"), eq("C1"), any(JsonNode.class), eq(null), eq("fallback"));
         doThrow(new RuntimeException("db failure"))
                 .when(reviewNotificationOutboxRepository)
-                .saveIfProcessingLeaseMatched(firstClaimed, CLAIMED_PROCESSING_STARTED_AT);
+                .saveIfProcessingLeaseMatched(eq(firstClaimed), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
 
         // when & then
         assertThatCode(() -> processor.processPending(10)).doesNotThrowAnyException();
@@ -334,9 +335,9 @@ class ReviewNotificationOutboxProcessorTest {
         verify(firstClaimed).markRetryPending(any(), anyString());
         verify(secondClaimed).markSent(any());
         verify(reviewNotificationOutboxRepository)
-                .saveIfProcessingLeaseMatched(secondClaimed, CLAIMED_PROCESSING_STARTED_AT);
+                .saveIfProcessingLeaseMatched(eq(secondClaimed), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
         verify(reviewNotificationOutboxRepository, times(2))
-                .saveIfProcessingLeaseMatched(any(ReviewNotificationOutbox.class), eq(CLAIMED_PROCESSING_STARTED_AT));
+                .saveIfProcessingLeaseMatched(any(ReviewNotificationOutbox.class), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
     }
 
     @Test
@@ -377,10 +378,10 @@ class ReviewNotificationOutboxProcessorTest {
         );
         verify(reviewNotificationOutboxRepository, never()).save(firstClaimed);
         verify(reviewNotificationOutboxRepository, never())
-                .saveIfProcessingLeaseMatched(firstClaimed, CLAIMED_PROCESSING_STARTED_AT);
+                .saveIfProcessingLeaseMatched(eq(firstClaimed), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
         verify(secondClaimed).markSent(any());
         verify(reviewNotificationOutboxRepository)
-                .saveIfProcessingLeaseMatched(secondClaimed, CLAIMED_PROCESSING_STARTED_AT);
+                .saveIfProcessingLeaseMatched(eq(secondClaimed), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
     }
 
     @Test
@@ -412,7 +413,7 @@ class ReviewNotificationOutboxProcessorTest {
         // then
         verify(claimed).markRetryPending(any(), anyString());
         verify(reviewNotificationOutboxRepository)
-                .saveIfProcessingLeaseMatched(claimed, CLAIMED_PROCESSING_STARTED_AT);
+                .saveIfProcessingLeaseMatched(eq(claimed), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
     }
 
     @Test
@@ -444,7 +445,7 @@ class ReviewNotificationOutboxProcessorTest {
         // then
         verify(claimed).markFailed(any(), anyString(), eq(SlackInteractionFailureType.RETRY_EXHAUSTED));
         verify(reviewNotificationOutboxRepository)
-                .saveIfProcessingLeaseMatched(claimed, CLAIMED_PROCESSING_STARTED_AT);
+                .saveIfProcessingLeaseMatched(eq(claimed), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
     }
 
     @Test
@@ -462,7 +463,7 @@ class ReviewNotificationOutboxProcessorTest {
         // then
         verify(claimed).markFailed(any(), anyString(), eq(SlackInteractionFailureType.BUSINESS_INVARIANT));
         verify(reviewNotificationOutboxRepository)
-                .saveIfProcessingLeaseMatched(claimed, CLAIMED_PROCESSING_STARTED_AT);
+                .saveIfProcessingLeaseMatched(eq(claimed), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
     }
 
     @Test
@@ -493,7 +494,7 @@ class ReviewNotificationOutboxProcessorTest {
                 eq("fallback")
         );
         verify(reviewNotificationOutboxRepository)
-                .saveIfProcessingLeaseMatched(claimed, CLAIMED_PROCESSING_STARTED_AT);
+                .saveIfProcessingLeaseMatched(eq(claimed), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
     }
 
     @Test
@@ -540,7 +541,7 @@ class ReviewNotificationOutboxProcessorTest {
                 eq("fallback")
         );
         verify(reviewNotificationOutboxRepository)
-                .saveIfProcessingLeaseMatched(claimed, CLAIMED_PROCESSING_STARTED_AT);
+                .saveIfProcessingLeaseMatched(eq(claimed), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
     }
 
     private ReviewNotificationOutbox spyClaimed(String channelId, int processingAttempt, String attachmentsJson) {
@@ -570,9 +571,10 @@ class ReviewNotificationOutboxProcessorTest {
     ) {
         ReflectionTestUtils.setField(outbox, "status", ReviewNotificationOutboxStatus.PROCESSING);
         ReflectionTestUtils.setField(outbox, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(outbox, "sentAt", FailureSnapshotDefaults.NO_SENT_AT);
         ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(outbox, "failedAt", null);
-        ReflectionTestUtils.setField(outbox, "failureReason", null);
-        ReflectionTestUtils.setField(outbox, "failureType", null);
+        ReflectionTestUtils.setField(outbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
+        ReflectionTestUtils.setField(outbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
+        ReflectionTestUtils.setField(outbox, "failureType", SlackInteractionFailureType.NONE);
     }
 }

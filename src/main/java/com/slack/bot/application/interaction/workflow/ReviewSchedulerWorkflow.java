@@ -157,12 +157,17 @@ public class ReviewSchedulerWorkflow {
     }
 
     private void openReviewTimeModal(SchedulerContextDto context) {
+        int metaLength = 0;
+        if (context.metaJson() != null) {
+            metaLength = context.metaJson().length();
+        }
+
         log.info(
                 "리뷰 예약 모달 오픈 시도. teamId={}, userId={}, triggerIdPrefix={}, metaLength={}",
                 context.teamId(),
                 context.slackUserId(),
                 abbreviate(context.triggerId()),
-                context.metaJson() == null ? 0 : context.metaJson().length()
+                metaLength
         );
         View view = slackViews.reviewTimeSubmitModal(context.metaJson());
 

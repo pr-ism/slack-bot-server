@@ -2,11 +2,13 @@ package com.slack.bot.infrastructure.interaction.box.persistence.out;
 
 import static com.slack.bot.infrastructure.interaction.box.out.QSlackNotificationOutbox.slackNotificationOutbox;
 
+import com.querydsl.core.Tuple;
 import com.querydsl.core.types.dsl.BooleanExpression;
-import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
+import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxHistory;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
 import java.sql.Timestamp;
@@ -27,6 +29,7 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
     private final JPAQueryFactory queryFactory;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
     private final JpaSlackNotificationOutboxRepository repository;
+    private final JpaSlackNotificationOutboxHistoryRepository historyRepository;
 
     @Override
     public boolean enqueue(SlackNotificationOutbox outbox) {
@@ -40,7 +43,12 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                 .addValue("blocksJson", outbox.getBlocksJson())
                 .addValue("fallbackText", outbox.getFallbackText())
                 .addValue("pendingStatus", outbox.getStatus().name())
-                .addValue("processingAttempt", outbox.getProcessingAttempt());
+                .addValue("processingAttempt", outbox.getProcessingAttempt())
+                .addValue("noProcessingStartedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT))
+                .addValue("noSentAt", Timestamp.from(FailureSnapshotDefaults.NO_SENT_AT))
+                .addValue("noFailureAt", Timestamp.from(FailureSnapshotDefaults.NO_FAILURE_AT))
+                .addValue("noFailureReason", FailureSnapshotDefaults.NO_FAILURE_REASON)
+                .addValue("noneFailureType", SlackInteractionFailureType.NONE.name());
 
         int updatedCount = namedParameterJdbcTemplate.update(
                 buildEnqueueSql(),
@@ -96,6 +104,16 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
             SlackNotificationOutbox outbox,
             Instant claimedProcessingStartedAt
     ) {
+        return saveIfProcessingLeaseMatched(outbox, null, claimedProcessingStartedAt);
+    }
+
+    @Override
+    @Transactional
+    public boolean saveIfProcessingLeaseMatched(
+            SlackNotificationOutbox outbox,
+            SlackNotificationOutboxHistory history,
+            Instant claimedProcessingStartedAt
+    ) {
         validateSaveIfProcessingLeaseMatchedArguments(outbox, claimedProcessingStartedAt);
 
         MapSqlParameterSource parameters = new MapSqlParameterSource()
@@ -126,7 +144,15 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                 parameters
         );
 
-        return updatedCount > 0;
+        if (updatedCount == 0) {
+            return false;
+        }
+
+        if (history != null) {
+            historyRepository.save(history.bindOutboxId(outbox.getId()));
+        }
+
+        return true;
     }
 
     @Override
@@ -171,12 +197,17 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                 SET status = :processingStatus,
                     processing_started_at = :processingStartedAt,
                     processing_attempt = processing_attempt + 1,
-                    failed_at = NULL,
-                    failure_reason = NULL,
-                    failure_type = NULL
+                    sent_at = :noSentAt,
+                    failed_at = :noFailureAt,
+                    failure_reason = :noFailureReason,
+                    failure_type = :noneFailureType
                 WHERE id = :outboxId
                 """,
                 updateParameters
+                        .addValue("noSentAt", Timestamp.from(FailureSnapshotDefaults.NO_SENT_AT))
+                        .addValue("noFailureAt", Timestamp.from(FailureSnapshotDefaults.NO_FAILURE_AT))
+                        .addValue("noFailureReason", FailureSnapshotDefaults.NO_FAILURE_REASON)
+                        .addValue("noneFailureType", SlackInteractionFailureType.NONE.name())
         );
         if (updatedCount == 0) {
             return Optional.empty();
@@ -235,40 +266,86 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
     ) {
         validateRecoverTimeoutProcessingArguments(processingStartedBefore, failedAt, failureReason, maxAttempts);
 
-        BooleanExpression timeoutCondition = slackNotificationOutbox.processingStartedAt.isNull()
-                                                                                          .or(slackNotificationOutbox.processingStartedAt.lt(
-                                                                                                  processingStartedBefore
-                                                                                          ));
+        BooleanExpression timeoutCondition = slackNotificationOutbox.processingStartedAt.lt(processingStartedBefore);
 
-        long exhaustedCount = queryFactory
-                .update(slackNotificationOutbox)
-                .set(slackNotificationOutbox.status, SlackNotificationOutboxStatus.FAILED)
-                .set(slackNotificationOutbox.processingStartedAt, Expressions.nullExpression(Instant.class))
-                .set(slackNotificationOutbox.failedAt, failedAt)
-                .set(slackNotificationOutbox.failureReason, failureReason)
-                .set(slackNotificationOutbox.failureType, SlackInteractionFailureType.RETRY_EXHAUSTED)
+        int exhaustedCount = recoverTimeoutProcessingByStatus(
+                timeoutCondition,
+                slackNotificationOutbox.processingAttempt.goe(maxAttempts),
+                SlackNotificationOutboxStatus.FAILED,
+                failedAt,
+                failureReason,
+                SlackInteractionFailureType.RETRY_EXHAUSTED
+        );
+        int recoveredCount = recoverTimeoutProcessingByStatus(
+                timeoutCondition,
+                slackNotificationOutbox.processingAttempt.lt(maxAttempts),
+                SlackNotificationOutboxStatus.RETRY_PENDING,
+                failedAt,
+                failureReason,
+                SlackInteractionFailureType.NONE
+        );
+
+        return exhaustedCount + recoveredCount;
+    }
+
+    private int recoverTimeoutProcessingByStatus(
+            BooleanExpression timeoutCondition,
+            BooleanExpression attemptCondition,
+            SlackNotificationOutboxStatus targetStatus,
+            Instant failedAt,
+            String failureReason,
+            SlackInteractionFailureType failureType
+    ) {
+        List<Tuple> timedOutRows = queryFactory
+                .select(slackNotificationOutbox.id, slackNotificationOutbox.processingAttempt)
+                .from(slackNotificationOutbox)
                 .where(
                         slackNotificationOutbox.status.eq(SlackNotificationOutboxStatus.PROCESSING),
                         timeoutCondition,
-                        slackNotificationOutbox.processingAttempt.goe(maxAttempts)
+                        attemptCondition
                 )
-                .execute();
+                .fetch();
 
-        long recoveredCount = queryFactory
-                .update(slackNotificationOutbox)
-                .set(slackNotificationOutbox.status, SlackNotificationOutboxStatus.RETRY_PENDING)
-                .set(slackNotificationOutbox.processingStartedAt, Expressions.nullExpression(Instant.class))
-                .set(slackNotificationOutbox.failedAt, failedAt)
-                .set(slackNotificationOutbox.failureReason, failureReason)
-                .set(slackNotificationOutbox.failureType, Expressions.nullExpression(SlackInteractionFailureType.class))
-                .where(
-                        slackNotificationOutbox.status.eq(SlackNotificationOutboxStatus.PROCESSING),
-                        timeoutCondition,
-                        slackNotificationOutbox.processingAttempt.lt(maxAttempts)
-                )
-                .execute();
+        int recoveredCount = 0;
+        for (Tuple row : timedOutRows) {
+            Long outboxId = row.get(slackNotificationOutbox.id);
+            Integer processingAttempt = row.get(slackNotificationOutbox.processingAttempt);
+            long updatedCount = queryFactory
+                    .update(slackNotificationOutbox)
+                    .set(slackNotificationOutbox.status, targetStatus)
+                    .set(
+                            slackNotificationOutbox.processingStartedAt,
+                            FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
+                    )
+                    .set(slackNotificationOutbox.sentAt, FailureSnapshotDefaults.NO_SENT_AT)
+                    .set(slackNotificationOutbox.failedAt, failedAt)
+                    .set(slackNotificationOutbox.failureReason, failureReason)
+                    .set(slackNotificationOutbox.failureType, failureType)
+                    .where(
+                            slackNotificationOutbox.id.eq(outboxId),
+                            slackNotificationOutbox.status.eq(SlackNotificationOutboxStatus.PROCESSING),
+                            timeoutCondition,
+                            attemptCondition
+                    )
+                    .execute();
+            if (updatedCount == 0) {
+                continue;
+            }
 
-        return Math.toIntExact(exhaustedCount + recoveredCount);
+            historyRepository.save(
+                    SlackNotificationOutboxHistory.completed(
+                            outboxId,
+                            processingAttempt,
+                            targetStatus,
+                            failedAt,
+                            failureReason,
+                            failureType
+                    )
+            );
+            recoveredCount++;
+        }
+
+        return recoveredCount;
     }
 
     private void validateRecoverTimeoutProcessingArguments(
@@ -297,7 +374,12 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                     blocks_json,
                     fallback_text,
                     status,
-                    processing_attempt
+                    processing_attempt,
+                    processing_started_at,
+                    sent_at,
+                    failed_at,
+                    failure_reason,
+                    failure_type
                 )
                 VALUES (
                     CURRENT_TIMESTAMP(6),
@@ -311,7 +393,12 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                     :blocksJson,
                     :fallbackText,
                     :pendingStatus,
-                    :processingAttempt
+                    :processingAttempt,
+                    :noProcessingStartedAt,
+                    :noSentAt,
+                    :noFailureAt,
+                    :noFailureReason,
+                    :noneFailureType
                 )
                 ON DUPLICATE KEY UPDATE
                     idempotency_key = idempotency_key
@@ -374,18 +461,10 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
     }
 
     private Timestamp toTimestamp(Instant instant) {
-        if (instant == null) {
-            return null;
-        }
-
         return Timestamp.from(instant);
     }
 
     private String resolveFailureTypeName(SlackNotificationOutbox outbox) {
-        if (outbox.getFailureType() == null) {
-            return null;
-        }
-
         return outbox.getFailureType().name();
     }
 }

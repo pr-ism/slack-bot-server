@@ -22,7 +22,10 @@ public record SlackTokenResponse(
     }
 
     public Workspace toEntity(Long userId) {
-        String teamId = this.team == null ? null : this.team.id;
+        String teamId = null;
+        if (this.team != null) {
+            teamId = this.team.id;
+        }
 
         return Workspace.builder()
                         .userId(userId)

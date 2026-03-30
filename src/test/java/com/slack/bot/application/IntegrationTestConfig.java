@@ -13,8 +13,10 @@ import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
 import com.slack.bot.infrastructure.interaction.box.persistence.in.H2SlackInteractionInboxRepositoryAdapter;
+import com.slack.bot.infrastructure.interaction.box.persistence.in.JpaSlackInteractionInboxHistoryRepository;
 import com.slack.bot.infrastructure.interaction.box.persistence.in.JpaSlackInteractionInboxRepository;
 import com.slack.bot.infrastructure.interaction.box.persistence.out.H2SlackNotificationOutboxRepositoryAdapter;
+import com.slack.bot.infrastructure.interaction.box.persistence.out.JpaSlackNotificationOutboxHistoryRepository;
 import com.slack.bot.infrastructure.interaction.box.persistence.out.JpaSlackNotificationOutboxRepository;
 import com.slack.bot.infrastructure.review.batch.SpyReviewNotificationService;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
@@ -26,8 +28,10 @@ import org.springframework.context.annotation.Primary;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import com.slack.bot.infrastructure.review.persistence.box.in.H2ReviewRequestInboxRepositoryAdapter;
+import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxHistoryRepository;
 import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxRepository;
 import com.slack.bot.infrastructure.review.persistence.box.out.H2ReviewNotificationOutboxRepositoryAdapter;
+import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxHistoryRepository;
 import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxRepository;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.web.client.RestClient;
@@ -164,12 +168,14 @@ public class IntegrationTestConfig {
     public SlackInteractionInboxRepository slackInteractionInboxRepository(
             JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaSlackInteractionInboxRepository repository
+            JpaSlackInteractionInboxRepository repository,
+            JpaSlackInteractionInboxHistoryRepository historyRepository
     ) {
         return new H2SlackInteractionInboxRepositoryAdapter(
                 queryFactory,
                 namedParameterJdbcTemplate,
-                repository
+                repository,
+                historyRepository
         );
     }
 
@@ -178,12 +184,14 @@ public class IntegrationTestConfig {
     public SlackNotificationOutboxRepository slackNotificationOutboxRepository(
             JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaSlackNotificationOutboxRepository repository
+            JpaSlackNotificationOutboxRepository repository,
+            JpaSlackNotificationOutboxHistoryRepository historyRepository
     ) {
         return new H2SlackNotificationOutboxRepositoryAdapter(
                 queryFactory,
                 namedParameterJdbcTemplate,
-                repository
+                repository,
+                historyRepository
         );
     }
 
@@ -192,12 +200,14 @@ public class IntegrationTestConfig {
     public ReviewRequestInboxRepository reviewRequestInboxRepository(
             JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaReviewRequestInboxRepository repository
+            JpaReviewRequestInboxRepository repository,
+            JpaReviewRequestInboxHistoryRepository historyRepository
     ) {
         return new H2ReviewRequestInboxRepositoryAdapter(
                 queryFactory,
                 namedParameterJdbcTemplate,
-                repository
+                repository,
+                historyRepository
         );
     }
 
@@ -206,12 +216,14 @@ public class IntegrationTestConfig {
     public ReviewNotificationOutboxRepository reviewNotificationOutboxRepository(
             JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaReviewNotificationOutboxRepository repository
+            JpaReviewNotificationOutboxRepository repository,
+            JpaReviewNotificationOutboxHistoryRepository historyRepository
     ) {
         return new H2ReviewNotificationOutboxRepositoryAdapter(
                 queryFactory,
                 namedParameterJdbcTemplate,
-                repository
+                repository,
+                historyRepository
         );
     }
 }

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -164,15 +165,22 @@ class ReviewNotificationOutboxTest {
 
         // when
         Instant sentAt = Instant.parse("2026-02-24T00:03:00Z");
-        outbox.markSent(sentAt);
+        ReviewNotificationOutboxHistory history = outbox.markSent(sentAt);
 
         // then
         assertAll(
                 () -> assertThat(outbox.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.SENT),
+                () -> assertThat(outbox.getProcessingStartedAt()).isEqualTo(
+                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
+                ),
                 () -> assertThat(outbox.getSentAt()).isEqualTo(sentAt),
-                () -> assertThat(outbox.getFailedAt()).isNull(),
-                () -> assertThat(outbox.getFailureReason()).isNull(),
-                () -> assertThat(outbox.getFailureType()).isNull()
+                () -> assertThat(outbox.getFailedAt()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_AT),
+                () -> assertThat(outbox.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
+                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE),
+                () -> assertThat(history).isNotNull(),
+                () -> assertThat(history.getOutboxId()).isNull(),
+                () -> assertThat(history.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.SENT),
+                () -> assertThat(history.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
         );
     }
 
@@ -207,15 +215,22 @@ class ReviewNotificationOutboxTest {
 
         // when
         Instant failedAt = Instant.parse("2026-02-24T00:04:00Z");
-        outbox.markRetryPending(failedAt, "retry");
+        ReviewNotificationOutboxHistory history = outbox.markRetryPending(failedAt, "retry");
 
         // then
         assertAll(
                 () -> assertThat(outbox.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.RETRY_PENDING),
-                () -> assertThat(outbox.getProcessingStartedAt()).isNull(),
+                () -> assertThat(outbox.getProcessingStartedAt()).isEqualTo(
+                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
+                ),
+                () -> assertThat(outbox.getSentAt()).isEqualTo(FailureSnapshotDefaults.NO_SENT_AT),
                 () -> assertThat(outbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(outbox.getFailureReason()).isEqualTo("retry"),
-                () -> assertThat(outbox.getFailureType()).isNull()
+                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE),
+                () -> assertThat(history).isNotNull(),
+                () -> assertThat(history.getOutboxId()).isNull(),
+                () -> assertThat(history.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.RETRY_PENDING),
+                () -> assertThat(history.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
         );
     }
 
@@ -274,15 +289,25 @@ class ReviewNotificationOutboxTest {
 
         // when
         Instant failedAt = Instant.parse("2026-02-24T00:05:00Z");
-        outbox.markFailed(failedAt, "failure", SlackInteractionFailureType.RETRY_EXHAUSTED);
+        ReviewNotificationOutboxHistory history = outbox.markFailed(
+                failedAt,
+                "failure",
+                SlackInteractionFailureType.RETRY_EXHAUSTED
+        );
 
         // then
         assertAll(
                 () -> assertThat(outbox.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.FAILED),
-                () -> assertThat(outbox.getProcessingStartedAt()).isNull(),
+                () -> assertThat(outbox.getProcessingStartedAt()).isEqualTo(
+                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
+                ),
+                () -> assertThat(outbox.getSentAt()).isEqualTo(FailureSnapshotDefaults.NO_SENT_AT),
                 () -> assertThat(outbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(outbox.getFailureReason()).isEqualTo("failure"),
-                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED)
+                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
+                () -> assertThat(history).isNotNull(),
+                () -> assertThat(history.getOutboxId()).isNull(),
+                () -> assertThat(history.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.FAILED)
         );
     }
 
@@ -335,7 +360,7 @@ class ReviewNotificationOutboxTest {
     }
 
     @Test
-    void markFailed는_failureType이_null이면_예외를_던진다() {
+    void markFailed는_failureType이_NONE이면_예외를_던진다() {
         // given
         ReviewNotificationOutbox outbox = pendingOutbox();
         setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
@@ -345,11 +370,11 @@ class ReviewNotificationOutboxTest {
                 () -> outbox.markFailed(
                         Instant.parse("2026-02-24T00:05:00Z"),
                         "failure",
-                        null
+                        SlackInteractionFailureType.NONE
                 )
         )
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("failureType은 비어 있을 수 없습니다.");
+                .hasMessage("failureType은 NONE일 수 없습니다.");
     }
 
     @Test
@@ -386,9 +411,10 @@ class ReviewNotificationOutboxTest {
     ) {
         ReflectionTestUtils.setField(outbox, "status", ReviewNotificationOutboxStatus.PROCESSING);
         ReflectionTestUtils.setField(outbox, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(outbox, "sentAt", FailureSnapshotDefaults.NO_SENT_AT);
         ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(outbox, "failedAt", null);
-        ReflectionTestUtils.setField(outbox, "failureReason", null);
-        ReflectionTestUtils.setField(outbox, "failureType", null);
+        ReflectionTestUtils.setField(outbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
+        ReflectionTestUtils.setField(outbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
+        ReflectionTestUtils.setField(outbox, "failureType", SlackInteractionFailureType.NONE);
     }
 }

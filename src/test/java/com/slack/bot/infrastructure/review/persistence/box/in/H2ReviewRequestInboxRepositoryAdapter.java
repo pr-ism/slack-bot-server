@@ -8,9 +8,15 @@ public class H2ReviewRequestInboxRepositoryAdapter extends ReviewRequestInboxRep
     public H2ReviewRequestInboxRepositoryAdapter(
             JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaReviewRequestInboxRepository reviewRequestInboxJpaRepository
+            JpaReviewRequestInboxRepository reviewRequestInboxJpaRepository,
+            JpaReviewRequestInboxHistoryRepository reviewRequestInboxHistoryJpaRepository
     ) {
-        super(queryFactory, namedParameterJdbcTemplate, reviewRequestInboxJpaRepository);
+        super(
+                queryFactory,
+                namedParameterJdbcTemplate,
+                reviewRequestInboxJpaRepository,
+                reviewRequestInboxHistoryJpaRepository
+        );
     }
 
     @Override
@@ -44,11 +50,11 @@ public class H2ReviewRequestInboxRepositoryAdapter extends ReviewRequestInboxRep
                         available_at = source.available_at,
                         status = source.pending_status,
                         processing_attempt = 0,
-                        processing_started_at = NULL,
-                        processed_at = NULL,
-                        failed_at = NULL,
-                        failure_reason = NULL,
-                        failure_type = NULL
+                        processing_started_at = :noProcessingStartedAt,
+                        processed_at = :noProcessedAt,
+                        failed_at = :noFailureAt,
+                        failure_reason = :noFailureReason,
+                        failure_type = :noneFailureType
                 WHEN NOT MATCHED THEN
                     INSERT (
                         created_at,
@@ -59,7 +65,12 @@ public class H2ReviewRequestInboxRepositoryAdapter extends ReviewRequestInboxRep
                         request_json,
                         available_at,
                         status,
-                        processing_attempt
+                        processing_attempt,
+                        processing_started_at,
+                        processed_at,
+                        failed_at,
+                        failure_reason,
+                        failure_type
                     )
                     VALUES (
                         CURRENT_TIMESTAMP(6),
@@ -70,7 +81,12 @@ public class H2ReviewRequestInboxRepositoryAdapter extends ReviewRequestInboxRep
                         source.request_json,
                         source.available_at,
                         source.pending_status,
-                        0
+                        0,
+                        :noProcessingStartedAt,
+                        :noProcessedAt,
+                        :noFailureAt,
+                        :noFailureReason,
+                        :noneFailureType
                     )
                 """;
     }

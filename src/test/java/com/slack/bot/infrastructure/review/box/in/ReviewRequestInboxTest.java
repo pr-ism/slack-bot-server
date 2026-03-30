@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -27,7 +28,8 @@ class ReviewRequestInboxTest {
                 () -> assertThat(inbox.getRequestJson()).isEqualTo("{\"githubPullRequestId\":42}"),
                 () -> assertThat(inbox.getAvailableAt()).isEqualTo(Instant.parse("2026-02-24T00:00:00Z")),
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING),
-                () -> assertThat(inbox.getProcessingAttempt()).isZero()
+                () -> assertThat(inbox.getProcessingAttempt()).isZero(),
+                () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE)
         );
     }
 
@@ -183,16 +185,22 @@ class ReviewRequestInboxTest {
 
         // when
         Instant processedAt = Instant.parse("2026-02-24T00:13:00Z");
-        inbox.markProcessed(processedAt);
+        ReviewRequestInboxHistory history = inbox.markProcessed(processedAt);
 
         // then
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
                 () -> assertThat(inbox.getProcessedAt()).isEqualTo(processedAt),
-                () -> assertThat(inbox.getProcessingStartedAt()).isNull(),
-                () -> assertThat(inbox.getFailedAt()).isNull(),
-                () -> assertThat(inbox.getFailureReason()).isNull(),
-                () -> assertThat(inbox.getFailureType()).isNull()
+                () -> assertThat(inbox.getProcessingStartedAt()).isEqualTo(
+                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
+                ),
+                () -> assertThat(inbox.getFailedAt()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_AT),
+                () -> assertThat(inbox.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
+                () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
+                () -> assertThat(history).isNotNull(),
+                () -> assertThat(history.getInboxId()).isNull(),
+                () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
+                () -> assertThat(history.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE)
         );
     }
 
@@ -227,15 +235,22 @@ class ReviewRequestInboxTest {
 
         // when
         Instant failedAt = Instant.parse("2026-02-24T00:14:00Z");
-        inbox.markRetryPending(failedAt, "retry");
+        ReviewRequestInboxHistory history = inbox.markRetryPending(failedAt, "retry");
 
         // then
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
-                () -> assertThat(inbox.getProcessingStartedAt()).isNull(),
+                () -> assertThat(inbox.getProcessingStartedAt()).isEqualTo(
+                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
+                ),
+                () -> assertThat(inbox.getProcessedAt()).isEqualTo(FailureSnapshotDefaults.NO_PROCESSED_AT),
                 () -> assertThat(inbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(inbox.getFailureReason()).isEqualTo("retry"),
-                () -> assertThat(inbox.getFailureType()).isNull()
+                () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
+                () -> assertThat(history).isNotNull(),
+                () -> assertThat(history.getInboxId()).isNull(),
+                () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
+                () -> assertThat(history.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE)
         );
     }
 
@@ -294,15 +309,25 @@ class ReviewRequestInboxTest {
 
         // when
         Instant failedAt = Instant.parse("2026-02-24T00:15:00Z");
-        inbox.markFailed(failedAt, "failure", ReviewRequestInboxFailureType.NON_RETRYABLE);
+        ReviewRequestInboxHistory history = inbox.markFailed(
+                failedAt,
+                "failure",
+                ReviewRequestInboxFailureType.NON_RETRYABLE
+        );
 
         // then
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
-                () -> assertThat(inbox.getProcessingStartedAt()).isNull(),
+                () -> assertThat(inbox.getProcessingStartedAt()).isEqualTo(
+                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
+                ),
+                () -> assertThat(inbox.getProcessedAt()).isEqualTo(FailureSnapshotDefaults.NO_PROCESSED_AT),
                 () -> assertThat(inbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(inbox.getFailureReason()).isEqualTo("failure"),
-                () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE)
+                () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE),
+                () -> assertThat(history).isNotNull(),
+                () -> assertThat(history.getInboxId()).isNull(),
+                () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED)
         );
     }
 
@@ -355,15 +380,21 @@ class ReviewRequestInboxTest {
     }
 
     @Test
-    void markFailed는_failureType이_null이면_예외를_던진다() {
+    void markFailed는_failureType이_NONE이면_예외를_던진다() {
         // given
         ReviewRequestInbox inbox = pendingInbox();
         setProcessingState(inbox, Instant.parse("2026-02-24T00:10:00Z"), 1);
 
         // when & then
-        assertThatThrownBy(() -> inbox.markFailed(Instant.parse("2026-02-24T00:15:00Z"), "failure", null))
+        assertThatThrownBy(
+                () -> inbox.markFailed(
+                        Instant.parse("2026-02-24T00:15:00Z"),
+                        "failure",
+                        ReviewRequestInboxFailureType.NONE
+                )
+        )
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("failureType은 비어 있을 수 없습니다.");
+                .hasMessage("failureType은 NONE일 수 없습니다.");
     }
 
     @Test
@@ -396,9 +427,10 @@ class ReviewRequestInboxTest {
     private void setProcessingState(ReviewRequestInbox inbox, Instant processingStartedAt, int processingAttempt) {
         ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
         ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(inbox, "processedAt", FailureSnapshotDefaults.NO_PROCESSED_AT);
         ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(inbox, "failedAt", null);
-        ReflectionTestUtils.setField(inbox, "failureReason", null);
-        ReflectionTestUtils.setField(inbox, "failureType", null);
+        ReflectionTestUtils.setField(inbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
+        ReflectionTestUtils.setField(inbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
+        ReflectionTestUtils.setField(inbox, "failureType", ReviewRequestInboxFailureType.NONE);
     }
 }

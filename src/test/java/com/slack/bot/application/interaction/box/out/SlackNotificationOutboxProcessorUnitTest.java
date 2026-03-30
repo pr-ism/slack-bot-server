@@ -145,7 +145,7 @@ class SlackNotificationOutboxProcessorUnitTest {
         ArgumentCaptor<String> reasonCaptor = ArgumentCaptor.forClass(String.class);
         verify(outbox).markFailed(any(), reasonCaptor.capture(), eq(SlackInteractionFailureType.BUSINESS_INVARIANT));
         verify(slackNotificationOutboxRepository, times(1))
-                .saveIfProcessingLeaseMatched(outbox, CLAIMED_PROCESSING_STARTED_AT);
+                .saveIfProcessingLeaseMatched(eq(outbox), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
         verify(notificationTransportApiClient, never()).sendMessage(anyString(), anyString(), anyString());
 
         assertThat(reasonCaptor.getValue()).isEqualTo("지원하지 않는 메시지 타입입니다: null");
@@ -162,7 +162,7 @@ class SlackNotificationOutboxProcessorUnitTest {
         slackNotificationOutboxProcessor.processPending(10);
 
         // then
-        verify(slackNotificationOutboxRepository, never()).save(any());
+        verify(slackNotificationOutboxRepository, never()).saveIfProcessingLeaseMatched(any(), any(), any());
         verify(workspaceRepository, never()).findByTeamId(anyString());
         verify(notificationTransportApiClient, never()).sendMessage(anyString(), anyString(), anyString());
     }
@@ -191,7 +191,7 @@ class SlackNotificationOutboxProcessorUnitTest {
         verify(notificationTransportApiClient).sendMessage("xoxb-test-token", "C1", "hello");
         verify(outbox).markSent(any());
         verify(slackNotificationOutboxRepository)
-                .saveIfProcessingLeaseMatched(outbox, CLAIMED_PROCESSING_STARTED_AT);
+                .saveIfProcessingLeaseMatched(eq(outbox), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
         verify(outbox, never()).markFailed(any(), anyString(), any());
     }
 
@@ -212,7 +212,7 @@ class SlackNotificationOutboxProcessorUnitTest {
         given(slackNotificationOutboxRepository.claimNextId(any(), anyCollection()))
                 .willReturn(Optional.of(10L), Optional.empty());
         given(slackNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(outbox));
-        given(slackNotificationOutboxRepository.saveIfProcessingLeaseMatched(outbox, CLAIMED_PROCESSING_STARTED_AT))
+        given(slackNotificationOutboxRepository.saveIfProcessingLeaseMatched(outbox, null, CLAIMED_PROCESSING_STARTED_AT))
                 .willReturn(false);
 
         // when
@@ -243,7 +243,7 @@ class SlackNotificationOutboxProcessorUnitTest {
         given(slackNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(outbox));
         doThrow(new RuntimeException("db failure"))
                 .when(slackNotificationOutboxRepository)
-                .saveIfProcessingLeaseMatched(outbox, CLAIMED_PROCESSING_STARTED_AT);
+                .saveIfProcessingLeaseMatched(eq(outbox), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
 
         // when
         slackNotificationOutboxProcessor.processPending(10);
@@ -284,7 +284,7 @@ class SlackNotificationOutboxProcessorUnitTest {
         ArgumentCaptor<String> reasonCaptor = ArgumentCaptor.forClass(String.class);
         verify(outbox).markFailed(any(), reasonCaptor.capture(), eq(SlackInteractionFailureType.BUSINESS_INVARIANT));
         verify(slackNotificationOutboxRepository)
-                .saveIfProcessingLeaseMatched(outbox, CLAIMED_PROCESSING_STARTED_AT);
+                .saveIfProcessingLeaseMatched(eq(outbox), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
         assertThat(reasonCaptor.getValue()).isEqualTo("unknown failure");
     }
 
@@ -308,7 +308,7 @@ class SlackNotificationOutboxProcessorUnitTest {
         willThrow(new RuntimeException("dispatch failure"))
                 .given(notificationTransportApiClient)
                 .sendMessage("xoxb-test-token", "C1", "hello");
-        given(slackNotificationOutboxRepository.saveIfProcessingLeaseMatched(outbox, CLAIMED_PROCESSING_STARTED_AT))
+        given(slackNotificationOutboxRepository.saveIfProcessingLeaseMatched(outbox, null, CLAIMED_PROCESSING_STARTED_AT))
                 .willReturn(false);
 
         // when
@@ -352,7 +352,7 @@ class SlackNotificationOutboxProcessorUnitTest {
                 .sendMessage("xoxb-test-token", "C1", "first");
         doThrow(new RuntimeException("db failure"))
                 .when(slackNotificationOutboxRepository)
-                .saveIfProcessingLeaseMatched(firstOutbox, CLAIMED_PROCESSING_STARTED_AT);
+                .saveIfProcessingLeaseMatched(eq(firstOutbox), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
 
         // when
         slackNotificationOutboxProcessor.processPending(10);
@@ -362,7 +362,7 @@ class SlackNotificationOutboxProcessorUnitTest {
         verify(secondOutbox).markSent(any());
         verify(notificationTransportApiClient).sendMessage("xoxb-test-token", "C2", "second");
         verify(slackNotificationOutboxRepository)
-                .saveIfProcessingLeaseMatched(secondOutbox, CLAIMED_PROCESSING_STARTED_AT);
+                .saveIfProcessingLeaseMatched(eq(secondOutbox), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
     }
 
     @Test
@@ -408,7 +408,7 @@ class SlackNotificationOutboxProcessorUnitTest {
         verify(notificationTransportApiClient).sendMessage("xoxb-test-token", "C1", "first");
         verify(notificationTransportApiClient).sendMessage("xoxb-test-token", "C2", "second");
         verify(slackNotificationOutboxRepository, times(2))
-                .saveIfProcessingLeaseMatched(any(), eq(CLAIMED_PROCESSING_STARTED_AT));
+                .saveIfProcessingLeaseMatched(any(), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
     }
 
     @Test
@@ -427,7 +427,7 @@ class SlackNotificationOutboxProcessorUnitTest {
         // then
         verify(notificationTransportApiClient, never()).sendMessage(anyString(), anyString(), anyString());
         verify(slackNotificationOutboxRepository, never())
-                .saveIfProcessingLeaseMatched(any(), any());
+                .saveIfProcessingLeaseMatched(any(), any(), any());
     }
 
     @Test
@@ -448,6 +448,6 @@ class SlackNotificationOutboxProcessorUnitTest {
         verify(notificationTransportApiClient, never()).sendMessage(anyString(), anyString(), anyString());
         verify(outbox, never()).markSent(any());
         verify(outbox, never()).markFailed(any(), anyString(), any());
-        verify(slackNotificationOutboxRepository, never()).saveIfProcessingLeaseMatched(any(), any());
+        verify(slackNotificationOutboxRepository, never()).saveIfProcessingLeaseMatched(any(), any(), any());
     }
 }

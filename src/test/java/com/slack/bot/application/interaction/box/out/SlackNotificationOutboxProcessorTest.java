@@ -13,16 +13,21 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interaction.client.exception.SlackBotMessageDispatchException;
 import com.slack.bot.domain.workspace.Workspace;
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
+import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxHistory;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
+import com.slack.bot.infrastructure.interaction.box.persistence.out.JpaSlackNotificationOutboxHistoryRepository;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.workspace.persistence.JpaWorkspaceRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -46,6 +51,9 @@ class SlackNotificationOutboxProcessorTest {
 
     @Autowired
     JpaWorkspaceRepository jpaWorkspaceRepository;
+
+    @Autowired
+    JpaSlackNotificationOutboxHistoryRepository jpaSlackNotificationOutboxHistoryRepository;
 
     @Autowired
     Clock clock;
@@ -231,6 +239,7 @@ class SlackNotificationOutboxProcessorTest {
         slackNotificationOutboxProcessor.processPending(10);
         SlackNotificationOutbox actualSecondFailed = slackNotificationOutboxRepository.findById(pending.getId())
                                                                                       .orElseThrow();
+        List<SlackNotificationOutboxHistory> histories = historiesOf(pending.getId());
 
         // then
         assertAll(
@@ -241,8 +250,22 @@ class SlackNotificationOutboxProcessorTest {
                 () -> assertThat(actualSecondFailed.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
                 () -> assertThat(actualSecondFailed.getFailureReason()).isNotNull(),
                 () -> assertThat(actualSecondFailed.getFailureReason()).hasSize(500),
-                () -> assertThat(actualSecondFailed.getFailureReason()).isEqualTo("x".repeat(500))
+                () -> assertThat(actualSecondFailed.getFailureReason()).isEqualTo("x".repeat(500)),
+                () -> assertThat(histories).hasSize(2),
+                () -> assertThat(histories).extracting(history -> history.getStatus())
+                        .containsExactly(
+                                SlackNotificationOutboxStatus.RETRY_PENDING,
+                                SlackNotificationOutboxStatus.FAILED
+                        )
         );
+    }
+
+    private List<SlackNotificationOutboxHistory> historiesOf(Long outboxId) {
+        return jpaSlackNotificationOutboxHistoryRepository.findAll()
+                                                          .stream()
+                                                          .filter(history -> outboxId.equals(history.getOutboxId()))
+                                                          .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))
+                                                          .toList();
     }
 
     @Test
@@ -303,9 +326,10 @@ class SlackNotificationOutboxProcessorTest {
     ) {
         ReflectionTestUtils.setField(outbox, "status", SlackNotificationOutboxStatus.PROCESSING);
         ReflectionTestUtils.setField(outbox, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(outbox, "sentAt", FailureSnapshotDefaults.NO_SENT_AT);
         ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(outbox, "failedAt", null);
-        ReflectionTestUtils.setField(outbox, "failureReason", null);
-        ReflectionTestUtils.setField(outbox, "failureType", null);
+        ReflectionTestUtils.setField(outbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
+        ReflectionTestUtils.setField(outbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
+        ReflectionTestUtils.setField(outbox, "failureType", SlackInteractionFailureType.NONE);
     }
 }

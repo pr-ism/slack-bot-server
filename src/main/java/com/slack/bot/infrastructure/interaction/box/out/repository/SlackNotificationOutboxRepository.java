@@ -1,6 +1,7 @@
 package com.slack.bot.infrastructure.interaction.box.out.repository;
 
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
+import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxHistory;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Optional;
@@ -19,6 +20,12 @@ public interface SlackNotificationOutboxRepository {
 
     boolean saveIfProcessingLeaseMatched(
             SlackNotificationOutbox outbox,
+            Instant claimedProcessingStartedAt
+    );
+
+    boolean saveIfProcessingLeaseMatched(
+            SlackNotificationOutbox outbox,
+            SlackNotificationOutboxHistory history,
             Instant claimedProcessingStartedAt
     );
 

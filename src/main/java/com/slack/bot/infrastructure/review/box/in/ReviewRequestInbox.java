@@ -1,6 +1,7 @@
 package com.slack.bot.infrastructure.review.box.in;
 
 import com.slack.bot.domain.common.BaseTimeEntity;
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -112,18 +113,32 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         this.availableAt = availableAt;
         this.status = status;
         this.processingAttempt = processingAttempt;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.processedAt = FailureSnapshotDefaults.NO_PROCESSED_AT;
+        this.failedAt = FailureSnapshotDefaults.NO_FAILURE_AT;
+        this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
+        this.failureType = ReviewRequestInboxFailureType.NONE;
     }
 
-    public void markProcessed(Instant processedAt) {
+    public ReviewRequestInboxHistory markProcessed(Instant processedAt) {
         validateProcessedAt(processedAt);
         validateTransition(ReviewRequestInboxStatus.PROCESSING, "PROCESSED");
 
         this.status = ReviewRequestInboxStatus.PROCESSED;
-        this.processingStartedAt = null;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
         this.processedAt = processedAt;
-        this.failedAt = null;
-        this.failureReason = null;
-        this.failureType = null;
+        this.failedAt = FailureSnapshotDefaults.NO_FAILURE_AT;
+        this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
+        this.failureType = ReviewRequestInboxFailureType.NONE;
+
+        return ReviewRequestInboxHistory.completed(
+                getId(),
+                this.processingAttempt,
+                ReviewRequestInboxStatus.PROCESSED,
+                processedAt,
+                FailureSnapshotDefaults.NO_FAILURE_REASON,
+                ReviewRequestInboxFailureType.NONE
+        );
     }
 
     public void renewProcessingLease(Instant processingStartedAt) {
@@ -133,29 +148,53 @@ public class ReviewRequestInbox extends BaseTimeEntity {
         this.processingStartedAt = processingStartedAt;
     }
 
-    public void markRetryPending(Instant failedAt, String failureReason) {
+    public ReviewRequestInboxHistory markRetryPending(Instant failedAt, String failureReason) {
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
         validateTransition(ReviewRequestInboxStatus.PROCESSING, "RETRY_PENDING");
 
         this.status = ReviewRequestInboxStatus.RETRY_PENDING;
-        this.processingStartedAt = null;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.processedAt = FailureSnapshotDefaults.NO_PROCESSED_AT;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
-        this.failureType = null;
+        this.failureType = ReviewRequestInboxFailureType.NONE;
+
+        return ReviewRequestInboxHistory.completed(
+                getId(),
+                this.processingAttempt,
+                ReviewRequestInboxStatus.RETRY_PENDING,
+                failedAt,
+                failureReason,
+                ReviewRequestInboxFailureType.NONE
+        );
     }
 
-    public void markFailed(Instant failedAt, String failureReason, ReviewRequestInboxFailureType failureType) {
+    public ReviewRequestInboxHistory markFailed(
+            Instant failedAt,
+            String failureReason,
+            ReviewRequestInboxFailureType failureType
+    ) {
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
         validateFailureType(failureType);
         validateTransition(ReviewRequestInboxStatus.PROCESSING, "FAILED");
 
         this.status = ReviewRequestInboxStatus.FAILED;
-        this.processingStartedAt = null;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.processedAt = FailureSnapshotDefaults.NO_PROCESSED_AT;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = failureType;
+
+        return ReviewRequestInboxHistory.completed(
+                getId(),
+                this.processingAttempt,
+                ReviewRequestInboxStatus.FAILED,
+                failedAt,
+                failureReason,
+                failureType
+        );
     }
 
     private void validateProcessedAt(Instant processedAt) {
@@ -183,8 +222,8 @@ public class ReviewRequestInbox extends BaseTimeEntity {
     }
 
     private void validateFailureType(ReviewRequestInboxFailureType failureType) {
-        if (failureType == null) {
-            throw new IllegalArgumentException("failureType은 비어 있을 수 없습니다.");
+        if (failureType == null || failureType == ReviewRequestInboxFailureType.NONE) {
+            throw new IllegalArgumentException("failureType은 NONE일 수 없습니다.");
         }
     }
 

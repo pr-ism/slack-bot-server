@@ -1,6 +1,7 @@
 package com.slack.bot.infrastructure.interaction.box.in.repository;
 
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
+import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxHistory;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import java.time.Instant;
 import java.util.Collection;
@@ -27,4 +28,6 @@ public interface SlackInteractionInboxRepository {
     );
 
     SlackInteractionInbox save(SlackInteractionInbox inbox);
+
+    SlackInteractionInbox save(SlackInteractionInbox inbox, SlackInteractionInboxHistory history);
 }

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -30,7 +31,8 @@ class SlackInteractionInboxTest {
                 () -> assertThat(actual.getIdempotencyKey()).isEqualTo("key"),
                 () -> assertThat(actual.getPayloadJson()).isEqualTo("{\"type\":\"block_actions\"}"),
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackInteractionInboxStatus.PENDING),
-                () -> assertThat(actual.getProcessingAttempt()).isZero()
+                () -> assertThat(actual.getProcessingAttempt()).isZero(),
+                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
         );
     }
 
@@ -86,14 +88,20 @@ class SlackInteractionInboxTest {
 
         // when
         Instant processedAt = Instant.parse("2026-02-15T00:01:00Z");
-
-        inbox.markProcessed(processedAt);
+        SlackInteractionInboxHistory history = inbox.markProcessed(processedAt);
 
         // then
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
                 () -> assertThat(inbox.getProcessedAt()).isEqualTo(processedAt),
-                () -> assertThat(inbox.getProcessingStartedAt()).isNull()
+                () -> assertThat(inbox.getProcessingStartedAt()).isEqualTo(
+                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
+                ),
+                () -> assertThat(history).isNotNull(),
+                () -> assertThat(history.getInboxId()).isNull(),
+                () -> assertThat(inbox.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE),
+                () -> assertThat(history.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
+                () -> assertThat(history.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
         );
     }
 
@@ -109,15 +117,25 @@ class SlackInteractionInboxTest {
 
         // when
         Instant failedAt = Instant.parse("2026-02-15T01:00:00Z");
-
-        inbox.markFailed(failedAt, "failure", SlackInteractionFailureType.BUSINESS_INVARIANT);
+        SlackInteractionInboxHistory history = inbox.markFailed(
+                failedAt,
+                "failure",
+                SlackInteractionFailureType.BUSINESS_INVARIANT
+        );
 
         // then
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
+                () -> assertThat(inbox.getProcessingStartedAt()).isEqualTo(
+                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
+                ),
+                () -> assertThat(inbox.getProcessedAt()).isEqualTo(FailureSnapshotDefaults.NO_PROCESSED_AT),
                 () -> assertThat(inbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(inbox.getFailureReason()).isEqualTo("failure"),
-                () -> assertThat(inbox.getFailureType()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT)
+                () -> assertThat(inbox.getFailureType()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
+                () -> assertThat(history).isNotNull(),
+                () -> assertThat(history.getInboxId()).isNull(),
+                () -> assertThat(history.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED)
         );
     }
 
@@ -133,15 +151,22 @@ class SlackInteractionInboxTest {
 
         // when
         Instant failedAt = Instant.parse("2026-02-15T03:00:00Z");
-
-        inbox.markRetryPending(failedAt, "retry");
+        SlackInteractionInboxHistory history = inbox.markRetryPending(failedAt, "retry");
 
         // then
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
+                () -> assertThat(inbox.getProcessingStartedAt()).isEqualTo(
+                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
+                ),
+                () -> assertThat(inbox.getProcessedAt()).isEqualTo(FailureSnapshotDefaults.NO_PROCESSED_AT),
                 () -> assertThat(inbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(inbox.getFailureReason()).isEqualTo("retry"),
-                () -> assertThat(inbox.getFailureType()).isNull()
+                () -> assertThat(inbox.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE),
+                () -> assertThat(history).isNotNull(),
+                () -> assertThat(history.getInboxId()).isNull(),
+                () -> assertThat(history.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
+                () -> assertThat(history.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
         );
     }
 
@@ -255,7 +280,7 @@ class SlackInteractionInboxTest {
     }
 
     @Test
-    void markFailed는_failureType이_null이면_예외를_던진다() {
+    void markFailed는_failureType이_NONE이면_예외를_던진다() {
         // given
         SlackInteractionInbox inbox = SlackInteractionInbox.pending(
                 SlackInteractionInboxType.BLOCK_ACTIONS,
@@ -265,9 +290,9 @@ class SlackInteractionInboxTest {
         Instant failedAt = Instant.parse("2026-02-15T01:00:00Z");
 
         // when & then
-        assertThatThrownBy(() -> inbox.markFailed(failedAt, "failure", null))
+        assertThatThrownBy(() -> inbox.markFailed(failedAt, "failure", SlackInteractionFailureType.NONE))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("failureType은 비어 있을 수 없습니다.");
+                .hasMessage("failureType은 NONE일 수 없습니다.");
     }
 
     @Test
@@ -327,9 +352,10 @@ class SlackInteractionInboxTest {
     ) {
         ReflectionTestUtils.setField(inbox, "status", SlackInteractionInboxStatus.PROCESSING);
         ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(inbox, "processedAt", FailureSnapshotDefaults.NO_PROCESSED_AT);
         ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(inbox, "failedAt", null);
-        ReflectionTestUtils.setField(inbox, "failureReason", null);
-        ReflectionTestUtils.setField(inbox, "failureType", null);
+        ReflectionTestUtils.setField(inbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
+        ReflectionTestUtils.setField(inbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
+        ReflectionTestUtils.setField(inbox, "failureType", SlackInteractionFailureType.NONE);
     }
 }

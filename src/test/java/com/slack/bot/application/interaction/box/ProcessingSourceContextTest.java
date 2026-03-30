@@ -28,7 +28,13 @@ class ProcessingSourceContextTest {
     @Test
     void withInboxProcessing_supplier는_값을_반환하고_컨텍스트를_복원한다() {
         // when
-        String actual = context.withInboxProcessing(() -> context.isInboxProcessing() ? "INBOX" : "NONE");
+        String actual = context.withInboxProcessing(() -> {
+            if (context.isInboxProcessing()) {
+                return "INBOX";
+            }
+
+            return "NONE";
+        });
 
         // then
         assertAll(

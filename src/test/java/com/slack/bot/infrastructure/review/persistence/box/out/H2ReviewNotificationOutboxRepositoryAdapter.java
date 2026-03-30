@@ -8,9 +8,10 @@ public class H2ReviewNotificationOutboxRepositoryAdapter extends ReviewNotificat
     public H2ReviewNotificationOutboxRepositoryAdapter(
             JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaReviewNotificationOutboxRepository repository
+            JpaReviewNotificationOutboxRepository repository,
+            JpaReviewNotificationOutboxHistoryRepository historyRepository
     ) {
-        super(queryFactory, namedParameterJdbcTemplate, repository);
+        super(queryFactory, namedParameterJdbcTemplate, repository, historyRepository);
     }
 
     @Override
@@ -28,7 +29,12 @@ public class H2ReviewNotificationOutboxRepositoryAdapter extends ReviewNotificat
                         :attachmentsJson,
                         :fallbackText,
                         :pendingStatus,
-                        :processingAttempt
+                        :processingAttempt,
+                        :noProcessingStartedAt,
+                        :noSentAt,
+                        :noFailureAt,
+                        :noFailureReason,
+                        :noneFailureType
                     )
                 ) AS source (
                     idempotency_key,
@@ -40,7 +46,12 @@ public class H2ReviewNotificationOutboxRepositoryAdapter extends ReviewNotificat
                     attachments_json,
                     fallback_text,
                     status,
-                    processing_attempt
+                    processing_attempt,
+                    processing_started_at,
+                    sent_at,
+                    failed_at,
+                    failure_reason,
+                    failure_type
                 )
                 ON target.idempotency_key = source.idempotency_key
                 WHEN NOT MATCHED THEN
@@ -56,7 +67,12 @@ public class H2ReviewNotificationOutboxRepositoryAdapter extends ReviewNotificat
                         attachments_json,
                         fallback_text,
                         status,
-                        processing_attempt
+                        processing_attempt,
+                        processing_started_at,
+                        sent_at,
+                        failed_at,
+                        failure_reason,
+                        failure_type
                     )
                     VALUES (
                         CURRENT_TIMESTAMP(6),
@@ -70,7 +86,12 @@ public class H2ReviewNotificationOutboxRepositoryAdapter extends ReviewNotificat
                         source.attachments_json,
                         source.fallback_text,
                         source.status,
-                        source.processing_attempt
+                        source.processing_attempt,
+                        source.processing_started_at,
+                        source.sent_at,
+                        source.failed_at,
+                        source.failure_reason,
+                        source.failure_type
                     )
                 """;
     }

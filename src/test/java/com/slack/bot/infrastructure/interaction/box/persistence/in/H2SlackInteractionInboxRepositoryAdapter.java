@@ -8,9 +8,10 @@ public class H2SlackInteractionInboxRepositoryAdapter extends SlackInteractionIn
     public H2SlackInteractionInboxRepositoryAdapter(
             JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaSlackInteractionInboxRepository repository
+            JpaSlackInteractionInboxRepository repository,
+            JpaSlackInteractionInboxHistoryRepository historyRepository
     ) {
-        super(queryFactory, namedParameterJdbcTemplate, repository);
+        super(queryFactory, namedParameterJdbcTemplate, repository, historyRepository);
     }
 
     @Override
@@ -23,14 +24,24 @@ public class H2SlackInteractionInboxRepositoryAdapter extends SlackInteractionIn
                         :idempotencyKey,
                         :payloadJson,
                         :pendingStatus,
-                        :processingAttempt
+                        :processingAttempt,
+                        :noProcessingStartedAt,
+                        :noProcessedAt,
+                        :noFailureAt,
+                        :noFailureReason,
+                        :noneFailureType
                     )
                 ) AS source (
                     interaction_type,
                     idempotency_key,
                     payload_json,
                     status,
-                    processing_attempt
+                    processing_attempt,
+                    processing_started_at,
+                    processed_at,
+                    failed_at,
+                    failure_reason,
+                    failure_type
                 )
                 ON target.idempotency_key = source.idempotency_key
                 WHEN NOT MATCHED THEN
@@ -41,7 +52,12 @@ public class H2SlackInteractionInboxRepositoryAdapter extends SlackInteractionIn
                         idempotency_key,
                         payload_json,
                         status,
-                        processing_attempt
+                        processing_attempt,
+                        processing_started_at,
+                        processed_at,
+                        failed_at,
+                        failure_reason,
+                        failure_type
                     )
                     VALUES (
                         CURRENT_TIMESTAMP(6),
@@ -50,7 +66,12 @@ public class H2SlackInteractionInboxRepositoryAdapter extends SlackInteractionIn
                         source.idempotency_key,
                         source.payload_json,
                         source.status,
-                        source.processing_attempt
+                        source.processing_attempt,
+                        source.processing_started_at,
+                        source.processed_at,
+                        source.failed_at,
+                        source.failure_reason,
+                        source.failure_type
                     )
                 """;
     }

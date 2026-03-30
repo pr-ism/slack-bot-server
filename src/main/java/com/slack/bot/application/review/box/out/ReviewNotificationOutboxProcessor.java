@@ -13,6 +13,7 @@ import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
+import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxHistory;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -136,10 +137,11 @@ public class ReviewNotificationOutboxProcessor {
         } catch (Exception exception) {
             log.warn("review_notification outbox 처리에 실패했습니다. outboxId={}", outbox.getId(), exception);
 
-            markFailureStatus(outbox, exception);
+            ReviewNotificationOutboxHistory history = markFailureStatus(outbox, exception);
             try {
                 boolean updated = reviewNotificationOutboxRepository.saveIfProcessingLeaseMatched(
                         outbox,
+                        history,
                         currentProcessingStartedAt.get()
                 );
                 if (updated) {
@@ -157,10 +159,11 @@ public class ReviewNotificationOutboxProcessor {
             return;
         }
 
-        outbox.markSent(clock.instant());
+        ReviewNotificationOutboxHistory history = outbox.markSent(clock.instant());
         try {
             boolean updated = reviewNotificationOutboxRepository.saveIfProcessingLeaseMatched(
                     outbox,
+                    history,
                     currentProcessingStartedAt.get()
             );
             if (updated) {
@@ -223,20 +226,21 @@ public class ReviewNotificationOutboxProcessor {
         return objectMapper.readTree(attachmentsJson);
     }
 
-    private void markFailureStatus(ReviewNotificationOutbox outbox, Exception exception) {
+    private ReviewNotificationOutboxHistory markFailureStatus(
+            ReviewNotificationOutbox outbox,
+            Exception exception
+    ) {
         String reason = resolveFailureReason(exception);
 
         if (!retryExceptionClassifier.isRetryable(exception)) {
-            outbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.BUSINESS_INVARIANT);
-            return;
+            return outbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.BUSINESS_INVARIANT);
         }
 
         if (outbox.getProcessingAttempt() < interactionRetryProperties.outbox().maxAttempts()) {
-            outbox.markRetryPending(clock.instant(), reason);
-            return;
+            return outbox.markRetryPending(clock.instant(), reason);
         }
 
-        outbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.RETRY_EXHAUSTED);
+        return outbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.RETRY_EXHAUSTED);
     }
 
     private String resolveFailureReason(Exception exception) {

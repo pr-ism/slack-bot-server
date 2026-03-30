@@ -1,6 +1,7 @@
 package com.slack.bot.infrastructure.review.box.out;
 
 import com.slack.bot.domain.common.BaseTimeEntity;
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -77,17 +78,32 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
         this.fallbackText = fallbackText;
         this.status = ReviewNotificationOutboxStatus.PENDING;
         this.processingAttempt = 0;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.sentAt = FailureSnapshotDefaults.NO_SENT_AT;
+        this.failedAt = FailureSnapshotDefaults.NO_FAILURE_AT;
+        this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
+        this.failureType = SlackInteractionFailureType.NONE;
     }
 
-    public void markSent(Instant sentAt) {
+    public ReviewNotificationOutboxHistory markSent(Instant sentAt) {
         validateSentAt(sentAt);
         validateTransition(ReviewNotificationOutboxStatus.PROCESSING, "SENT");
 
         this.status = ReviewNotificationOutboxStatus.SENT;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
         this.sentAt = sentAt;
-        this.failedAt = null;
-        this.failureReason = null;
-        this.failureType = null;
+        this.failedAt = FailureSnapshotDefaults.NO_FAILURE_AT;
+        this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
+        this.failureType = SlackInteractionFailureType.NONE;
+
+        return ReviewNotificationOutboxHistory.completed(
+                getId(),
+                this.processingAttempt,
+                ReviewNotificationOutboxStatus.SENT,
+                sentAt,
+                FailureSnapshotDefaults.NO_FAILURE_REASON,
+                SlackInteractionFailureType.NONE
+        );
     }
 
     public void renewProcessingLease(Instant processingStartedAt) {
@@ -97,29 +113,53 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
         this.processingStartedAt = processingStartedAt;
     }
 
-    public void markRetryPending(Instant failedAt, String failureReason) {
+    public ReviewNotificationOutboxHistory markRetryPending(Instant failedAt, String failureReason) {
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
         validateTransition(ReviewNotificationOutboxStatus.PROCESSING, "RETRY_PENDING");
 
         this.status = ReviewNotificationOutboxStatus.RETRY_PENDING;
-        this.processingStartedAt = null;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.sentAt = FailureSnapshotDefaults.NO_SENT_AT;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
-        this.failureType = null;
+        this.failureType = SlackInteractionFailureType.NONE;
+
+        return ReviewNotificationOutboxHistory.completed(
+                getId(),
+                this.processingAttempt,
+                ReviewNotificationOutboxStatus.RETRY_PENDING,
+                failedAt,
+                failureReason,
+                SlackInteractionFailureType.NONE
+        );
     }
 
-    public void markFailed(Instant failedAt, String failureReason, SlackInteractionFailureType failureType) {
+    public ReviewNotificationOutboxHistory markFailed(
+            Instant failedAt,
+            String failureReason,
+            SlackInteractionFailureType failureType
+    ) {
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
         validateFailureType(failureType);
         validateTransition(ReviewNotificationOutboxStatus.PROCESSING, "FAILED");
 
         this.status = ReviewNotificationOutboxStatus.FAILED;
-        this.processingStartedAt = null;
+        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
+        this.sentAt = FailureSnapshotDefaults.NO_SENT_AT;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
         this.failureType = failureType;
+
+        return ReviewNotificationOutboxHistory.completed(
+                getId(),
+                this.processingAttempt,
+                ReviewNotificationOutboxStatus.FAILED,
+                failedAt,
+                failureReason,
+                failureType
+        );
     }
 
     private void validateTransition(ReviewNotificationOutboxStatus expectedStatus, String targetStatus) {
@@ -200,8 +240,8 @@ public class ReviewNotificationOutbox extends BaseTimeEntity {
     }
 
     private void validateFailureType(SlackInteractionFailureType failureType) {
-        if (failureType == null) {
-            throw new IllegalArgumentException("failureType은 비어 있을 수 없습니다.");
+        if (failureType == null || failureType == SlackInteractionFailureType.NONE) {
+            throw new IllegalArgumentException("failureType은 NONE일 수 없습니다.");
         }
     }
 }

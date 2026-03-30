@@ -20,16 +20,20 @@ import com.slack.bot.application.review.box.out.ReviewNotificationOutboxEnqueuer
 import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.application.worker.PollingHintPublisher;
 import com.slack.bot.application.worker.PollingHintTarget;
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.review.batch.SpyReviewNotificationService;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
+import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxHistory;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
+import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxHistoryRepository;
 import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxRepository;
 import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,6 +63,9 @@ class ReviewRequestInboxProcessorTest {
 
     @Autowired
     JpaReviewNotificationOutboxRepository jpaReviewNotificationOutboxRepository;
+
+    @Autowired
+    JpaReviewRequestInboxHistoryRepository jpaReviewRequestInboxHistoryRepository;
 
     @Autowired
     SpyReviewNotificationService spyReviewNotificationService;
@@ -115,7 +122,7 @@ class ReviewRequestInboxProcessorTest {
                     () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
                     () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
                     () -> assertThat(inbox.getIdempotencyKey()).hasSize(64),
-                    () -> assertThat(inbox.getFailureType()).isNull(),
+                    () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
                     () -> assertThat(reviewNotificationSourceContext.currentSourceKey()).isEmpty()
             );
         });
@@ -209,12 +216,19 @@ class ReviewRequestInboxProcessorTest {
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
             ReviewRequestInbox processed = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
+            List<ReviewRequestInboxHistory> histories = historiesOf(saved.getId());
 
             assertAll(
                     () -> assertThat(spyReviewNotificationService.getSendCount()).isEqualTo(1),
                     () -> assertThat(processed.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
                     () -> assertThat(processed.getProcessingAttempt()).isEqualTo(2),
-                    () -> assertThat(processed.getFailureReason()).isNull()
+                    () -> assertThat(processed.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
+                    () -> assertThat(histories).hasSize(2),
+                    () -> assertThat(histories).extracting(history -> history.getStatus())
+                            .containsExactly(
+                                    ReviewRequestInboxStatus.RETRY_PENDING,
+                                    ReviewRequestInboxStatus.PROCESSED
+                            )
             );
         });
     }
@@ -281,6 +295,14 @@ class ReviewRequestInboxProcessorTest {
 
         // then
         verify(pollingHintPublisher).publish(PollingHintTarget.REVIEW_REQUEST_INBOX);
+    }
+
+    private List<ReviewRequestInboxHistory> historiesOf(Long inboxId) {
+        return jpaReviewRequestInboxHistoryRepository.findAll()
+                                                     .stream()
+                                                     .filter(history -> inboxId.equals(history.getInboxId()))
+                                                     .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))
+                                                     .toList();
     }
 
     @Test
@@ -427,8 +449,8 @@ class ReviewRequestInboxProcessorTest {
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(inbox.getFailureType()).isNull(),
-                () -> assertThat(inbox.getFailureReason()).isNull(),
+                () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
+                () -> assertThat(inbox.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
                 () -> assertThat(jpaReviewNotificationOutboxRepository.findAll()).isEmpty()
         );
     }
@@ -472,8 +494,8 @@ class ReviewRequestInboxProcessorTest {
         assertAll(
                 () -> assertThat(failed.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(failed.getProcessingAttempt()).isEqualTo(2),
-                () -> assertThat(failed.getFailureType()).isNull(),
-                () -> assertThat(failed.getFailureReason()).isNull(),
+                () -> assertThat(failed.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
+                () -> assertThat(failed.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
                 () -> assertThat(jpaReviewNotificationOutboxRepository.findAll()).isEmpty()
         );
     }
@@ -552,10 +574,11 @@ class ReviewRequestInboxProcessorTest {
     private void setProcessingState(ReviewRequestInbox inbox, Instant processingStartedAt, int processingAttempt) {
         ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
         ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(inbox, "processedAt", FailureSnapshotDefaults.NO_PROCESSED_AT);
         ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(inbox, "failedAt", null);
-        ReflectionTestUtils.setField(inbox, "failureReason", null);
-        ReflectionTestUtils.setField(inbox, "failureType", null);
+        ReflectionTestUtils.setField(inbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
+        ReflectionTestUtils.setField(inbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
+        ReflectionTestUtils.setField(inbox, "failureType", ReviewRequestInboxFailureType.NONE);
     }
 
     private ReviewRequestInbox findOnlyInbox() {
