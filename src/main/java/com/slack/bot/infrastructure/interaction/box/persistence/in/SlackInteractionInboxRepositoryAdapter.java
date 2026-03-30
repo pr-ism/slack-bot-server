@@ -11,8 +11,6 @@ import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -196,7 +194,6 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
             inboxIds.add(row.inboxId());
         }
 
-        LocalDateTime recoveryUpdatedAt = LocalDateTime.ofInstant(failedAt, ZoneOffset.UTC);
         long updatedCount = namedParameterJdbcTemplate.update(
                 """
                 UPDATE slack_interaction_inbox
@@ -222,7 +219,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                         .addValue("maxAttempts", maxAttempts)
                         .addValue("failedStatus", SlackInteractionInboxStatus.FAILED.name())
                         .addValue("retryPendingStatus", SlackInteractionInboxStatus.RETRY_PENDING.name())
-                        .addValue("recoveryUpdatedAt", Timestamp.valueOf(recoveryUpdatedAt))
+                        .addValue("recoveryUpdatedAt", Timestamp.from(failedAt))
                         .addValue("noProcessingStartedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT))
                         .addValue("noProcessedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSED_AT))
                         .addValue("failedAt", Timestamp.from(failedAt))
