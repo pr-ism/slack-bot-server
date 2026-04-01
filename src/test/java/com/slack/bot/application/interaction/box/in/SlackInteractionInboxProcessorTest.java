@@ -15,6 +15,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interaction.block.BlockActionType;
 import com.slack.bot.application.interaction.client.NotificationApiClient;
+import com.slack.bot.application.worker.PollingHintPublisher;
+import com.slack.bot.application.worker.PollingHintTarget;
 import com.slack.bot.domain.reservation.ReservationStatus;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.repository.ReviewReservationRepository;
@@ -33,14 +35,25 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @IntegrationTest
+@MockitoSpyBean(types = PollingHintPublisher.class)
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class SlackInteractionInboxProcessorTest {
@@ -68,6 +81,15 @@ class SlackInteractionInboxProcessorTest {
 
     @Autowired
     Clock clock;
+
+    @Autowired
+    PollingHintPublisher pollingHintPublisher;
+
+    @Autowired
+    NamedParameterJdbcTemplate namedParameterJdbcTemplate;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
     @Test
     @Sql(scripts = {
@@ -131,10 +153,15 @@ class SlackInteractionInboxProcessorTest {
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
             SlackInteractionInbox actualProcessedInbox = jpaSlackInteractionInboxRepository.findById(200L).orElseThrow();
             Optional<ReviewReservation> actualReservation = actualReviewReservationRepository.findById(100L);
+            List<SlackInteractionInboxHistory> actualHistories = historiesOf(200L);
 
             assertAll(
                     () -> assertThat(actualProcessedInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
                     () -> assertThat(actualProcessedInbox.getProcessingAttempt()).isEqualTo(2),
+                    () -> assertThat(actualHistories).hasSize(2),
+                    () -> assertThat(actualHistories.getFirst().getFailureType()).isEqualTo(
+                            SlackInteractionFailureType.PROCESSING_TIMEOUT
+                    ),
                     () -> assertThat(actualReservation)
                             .isPresent()
                             .get()
@@ -148,6 +175,7 @@ class SlackInteractionInboxProcessorTest {
                     any(),
                     any()
             );
+            verify(pollingHintPublisher).publish(PollingHintTarget.BLOCK_ACTION_INBOX);
         });
     }
 
@@ -177,6 +205,137 @@ class SlackInteractionInboxProcessorTest {
                 () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
                 () -> assertThat(actual.getFailureReason()).isNotBlank()
         );
+    }
+
+    @Test
+    void PROCESSING_타임아웃_block_actions_inbox_복구는_배치_크기만큼만_처리한다() {
+        // given
+        Instant base = clock.instant();
+        for (int index = 0; index < 101; index++) {
+            SlackInteractionInbox timeoutInbox = SlackInteractionInbox.pending(
+                    SlackInteractionInboxType.BLOCK_ACTIONS,
+                    "BLOCK-ACTION-TIMEOUT-BATCH-" + index,
+                    "{\"type\":\"block_actions\",\"actions\":[]}"
+            );
+            setProcessingState(timeoutInbox, base.minusSeconds(120L + index), 1);
+            jpaSlackInteractionInboxRepository.save(timeoutInbox);
+        }
+
+        // when
+        int recoveredCount = slackInteractionInboxProcessor.recoverBlockActionTimeoutProcessing();
+
+        // then
+        List<SlackInteractionInbox> actualInboxes = jpaSlackInteractionInboxRepository.findAll();
+        List<SlackInteractionInboxHistory> actualHistories = jpaSlackInteractionInboxHistoryRepository.findAll();
+
+        assertAll(
+                () -> assertThat(recoveredCount).isEqualTo(100),
+                () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == SlackInteractionInboxStatus.RETRY_PENDING)
+                        .hasSize(100),
+                () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == SlackInteractionInboxStatus.PROCESSING)
+                        .hasSize(1),
+                () -> assertThat(actualHistories).hasSize(100),
+                () -> assertThat(actualHistories).extracting(history -> history.getStatus())
+                        .containsOnly(SlackInteractionInboxStatus.RETRY_PENDING)
+        );
+    }
+
+    @Test
+    void PROCESSING_타임아웃_block_actions_inbox_복구는_재시도_가능과_소진건을_합쳐_배치_크기만큼만_처리한다() {
+        // given
+        Instant base = clock.instant();
+        for (int index = 0; index < 50; index++) {
+            SlackInteractionInbox retryableInbox = SlackInteractionInbox.pending(
+                    SlackInteractionInboxType.BLOCK_ACTIONS,
+                    "BLOCK-ACTION-TIMEOUT-MIXED-RETRY-" + index,
+                    "{\"type\":\"block_actions\",\"actions\":[]}"
+            );
+            setProcessingState(retryableInbox, base.minusSeconds(200L + index), 1);
+            jpaSlackInteractionInboxRepository.save(retryableInbox);
+        }
+        for (int index = 0; index < 51; index++) {
+            SlackInteractionInbox exhaustedInbox = SlackInteractionInbox.pending(
+                    SlackInteractionInboxType.BLOCK_ACTIONS,
+                    "BLOCK-ACTION-TIMEOUT-MIXED-FAILED-" + index,
+                    "{\"type\":\"block_actions\",\"actions\":[]}"
+            );
+            setProcessingState(exhaustedInbox, base.minusSeconds(100L + index), 2);
+            jpaSlackInteractionInboxRepository.save(exhaustedInbox);
+        }
+
+        // when
+        int recoveredCount = slackInteractionInboxProcessor.recoverBlockActionTimeoutProcessing();
+
+        // then
+        List<SlackInteractionInbox> actualInboxes = jpaSlackInteractionInboxRepository.findAll();
+        List<SlackInteractionInboxHistory> actualHistories = jpaSlackInteractionInboxHistoryRepository.findAll();
+
+        assertAll(
+                () -> assertThat(recoveredCount).isEqualTo(100),
+                () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == SlackInteractionInboxStatus.RETRY_PENDING)
+                        .hasSize(50),
+                () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == SlackInteractionInboxStatus.FAILED)
+                        .hasSize(50),
+                () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == SlackInteractionInboxStatus.PROCESSING)
+                        .hasSize(1),
+                () -> assertThat(actualHistories).filteredOn(
+                        history -> history.getFailureType() == SlackInteractionFailureType.PROCESSING_TIMEOUT
+                ).hasSize(50),
+                () -> assertThat(actualHistories).filteredOn(
+                        history -> history.getFailureType() == SlackInteractionFailureType.RETRY_EXHAUSTED
+                ).hasSize(50)
+        );
+    }
+
+    @Test
+    void 잠겨있는_block_actions_timeout_행은_recovery에서_건너뛴다() throws Exception {
+        // given
+        SlackInteractionInbox timeoutInbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "BLOCK-ACTION-TIMEOUT-LOCKED",
+                "{\"type\":\"block_actions\",\"actions\":[]}"
+        );
+        setProcessingState(timeoutInbox, Instant.parse("2026-03-24T00:01:00Z"), 1);
+        SlackInteractionInbox saved = jpaSlackInteractionInboxRepository.save(timeoutInbox);
+        CountDownLatch lockAcquired = new CountDownLatch(1);
+        CountDownLatch releaseLock = new CountDownLatch(1);
+
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        try {
+            Future<?> lockFuture = executorService.submit(() -> {
+                new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                    namedParameterJdbcTemplate.query(
+                            """
+                            SELECT id
+                            FROM slack_interaction_inbox
+                            WHERE id = :inboxId
+                            FOR UPDATE
+                            """,
+                            new MapSqlParameterSource().addValue("inboxId", saved.getId()),
+                            (resultSet, rowNum) -> resultSet.getLong(1)
+                    );
+                    lockAcquired.countDown();
+                    awaitLatch(releaseLock);
+                });
+            });
+            awaitLatch(lockAcquired);
+
+            // when
+            int skippedCount = slackInteractionInboxProcessor.recoverBlockActionTimeoutProcessing();
+
+            // then
+            SlackInteractionInbox lockedInbox = jpaSlackInteractionInboxRepository.findById(saved.getId()).orElseThrow();
+            assertAll(
+                    () -> assertThat(skippedCount).isZero(),
+                    () -> assertThat(lockedInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSING),
+                    () -> assertThat(jpaSlackInteractionInboxHistoryRepository.findAll()).isEmpty()
+            );
+
+            releaseLock.countDown();
+            lockFuture.get(5, TimeUnit.SECONDS);
+        } finally {
+            executorService.shutdownNow();
+        }
     }
 
     @Test
@@ -258,6 +417,18 @@ class SlackInteractionInboxProcessorTest {
                                                         .filter(history -> inboxId.equals(history.getInboxId()))
                                                         .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))
                                                         .toList();
+    }
+
+    private void awaitLatch(CountDownLatch latch) {
+        try {
+            boolean completed = latch.await(5, TimeUnit.SECONDS);
+            if (!completed) {
+                throw new IllegalStateException("락 대기 중 시간이 초과되었습니다.");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("락 대기 중 인터럽트가 발생했습니다.", e);
+        }
     }
 
     private ObjectNode cancelReservationPayload(String reservationId) {

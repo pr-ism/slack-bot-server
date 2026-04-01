@@ -8,6 +8,7 @@ import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.application.worker.PollingHintPublisher;
 import com.slack.bot.application.worker.PollingHintTarget;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
+import com.slack.bot.global.config.properties.ReviewWorkerProperties;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -29,6 +30,7 @@ public class ReviewRequestInboxProcessor {
     private final Clock clock;
     private final ObjectMapper objectMapper;
     private final InteractionRetryProperties interactionRetryProperties;
+    private final ReviewWorkerProperties reviewWorkerProperties;
     private final ReviewRequestInboxRepository reviewRequestInboxRepository;
     private final ReviewRequestInboxEntryProcessor reviewRequestInboxEntryProcessor;
     private final ReviewNotificationIdempotencyKeyGenerator idempotencyKeyGenerator;
@@ -78,10 +80,12 @@ public class ReviewRequestInboxProcessor {
                 now.minusMillis(processingTimeoutMs),
                 now,
                 PROCESSING_TIMEOUT_FAILURE_REASON,
-                interactionRetryProperties.inbox().maxAttempts()
+                interactionRetryProperties.inbox().maxAttempts(),
+                reviewWorkerProperties.inbox().timeoutRecoveryBatchSize()
         );
 
         if (recoveredCount > 0) {
+            pollingHintPublisher.publish(PollingHintTarget.REVIEW_REQUEST_INBOX);
             log.warn("review_request inbox PROCESSING 고착 건을 복구했습니다. count={}", recoveredCount);
         }
 

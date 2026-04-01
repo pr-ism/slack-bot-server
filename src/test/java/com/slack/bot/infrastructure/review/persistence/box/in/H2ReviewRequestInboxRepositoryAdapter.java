@@ -1,18 +1,15 @@
 package com.slack.bot.infrastructure.review.persistence.box.in;
 
-import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 public class H2ReviewRequestInboxRepositoryAdapter extends ReviewRequestInboxRepositoryAdapter {
 
     public H2ReviewRequestInboxRepositoryAdapter(
-            JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
             JpaReviewRequestInboxRepository reviewRequestInboxJpaRepository,
             JpaReviewRequestInboxHistoryRepository reviewRequestInboxHistoryJpaRepository
     ) {
         super(
-                queryFactory,
                 namedParameterJdbcTemplate,
                 reviewRequestInboxJpaRepository,
                 reviewRequestInboxHistoryJpaRepository

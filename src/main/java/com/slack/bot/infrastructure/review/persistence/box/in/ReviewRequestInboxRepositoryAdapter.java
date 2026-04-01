@@ -2,9 +2,6 @@ package com.slack.bot.infrastructure.review.persistence.box.in;
 
 import static com.slack.bot.infrastructure.review.box.in.QReviewRequestInbox.reviewRequestInbox;
 
-import com.querydsl.core.Tuple;
-import com.querydsl.core.types.dsl.BooleanExpression;
-import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
@@ -15,6 +12,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -32,8 +30,6 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
             ReviewRequestInboxStatus.PENDING,
             ReviewRequestInboxStatus.RETRY_PENDING
     );
-
-    private final JPAQueryFactory queryFactory;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
     private final JpaReviewRequestInboxRepository reviewRequestInboxJpaRepository;
     private final JpaReviewRequestInboxHistoryRepository reviewRequestInboxHistoryJpaRepository;
@@ -229,97 +225,183 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
             Instant processingStartedBefore,
             Instant failedAt,
             String failureReason,
-            int maxAttempts
+            int maxAttempts,
+            int recoveryBatchSize
     ) {
         validateProcessingStartedBefore(processingStartedBefore);
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
         validateMaxAttempts(maxAttempts);
+        validateRecoveryBatchSize(recoveryBatchSize);
 
-        BooleanExpression timeoutCondition = reviewRequestInbox.processingStartedAt.lt(processingStartedBefore);
-
-        int exhaustedCount = recoverTimeoutProcessingByStatus(
-                timeoutCondition,
-                reviewRequestInbox.processingAttempt.goe(maxAttempts),
-                ReviewRequestInboxStatus.FAILED,
-                failedAt,
-                failureReason,
-                ReviewRequestInboxFailureType.RETRY_EXHAUSTED,
-                ReviewRequestInboxFailureType.RETRY_EXHAUSTED
-        );
-        int recoveredCount = recoverTimeoutProcessingByStatus(
-                timeoutCondition,
-                reviewRequestInbox.processingAttempt.lt(maxAttempts),
-                ReviewRequestInboxStatus.RETRY_PENDING,
-                failedAt,
-                failureReason,
-                ReviewRequestInboxFailureType.NONE,
-                ReviewRequestInboxFailureType.PROCESSING_TIMEOUT
+        List<TimeoutRecoveryTarget> timedOutRows = selectTimeoutRecoveryTargets(
+                processingStartedBefore,
+                recoveryBatchSize
         );
 
-        return exhaustedCount + recoveredCount;
-    }
-
-    private int recoverTimeoutProcessingByStatus(
-            BooleanExpression timeoutCondition,
-            BooleanExpression attemptCondition,
-            ReviewRequestInboxStatus targetStatus,
-            Instant failedAt,
-            String failureReason,
-            ReviewRequestInboxFailureType snapshotFailureType,
-            ReviewRequestInboxFailureType historyFailureType
-    ) {
-        List<Tuple> timedOutRows = queryFactory
-                .select(reviewRequestInbox.id, reviewRequestInbox.processingAttempt)
-                .from(reviewRequestInbox)
-                .where(
-                        reviewRequestInbox.status.eq(ReviewRequestInboxStatus.PROCESSING),
-                        timeoutCondition,
-                        attemptCondition
-                )
-                .fetch();
-
-        int recoveredCount = 0;
-        for (Tuple row : timedOutRows) {
-            Long inboxId = row.get(reviewRequestInbox.id);
-            Integer processingAttempt = row.get(reviewRequestInbox.processingAttempt);
-            long updatedCount = queryFactory
-                    .update(reviewRequestInbox)
-                    .set(reviewRequestInbox.status, targetStatus)
-                    .set(reviewRequestInbox.updatedAt, LocalDateTime.ofInstant(failedAt, ZoneOffset.UTC))
-                    .set(
-                            reviewRequestInbox.processingStartedAt,
-                            FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
-                    )
-                    .set(reviewRequestInbox.processedAt, FailureSnapshotDefaults.NO_PROCESSED_AT)
-                    .set(reviewRequestInbox.failedAt, failedAt)
-                    .set(reviewRequestInbox.failureReason, failureReason)
-                    .set(reviewRequestInbox.failureType, snapshotFailureType)
-                    .where(
-                            reviewRequestInbox.id.eq(inboxId),
-                            reviewRequestInbox.status.eq(ReviewRequestInboxStatus.PROCESSING),
-                            timeoutCondition,
-                            attemptCondition
-                    )
-                    .execute();
-            if (updatedCount == 0) {
-                continue;
-            }
-
-            reviewRequestInboxHistoryJpaRepository.save(
-                    ReviewRequestInboxHistory.completed(
-                            inboxId,
-                            processingAttempt,
-                            targetStatus,
-                            failedAt,
-                            failureReason,
-                            historyFailureType
-                    )
-            );
-            recoveredCount++;
+        if (timedOutRows.isEmpty()) {
+            return 0;
         }
 
-        return recoveredCount;
+        List<Long> inboxIds = new ArrayList<>();
+        for (TimeoutRecoveryTarget row : timedOutRows) {
+            inboxIds.add(row.inboxId());
+        }
+
+        LocalDateTime recoveryUpdatedAt = LocalDateTime.ofInstant(failedAt, ZoneOffset.UTC);
+        long updatedCount = namedParameterJdbcTemplate.update(
+                """
+                UPDATE review_request_inbox
+                SET status = CASE
+                        WHEN processing_attempt >= :maxAttempts THEN :failedStatus
+                        ELSE :retryPendingStatus
+                    END,
+                    updated_at = :recoveryUpdatedAt,
+                    processing_started_at = :noProcessingStartedAt,
+                    processed_at = :noProcessedAt,
+                    failed_at = :failedAt,
+                    failure_reason = :failureReason,
+                    failure_type = CASE
+                        WHEN processing_attempt >= :maxAttempts THEN :retryExhaustedFailureType
+                        ELSE :noneFailureType
+                    END
+                WHERE id IN (:inboxIds)
+                  AND status = :processingStatus
+                  AND processing_started_at < :processingStartedBefore
+                """,
+                new MapSqlParameterSource()
+                        .addValue("maxAttempts", maxAttempts)
+                        .addValue("failedStatus", ReviewRequestInboxStatus.FAILED.name())
+                        .addValue("retryPendingStatus", ReviewRequestInboxStatus.RETRY_PENDING.name())
+                        .addValue("recoveryUpdatedAt", Timestamp.valueOf(recoveryUpdatedAt))
+                        .addValue("noProcessingStartedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT))
+                        .addValue("noProcessedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSED_AT))
+                        .addValue("failedAt", Timestamp.from(failedAt))
+                        .addValue("failureReason", failureReason)
+                        .addValue("retryExhaustedFailureType", ReviewRequestInboxFailureType.RETRY_EXHAUSTED.name())
+                        .addValue("noneFailureType", ReviewRequestInboxFailureType.NONE.name())
+                        .addValue("inboxIds", inboxIds)
+                        .addValue("processingStatus", ReviewRequestInboxStatus.PROCESSING.name())
+                        .addValue("processingStartedBefore", Timestamp.from(processingStartedBefore))
+        );
+        if (updatedCount == 0) {
+            return 0;
+        }
+
+        batchInsertTimeoutRecoveryHistory(
+                timedOutRows,
+                failedAt,
+                failureReason,
+                maxAttempts
+        );
+
+        return Math.toIntExact(updatedCount);
+    }
+
+    private void batchInsertTimeoutRecoveryHistory(
+            List<TimeoutRecoveryTarget> timedOutRows,
+            Instant failedAt,
+            String failureReason,
+            int maxAttempts
+    ) {
+        List<MapSqlParameterSource> batchParameters = new ArrayList<>();
+
+        for (TimeoutRecoveryTarget row : timedOutRows) {
+            ReviewRequestInboxStatus targetStatus = resolveTimeoutRecoveryStatus(row.processingAttempt(), maxAttempts);
+            ReviewRequestInboxFailureType historyFailureType = resolveTimeoutRecoveryHistoryFailureType(
+                    row.processingAttempt(),
+                    maxAttempts
+            );
+            batchParameters.add(new MapSqlParameterSource()
+                    .addValue("createdAt", Timestamp.from(failedAt))
+                    .addValue("updatedAt", Timestamp.from(failedAt))
+                    .addValue("inboxId", row.inboxId())
+                    .addValue("processingAttempt", row.processingAttempt())
+                    .addValue("status", targetStatus.name())
+                    .addValue("completedAt", Timestamp.from(failedAt))
+                    .addValue("failureReason", failureReason)
+                    .addValue("failureType", historyFailureType.name()));
+        }
+
+        namedParameterJdbcTemplate.batchUpdate(
+                """
+                INSERT INTO review_request_inbox_history (
+                    created_at,
+                    updated_at,
+                    inbox_id,
+                    processing_attempt,
+                    status,
+                    completed_at,
+                    failure_reason,
+                    failure_type
+                )
+                VALUES (
+                    :createdAt,
+                    :updatedAt,
+                    :inboxId,
+                    :processingAttempt,
+                    :status,
+                    :completedAt,
+                    :failureReason,
+                    :failureType
+                )
+                """,
+                batchParameters.toArray(new MapSqlParameterSource[0])
+        );
+    }
+
+    private List<TimeoutRecoveryTarget> selectTimeoutRecoveryTargets(
+            Instant processingStartedBefore,
+            int recoveryBatchSize
+    ) {
+        return namedParameterJdbcTemplate.query(
+                buildTimeoutRecoverySelectSql(recoveryBatchSize),
+                new MapSqlParameterSource()
+                        .addValue("processingStatus", ReviewRequestInboxStatus.PROCESSING.name())
+                        .addValue("processingStartedBefore", Timestamp.from(processingStartedBefore)),
+                (resultSet, rowNum) -> new TimeoutRecoveryTarget(
+                        resultSet.getLong("id"),
+                        resultSet.getInt("processing_attempt")
+                )
+        );
+    }
+
+    private String buildTimeoutRecoverySelectSql(int recoveryBatchSize) {
+        StringBuilder sql = new StringBuilder(
+                """
+                SELECT id, processing_attempt
+                FROM review_request_inbox
+                WHERE status = :processingStatus
+                  AND processing_started_at < :processingStartedBefore
+                ORDER BY processing_started_at ASC, id ASC
+                LIMIT
+                """
+        );
+        sql.append(recoveryBatchSize);
+        sql.append("\nFOR UPDATE SKIP LOCKED");
+        return sql.toString();
+    }
+
+    private ReviewRequestInboxStatus resolveTimeoutRecoveryStatus(int processingAttempt, int maxAttempts) {
+        if (processingAttempt >= maxAttempts) {
+            return ReviewRequestInboxStatus.FAILED;
+        }
+
+        return ReviewRequestInboxStatus.RETRY_PENDING;
+    }
+
+    private ReviewRequestInboxFailureType resolveTimeoutRecoveryHistoryFailureType(
+            int processingAttempt,
+            int maxAttempts
+    ) {
+        if (processingAttempt >= maxAttempts) {
+            return ReviewRequestInboxFailureType.RETRY_EXHAUSTED;
+        }
+
+        return ReviewRequestInboxFailureType.PROCESSING_TIMEOUT;
+    }
+
+    private record TimeoutRecoveryTarget(Long inboxId, Integer processingAttempt) {
     }
 
     @Override
@@ -552,6 +634,12 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
     private void validateMaxAttempts(int maxAttempts) {
         if (maxAttempts <= 0) {
             throw new IllegalArgumentException("maxAttempts는 0보다 커야 합니다.");
+        }
+    }
+
+    private void validateRecoveryBatchSize(int recoveryBatchSize) {
+        if (recoveryBatchSize <= 0) {
+            throw new IllegalArgumentException("recoveryBatchSize는 0보다 커야 합니다.");
         }
     }
 

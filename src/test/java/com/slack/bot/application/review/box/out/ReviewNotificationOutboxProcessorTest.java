@@ -21,9 +21,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
 import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
 import com.slack.bot.application.review.dto.ReviewMessageDto;
+import com.slack.bot.application.worker.PollingHintPublisher;
+import com.slack.bot.application.worker.PollingHintTarget;
 import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
+import com.slack.bot.global.config.properties.ReviewWorkerProperties;
 import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
@@ -53,6 +56,7 @@ import org.springframework.web.client.ResourceAccessException;
 class ReviewNotificationOutboxProcessorTest {
 
     private static final Instant CLAIMED_PROCESSING_STARTED_AT = Instant.parse("2026-02-24T00:00:00Z");
+    private static final int OUTBOX_RECOVERY_BATCH_SIZE = 55;
 
     @Mock
     WorkspaceRepository workspaceRepository;
@@ -65,6 +69,9 @@ class ReviewNotificationOutboxProcessorTest {
 
     @Mock
     ReviewNotificationMessageRenderer reviewNotificationMessageRenderer;
+
+    @Mock
+    PollingHintPublisher pollingHintPublisher;
 
     ReviewNotificationOutboxProcessor processor;
 
@@ -88,6 +95,17 @@ class ReviewNotificationOutboxProcessorTest {
                 workspaceRepository,
                 new BoxFailureReasonTruncator(),
                 retryProperties,
+                new ReviewWorkerProperties(
+                        new ReviewWorkerProperties.InboxProperties(),
+                        new ReviewWorkerProperties.OutboxProperties(
+                                1_000L,
+                                30_000L,
+                                50,
+                                60_000L,
+                                OUTBOX_RECOVERY_BATCH_SIZE
+                        )
+                ),
+                pollingHintPublisher,
                 notificationTransportApiClient,
                 reviewNotificationOutboxRepository,
                 classifier
@@ -132,7 +150,16 @@ class ReviewNotificationOutboxProcessorTest {
     }
 
     @Test
-    void processing_timeout_복구시_maxAttempts를_전달한다() {
+    void processing_timeout_복구시_batch_size와_maxAttempts를_전달하고_polling_hint를_발행한다() {
+        // given
+        given(reviewNotificationOutboxRepository.recoverTimeoutProcessing(
+                any(),
+                any(),
+                anyString(),
+                eq(2),
+                eq(OUTBOX_RECOVERY_BATCH_SIZE)
+        )).willReturn(2);
+
         // when
         processor.recoverTimeoutProcessing(60_000L);
 
@@ -141,8 +168,28 @@ class ReviewNotificationOutboxProcessorTest {
                 any(),
                 any(),
                 anyString(),
-                eq(2)
+                eq(2),
+                eq(OUTBOX_RECOVERY_BATCH_SIZE)
         );
+        verify(pollingHintPublisher).publish(PollingHintTarget.REVIEW_NOTIFICATION_OUTBOX);
+    }
+
+    @Test
+    void processing_timeout_복구건이_없으면_polling_hint를_발행하지_않는다() {
+        // given
+        given(reviewNotificationOutboxRepository.recoverTimeoutProcessing(
+                any(),
+                any(),
+                anyString(),
+                eq(2),
+                eq(OUTBOX_RECOVERY_BATCH_SIZE)
+        )).willReturn(0);
+
+        // when
+        processor.recoverTimeoutProcessing(60_000L);
+
+        // then
+        verify(pollingHintPublisher, never()).publish(PollingHintTarget.REVIEW_NOTIFICATION_OUTBOX);
     }
 
     @Test

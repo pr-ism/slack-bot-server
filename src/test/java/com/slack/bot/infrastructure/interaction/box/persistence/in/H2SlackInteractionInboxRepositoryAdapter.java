@@ -1,17 +1,15 @@
 package com.slack.bot.infrastructure.interaction.box.persistence.in;
 
-import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 public class H2SlackInteractionInboxRepositoryAdapter extends SlackInteractionInboxRepositoryAdapter {
 
     public H2SlackInteractionInboxRepositoryAdapter(
-            JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
             JpaSlackInteractionInboxRepository repository,
             JpaSlackInteractionInboxHistoryRepository historyRepository
     ) {
-        super(queryFactory, namedParameterJdbcTemplate, repository, historyRepository);
+        super(namedParameterJdbcTemplate, repository, historyRepository);
     }
 
     @Override

@@ -8,6 +8,8 @@ import com.slack.bot.application.interaction.box.out.exception.OutboxProcessingL
 import com.slack.bot.application.interaction.box.out.exception.OutboxWorkspaceNotFoundException;
 import com.slack.bot.application.interaction.box.out.exception.UnsupportedSlackNotificationOutboxMessageTypeException;
 import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
+import com.slack.bot.application.worker.PollingHintPublisher;
+import com.slack.bot.application.worker.PollingHintTarget;
 import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
@@ -44,6 +46,7 @@ public class SlackNotificationOutboxProcessor {
     private final BoxFailureReasonTruncator failureReasonTruncator;
     private final InteractionRetryProperties interactionRetryProperties;
     private final InteractionWorkerProperties interactionWorkerProperties;
+    private final PollingHintPublisher pollingHintPublisher;
     private final NotificationTransportApiClient notificationTransportApiClient;
     private final SlackNotificationOutboxRepository slackNotificationOutboxRepository;
     private final InteractionRetryExceptionClassifier retryExceptionClassifier;
@@ -75,10 +78,12 @@ public class SlackNotificationOutboxProcessor {
                 now.minusMillis(interactionWorkerProperties.outbox().processingTimeoutMs()),
                 now,
                 PROCESSING_TIMEOUT_FAILURE_REASON,
-                interactionRetryProperties.outbox().maxAttempts()
+                interactionRetryProperties.outbox().maxAttempts(),
+                interactionWorkerProperties.outbox().timeoutRecoveryBatchSize()
         );
 
         if (recoveredCount > 0) {
+            pollingHintPublisher.publish(PollingHintTarget.INTERACTION_OUTBOX);
             log.warn("outbox PROCESSING 고착 건을 복구했습니다. count={}", recoveredCount);
         }
 

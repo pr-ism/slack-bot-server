@@ -147,8 +147,10 @@ public class ReviewNotificationOutboxHistory extends BaseTimeEntity {
                 throw new IllegalArgumentException("FAILED history에는 failureType이 필요합니다.");
             }
         }
-        if (status == ReviewNotificationOutboxStatus.RETRY_PENDING && failureType != SlackInteractionFailureType.NONE) {
-            throw new IllegalArgumentException("RETRY_PENDING history에는 failureType이 없어야 합니다.");
+        if (status == ReviewNotificationOutboxStatus.RETRY_PENDING
+                && failureType != SlackInteractionFailureType.NONE
+                && failureType != SlackInteractionFailureType.PROCESSING_TIMEOUT) {
+            throw new IllegalArgumentException("RETRY_PENDING history의 failureType이 올바르지 않습니다.");
         }
     }
 }

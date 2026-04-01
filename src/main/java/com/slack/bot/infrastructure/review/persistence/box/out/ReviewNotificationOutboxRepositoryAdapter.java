@@ -2,9 +2,6 @@ package com.slack.bot.infrastructure.review.persistence.box.out;
 
 import static com.slack.bot.infrastructure.review.box.out.QReviewNotificationOutbox.reviewNotificationOutbox;
 
-import com.querydsl.core.Tuple;
-import com.querydsl.core.types.dsl.BooleanExpression;
-import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
@@ -13,6 +10,9 @@ import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxStatu
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -26,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotificationOutboxRepository {
 
-    private final JPAQueryFactory queryFactory;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
     private final JpaReviewNotificationOutboxRepository repository;
     private final JpaReviewNotificationOutboxHistoryRepository historyRepository;
@@ -262,93 +261,183 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
             Instant processingStartedBefore,
             Instant failedAt,
             String failureReason,
-            int maxAttempts
+            int maxAttempts,
+            int recoveryBatchSize
     ) {
         validateProcessingStartedBefore(processingStartedBefore);
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
         validateMaxAttempts(maxAttempts);
+        validateRecoveryBatchSize(recoveryBatchSize);
 
-        BooleanExpression timeoutCondition = reviewNotificationOutbox.processingStartedAt.lt(processingStartedBefore);
-
-        int exhaustedCount = recoverTimeoutProcessingByStatus(
-                timeoutCondition,
-                reviewNotificationOutbox.processingAttempt.goe(maxAttempts),
-                ReviewNotificationOutboxStatus.FAILED,
-                failedAt,
-                failureReason,
-                SlackInteractionFailureType.RETRY_EXHAUSTED
-        );
-        int recoveredCount = recoverTimeoutProcessingByStatus(
-                timeoutCondition,
-                reviewNotificationOutbox.processingAttempt.lt(maxAttempts),
-                ReviewNotificationOutboxStatus.RETRY_PENDING,
-                failedAt,
-                failureReason,
-                SlackInteractionFailureType.NONE
+        List<TimeoutRecoveryTarget> timedOutRows = selectTimeoutRecoveryTargets(
+                processingStartedBefore,
+                recoveryBatchSize
         );
 
-        return exhaustedCount + recoveredCount;
-    }
-
-    private int recoverTimeoutProcessingByStatus(
-            BooleanExpression timeoutCondition,
-            BooleanExpression attemptCondition,
-            ReviewNotificationOutboxStatus targetStatus,
-            Instant failedAt,
-            String failureReason,
-            SlackInteractionFailureType failureType
-    ) {
-        List<Tuple> timedOutRows = queryFactory
-                .select(reviewNotificationOutbox.id, reviewNotificationOutbox.processingAttempt)
-                .from(reviewNotificationOutbox)
-                .where(
-                        reviewNotificationOutbox.status.eq(ReviewNotificationOutboxStatus.PROCESSING),
-                        timeoutCondition,
-                        attemptCondition
-                )
-                .fetch();
-
-        int recoveredCount = 0;
-        for (Tuple row : timedOutRows) {
-            Long outboxId = row.get(reviewNotificationOutbox.id);
-            Integer processingAttempt = row.get(reviewNotificationOutbox.processingAttempt);
-            long updatedCount = queryFactory
-                    .update(reviewNotificationOutbox)
-                    .set(reviewNotificationOutbox.status, targetStatus)
-                    .set(
-                            reviewNotificationOutbox.processingStartedAt,
-                            FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
-                    )
-                    .set(reviewNotificationOutbox.sentAt, FailureSnapshotDefaults.NO_SENT_AT)
-                    .set(reviewNotificationOutbox.failedAt, failedAt)
-                    .set(reviewNotificationOutbox.failureReason, failureReason)
-                    .set(reviewNotificationOutbox.failureType, failureType)
-                    .where(
-                            reviewNotificationOutbox.id.eq(outboxId),
-                            reviewNotificationOutbox.status.eq(ReviewNotificationOutboxStatus.PROCESSING),
-                            timeoutCondition,
-                            attemptCondition
-                    )
-                    .execute();
-            if (updatedCount == 0) {
-                continue;
-            }
-
-            historyRepository.save(
-                    ReviewNotificationOutboxHistory.completed(
-                            outboxId,
-                            processingAttempt,
-                            targetStatus,
-                            failedAt,
-                            failureReason,
-                            failureType
-                    )
-            );
-            recoveredCount++;
+        if (timedOutRows.isEmpty()) {
+            return 0;
         }
 
-        return recoveredCount;
+        List<Long> outboxIds = new ArrayList<>();
+        for (TimeoutRecoveryTarget row : timedOutRows) {
+            outboxIds.add(row.outboxId());
+        }
+
+        LocalDateTime recoveryUpdatedAt = LocalDateTime.ofInstant(failedAt, ZoneOffset.UTC);
+        long updatedCount = namedParameterJdbcTemplate.update(
+                """
+                UPDATE review_notification_outbox
+                SET status = CASE
+                        WHEN processing_attempt >= :maxAttempts THEN :failedStatus
+                        ELSE :retryPendingStatus
+                    END,
+                    updated_at = :recoveryUpdatedAt,
+                    processing_started_at = :noProcessingStartedAt,
+                    sent_at = :noSentAt,
+                    failed_at = :failedAt,
+                    failure_reason = :failureReason,
+                    failure_type = CASE
+                        WHEN processing_attempt >= :maxAttempts THEN :retryExhaustedFailureType
+                        ELSE :noneFailureType
+                    END
+                WHERE id IN (:outboxIds)
+                  AND status = :processingStatus
+                  AND processing_started_at < :processingStartedBefore
+                """,
+                new MapSqlParameterSource()
+                        .addValue("maxAttempts", maxAttempts)
+                        .addValue("failedStatus", ReviewNotificationOutboxStatus.FAILED.name())
+                        .addValue("retryPendingStatus", ReviewNotificationOutboxStatus.RETRY_PENDING.name())
+                        .addValue("recoveryUpdatedAt", Timestamp.valueOf(recoveryUpdatedAt))
+                        .addValue("noProcessingStartedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT))
+                        .addValue("noSentAt", Timestamp.from(FailureSnapshotDefaults.NO_SENT_AT))
+                        .addValue("failedAt", Timestamp.from(failedAt))
+                        .addValue("failureReason", failureReason)
+                        .addValue("retryExhaustedFailureType", SlackInteractionFailureType.RETRY_EXHAUSTED.name())
+                        .addValue("noneFailureType", SlackInteractionFailureType.NONE.name())
+                        .addValue("outboxIds", outboxIds)
+                        .addValue("processingStatus", ReviewNotificationOutboxStatus.PROCESSING.name())
+                        .addValue("processingStartedBefore", Timestamp.from(processingStartedBefore))
+        );
+        if (updatedCount == 0) {
+            return 0;
+        }
+
+        batchInsertTimeoutRecoveryHistory(
+                timedOutRows,
+                failedAt,
+                failureReason,
+                maxAttempts
+        );
+
+        return Math.toIntExact(updatedCount);
+    }
+
+    private void batchInsertTimeoutRecoveryHistory(
+            List<TimeoutRecoveryTarget> timedOutRows,
+            Instant failedAt,
+            String failureReason,
+            int maxAttempts
+    ) {
+        List<MapSqlParameterSource> batchParameters = new ArrayList<>();
+
+        for (TimeoutRecoveryTarget row : timedOutRows) {
+            ReviewNotificationOutboxStatus targetStatus = resolveTimeoutRecoveryStatus(
+                    row.processingAttempt(),
+                    maxAttempts
+            );
+            SlackInteractionFailureType failureType = resolveTimeoutRecoveryFailureType(
+                    row.processingAttempt(),
+                    maxAttempts
+            );
+            batchParameters.add(new MapSqlParameterSource()
+                    .addValue("createdAt", Timestamp.from(failedAt))
+                    .addValue("updatedAt", Timestamp.from(failedAt))
+                    .addValue("outboxId", row.outboxId())
+                    .addValue("processingAttempt", row.processingAttempt())
+                    .addValue("status", targetStatus.name())
+                    .addValue("completedAt", Timestamp.from(failedAt))
+                    .addValue("failureReason", failureReason)
+                    .addValue("failureType", failureType.name()));
+        }
+
+        namedParameterJdbcTemplate.batchUpdate(
+                """
+                INSERT INTO review_notification_outbox_history (
+                    created_at,
+                    updated_at,
+                    outbox_id,
+                    processing_attempt,
+                    status,
+                    completed_at,
+                    failure_reason,
+                    failure_type
+                )
+                VALUES (
+                    :createdAt,
+                    :updatedAt,
+                    :outboxId,
+                    :processingAttempt,
+                    :status,
+                    :completedAt,
+                    :failureReason,
+                    :failureType
+                )
+                """,
+                batchParameters.toArray(new MapSqlParameterSource[0])
+        );
+    }
+
+    private List<TimeoutRecoveryTarget> selectTimeoutRecoveryTargets(
+            Instant processingStartedBefore,
+            int recoveryBatchSize
+    ) {
+        return namedParameterJdbcTemplate.query(
+                buildTimeoutRecoverySelectSql(recoveryBatchSize),
+                new MapSqlParameterSource()
+                        .addValue("processingStatus", ReviewNotificationOutboxStatus.PROCESSING.name())
+                        .addValue("processingStartedBefore", Timestamp.from(processingStartedBefore)),
+                (resultSet, rowNum) -> new TimeoutRecoveryTarget(
+                        resultSet.getLong("id"),
+                        resultSet.getInt("processing_attempt")
+                )
+        );
+    }
+
+    private String buildTimeoutRecoverySelectSql(int recoveryBatchSize) {
+        StringBuilder sql = new StringBuilder(
+                """
+                SELECT id, processing_attempt
+                FROM review_notification_outbox
+                WHERE status = :processingStatus
+                  AND processing_started_at < :processingStartedBefore
+                ORDER BY processing_started_at ASC, id ASC
+                LIMIT
+                """
+        );
+        sql.append(recoveryBatchSize);
+        sql.append("\nFOR UPDATE SKIP LOCKED");
+        return sql.toString();
+    }
+
+    private ReviewNotificationOutboxStatus resolveTimeoutRecoveryStatus(int processingAttempt, int maxAttempts) {
+        if (processingAttempt >= maxAttempts) {
+            return ReviewNotificationOutboxStatus.FAILED;
+        }
+
+        return ReviewNotificationOutboxStatus.RETRY_PENDING;
+    }
+
+    private SlackInteractionFailureType resolveTimeoutRecoveryFailureType(int processingAttempt, int maxAttempts) {
+        if (processingAttempt >= maxAttempts) {
+            return SlackInteractionFailureType.RETRY_EXHAUSTED;
+        }
+
+        return SlackInteractionFailureType.PROCESSING_TIMEOUT;
+    }
+
+    private record TimeoutRecoveryTarget(Long outboxId, Integer processingAttempt) {
     }
 
     private void validateProcessingStartedAt(Instant processingStartedAt) {
@@ -448,6 +537,12 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
     private void validateMaxAttempts(int maxAttempts) {
         if (maxAttempts <= 0) {
             throw new IllegalArgumentException("maxAttempts는 0보다 커야 합니다.");
+        }
+    }
+
+    private void validateRecoveryBatchSize(int recoveryBatchSize) {
+        if (recoveryBatchSize <= 0) {
+            throw new IllegalArgumentException("recoveryBatchSize는 0보다 커야 합니다.");
         }
     }
 

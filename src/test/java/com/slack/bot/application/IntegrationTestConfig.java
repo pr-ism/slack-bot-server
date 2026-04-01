@@ -25,7 +25,6 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
-import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import com.slack.bot.infrastructure.review.persistence.box.in.H2ReviewRequestInboxRepositoryAdapter;
 import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxHistoryRepository;
@@ -166,13 +165,11 @@ public class IntegrationTestConfig {
     @Bean
     @Primary
     public SlackInteractionInboxRepository slackInteractionInboxRepository(
-            JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
             JpaSlackInteractionInboxRepository repository,
             JpaSlackInteractionInboxHistoryRepository historyRepository
     ) {
         return new H2SlackInteractionInboxRepositoryAdapter(
-                queryFactory,
                 namedParameterJdbcTemplate,
                 repository,
                 historyRepository
@@ -182,13 +179,11 @@ public class IntegrationTestConfig {
     @Bean
     @Primary
     public SlackNotificationOutboxRepository slackNotificationOutboxRepository(
-            JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
             JpaSlackNotificationOutboxRepository repository,
             JpaSlackNotificationOutboxHistoryRepository historyRepository
     ) {
         return new H2SlackNotificationOutboxRepositoryAdapter(
-                queryFactory,
                 namedParameterJdbcTemplate,
                 repository,
                 historyRepository
@@ -198,13 +193,11 @@ public class IntegrationTestConfig {
     @Bean
     @Primary
     public ReviewRequestInboxRepository reviewRequestInboxRepository(
-            JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
             JpaReviewRequestInboxRepository repository,
             JpaReviewRequestInboxHistoryRepository historyRepository
     ) {
         return new H2ReviewRequestInboxRepositoryAdapter(
-                queryFactory,
                 namedParameterJdbcTemplate,
                 repository,
                 historyRepository
@@ -214,13 +207,11 @@ public class IntegrationTestConfig {
     @Bean
     @Primary
     public ReviewNotificationOutboxRepository reviewNotificationOutboxRepository(
-            JPAQueryFactory queryFactory,
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
             JpaReviewNotificationOutboxRepository repository,
             JpaReviewNotificationOutboxHistoryRepository historyRepository
     ) {
         return new H2ReviewNotificationOutboxRepositoryAdapter(
-                queryFactory,
                 namedParameterJdbcTemplate,
                 repository,
                 historyRepository

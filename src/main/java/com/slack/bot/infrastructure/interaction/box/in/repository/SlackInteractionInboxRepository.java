@@ -24,7 +24,8 @@ public interface SlackInteractionInboxRepository {
             Instant processingStartedBefore,
             Instant failedAt,
             String failureReason,
-            int maxAttempts
+            int maxAttempts,
+            int recoveryBatchSize
     );
 
     SlackInteractionInbox save(SlackInteractionInbox inbox);

@@ -37,6 +37,7 @@ public interface SlackNotificationOutboxRepository {
             Instant processingStartedBefore,
             Instant failedAt,
             String failureReason,
-            int maxAttempts
+            int maxAttempts,
+            int recoveryBatchSize
     );
 }

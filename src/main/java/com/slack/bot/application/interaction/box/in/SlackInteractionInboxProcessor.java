@@ -4,6 +4,8 @@ import com.slack.bot.application.interaction.box.SlackInteractionIdempotencyKeyG
 import com.slack.bot.application.interaction.box.SlackInteractionIdempotencyScope;
 import com.slack.bot.application.interaction.box.aop.InteractionImmediateTriggerTarget;
 import com.slack.bot.application.interaction.box.aop.TriggerInteractionImmediateProcessing;
+import com.slack.bot.application.worker.PollingHintPublisher;
+import com.slack.bot.application.worker.PollingHintTarget;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.global.config.properties.InteractionWorkerProperties;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
@@ -32,6 +34,7 @@ public class SlackInteractionInboxProcessor {
     private final SlackInteractionInboxIdempotencyPayloadEncoder idempotencyPayloadEncoder;
     private final SlackInteractionIdempotencyKeyGenerator idempotencyKeyGenerator;
     private final SlackInteractionInboxEntryProcessor slackInteractionInboxEntryProcessor;
+    private final PollingHintPublisher pollingHintPublisher;
 
     @TriggerInteractionImmediateProcessing(
             value = InteractionImmediateTriggerTarget.BLOCK_ACTION_INBOX,
@@ -133,14 +136,32 @@ public class SlackInteractionInboxProcessor {
                 now.minusMillis(processingTimeoutMs),
                 now,
                 PROCESSING_TIMEOUT_FAILURE_REASON,
-                interactionRetryProperties.inbox().maxAttempts()
+                interactionRetryProperties.inbox().maxAttempts(),
+                resolveTimeoutRecoveryBatchSize(interactionType)
         );
 
         if (recoveredCount > 0) {
+            pollingHintPublisher.publish(resolvePollingHintTarget(interactionType));
             log.warn("{} inbox PROCESSING 고착 건을 복구했습니다. count={}", interactionType, recoveredCount);
         }
 
         return recoveredCount;
+    }
+
+    private int resolveTimeoutRecoveryBatchSize(SlackInteractionInboxType interactionType) {
+        if (interactionType.isBlockActions()) {
+            return interactionWorkerProperties.inbox().blockActions().timeoutRecoveryBatchSize();
+        }
+
+        return interactionWorkerProperties.inbox().viewSubmission().timeoutRecoveryBatchSize();
+    }
+
+    private PollingHintTarget resolvePollingHintTarget(SlackInteractionInboxType interactionType) {
+        if (interactionType.isBlockActions()) {
+            return PollingHintTarget.BLOCK_ACTION_INBOX;
+        }
+
+        return PollingHintTarget.VIEW_SUBMISSION_INBOX;
     }
 
     private void processSafely(

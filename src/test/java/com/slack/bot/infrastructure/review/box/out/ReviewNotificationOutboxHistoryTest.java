@@ -90,4 +90,23 @@ class ReviewNotificationOutboxHistoryTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("FAILED history에는 failureType이 필요합니다.");
     }
+
+    @Test
+    void RETRY_PENDING_history는_PROCESSING_TIMEOUT_failureType을_허용한다() {
+        // when
+        ReviewNotificationOutboxHistory history = ReviewNotificationOutboxHistory.completed(
+                10L,
+                1,
+                ReviewNotificationOutboxStatus.RETRY_PENDING,
+                Instant.parse("2026-03-27T00:00:00Z"),
+                "timeout",
+                SlackInteractionFailureType.PROCESSING_TIMEOUT
+        );
+
+        // then
+        assertAll(
+                () -> assertThat(history.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.RETRY_PENDING),
+                () -> assertThat(history.getFailureType()).isEqualTo(SlackInteractionFailureType.PROCESSING_TIMEOUT)
+        );
+    }
 }
