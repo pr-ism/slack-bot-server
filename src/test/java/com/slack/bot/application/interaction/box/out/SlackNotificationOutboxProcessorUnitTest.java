@@ -15,6 +15,7 @@ import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
+import com.slack.bot.application.interaction.box.retry.EqualJitterExponentialBackOffPolicy;
 import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
 import com.slack.bot.application.worker.PollingHintPublisher;
 import com.slack.bot.application.worker.PollingHintTarget;
@@ -39,7 +40,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.retry.backoff.ExponentialBackOffPolicy;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
 
@@ -111,7 +111,7 @@ class SlackNotificationOutboxProcessorUnitTest {
                 false
         ));
 
-        ExponentialBackOffPolicy backOffPolicy = new ExponentialBackOffPolicy();
+        EqualJitterExponentialBackOffPolicy backOffPolicy = new EqualJitterExponentialBackOffPolicy();
         backOffPolicy.setInitialInterval(retryProperties.outbox().initialDelayMs());
         backOffPolicy.setMultiplier(retryProperties.outbox().multiplier());
         backOffPolicy.setMaxInterval(retryProperties.outbox().maxDelayMs());
