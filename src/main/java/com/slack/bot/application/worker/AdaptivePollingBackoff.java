@@ -42,7 +42,7 @@ public class AdaptivePollingBackoff {
         consecutiveEmptyPolls++;
         nextUpperBoundMs = Math.min(capDelayMs, safeDouble(currentUpperBoundMs));
 
-        return Duration.ofMillis(randomSource.nextLong(currentUpperBoundMs + 1L));
+        return Duration.ofMillis(equalJitterDelay(currentUpperBoundMs));
     }
 
     void reset() {
@@ -94,6 +94,20 @@ public class AdaptivePollingBackoff {
         }
 
         return value * 2L;
+    }
+
+    private long equalJitterDelay(long currentUpperBoundMs) {
+        long stableDelayMs = currentUpperBoundMs / 2L;
+        if (stableDelayMs == 0L) {
+            stableDelayMs = 1L;
+        }
+
+        long jitterRangeMs = currentUpperBoundMs - stableDelayMs;
+        if (jitterRangeMs == 0L) {
+            return stableDelayMs;
+        }
+
+        return stableDelayMs + randomSource.nextLong(jitterRangeMs + 1L);
     }
 
     private void claimOwnership() {

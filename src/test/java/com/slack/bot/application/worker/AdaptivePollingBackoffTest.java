@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 class AdaptivePollingBackoffTest {
 
     @Test
-    void empty_poll이_연속되면_full_jitter_upper_bound가_exponential_backoff_with_cap으로_증가한다() {
+    void empty_poll이_연속되면_equal_jitter_upper_bound가_exponential_backoff_with_cap으로_증가한다() {
         // given
         List<Long> bounds = new ArrayList<>();
         AdaptivePollingBackoff adaptivePollingBackoff = new AdaptivePollingBackoff(
@@ -37,7 +37,7 @@ class AdaptivePollingBackoffTest {
 
         // then
         assertAll(
-                () -> assertThat(bounds).containsExactly(101L, 201L, 251L, 251L),
+                () -> assertThat(bounds).containsExactly(51L, 101L, 126L, 126L),
                 () -> assertThat(firstDelay).isEqualTo(Duration.ofMillis(100L)),
                 () -> assertThat(secondDelay).isEqualTo(Duration.ofMillis(200L)),
                 () -> assertThat(thirdDelay).isEqualTo(Duration.ofMillis(250L)),
