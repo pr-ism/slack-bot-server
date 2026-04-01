@@ -1,5 +1,6 @@
 package com.slack.bot.application.interaction.box.retry;
 
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 import org.springframework.retry.RetryContext;
 import org.springframework.retry.backoff.BackOffContext;
@@ -122,7 +123,7 @@ public class EqualJitterExponentialBackOffPolicy extends ExponentialBackOffPolic
 
         @Override
         public double nextDouble() {
-            return java.util.concurrent.ThreadLocalRandom.current().nextDouble();
+            return ThreadLocalRandom.current().nextDouble();
         }
     }
 
