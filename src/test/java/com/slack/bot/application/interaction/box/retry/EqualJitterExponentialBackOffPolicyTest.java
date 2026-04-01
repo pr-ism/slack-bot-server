@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -124,6 +126,58 @@ class EqualJitterExponentialBackOffPolicyTest {
         assertThatThrownBy(() -> backOffPolicy.setSleeper(null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("sleeper는 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void start는_initial_interval_supplier를_즉시_평가하지_않는다() {
+        // given
+        EqualJitterExponentialBackOffPolicy backOffPolicy = new EqualJitterExponentialBackOffPolicy(
+                new SequenceRandomSource(0.0d)
+        );
+        RecordingSleeper sleeper = new RecordingSleeper();
+        AtomicLong initialInterval = new AtomicLong(100L);
+        AtomicInteger invocationCount = new AtomicInteger();
+        backOffPolicy.initialIntervalSupplier(() -> {
+            invocationCount.incrementAndGet();
+            return initialInterval.get();
+        });
+        backOffPolicy.setSleeper(sleeper);
+        BackOffContext backOffContext = backOffPolicy.start(null);
+        initialInterval.set(200L);
+
+        // when
+        backOffPolicy.backOff(backOffContext);
+
+        // then
+        assertThat(invocationCount.get()).isEqualTo(1);
+        assertThat(sleeper.sleepMillis()).containsExactly(100L);
+    }
+
+    @Test
+    void multiplier_supplier와_max_interval_supplier를_백오프마다_다시_읽는다() {
+        // given
+        EqualJitterExponentialBackOffPolicy backOffPolicy = new EqualJitterExponentialBackOffPolicy(
+                new SequenceRandomSource(0.0d, 0.0d, 0.0d)
+        );
+        RecordingSleeper sleeper = new RecordingSleeper();
+        AtomicLong initialInterval = new AtomicLong(100L);
+        AtomicLong maxInterval = new AtomicLong(1_000L);
+        AtomicInteger multiplierScale = new AtomicInteger(20);
+        backOffPolicy.initialIntervalSupplier(initialInterval::get);
+        backOffPolicy.multiplierSupplier(() -> multiplierScale.get() / 10.0d);
+        backOffPolicy.maxIntervalSupplier(maxInterval::get);
+        backOffPolicy.setSleeper(sleeper);
+        BackOffContext backOffContext = backOffPolicy.start(null);
+
+        // when
+        backOffPolicy.backOff(backOffContext);
+        multiplierScale.set(30);
+        backOffPolicy.backOff(backOffContext);
+        maxInterval.set(250L);
+        backOffPolicy.backOff(backOffContext);
+
+        // then
+        assertThat(sleeper.sleepMillis()).containsExactly(50L, 100L, 125L);
     }
 
     private static final class SequenceRandomSource implements EqualJitterExponentialBackOffPolicy.RandomSource {

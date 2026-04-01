@@ -1,5 +1,6 @@
 package com.slack.bot.application.interaction.box.retry;
 
+import java.util.function.Supplier;
 import org.springframework.retry.RetryContext;
 import org.springframework.retry.backoff.BackOffContext;
 import org.springframework.retry.backoff.BackOffInterruptedException;
@@ -46,10 +47,16 @@ public class EqualJitterExponentialBackOffPolicy extends ExponentialBackOffPolic
 
     @Override
     public BackOffContext start(RetryContext context) {
+        Supplier<Long> initialIntervalSupplier = getInitialIntervalSupplier();
+        Supplier<Double> multiplierSupplier = getMultiplierSupplier();
+        Supplier<Long> maxIntervalSupplier = getMaxIntervalSupplier();
         return new EqualJitterBackOffContext(
-                getInitialInterval(),
-                getMultiplier(),
-                getMaxInterval()
+                resolveInitialInterval(initialIntervalSupplier),
+                resolveMultiplier(multiplierSupplier),
+                resolveMaxInterval(maxIntervalSupplier),
+                initialIntervalSupplier,
+                multiplierSupplier,
+                maxIntervalSupplier
         );
     }
 
@@ -82,6 +89,30 @@ public class EqualJitterExponentialBackOffPolicy extends ExponentialBackOffPolic
         }
     }
 
+    private long resolveInitialInterval(Supplier<Long> initialIntervalSupplier) {
+        if (initialIntervalSupplier != null) {
+            return DEFAULT_INITIAL_INTERVAL;
+        }
+
+        return getInitialInterval();
+    }
+
+    private double resolveMultiplier(Supplier<Double> multiplierSupplier) {
+        if (multiplierSupplier != null) {
+            return DEFAULT_MULTIPLIER;
+        }
+
+        return getMultiplier();
+    }
+
+    private long resolveMaxInterval(Supplier<Long> maxIntervalSupplier) {
+        if (maxIntervalSupplier != null) {
+            return DEFAULT_MAX_INTERVAL;
+        }
+
+        return getMaxInterval();
+    }
+
     interface RandomSource {
 
         double nextDouble();
@@ -99,16 +130,25 @@ public class EqualJitterExponentialBackOffPolicy extends ExponentialBackOffPolic
 
         private final double multiplier;
         private final long maxInterval;
+        private Supplier<Long> initialIntervalSupplier;
+        private final Supplier<Double> multiplierSupplier;
+        private final Supplier<Long> maxIntervalSupplier;
         private long interval;
 
         private EqualJitterBackOffContext(
                 long initialInterval,
                 double multiplier,
-                long maxInterval
+                long maxInterval,
+                Supplier<Long> initialIntervalSupplier,
+                Supplier<Double> multiplierSupplier,
+                Supplier<Long> maxIntervalSupplier
         ) {
             this.interval = initialInterval;
             this.multiplier = multiplier;
             this.maxInterval = maxInterval;
+            this.initialIntervalSupplier = initialIntervalSupplier;
+            this.multiplierSupplier = multiplierSupplier;
+            this.maxIntervalSupplier = maxIntervalSupplier;
         }
 
         private synchronized long nextSleepMillis() {
@@ -118,25 +158,52 @@ public class EqualJitterExponentialBackOffPolicy extends ExponentialBackOffPolic
         }
 
         private long resolveCappedInterval() {
-            if (interval > maxInterval) {
-                return maxInterval;
+            long currentInterval = getInterval();
+            long currentMaxInterval = getMaxInterval();
+            if (currentInterval > currentMaxInterval) {
+                return currentMaxInterval;
             }
 
-            return interval;
+            return currentInterval;
         }
 
         private void updateNextInterval() {
-            if (interval > maxInterval) {
+            if (interval > getMaxInterval()) {
                 return;
             }
 
-            double multipliedInterval = interval * multiplier;
+            double multipliedInterval = interval * getMultiplier();
             if (multipliedInterval >= Long.MAX_VALUE) {
                 interval = Long.MAX_VALUE;
                 return;
             }
 
             interval = (long) multipliedInterval;
+        }
+
+        private long getInterval() {
+            if (initialIntervalSupplier != null) {
+                interval = initialIntervalSupplier.get();
+                initialIntervalSupplier = null;
+            }
+
+            return interval;
+        }
+
+        private double getMultiplier() {
+            if (multiplierSupplier != null) {
+                return multiplierSupplier.get();
+            }
+
+            return multiplier;
+        }
+
+        private long getMaxInterval() {
+            if (maxIntervalSupplier != null) {
+                return maxIntervalSupplier.get();
+            }
+
+            return maxInterval;
         }
 
         private long applyEqualJitter(long cappedInterval) {
