@@ -1,12 +1,12 @@
 package com.slack.bot.global.config;
 
+import com.slack.bot.application.interaction.box.retry.EqualJitterExponentialBackOffPolicy;
 import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.global.config.properties.InteractionWorkerProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.retry.backoff.ExponentialRandomBackOffPolicy;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
 
@@ -33,7 +33,7 @@ public class RetryConfig {
                 false
         ));
 
-        ExponentialRandomBackOffPolicy backOffPolicy = new ExponentialRandomBackOffPolicy();
+        EqualJitterExponentialBackOffPolicy backOffPolicy = new EqualJitterExponentialBackOffPolicy();
         backOffPolicy.setInitialInterval(retry.initialDelayMs());
         backOffPolicy.setMultiplier(retry.multiplier());
         backOffPolicy.setMaxInterval(retry.maxDelayMs());
@@ -56,7 +56,7 @@ public class RetryConfig {
                 false
         ));
 
-        ExponentialRandomBackOffPolicy backOffPolicy = new ExponentialRandomBackOffPolicy();
+        EqualJitterExponentialBackOffPolicy backOffPolicy = new EqualJitterExponentialBackOffPolicy();
         backOffPolicy.setInitialInterval(retry.initialDelayMs());
         backOffPolicy.setMultiplier(retry.multiplier());
         backOffPolicy.setMaxInterval(retry.maxDelayMs());

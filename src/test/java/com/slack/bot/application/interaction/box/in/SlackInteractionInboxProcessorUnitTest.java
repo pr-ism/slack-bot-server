@@ -22,6 +22,7 @@ import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteracti
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -174,7 +175,7 @@ class SlackInteractionInboxProcessorUnitTest {
                 any(),
                 anyCollection()
         ))
-                .willReturn(java.util.Optional.of(1L), java.util.Optional.of(2L), java.util.Optional.of(3L));
+                .willReturn(Optional.of(1L), Optional.of(2L), Optional.of(3L));
         willThrow(new RuntimeException("db failure"))
                 .given(slackInteractionInboxEntryProcessor)
                 .processClaimedBlockAction(1L);
@@ -227,7 +228,7 @@ class SlackInteractionInboxProcessorUnitTest {
                 any(),
                 anyCollection()
         ))
-                .willReturn(java.util.Optional.of(11L), java.util.Optional.of(12L));
+                .willReturn(Optional.of(11L), Optional.of(12L));
         willThrow(new RuntimeException("db failure"))
                 .given(slackInteractionInboxEntryProcessor)
                 .processClaimedViewSubmission(11L);

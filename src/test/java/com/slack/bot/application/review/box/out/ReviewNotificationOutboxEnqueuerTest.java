@@ -4,7 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -24,8 +27,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import static org.mockito.Mockito.doThrow;
 
 @SuppressWarnings("NonAsciiCharacters")
 @ExtendWith(MockitoExtension.class)
@@ -184,7 +185,7 @@ class ReviewNotificationOutboxEnqueuerTest {
 
         // then
         ArgumentCaptor<ReviewNotificationOutbox> captor = ArgumentCaptor.forClass(ReviewNotificationOutbox.class);
-        verify(reviewNotificationOutboxRepository, org.mockito.Mockito.times(2)).enqueue(captor.capture());
+        verify(reviewNotificationOutboxRepository, times(2)).enqueue(captor.capture());
 
         assertThat(captor.getAllValues().get(0).getIdempotencyKey())
                 .isEqualTo(captor.getAllValues().get(1).getIdempotencyKey());
@@ -214,7 +215,7 @@ class ReviewNotificationOutboxEnqueuerTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("blocks");
 
-        verify(reviewNotificationOutboxRepository, never()).enqueue(org.mockito.ArgumentMatchers.any());
+        verify(reviewNotificationOutboxRepository, never()).enqueue(any());
     }
 
     @Test
@@ -230,7 +231,7 @@ class ReviewNotificationOutboxEnqueuerTest {
     @Test
     void semantic_payload_직렬화에_실패하면_예외를_던지고_enqueue하지_않는다() throws Exception {
         // given
-        ObjectMapper objectMapper = org.mockito.Mockito.mock(ObjectMapper.class);
+        ObjectMapper objectMapper = mock(ObjectMapper.class);
         ReviewNotificationOutboxEnqueuer failingEnqueuer = new ReviewNotificationOutboxEnqueuer(
                 objectMapper,
                 reviewNotificationOutboxRepository,
@@ -280,7 +281,7 @@ class ReviewNotificationOutboxEnqueuerTest {
 
         // then
         ArgumentCaptor<ReviewNotificationOutbox> captor = ArgumentCaptor.forClass(ReviewNotificationOutbox.class);
-        verify(reviewNotificationOutboxRepository, org.mockito.Mockito.times(2)).enqueue(captor.capture());
+        verify(reviewNotificationOutboxRepository, times(2)).enqueue(captor.capture());
 
         assertThat(captor.getAllValues().get(0).getIdempotencyKey())
                 .isNotEqualTo(captor.getAllValues().get(1).getIdempotencyKey());
@@ -306,7 +307,7 @@ class ReviewNotificationOutboxEnqueuerTest {
 
         // then
         ArgumentCaptor<ReviewNotificationOutbox> captor = ArgumentCaptor.forClass(ReviewNotificationOutbox.class);
-        verify(reviewNotificationOutboxRepository, org.mockito.Mockito.times(2)).enqueue(captor.capture());
+        verify(reviewNotificationOutboxRepository, times(2)).enqueue(captor.capture());
 
         assertThat(captor.getAllValues().get(0).getIdempotencyKey())
                 .isNotEqualTo(captor.getAllValues().get(1).getIdempotencyKey());

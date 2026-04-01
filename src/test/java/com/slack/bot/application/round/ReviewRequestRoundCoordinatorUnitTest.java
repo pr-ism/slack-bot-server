@@ -14,6 +14,7 @@ import com.slack.bot.domain.round.PullRequestRound;
 import com.slack.bot.domain.round.RoundReviewer;
 import com.slack.bot.domain.round.repository.PullRequestRoundRepository;
 import com.slack.bot.domain.round.repository.RoundReviewerRepository;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -249,7 +250,7 @@ class ReviewRequestRoundCoordinatorUnitTest {
                 "url",
                 "author",
                 "hash-4",
-                java.util.Arrays.asList(null, " ", " reviewer-1 ", "reviewer-1"),
+                Arrays.asList(null, " ", " reviewer-1 ", "reviewer-1"),
                 List.of()
         );
 
