@@ -1,11 +1,6 @@
 package com.slack.bot.infrastructure.interaction.box.persistence.in;
 
-import static com.slack.bot.infrastructure.interaction.box.in.QSlackInteractionInbox.slackInteractionInbox;
-
-import com.slack.bot.infrastructure.common.BoxEventTimeState;
-import com.slack.bot.infrastructure.common.BoxFailureState;
 import com.slack.bot.infrastructure.common.BoxProcessingLease;
-import com.slack.bot.infrastructure.common.BoxProcessingLeaseState;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxHistory;
@@ -41,9 +36,11 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                 .addValue("payloadJson", inbox.getPayloadJson())
                 .addValue("pendingStatus", inbox.getStatus().name())
                 .addValue("processingAttempt", inbox.getProcessingAttempt())
-                .addValue("idleLeaseState", BoxProcessingLeaseState.IDLE.name())
-                .addValue("absentTimeState", BoxEventTimeState.ABSENT.name())
-                .addValue("absentFailureState", BoxFailureState.ABSENT.name());
+                .addValue("processingStartedAt", null)
+                .addValue("processedAt", null)
+                .addValue("failedAt", null)
+                .addValue("failureReason", null)
+                .addValue("failureType", null);
 
         int updatedCount = namedParameterJdbcTemplate.update(buildEnqueueSql(), parameters);
 
@@ -82,10 +79,12 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
 
         Long inboxId = claimedIds.getFirst();
         return repository.findLockedById(inboxId)
-                .flatMap(inbox -> {
+                .flatMap(entity -> {
+                    SlackInteractionInbox inbox = entity.toDomain();
                     inbox.claim(processingStartedAt);
-                    repository.save(inbox);
-                    return Optional.of(inbox.getId());
+                    entity.apply(inbox);
+                    SlackInteractionInboxJpaEntity saved = repository.save(entity);
+                    return Optional.of(saved.getId());
                 });
     }
 
@@ -133,7 +132,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
     @Override
     @Transactional(readOnly = true)
     public Optional<SlackInteractionInbox> findById(Long inboxId) {
-        return repository.findById(inboxId);
+        return repository.findDomainById(inboxId);
     }
 
     @Override
@@ -164,17 +163,19 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
         AtomicInteger recoveredCount = new AtomicInteger();
         for (Long inboxId : timedOutInboxIds) {
             repository.findLockedById(inboxId)
-                    .filter(inbox -> isTimeoutRecoverable(inbox, interactionType, processingStartedBefore))
-                    .ifPresent(inbox -> {
+                    .map(entity -> TimeoutRecoveryCandidate.of(entity, entity.toDomain()))
+                    .filter(candidate -> isTimeoutRecoverable(candidate.inbox(), interactionType, processingStartedBefore))
+                    .ifPresent(candidate -> {
                         SlackInteractionInboxHistory history = recoverTimeoutProcessing(
-                                inbox,
+                                candidate.inbox(),
                                 failedAt,
                                 failureReason,
                                 maxAttempts
                         );
 
-                        repository.save(inbox);
-                        historyRepository.save(history.bindInboxId(inbox.getId()));
+                        candidate.entity().apply(candidate.inbox());
+                        repository.save(candidate.entity());
+                        saveHistory(history.bindInboxId(candidate.inbox().getId()));
                         recoveredCount.incrementAndGet();
                     });
         }
@@ -200,14 +201,12 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
     private String buildTimeoutRecoverySelectSql(int recoveryBatchSize) {
         StringBuilder sql = new StringBuilder(
                 """
-                SELECT inbox.id
-                FROM slack_interaction_inbox inbox
-                JOIN slack_interaction_inbox_processing_lease_details lease
-                  ON lease.owner_id = inbox.id
-                WHERE inbox.interaction_type = :interactionType
-                  AND inbox.status = :processingStatus
-                  AND lease.started_at < :processingStartedBefore
-                ORDER BY lease.started_at ASC, inbox.id ASC
+                SELECT id
+                FROM slack_interaction_inbox
+                WHERE interaction_type = :interactionType
+                  AND status = :processingStatus
+                  AND processing_started_at < :processingStartedBefore
+                ORDER BY processing_started_at ASC, id ASC
                 LIMIT
                 """
         );
@@ -287,10 +286,11 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                     payload_json,
                     status,
                     processing_attempt,
-                    processing_lease_state,
-                    processed_time_state,
-                    failed_time_state,
-                    failure_state
+                    processing_started_at,
+                    processed_at,
+                    failed_at,
+                    failure_reason,
+                    failure_type
                 )
                 VALUES (
                     CURRENT_TIMESTAMP(6),
@@ -300,10 +300,11 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                     :payloadJson,
                     :pendingStatus,
                     :processingAttempt,
-                    :idleLeaseState,
-                    :absentTimeState,
-                    :absentTimeState,
-                    :absentFailureState
+                    :processingStartedAt,
+                    :processedAt,
+                    :failedAt,
+                    :failureReason,
+                    :failureType
                 )
                 ON DUPLICATE KEY UPDATE
                     idempotency_key = idempotency_key
@@ -355,17 +356,45 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
     @Override
     @Transactional
     public SlackInteractionInbox save(SlackInteractionInbox inbox) {
-        return repository.save(inbox);
+        SlackInteractionInboxJpaEntity entity = findInboxEntity(inbox.getId()).orElseGet(SlackInteractionInboxJpaEntity::new);
+        entity.apply(inbox);
+        return repository.save(entity).toDomain();
     }
 
     @Override
     @Transactional
     public SlackInteractionInbox save(SlackInteractionInbox inbox, SlackInteractionInboxHistory history) {
-        SlackInteractionInbox saved = repository.save(inbox);
+        SlackInteractionInbox saved = save(inbox);
         if (history != null) {
-            historyRepository.save(history.bindInboxId(saved.getId()));
+            saveHistory(history.bindInboxId(saved.getId()));
         }
 
         return saved;
+    }
+
+    private Optional<SlackInteractionInboxJpaEntity> findInboxEntity(Long inboxId) {
+        if (inboxId == null) {
+            return Optional.empty();
+        }
+
+        return repository.findById(inboxId);
+    }
+
+    private void saveHistory(SlackInteractionInboxHistory history) {
+        SlackInteractionInboxHistoryJpaEntity entity = new SlackInteractionInboxHistoryJpaEntity();
+        entity.apply(history);
+        historyRepository.save(entity);
+    }
+
+    private record TimeoutRecoveryCandidate(
+            SlackInteractionInboxJpaEntity entity,
+            SlackInteractionInbox inbox
+    ) {
+        private static TimeoutRecoveryCandidate of(
+                SlackInteractionInboxJpaEntity entity,
+                SlackInteractionInbox inbox
+        ) {
+            return new TimeoutRecoveryCandidate(entity, inbox);
+        }
     }
 }

@@ -1,10 +1,5 @@
 SET REFERENTIAL_INTEGRITY FALSE;
 
-TRUNCATE TABLE slack_interaction_inbox_history_failure_details;
-TRUNCATE TABLE slack_interaction_inbox_failure_details;
-TRUNCATE TABLE slack_interaction_inbox_failed_time_details;
-TRUNCATE TABLE slack_interaction_inbox_processed_time_details;
-TRUNCATE TABLE slack_interaction_inbox_processing_lease_details;
 TRUNCATE TABLE review_reminders;
 TRUNCATE TABLE slack_interaction_inbox_history;
 TRUNCATE TABLE slack_interaction_inbox;

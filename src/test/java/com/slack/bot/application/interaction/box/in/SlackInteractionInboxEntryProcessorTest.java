@@ -82,7 +82,7 @@ class SlackInteractionInboxEntryProcessorTest {
         slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId());
 
         // then
-        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
+        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
 
         assertAll(
                 () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
@@ -117,7 +117,7 @@ class SlackInteractionInboxEntryProcessorTest {
         slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId());
 
         // then
-        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
+        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
 
         assertAll(
                 () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
@@ -149,7 +149,7 @@ class SlackInteractionInboxEntryProcessorTest {
         slackInteractionInboxEntryProcessor.processClaimedViewSubmission(inbox.getId());
 
         // then
-        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
+        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
 
         assertAll(
                 () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
@@ -169,7 +169,7 @@ class SlackInteractionInboxEntryProcessorTest {
         slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId());
 
         // then
-        SlackInteractionInbox actual = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
+        SlackInteractionInbox actual = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
 
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
@@ -203,7 +203,7 @@ class SlackInteractionInboxEntryProcessorTest {
                 .isInstanceOf(DataAccessException.class)
                 .hasMessageContaining("forced save failure");
 
-        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
+        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
         ReviewReservation actualReservation = reviewReservationRepository.findById(100L).orElseThrow();
 
         assertAll(
@@ -238,7 +238,7 @@ class SlackInteractionInboxEntryProcessorTest {
         slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId());
 
         // then
-        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
+        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
         List<SlackInteractionInboxHistory> histories = historiesOf(inbox.getId());
 
         assertAll(
@@ -338,7 +338,7 @@ class SlackInteractionInboxEntryProcessorTest {
     }
 
     private List<SlackInteractionInboxHistory> historiesOf(Long inboxId) {
-        return jpaSlackInteractionInboxHistoryRepository.findAll()
+        return jpaSlackInteractionInboxHistoryRepository.findAllDomains()
                                                         .stream()
                                                         .filter(history -> inboxId.equals(history.getInboxId()))
                                                         .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))

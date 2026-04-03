@@ -1,68 +1,26 @@
 package com.slack.bot.infrastructure.interaction.box.in;
 
-import com.slack.bot.domain.common.BaseTimeEntity;
 import com.slack.bot.infrastructure.common.BoxEventTime;
-import com.slack.bot.infrastructure.common.BoxEventTimeDetail;
-import com.slack.bot.infrastructure.common.BoxEventTimeState;
-import com.slack.bot.infrastructure.common.BoxFailureDetail;
 import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
-import com.slack.bot.infrastructure.common.BoxFailureState;
 import com.slack.bot.infrastructure.common.BoxProcessingLease;
-import com.slack.bot.infrastructure.common.BoxProcessingLeaseDetail;
-import com.slack.bot.infrastructure.common.BoxProcessingLeaseState;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Table;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import lombok.AccessLevel;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 
 @Getter
-@Entity
-@Table(name = "slack_interaction_inbox")
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class SlackInteractionInbox extends BaseTimeEntity {
+public class SlackInteractionInbox {
 
-    @Enumerated(EnumType.STRING)
-    private SlackInteractionInboxType interactionType;
+    private final Long id;
+    private final SlackInteractionInboxType interactionType;
+    private final String idempotencyKey;
+    private final String payloadJson;
 
-    private String idempotencyKey;
-
-    private String payloadJson;
-
-    @Enumerated(EnumType.STRING)
     private SlackInteractionInboxStatus status;
-
     private int processingAttempt;
-
-    @Enumerated(EnumType.STRING)
-    private BoxProcessingLeaseState processingLeaseState;
-
-    @Getter(AccessLevel.NONE)
-    private List<BoxProcessingLeaseDetail> processingLeaseDetails = new ArrayList<>();
-
-    @Enumerated(EnumType.STRING)
-    private BoxEventTimeState processedTimeState;
-
-    @Getter(AccessLevel.NONE)
-    private List<BoxEventTimeDetail> processedTimeDetails = new ArrayList<>();
-
-    @Enumerated(EnumType.STRING)
-    private BoxEventTimeState failedTimeState;
-
-    @Getter(AccessLevel.NONE)
-    private List<BoxEventTimeDetail> failedTimeDetails = new ArrayList<>();
-
-    @Enumerated(EnumType.STRING)
-    private BoxFailureState failureState;
-
-    @Getter(AccessLevel.NONE)
-    private List<BoxFailureDetail> failureDetails = new ArrayList<>();
+    private BoxProcessingLease processingLease;
+    private BoxEventTime processedTime;
+    private BoxEventTime failedTime;
+    private BoxFailureSnapshot<SlackInteractionFailureType> failure;
 
     public static SlackInteractionInbox pending(
             SlackInteractionInboxType interactionType,
@@ -74,47 +32,77 @@ public class SlackInteractionInbox extends BaseTimeEntity {
         validatePayloadJson(payloadJson);
 
         return new SlackInteractionInbox(
+                null,
                 interactionType,
                 idempotencyKey,
                 payloadJson,
                 SlackInteractionInboxStatus.PENDING,
-                0
+                0,
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.absent(),
+                BoxFailureSnapshot.absent()
         );
     }
 
-    private static void validateInteractionType(SlackInteractionInboxType interactionType) {
-        if (interactionType == null) {
-            throw new IllegalArgumentException("interactionType은 비어 있을 수 없습니다.");
-        }
-    }
-
-    private static void validateIdempotencyKey(String idempotencyKey) {
-        if (idempotencyKey == null || idempotencyKey.isBlank()) {
-            throw new IllegalArgumentException("idempotencyKey는 비어 있을 수 없습니다.");
-        }
-    }
-
-    private static void validatePayloadJson(String payloadJson) {
-        if (payloadJson == null || payloadJson.isBlank()) {
-            throw new IllegalArgumentException("payloadJson은 비어 있을 수 없습니다.");
-        }
-    }
-
-    private SlackInteractionInbox(
+    public static SlackInteractionInbox rehydrate(
+            Long id,
             SlackInteractionInboxType interactionType,
             String idempotencyKey,
             String payloadJson,
             SlackInteractionInboxStatus status,
-            int processingAttempt
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime processedTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
     ) {
+        validateInteractionType(interactionType);
+        validateIdempotencyKey(idempotencyKey);
+        validatePayloadJson(payloadJson);
+        validateStatus(status);
+        validateProcessingAttempt(processingAttempt);
+        validateProcessingLease(processingLease);
+        validateProcessedTime(processedTime);
+        validateFailedTime(failedTime);
+        validateFailure(failure);
+
+        return new SlackInteractionInbox(
+                id,
+                interactionType,
+                idempotencyKey,
+                payloadJson,
+                status,
+                processingAttempt,
+                processingLease,
+                processedTime,
+                failedTime,
+                failure
+        );
+    }
+
+    private SlackInteractionInbox(
+            Long id,
+            SlackInteractionInboxType interactionType,
+            String idempotencyKey,
+            String payloadJson,
+            SlackInteractionInboxStatus status,
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime processedTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
+    ) {
+        this.id = id;
         this.interactionType = interactionType;
         this.idempotencyKey = idempotencyKey;
         this.payloadJson = payloadJson;
         this.status = status;
         this.processingAttempt = processingAttempt;
-        clearProcessingLease();
-        clearCompletion();
-        clearFailure();
+        this.processingLease = processingLease;
+        this.processedTime = processedTime;
+        this.failedTime = failedTime;
+        this.failure = failure;
     }
 
     public SlackInteractionInboxHistory markProcessed(Instant processedAt) {
@@ -122,12 +110,10 @@ public class SlackInteractionInbox extends BaseTimeEntity {
         validateTransition(SlackInteractionInboxStatus.PROCESSING, "PROCESSED");
 
         this.status = SlackInteractionInboxStatus.PROCESSED;
-        clearProcessingLease();
-        this.processedTimeState = BoxEventTimeState.PRESENT;
-        replaceProcessedTime(processedAt);
-        this.failedTimeState = BoxEventTimeState.ABSENT;
-        clearFailedTime();
-        clearFailure();
+        this.processingLease = BoxProcessingLease.idle();
+        this.processedTime = BoxEventTime.present(processedAt);
+        this.failedTime = BoxEventTime.absent();
+        this.failure = BoxFailureSnapshot.absent();
 
         return SlackInteractionInboxHistory.completed(
                 getId(),
@@ -142,8 +128,7 @@ public class SlackInteractionInbox extends BaseTimeEntity {
         validateProcessingStartedAt(processingStartedAt);
         validateTransition(SlackInteractionInboxStatus.PROCESSING, "PROCESSING");
 
-        this.processingLeaseState = BoxProcessingLeaseState.CLAIMED;
-        replaceProcessingLease(processingStartedAt);
+        this.processingLease = BoxProcessingLease.claimed(processingStartedAt);
     }
 
     public void claim(Instant processingStartedAt) {
@@ -152,13 +137,10 @@ public class SlackInteractionInbox extends BaseTimeEntity {
 
         this.status = SlackInteractionInboxStatus.PROCESSING;
         this.processingAttempt++;
-        this.processingLeaseState = BoxProcessingLeaseState.CLAIMED;
-        replaceProcessingLease(processingStartedAt);
-        this.processedTimeState = BoxEventTimeState.ABSENT;
-        clearProcessedTime();
-        this.failedTimeState = BoxEventTimeState.ABSENT;
-        clearFailedTime();
-        clearFailure();
+        this.processingLease = BoxProcessingLease.claimed(processingStartedAt);
+        this.processedTime = BoxEventTime.absent();
+        this.failedTime = BoxEventTime.absent();
+        this.failure = BoxFailureSnapshot.absent();
     }
 
     public SlackInteractionInboxHistory markRetryPending(Instant failedAt, String failureReason) {
@@ -176,13 +158,10 @@ public class SlackInteractionInbox extends BaseTimeEntity {
         validateTransition(SlackInteractionInboxStatus.PROCESSING, "RETRY_PENDING");
 
         this.status = SlackInteractionInboxStatus.RETRY_PENDING;
-        clearProcessingLease();
-        this.processedTimeState = BoxEventTimeState.ABSENT;
-        clearProcessedTime();
-        this.failedTimeState = BoxEventTimeState.PRESENT;
-        replaceFailedTime(failedAt);
-        this.failureState = BoxFailureState.PRESENT;
-        replaceFailure(failedAt, failureReason, failureType);
+        this.processingLease = BoxProcessingLease.idle();
+        this.processedTime = BoxEventTime.absent();
+        this.failedTime = BoxEventTime.present(failedAt);
+        this.failure = BoxFailureSnapshot.present(failureReason, failureType);
 
         return SlackInteractionInboxHistory.completed(
                 getId(),
@@ -204,13 +183,10 @@ public class SlackInteractionInbox extends BaseTimeEntity {
         validateTransition(SlackInteractionInboxStatus.PROCESSING, "FAILED");
 
         this.status = SlackInteractionInboxStatus.FAILED;
-        clearProcessingLease();
-        this.processedTimeState = BoxEventTimeState.ABSENT;
-        clearProcessedTime();
-        this.failedTimeState = BoxEventTimeState.PRESENT;
-        replaceFailedTime(failedAt);
-        this.failureState = BoxFailureState.PRESENT;
-        replaceFailure(failedAt, failureReason, failureType);
+        this.processingLease = BoxProcessingLease.idle();
+        this.processedTime = BoxEventTime.absent();
+        this.failedTime = BoxEventTime.present(failedAt);
+        this.failure = BoxFailureSnapshot.present(failureReason, failureType);
 
         return SlackInteractionInboxHistory.completed(
                 getId(),
@@ -221,41 +197,58 @@ public class SlackInteractionInbox extends BaseTimeEntity {
         );
     }
 
-    public BoxProcessingLease getProcessingLease() {
-        if (processingLeaseState == BoxProcessingLeaseState.IDLE) {
-            return BoxProcessingLease.idle();
+    private static void validateInteractionType(SlackInteractionInboxType interactionType) {
+        if (interactionType == null) {
+            throw new IllegalArgumentException("interactionType은 비어 있을 수 없습니다.");
         }
-
-        return BoxProcessingLease.claimed(requireProcessingLeaseDetail().getStartedAt());
     }
 
-    public BoxEventTime getProcessedTime() {
-        if (processedTimeState == BoxEventTimeState.ABSENT) {
-            return BoxEventTime.absent();
+    private static void validateIdempotencyKey(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new IllegalArgumentException("idempotencyKey는 비어 있을 수 없습니다.");
         }
-
-        return BoxEventTime.present(requireProcessedTimeDetail().getOccurredAt());
     }
 
-    public BoxEventTime getFailedTime() {
-        if (failedTimeState == BoxEventTimeState.ABSENT) {
-            return BoxEventTime.absent();
+    private static void validatePayloadJson(String payloadJson) {
+        if (payloadJson == null || payloadJson.isBlank()) {
+            throw new IllegalArgumentException("payloadJson은 비어 있을 수 없습니다.");
         }
-
-        return BoxEventTime.present(requireFailedTimeDetail().getOccurredAt());
     }
 
-    public BoxFailureSnapshot<SlackInteractionFailureType> getFailure() {
-        if (failureState == BoxFailureState.ABSENT) {
-            return BoxFailureSnapshot.absent();
+    private static void validateStatus(SlackInteractionInboxStatus status) {
+        if (status == null) {
+            throw new IllegalArgumentException("status는 비어 있을 수 없습니다.");
         }
+    }
 
-        BoxFailureDetail failureDetail = requireFailureDetail();
+    private static void validateProcessingAttempt(int processingAttempt) {
+        if (processingAttempt < 0) {
+            throw new IllegalArgumentException("processingAttempt는 0 이상이어야 합니다.");
+        }
+    }
 
-        return BoxFailureSnapshot.present(
-                failureDetail.getFailureReason(),
-                SlackInteractionFailureType.valueOf(failureDetail.getFailureTypeName())
-        );
+    private static void validateProcessingLease(BoxProcessingLease processingLease) {
+        if (processingLease == null) {
+            throw new IllegalArgumentException("processingLease는 비어 있을 수 없습니다.");
+        }
+    }
+
+    private static void validateProcessedTime(BoxEventTime processedTime) {
+        if (processedTime == null) {
+            throw new IllegalArgumentException("processedTime은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private static void validateFailedTime(BoxEventTime failedTime) {
+        if (failedTime == null) {
+            throw new IllegalArgumentException("failedTime은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private static void validateFailure(BoxFailureSnapshot<SlackInteractionFailureType> failure) {
+        if (failure == null) {
+            throw new IllegalArgumentException("failure는 비어 있을 수 없습니다.");
+        }
     }
 
     private void validateProcessedAt(Instant processedAt) {
@@ -300,97 +293,12 @@ public class SlackInteractionInbox extends BaseTimeEntity {
         throw new IllegalArgumentException("RETRY_PENDING failureType이 올바르지 않습니다.");
     }
 
-    private void clearProcessingLease() {
-        this.processingLeaseState = BoxProcessingLeaseState.IDLE;
-        this.processingLeaseDetails.clear();
-    }
-
-    private void clearCompletion() {
-        this.processedTimeState = BoxEventTimeState.ABSENT;
-        clearProcessedTime();
-        this.failedTimeState = BoxEventTimeState.ABSENT;
-        clearFailedTime();
-    }
-
-    private void clearFailure() {
-        this.failureState = BoxFailureState.ABSENT;
-        this.failureDetails.clear();
-    }
-
     private void validateClaimableStatus() {
         if (this.status == SlackInteractionInboxStatus.PENDING || this.status == SlackInteractionInboxStatus.RETRY_PENDING) {
             return;
         }
 
         throw new IllegalStateException("PROCESSING 전이는 PENDING 또는 RETRY_PENDING 상태에서만 가능합니다. 현재: " + this.status);
-    }
-
-    private void replaceProcessingLease(Instant processingStartedAt) {
-        if (this.processingLeaseDetails.isEmpty()) {
-            this.processingLeaseDetails.add(BoxProcessingLeaseDetail.of(processingStartedAt));
-            return;
-        }
-
-        requireProcessingLeaseDetail().updateStartedAt(processingStartedAt);
-    }
-
-    private void clearProcessedTime() {
-        this.processedTimeDetails.clear();
-    }
-
-    private void replaceProcessedTime(Instant processedAt) {
-        clearProcessedTime();
-        this.processedTimeDetails.add(BoxEventTimeDetail.of(processedAt));
-    }
-
-    private void clearFailedTime() {
-        this.failedTimeDetails.clear();
-    }
-
-    private void replaceFailedTime(Instant failedAt) {
-        clearFailedTime();
-        this.failedTimeDetails.add(BoxEventTimeDetail.of(failedAt));
-    }
-
-    private void replaceFailure(
-            Instant failedAt,
-            String failureReason,
-            SlackInteractionFailureType failureType
-    ) {
-        this.failureDetails.clear();
-        this.failureDetails.add(BoxFailureDetail.of(failedAt, failureReason, failureType));
-    }
-
-    private BoxProcessingLeaseDetail requireProcessingLeaseDetail() {
-        validateSingleDetail(processingLeaseDetails, "processing lease");
-
-        return processingLeaseDetails.getFirst();
-    }
-
-    private BoxEventTimeDetail requireProcessedTimeDetail() {
-        validateSingleDetail(processedTimeDetails, "processed time");
-
-        return processedTimeDetails.getFirst();
-    }
-
-    private BoxEventTimeDetail requireFailedTimeDetail() {
-        validateSingleDetail(failedTimeDetails, "failed time");
-
-        return failedTimeDetails.getFirst();
-    }
-
-    private BoxFailureDetail requireFailureDetail() {
-        validateSingleDetail(failureDetails, "failure");
-
-        return failureDetails.getFirst();
-    }
-
-    private void validateSingleDetail(List<?> details, String detailName) {
-        if (details.size() == 1) {
-            return;
-        }
-
-        throw new IllegalStateException(detailName + " detail 상태가 올바르지 않습니다.");
     }
 
     private void validateTransition(SlackInteractionInboxStatus expectedStatus, String targetStatus) {

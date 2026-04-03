@@ -23,10 +23,11 @@ public class H2SlackInteractionInboxRepositoryAdapter extends SlackInteractionIn
                         :payloadJson,
                         :pendingStatus,
                         :processingAttempt,
-                        :idleLeaseState,
-                        :absentTimeState,
-                        :absentTimeState,
-                        :absentFailureState
+                        :processingStartedAt,
+                        :processedAt,
+                        :failedAt,
+                        :failureReason,
+                        :failureType
                     )
                 ) AS source (
                     interaction_type,
@@ -34,10 +35,11 @@ public class H2SlackInteractionInboxRepositoryAdapter extends SlackInteractionIn
                     payload_json,
                     status,
                     processing_attempt,
-                    processing_lease_state,
-                    processed_time_state,
-                    failed_time_state,
-                    failure_state
+                    processing_started_at,
+                    processed_at,
+                    failed_at,
+                    failure_reason,
+                    failure_type
                 )
                 ON target.idempotency_key = source.idempotency_key
                 WHEN NOT MATCHED THEN
@@ -49,10 +51,11 @@ public class H2SlackInteractionInboxRepositoryAdapter extends SlackInteractionIn
                         payload_json,
                         status,
                         processing_attempt,
-                        processing_lease_state,
-                        processed_time_state,
-                        failed_time_state,
-                        failure_state
+                        processing_started_at,
+                        processed_at,
+                        failed_at,
+                        failure_reason,
+                        failure_type
                     )
                     VALUES (
                         CURRENT_TIMESTAMP(6),
@@ -62,10 +65,11 @@ public class H2SlackInteractionInboxRepositoryAdapter extends SlackInteractionIn
                         source.payload_json,
                         source.status,
                         source.processing_attempt,
-                        source.processing_lease_state,
-                        source.processed_time_state,
-                        source.failed_time_state,
-                        source.failure_state
+                        source.processing_started_at,
+                        source.processed_at,
+                        source.failed_at,
+                        source.failure_reason,
+                        source.failure_type
                     )
                 """;
     }
