@@ -7,8 +7,10 @@ INSERT INTO slack_interaction_inbox (
     payload_json,
     status,
     processing_attempt,
-    processing_started_at,
-    processed_at
+    processing_lease_state,
+    processed_time_state,
+    failed_time_state,
+    failure_state
 ) VALUES (
     200,
     NOW(),
@@ -18,6 +20,16 @@ INSERT INTO slack_interaction_inbox (
     '{"team":{"id":"T1"},"channel":{"id":"C1"},"user":{"id":"U1"},"actions":[{"action_id":"cancel_review_reservation","value":"100"}]}',
     'PROCESSING',
     1,
-    DATEADD('MINUTE', -10, NOW()),
-    NULL
+    'CLAIMED',
+    'ABSENT',
+    'ABSENT',
+    'ABSENT'
+);
+
+INSERT INTO slack_interaction_inbox_processing_lease_details (
+    owner_id,
+    started_at
+) VALUES (
+    200,
+    DATEADD('MINUTE', -10, NOW())
 );

@@ -1,13 +1,17 @@
 package com.slack.bot.infrastructure.interaction.box.in;
 
 import com.slack.bot.domain.common.BaseTimeEntity;
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
+import com.slack.bot.infrastructure.common.BoxFailureState;
+import com.slack.bot.infrastructure.common.BoxHistoryFailureDetail;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -27,32 +31,31 @@ public class SlackInteractionInboxHistory extends BaseTimeEntity {
 
     private Instant completedAt;
 
-    private String failureReason;
-
     @Enumerated(EnumType.STRING)
-    private SlackInteractionFailureType failureType;
+    private BoxFailureState failureState;
+
+    @Getter(AccessLevel.NONE)
+    private List<BoxHistoryFailureDetail> failureDetails = new ArrayList<>();
 
     public static SlackInteractionInboxHistory completed(
             Long inboxId,
             int processingAttempt,
             SlackInteractionInboxStatus status,
             Instant completedAt,
-            String failureReason,
-            SlackInteractionFailureType failureType
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
     ) {
         validateInboxIdIfPresent(inboxId);
         validateProcessingAttempt(processingAttempt);
         validateStatus(status);
         validateCompletedAt(completedAt);
-        validateFailure(status, failureReason, failureType);
+        validateFailure(status, failure);
 
         return new SlackInteractionInboxHistory(
                 inboxId,
                 processingAttempt,
                 status,
                 completedAt,
-                failureReason,
-                failureType
+                failure
         );
     }
 
@@ -70,8 +73,7 @@ public class SlackInteractionInboxHistory extends BaseTimeEntity {
                 processingAttempt,
                 status,
                 completedAt,
-                failureReason,
-                failureType
+                getFailure()
         );
     }
 
@@ -80,15 +82,26 @@ public class SlackInteractionInboxHistory extends BaseTimeEntity {
             int processingAttempt,
             SlackInteractionInboxStatus status,
             Instant completedAt,
-            String failureReason,
-            SlackInteractionFailureType failureType
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
     ) {
         this.inboxId = inboxId;
         this.processingAttempt = processingAttempt;
         this.status = status;
         this.completedAt = completedAt;
-        this.failureReason = failureReason;
-        this.failureType = failureType;
+        applyFailure(failure);
+    }
+
+    public BoxFailureSnapshot<SlackInteractionFailureType> getFailure() {
+        if (failureState == BoxFailureState.ABSENT) {
+            return BoxFailureSnapshot.absent();
+        }
+
+        BoxHistoryFailureDetail failureDetail = requireFailureDetail();
+
+        return BoxFailureSnapshot.present(
+                failureDetail.getFailureReason(),
+                SlackInteractionFailureType.valueOf(failureDetail.getFailureTypeName())
+        );
     }
 
     private static void validateInboxId(Long inboxId) {
@@ -128,27 +141,47 @@ public class SlackInteractionInboxHistory extends BaseTimeEntity {
 
     private static void validateFailure(
             SlackInteractionInboxStatus status,
-            String failureReason,
-            SlackInteractionFailureType failureType
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
     ) {
         if (status == SlackInteractionInboxStatus.PROCESSED) {
-            if (!FailureSnapshotDefaults.NO_FAILURE_REASON.equals(failureReason)
-                    || failureType != SlackInteractionFailureType.NONE) {
+            if (failure.isPresent()) {
                 throw new IllegalArgumentException("PROCESSED history에는 실패 정보가 없어야 합니다.");
             }
             return;
         }
 
-        if (failureReason == null || failureReason.isBlank()) {
-            throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
+        if (!failure.isPresent()) {
+            throw new IllegalArgumentException("완료 실패 정보는 비어 있을 수 없습니다.");
         }
-        if (status == SlackInteractionInboxStatus.FAILED && failureType == SlackInteractionFailureType.NONE) {
-            throw new IllegalArgumentException("FAILED history에는 failureType이 필요합니다.");
+
+        SlackInteractionFailureType failureType = failure.type();
+        if (failureType == SlackInteractionFailureType.ABSENT || failureType == SlackInteractionFailureType.NONE) {
+            throw new IllegalArgumentException("완료 실패 정보의 failureType이 올바르지 않습니다.");
         }
         if (status == SlackInteractionInboxStatus.RETRY_PENDING
-                && failureType != SlackInteractionFailureType.NONE
+                && failureType != SlackInteractionFailureType.RETRYABLE
                 && failureType != SlackInteractionFailureType.PROCESSING_TIMEOUT) {
             throw new IllegalArgumentException("RETRY_PENDING history의 failureType이 올바르지 않습니다.");
         }
+    }
+
+    private void applyFailure(BoxFailureSnapshot<SlackInteractionFailureType> failure) {
+        if (!failure.isPresent()) {
+            this.failureState = BoxFailureState.ABSENT;
+            this.failureDetails.clear();
+            return;
+        }
+
+        this.failureState = BoxFailureState.PRESENT;
+        this.failureDetails.clear();
+        this.failureDetails.add(BoxHistoryFailureDetail.of(failure.reason(), failure.type()));
+    }
+
+    private BoxHistoryFailureDetail requireFailureDetail() {
+        if (failureDetails.size() == 1) {
+            return failureDetails.getFirst();
+        }
+
+        throw new IllegalStateException("history failure detail 상태가 올바르지 않습니다.");
     }
 }

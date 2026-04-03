@@ -159,8 +159,8 @@ class AdaptivePollingRunnerIntegrationTest {
 
                 assertAll(
                         () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
-                        () -> assertThat(actualInbox.getProcessedAt()).isAfterOrEqualTo(wakeUpRequestedAt),
-                        () -> assertThat(Duration.between(wakeUpRequestedAt, actualInbox.getProcessedAt()))
+                        () -> assertThat(actualInbox.getProcessedTime().occurredAt()).isAfterOrEqualTo(wakeUpRequestedAt),
+                        () -> assertThat(Duration.between(wakeUpRequestedAt, actualInbox.getProcessedTime().occurredAt()))
                                 .isLessThan(pollInterval),
                         () -> assertThat(reviewReservationRepository.findById(100L))
                                 .isPresent()

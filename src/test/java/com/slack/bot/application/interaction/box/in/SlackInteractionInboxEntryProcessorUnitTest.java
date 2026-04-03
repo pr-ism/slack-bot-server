@@ -15,7 +15,6 @@ import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
 import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
 import com.slack.bot.application.interaction.view.ViewSubmissionInteractionCoordinator;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStatus;
@@ -150,7 +149,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
+                () -> assertThat(actual.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRYABLE)
         );
         verify(slackInteractionInboxRepository).save(eq(actual), any());
     }
@@ -179,7 +178,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(2),
-                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED)
+                () -> assertThat(actual.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED)
         );
         verify(slackInteractionInboxRepository).save(eq(actual), any());
     }
@@ -205,8 +204,8 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         // then
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
-                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
-                () -> assertThat(actual.getFailureReason()).hasSize(500)
+                () -> assertThat(actual.getFailure().type()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
+                () -> assertThat(actual.getFailure().reason()).hasSize(500)
         );
         verify(slackInteractionInboxRepository).save(eq(actual), any());
     }
@@ -232,8 +231,8 @@ class SlackInteractionInboxEntryProcessorUnitTest {
         // then
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
-                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
-                () -> assertThat(actual.getFailureReason()).isEqualTo("unknown failure")
+                () -> assertThat(actual.getFailure().type()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
+                () -> assertThat(actual.getFailure().reason()).isEqualTo("unknown failure")
         );
         verify(slackInteractionInboxRepository).save(eq(actual), any());
     }
@@ -268,12 +267,7 @@ class SlackInteractionInboxEntryProcessorUnitTest {
             Instant processingStartedAt,
             int processingAttempt
     ) {
-        ReflectionTestUtils.setField(inbox, "status", SlackInteractionInboxStatus.PROCESSING);
-        ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
-        ReflectionTestUtils.setField(inbox, "processedAt", FailureSnapshotDefaults.NO_PROCESSED_AT);
+        inbox.claim(processingStartedAt);
         ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(inbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
-        ReflectionTestUtils.setField(inbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
-        ReflectionTestUtils.setField(inbox, "failureType", SlackInteractionFailureType.NONE);
     }
 }

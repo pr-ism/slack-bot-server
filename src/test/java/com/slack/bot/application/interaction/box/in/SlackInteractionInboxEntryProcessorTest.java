@@ -175,8 +175,8 @@ class SlackInteractionInboxEntryProcessorTest {
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
-                () -> assertThat(actual.getFailureReason()).isNotBlank()
+                () -> assertThat(actual.getFailure().type()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
+                () -> assertThat(actual.getFailure().reason()).isNotBlank()
         );
     }
 
@@ -246,10 +246,10 @@ class SlackInteractionInboxEntryProcessorTest {
         assertAll(
                 () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
                 () -> assertThat(actualInbox.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actualInbox.getFailureType()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
+                () -> assertThat(actualInbox.getFailure().type()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
                 () -> assertThat(histories).hasSize(1),
                 () -> assertThat(histories.getFirst().getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
-                () -> assertThat(histories.getFirst().getFailureType())
+                () -> assertThat(histories.getFirst().getFailure().type())
                         .isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
                 () -> assertThat(actualReservation).isPresent(),
                 () -> assertThat(actualReservation.get().getStatus()).isEqualTo(ReservationStatus.ACTIVE)
@@ -266,8 +266,7 @@ class SlackInteractionInboxEntryProcessorTest {
     private SlackInteractionInbox savePendingInbox(SlackInteractionInboxType interactionType, String payloadJson) {
         String idempotencyKey = interactionType + "-entry-" + System.nanoTime();
         SlackInteractionInbox inbox = SlackInteractionInbox.pending(interactionType, idempotencyKey, payloadJson);
-        ReflectionTestUtils.setField(inbox, "status", SlackInteractionInboxStatus.PROCESSING);
-        ReflectionTestUtils.setField(inbox, "processingStartedAt", Instant.parse("2026-02-15T00:00:00Z"));
+        inbox.claim(Instant.parse("2026-02-15T00:00:00Z"));
         ReflectionTestUtils.setField(inbox, "processingAttempt", 1);
         return slackInteractionInboxRepository.save(inbox);
     }
