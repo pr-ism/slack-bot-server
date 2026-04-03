@@ -56,20 +56,36 @@ public class SlackNotificationOutboxProcessor {
         int claimedCount = 0;
         for (int count = 0; count < limit; count++) {
             Instant claimedProcessingStartedAt = currentLeaseStartedAt();
-            Long claimedOutboxId = slackNotificationOutboxRepository.claimNextId(
-                    claimedProcessingStartedAt,
-                    claimedOutboxIds
-            ).orElse(null);
-            if (claimedOutboxId == null) {
+            int nextClaimedCount = processNextClaimedOutbox(
+                    claimedOutboxIds,
+                    claimedCount,
+                    claimedProcessingStartedAt
+            );
+            if (nextClaimedCount == claimedCount) {
                 return claimedCount;
             }
 
-            claimedOutboxIds.add(claimedOutboxId);
-            claimedCount++;
-            processClaimedOutboxSafely(claimedOutboxId, claimedProcessingStartedAt);
+            claimedCount = nextClaimedCount;
         }
 
         return claimedCount;
+    }
+
+    private int processNextClaimedOutbox(
+            Set<Long> claimedOutboxIds,
+            int claimedCount,
+            Instant claimedProcessingStartedAt
+    ) {
+        return slackNotificationOutboxRepository.claimNextId(
+                    claimedProcessingStartedAt,
+                    claimedOutboxIds
+            )
+            .map(claimedOutboxId -> {
+                claimedOutboxIds.add(claimedOutboxId);
+                processClaimedOutboxSafely(claimedOutboxId, claimedProcessingStartedAt);
+                return claimedCount + 1;
+            })
+            .orElse(claimedCount);
     }
 
     public int recoverTimeoutProcessing() {
@@ -112,7 +128,7 @@ public class SlackNotificationOutboxProcessor {
             slackNotificationOutboxRetryTemplate.execute(context -> {
                 renewProcessingLease(outbox, currentProcessingStartedAt);
                 dispatch(outbox);
-                return null;
+                return true;
             });
         } catch (OutboxProcessingLeaseLostException e) {
             return;

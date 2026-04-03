@@ -98,21 +98,39 @@ public class SlackInteractionInboxProcessor {
         Set<Long> claimedInboxIds = new HashSet<>();
         int claimedCount = 0;
         for (int count = 0; count < limit; count++) {
-            Long claimedInboxId = slackInteractionInboxRepository.claimNextId(
+            int nextClaimedCount = processNextClaimedInbox(
                     interactionType,
-                    clock.instant(),
-                    claimedInboxIds
-            ).orElse(null);
-            if (claimedInboxId == null) {
+                    action,
+                    claimedInboxIds,
+                    claimedCount
+            );
+            if (nextClaimedCount == claimedCount) {
                 return claimedCount;
             }
 
-            claimedInboxIds.add(claimedInboxId);
-            claimedCount++;
-            processSafely(claimedInboxId, action, interactionType);
+            claimedCount = nextClaimedCount;
         }
 
         return claimedCount;
+    }
+
+    private int processNextClaimedInbox(
+            SlackInteractionInboxType interactionType,
+            LongConsumer action,
+            Set<Long> claimedInboxIds,
+            int claimedCount
+    ) {
+        return slackInteractionInboxRepository.claimNextId(
+                    interactionType,
+                    clock.instant(),
+                    claimedInboxIds
+            )
+            .map(inboxId -> {
+                claimedInboxIds.add(inboxId);
+                processSafely(inboxId, action, interactionType);
+                return claimedCount + 1;
+            })
+            .orElse(claimedCount);
     }
 
     public int recoverBlockActionTimeoutProcessing() {

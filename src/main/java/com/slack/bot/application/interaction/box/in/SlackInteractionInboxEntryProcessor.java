@@ -93,7 +93,7 @@ public class SlackInteractionInboxEntryProcessor {
 
             slackInteractionInboxRetryTemplate.execute(context -> {
                 consumer.accept(payload);
-                return null;
+                return true;
             });
 
             history = claimedInbox.markProcessed(clock.instant());

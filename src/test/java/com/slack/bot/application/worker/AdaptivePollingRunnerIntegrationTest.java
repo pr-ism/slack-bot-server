@@ -90,10 +90,8 @@ class AdaptivePollingRunnerIntegrationTest {
                         () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
                         () -> assertThat(actualInbox.getProcessingAttempt()).isEqualTo(1),
                         () -> assertThat(reviewReservationRepository.findById(100L))
-                                .isPresent()
-                                .get()
-                                .extracting(reservation -> reservation.getStatus())
-                                .isEqualTo(ReservationStatus.CANCELLED),
+                                .map(reservation -> reservation.getStatus())
+                                .hasValue(ReservationStatus.CANCELLED),
                         () -> assertThat(pollCount.get()).isGreaterThanOrEqualTo(2)
                 );
             });
@@ -163,10 +161,8 @@ class AdaptivePollingRunnerIntegrationTest {
                         () -> assertThat(Duration.between(wakeUpRequestedAt, actualInbox.getProcessedTime().occurredAt()))
                                 .isLessThan(pollInterval),
                         () -> assertThat(reviewReservationRepository.findById(100L))
-                                .isPresent()
-                                .get()
-                                .extracting(reservation -> reservation.getStatus())
-                                .isEqualTo(ReservationStatus.CANCELLED),
+                                .map(reservation -> reservation.getStatus())
+                                .hasValue(ReservationStatus.CANCELLED),
                         () -> assertThat(pollCount.get()).isGreaterThanOrEqualTo(2)
                 );
             });

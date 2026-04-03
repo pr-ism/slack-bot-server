@@ -23,16 +23,24 @@ public class ReviewNotificationSourceBindingAspect {
             String apiKey,
             ReviewNotificationPayload request
     ) throws Throwable {
-        if (reviewNotificationSourceContext.currentSourceKey().isPresent()) {
-            return joinPoint.proceed();
-        }
-
-        String sourceKey = buildDefaultSourceKey(apiKey, request);
         try {
-            return reviewNotificationSourceContext.withSourceKey(sourceKey, () -> proceed(joinPoint));
+            ProceedResult proceedResult = reviewNotificationSourceContext.currentSourceKey()
+                    .map(currentSourceKey -> ProceedResult.of(proceed(joinPoint)))
+                    .orElseGet(() -> ProceedResult.of(proceedWithBoundSourceKey(joinPoint, apiKey, request)));
+
+            return proceedResult.value();
         } catch (WrappedThrowable wrapped) {
             throw wrapped.getCause();
         }
+    }
+
+    private Object proceedWithBoundSourceKey(
+            ProceedingJoinPoint joinPoint,
+            String apiKey,
+            ReviewNotificationPayload request
+    ) {
+        String sourceKey = buildDefaultSourceKey(apiKey, request);
+        return reviewNotificationSourceContext.withSourceKey(sourceKey, () -> proceed(joinPoint));
     }
 
     private String buildDefaultSourceKey(String apiKey, ReviewNotificationPayload request) {
@@ -60,6 +68,13 @@ public class ReviewNotificationSourceBindingAspect {
 
         private WrappedThrowable(Throwable cause) {
             super(cause);
+        }
+    }
+
+    private record ProceedResult(Object value) {
+
+        private static ProceedResult of(Object value) {
+            return new ProceedResult(value);
         }
     }
 }

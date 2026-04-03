@@ -27,11 +27,11 @@ public class AspectIntegrationProbes {
         private final AtomicInteger proceedCount = new AtomicInteger();
 
         @EnqueueBlockActionInInbox
-        public Object handle(JsonNode payload, BlockActionProbeMode mode) {
+        public void handle(JsonNode payload, BlockActionProbeMode mode) {
             proceedCount.incrementAndGet();
 
             if (mode == BlockActionProbeMode.RETURN_VALUE) {
-                return "PROCEEDED";
+                return;
             }
             if (mode == BlockActionProbeMode.THROW_RUNTIME) {
                 throw new IllegalArgumentException("runtime failure");
@@ -41,7 +41,6 @@ public class AspectIntegrationProbes {
             }
 
             sneakyThrow(new Exception("checked failure"));
-            return null;
         }
 
         public int proceedCount() {
@@ -84,7 +83,7 @@ public class AspectIntegrationProbes {
             }
 
             sneakyThrow(new Exception("checked failure"));
-            return null;
+            throw new IllegalStateException("checked failure는 여기까지 도달할 수 없습니다.");
         }
 
         @EnqueueViewSubmissionInInbox

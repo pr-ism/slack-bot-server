@@ -5,6 +5,7 @@ import com.slack.bot.application.interaction.block.BlockActionType;
 import com.slack.bot.application.interaction.box.ProcessingSourceContext;
 import com.slack.bot.application.interaction.box.aop.aspect.exception.BlockActionAopProceedException;
 import com.slack.bot.application.interaction.box.in.SlackInteractionInboxProcessor;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -22,56 +23,81 @@ public class BlockActionInboxEnqueueAspect {
     private final ProcessingSourceContext processingSourceContext;
 
     @Around("@annotation(com.slack.bot.application.interaction.box.aop.EnqueueBlockActionInInbox) && args(payload,..)")
-    public Object enqueue(ProceedingJoinPoint joinPoint, JsonNode payload) {
+    public void enqueue(ProceedingJoinPoint joinPoint, JsonNode payload) {
         if (processingSourceContext.isInboxProcessing() || isSyncAction(payload)) {
-            return proceedInInboxContext(joinPoint);
+            proceedInInboxContext(joinPoint);
+            return;
         }
 
         String payloadJson = payload.toString();
-        String payloadType = payload.path("type")
-                                    .asText(null);
 
         try {
             boolean enqueued = slackInteractionInboxProcessor.enqueueBlockAction(payloadJson);
             if (!enqueued) {
-                log.info("block action enqueue가 중복 요청으로 스킵되었습니다. payloadType={}", payloadType);
+                logDuplicateSkip(payload.path("type"));
             }
         } catch (RuntimeException runtimeException) {
-            log.error(
-                    "block action enqueue 처리 중 예외가 발생했습니다. payloadType={}",
-                    payloadType,
-                    runtimeException
-            );
+            logEnqueueFailure(payload.path("type"), runtimeException);
             throw runtimeException;
         }
-
-        // block action은 슬랙에 즉시 ack만 하므로 반환 값이 필요하지 않음
-        return null;
     }
 
     private boolean isSyncAction(JsonNode payload) {
-        String actionId = resolveActionId(payload);
-        BlockActionType actionType = BlockActionType.from(actionId);
-
-        return actionType.isOpenReviewScheduler() || actionType.isChangeReviewReservation();
+        return resolveActionType(payload)
+                .map(actionType -> actionType.isOpenReviewScheduler() || actionType.isChangeReviewReservation())
+                .orElse(false);
     }
 
-    private String resolveActionId(JsonNode payload) {
-        String actionId = payload.path("actions")
-                                 .path(0)
-                                 .path("action_id")
-                                 .asText(null);
-        if (actionId != null && !actionId.isBlank()) {
-            return actionId;
-        }
-
-        return payload.path("action_id")
-                      .asText(null);
+    private Optional<BlockActionType> resolveActionType(JsonNode payload) {
+        return resolveActionId(payload)
+                .map(actionId -> BlockActionType.from(actionId));
     }
 
-    private Object proceedInInboxContext(ProceedingJoinPoint joinPoint) {
+    private Optional<String> resolveActionId(JsonNode payload) {
+        return resolveText(
+                payload.path("actions")
+                       .path(0)
+                       .path("action_id")
+        ).filter(actionId -> !actionId.isBlank())
+         .or(() -> resolveText(payload.path("action_id")));
+    }
+
+    private Optional<String> resolveText(JsonNode node) {
+        return Optional.of(node)
+                .filter(currentNode -> !currentNode.isMissingNode())
+                .filter(currentNode -> !currentNode.isNull())
+                .filter(currentNode -> currentNode.isValueNode())
+                .map(currentNode -> currentNode.asText());
+    }
+
+    private void logDuplicateSkip(JsonNode payloadTypeNode) {
+        resolveText(payloadTypeNode)
+                .filter(value -> !value.isBlank())
+                .ifPresentOrElse(
+                value -> log.info("block action enqueue가 중복 요청으로 스킵되었습니다. payloadType={}", value),
+                () -> log.info("block action enqueue가 중복 요청으로 스킵되었습니다. payloadType 정보가 없습니다.")
+        );
+    }
+
+    private void logEnqueueFailure(JsonNode payloadTypeNode, RuntimeException runtimeException) {
+        resolveText(payloadTypeNode)
+                .filter(value -> !value.isBlank())
+                .ifPresentOrElse(
+                value -> log.error(
+                        "block action enqueue 처리 중 예외가 발생했습니다. payloadType={}",
+                        value,
+                        runtimeException
+                ),
+                () -> log.error(
+                        "block action enqueue 처리 중 예외가 발생했습니다. payloadType 정보가 없습니다.",
+                        runtimeException
+                )
+        );
+    }
+
+    private void proceedInInboxContext(ProceedingJoinPoint joinPoint) {
         try {
-            return joinPoint.proceed();
+            joinPoint.proceed();
         } catch (Throwable throwable) {
             if (throwable instanceof RuntimeException runtimeException) {
                 throw runtimeException;
