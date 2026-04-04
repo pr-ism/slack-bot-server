@@ -91,4 +91,63 @@ class SlackInteractionInboxHistoryTest {
                 () -> assertThat(history.getFailure().type()).isEqualTo(SlackInteractionFailureType.PROCESSING_TIMEOUT)
         );
     }
+
+    @Test
+    void completed는_null_failure을_허용하지_않는다() {
+        // given
+        Instant completedAt = Instant.parse("2026-03-27T00:00:00Z");
+
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInboxHistory.completed(
+                10L,
+                1,
+                SlackInteractionInboxStatus.FAILED,
+                completedAt,
+                null
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("failure는 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void FAILED_history는_RETRYABLE_failureType을_허용하지_않는다() {
+        // given
+        Instant completedAt = Instant.parse("2026-03-27T00:00:00Z");
+        BoxFailureSnapshot<SlackInteractionFailureType> failure = BoxFailureSnapshot.present(
+                "retryable",
+                SlackInteractionFailureType.RETRYABLE
+        );
+
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInboxHistory.completed(
+                10L,
+                1,
+                SlackInteractionInboxStatus.FAILED,
+                completedAt,
+                failure
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("FAILED history의 failureType이 올바르지 않습니다.");
+    }
+
+    @Test
+    void FAILED_history는_PROCESSING_TIMEOUT_failureType을_허용하지_않는다() {
+        // given
+        Instant completedAt = Instant.parse("2026-03-27T00:00:00Z");
+        BoxFailureSnapshot<SlackInteractionFailureType> failure = BoxFailureSnapshot.present(
+                "processing-timeout",
+                SlackInteractionFailureType.PROCESSING_TIMEOUT
+        );
+
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInboxHistory.completed(
+                10L,
+                1,
+                SlackInteractionInboxStatus.FAILED,
+                completedAt,
+                failure
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("FAILED history의 failureType이 올바르지 않습니다.");
+    }
 }
