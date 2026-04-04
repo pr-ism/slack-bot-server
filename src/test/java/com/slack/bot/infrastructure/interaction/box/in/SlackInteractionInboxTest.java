@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
+import com.slack.bot.infrastructure.common.BoxEventTime;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
+import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -76,6 +79,132 @@ class SlackInteractionInboxTest {
         assertThatThrownBy(() -> SlackInteractionInbox.pending(SlackInteractionInboxType.BLOCK_ACTIONS, "key", " "))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("payloadJson은 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void rehydrate는_PENDING과_0이_아닌_processingAttempt_조합을_허용하지_않는다() {
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInbox.rehydrate(
+                1L,
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}",
+                SlackInteractionInboxStatus.PENDING,
+                1,
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.absent(),
+                BoxFailureSnapshot.absent()
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("PENDING 상태의 processingAttempt는 0이어야 합니다.");
+    }
+
+    @Test
+    void rehydrate는_PROCESSING과_idle_processingLease_조합을_허용하지_않는다() {
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInbox.rehydrate(
+                1L,
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}",
+                SlackInteractionInboxStatus.PROCESSING,
+                1,
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.absent(),
+                BoxFailureSnapshot.absent()
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("PROCESSING 상태는 processingLease를 보유해야 합니다.");
+    }
+
+    @Test
+    void rehydrate는_PROCESSED와_absent_processedTime_조합을_허용하지_않는다() {
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInbox.rehydrate(
+                1L,
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}",
+                SlackInteractionInboxStatus.PROCESSED,
+                1,
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.absent(),
+                BoxFailureSnapshot.absent()
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("PROCESSED 상태는 processedTime이 있어야 합니다.");
+    }
+
+    @Test
+    void rehydrate는_RETRY_PENDING과_absent_failedTime_조합을_허용하지_않는다() {
+        // given
+        BoxFailureSnapshot<SlackInteractionFailureType> failure = BoxFailureSnapshot.present(
+                "retryable",
+                SlackInteractionFailureType.RETRYABLE
+        );
+
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInbox.rehydrate(
+                1L,
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}",
+                SlackInteractionInboxStatus.RETRY_PENDING,
+                1,
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.absent(),
+                failure
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("RETRY_PENDING 상태는 failedTime이 있어야 합니다.");
+    }
+
+    @Test
+    void rehydrate는_FAILED와_absent_failure_조합을_허용하지_않는다() {
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInbox.rehydrate(
+                1L,
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}",
+                SlackInteractionInboxStatus.FAILED,
+                1,
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.present(Instant.parse("2026-02-15T01:00:00Z")),
+                BoxFailureSnapshot.absent()
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("FAILED 상태는 failure가 있어야 합니다.");
+    }
+
+    @Test
+    void rehydrate는_FAILED와_RETRYABLE_failureType_조합을_허용하지_않는다() {
+        // given
+        BoxFailureSnapshot<SlackInteractionFailureType> failure = BoxFailureSnapshot.present(
+                "retryable",
+                SlackInteractionFailureType.RETRYABLE
+        );
+
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInbox.rehydrate(
+                1L,
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}",
+                SlackInteractionInboxStatus.FAILED,
+                1,
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.present(Instant.parse("2026-02-15T01:00:00Z")),
+                failure
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("FAILED 상태의 failureType이 올바르지 않습니다.");
     }
 
     @Test
@@ -291,6 +420,23 @@ class SlackInteractionInboxTest {
         assertThatThrownBy(() -> inbox.markFailed(failedAt, "failure", SlackInteractionFailureType.ABSENT))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("failureType은 ABSENT일 수 없습니다.");
+    }
+
+    @Test
+    void markFailed는_RETRYABLE_failureType을_허용하지_않는다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+        setProcessingState(inbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
+        Instant failedAt = Instant.parse("2026-02-15T01:00:00Z");
+
+        // when & then
+        assertThatThrownBy(() -> inbox.markFailed(failedAt, "failure", SlackInteractionFailureType.RETRYABLE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("FAILED failureType이 올바르지 않습니다.");
     }
 
     @Test

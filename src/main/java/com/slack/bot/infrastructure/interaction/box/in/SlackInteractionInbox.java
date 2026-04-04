@@ -66,6 +66,14 @@ public class SlackInteractionInbox {
         validateProcessedTime(processedTime);
         validateFailedTime(failedTime);
         validateFailure(failure);
+        validateState(
+                status,
+                processingAttempt,
+                processingLease,
+                processedTime,
+                failedTime,
+                failure
+        );
 
         return new SlackInteractionInbox(
                 id,
@@ -179,7 +187,7 @@ public class SlackInteractionInbox {
     ) {
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
-        validateFailureType(failureType);
+        validateFailedFailureType(failureType);
         validateTransition(SlackInteractionInboxStatus.PROCESSING, "FAILED");
 
         this.status = SlackInteractionInboxStatus.FAILED;
@@ -251,6 +259,165 @@ public class SlackInteractionInbox {
         }
     }
 
+    private static void validateState(
+            SlackInteractionInboxStatus status,
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime processedTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
+    ) {
+        if (status == SlackInteractionInboxStatus.PENDING) {
+            validatePendingState(processingAttempt, processingLease, processedTime, failedTime, failure);
+            return;
+        }
+        if (status == SlackInteractionInboxStatus.PROCESSING) {
+            validateProcessingState(processingAttempt, processingLease, processedTime, failedTime, failure);
+            return;
+        }
+        if (status == SlackInteractionInboxStatus.PROCESSED) {
+            validateProcessedState(processingAttempt, processingLease, processedTime, failedTime, failure);
+            return;
+        }
+        if (status == SlackInteractionInboxStatus.RETRY_PENDING) {
+            validateRetryPendingState(processingAttempt, processingLease, processedTime, failedTime, failure);
+            return;
+        }
+
+        validateFailedState(processingAttempt, processingLease, processedTime, failedTime, failure);
+    }
+
+    private static void validatePendingState(
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime processedTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
+    ) {
+        if (processingAttempt != 0) {
+            throw new IllegalArgumentException("PENDING 상태의 processingAttempt는 0이어야 합니다.");
+        }
+        validateIdleLease(processingLease, "PENDING");
+        validateProcessedTimeAbsent(processedTime, "PENDING");
+        validateFailedStateAbsent(failedTime, failure, "PENDING");
+    }
+
+    private static void validateProcessingState(
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime processedTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
+    ) {
+        validateProcessedAttemptStarted(processingAttempt, "PROCESSING");
+        if (!processingLease.isClaimed()) {
+            throw new IllegalArgumentException("PROCESSING 상태는 processingLease를 보유해야 합니다.");
+        }
+        validateProcessedTimeAbsent(processedTime, "PROCESSING");
+        validateFailedStateAbsent(failedTime, failure, "PROCESSING");
+    }
+
+    private static void validateProcessedState(
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime processedTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
+    ) {
+        validateProcessedAttemptStarted(processingAttempt, "PROCESSED");
+        validateIdleLease(processingLease, "PROCESSED");
+        if (!processedTime.isPresent()) {
+            throw new IllegalArgumentException("PROCESSED 상태는 processedTime이 있어야 합니다.");
+        }
+        validateFailedStateAbsent(failedTime, failure, "PROCESSED");
+    }
+
+    private static void validateRetryPendingState(
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime processedTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
+    ) {
+        validateProcessedAttemptStarted(processingAttempt, "RETRY_PENDING");
+        validateIdleLease(processingLease, "RETRY_PENDING");
+        validateProcessedTimeAbsent(processedTime, "RETRY_PENDING");
+        validateFailedStatePresent(failedTime, failure, "RETRY_PENDING");
+
+        SlackInteractionFailureType failureType = failure.type();
+        if (failureType != SlackInteractionFailureType.RETRYABLE
+                && failureType != SlackInteractionFailureType.PROCESSING_TIMEOUT) {
+            throw new IllegalArgumentException("RETRY_PENDING 상태의 failureType이 올바르지 않습니다.");
+        }
+    }
+
+    private static void validateFailedState(
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime processedTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
+    ) {
+        validateProcessedAttemptStarted(processingAttempt, "FAILED");
+        validateIdleLease(processingLease, "FAILED");
+        validateProcessedTimeAbsent(processedTime, "FAILED");
+        validateFailedStatePresent(failedTime, failure, "FAILED");
+
+        SlackInteractionFailureType failureType = failure.type();
+        if (failureType != SlackInteractionFailureType.BUSINESS_INVARIANT
+                && failureType != SlackInteractionFailureType.RETRY_EXHAUSTED) {
+            throw new IllegalArgumentException("FAILED 상태의 failureType이 올바르지 않습니다.");
+        }
+    }
+
+    private static void validateProcessedAttemptStarted(int processingAttempt, String statusName) {
+        if (processingAttempt <= 0) {
+            throw new IllegalArgumentException(statusName + " 상태의 processingAttempt는 1 이상이어야 합니다.");
+        }
+    }
+
+    private static void validateIdleLease(BoxProcessingLease processingLease, String statusName) {
+        if (processingLease.isClaimed()) {
+            throw new IllegalArgumentException(statusName + " 상태는 processingLease가 비어 있어야 합니다.");
+        }
+    }
+
+    private static void validateProcessedTimeAbsent(BoxEventTime processedTime, String statusName) {
+        if (processedTime.isPresent()) {
+            throw new IllegalArgumentException(statusName + " 상태는 processedTime이 비어 있어야 합니다.");
+        }
+    }
+
+    private static void validateFailedStateAbsent(
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<SlackInteractionFailureType> failure,
+            String statusName
+    ) {
+        if (failedTime.isPresent()) {
+            throw new IllegalArgumentException(statusName + " 상태는 failedTime이 비어 있어야 합니다.");
+        }
+        if (failure.isPresent()) {
+            throw new IllegalArgumentException(statusName + " 상태는 failure가 비어 있어야 합니다.");
+        }
+    }
+
+    private static void validateFailedStatePresent(
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<SlackInteractionFailureType> failure,
+            String statusName
+    ) {
+        if (!failedTime.isPresent()) {
+            throw new IllegalArgumentException(statusName + " 상태는 failedTime이 있어야 합니다.");
+        }
+        if (!failure.isPresent()) {
+            throw new IllegalArgumentException(statusName + " 상태는 failure가 있어야 합니다.");
+        }
+        if (failure.type() == SlackInteractionFailureType.ABSENT
+                || failure.type() == SlackInteractionFailureType.NONE) {
+            throw new IllegalArgumentException(statusName + " 상태의 failureType이 올바르지 않습니다.");
+        }
+    }
+
     private void validateProcessedAt(Instant processedAt) {
         if (processedAt == null) {
             throw new IllegalArgumentException("processedAt은 비어 있을 수 없습니다.");
@@ -291,6 +458,16 @@ public class SlackInteractionInbox {
         }
 
         throw new IllegalArgumentException("RETRY_PENDING failureType이 올바르지 않습니다.");
+    }
+
+    private void validateFailedFailureType(SlackInteractionFailureType failureType) {
+        validateFailureType(failureType);
+        if (failureType == SlackInteractionFailureType.BUSINESS_INVARIANT
+                || failureType == SlackInteractionFailureType.RETRY_EXHAUSTED) {
+            return;
+        }
+
+        throw new IllegalArgumentException("FAILED failureType이 올바르지 않습니다.");
     }
 
     private void validateClaimableStatus() {
