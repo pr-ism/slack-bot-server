@@ -105,23 +105,24 @@ public class SlackInteractionInboxProcessor {
         Set<Long> claimedInboxIds = new HashSet<>();
         int claimedCount = 0;
         for (int count = 0; count < limit; count++) {
-            int nextClaimedCount = processNextClaimedInbox(
+            ClaimStep nextClaimStep = processNextClaimedInbox(
                     interactionType,
                     action,
                     claimedInboxIds,
                     claimedCount
             );
-            if (nextClaimedCount == claimedCount) {
+            if (nextClaimStep.isUnchangedFrom(claimedCount)) {
                 return claimedCount;
             }
 
-            claimedCount = nextClaimedCount;
+            claimedInboxIds = nextClaimStep.claimedInboxIds();
+            claimedCount = nextClaimStep.claimedCount();
         }
 
         return claimedCount;
     }
 
-    private int processNextClaimedInbox(
+    private ClaimStep processNextClaimedInbox(
             SlackInteractionInboxType interactionType,
             BiConsumer<Long, Instant> action,
             Set<Long> claimedInboxIds,
@@ -129,16 +130,19 @@ public class SlackInteractionInboxProcessor {
     ) {
         Instant claimedProcessingStartedAt = normalizeProcessingStartedAt(clock.instant());
         return slackInteractionInboxRepository.claimNextId(
-                    interactionType,
-                    claimedProcessingStartedAt,
-                    claimedInboxIds
-            )
-            .map(inboxId -> {
-                claimedInboxIds.add(inboxId);
-                processSafely(inboxId, claimedProcessingStartedAt, action, interactionType);
-                return claimedCount + 1;
-            })
-            .orElse(claimedCount);
+                interactionType,
+                claimedProcessingStartedAt,
+                claimedInboxIds
+        )
+                .map(inboxId -> createClaimStep(
+                        inboxId,
+                        claimedProcessingStartedAt,
+                        action,
+                        interactionType,
+                        claimedInboxIds,
+                        claimedCount
+                ))
+                .orElseGet(() -> new ClaimStep(claimedInboxIds, claimedCount));
     }
 
     public int recoverBlockActionTimeoutProcessing() {
@@ -150,6 +154,20 @@ public class SlackInteractionInboxProcessor {
 
     private Instant normalizeProcessingStartedAt(Instant processingStartedAt) {
         return processingStartedAt.truncatedTo(ChronoUnit.MICROS);
+    }
+
+    private ClaimStep createClaimStep(
+            Long inboxId,
+            Instant claimedProcessingStartedAt,
+            BiConsumer<Long, Instant> action,
+            SlackInteractionInboxType interactionType,
+            Set<Long> claimedInboxIds,
+            int claimedCount
+    ) {
+        Set<Long> nextClaimedInboxIds = new HashSet<>(claimedInboxIds);
+        nextClaimedInboxIds.add(inboxId);
+        processSafely(inboxId, claimedProcessingStartedAt, action, interactionType);
+        return new ClaimStep(nextClaimedInboxIds, claimedCount + 1);
     }
 
     public int recoverViewSubmissionTimeoutProcessing() {
@@ -209,6 +227,15 @@ public class SlackInteractionInboxProcessor {
                     inboxId,
                     e
             );
+        }
+    }
+
+    private record ClaimStep(
+            Set<Long> claimedInboxIds,
+            int claimedCount
+    ) {
+        private boolean isUnchangedFrom(int claimedCount) {
+            return this.claimedCount == claimedCount;
         }
     }
 }
