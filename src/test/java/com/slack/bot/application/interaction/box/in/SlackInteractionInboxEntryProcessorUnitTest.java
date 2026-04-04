@@ -107,6 +107,28 @@ class SlackInteractionInboxEntryProcessorUnitTest {
     }
 
     @Test
+    void inboxId가_null이면_즉시_예외를_던진다() {
+        // when & then
+        assertThatThrownBy(() -> slackInteractionInboxEntryProcessor.processClaimedBlockAction(
+                null,
+                CLAIMED_PROCESSING_STARTED_AT
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("inboxId는 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void claimedProcessingStartedAt이_null이면_즉시_예외를_던진다() {
+        // when & then
+        assertThatThrownBy(() -> slackInteractionInboxEntryProcessor.processClaimedBlockAction(
+                10L,
+                null
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("claimedProcessingStartedAt은 비어 있을 수 없습니다.");
+    }
+
+    @Test
     void claimed_lease가_없는_inbox는_처리를_건너뛴다() {
         // given
         SlackInteractionInbox actual = SlackInteractionInbox.pending(

@@ -68,8 +68,11 @@ public class SlackInteractionInboxEntryProcessor {
             Consumer<JsonNode> consumer,
             SlackInteractionInboxType interactionType
     ) {
-        if (inboxId == null || claimedProcessingStartedAt == null) {
-            return;
+        if (inboxId == null) {
+            throw new IllegalArgumentException("inboxId는 비어 있을 수 없습니다.");
+        }
+        if (claimedProcessingStartedAt == null) {
+            throw new IllegalArgumentException("claimedProcessingStartedAt은 비어 있을 수 없습니다.");
         }
 
         slackInteractionInboxRepository.findById(inboxId)
