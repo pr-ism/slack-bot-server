@@ -16,6 +16,7 @@ import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -74,12 +75,13 @@ public class SlackInteractionInboxEntryProcessor {
         if (claimedProcessingStartedAt == null) {
             throw new IllegalArgumentException("claimedProcessingStartedAt은 비어 있을 수 없습니다.");
         }
+        Instant normalizedClaimedProcessingStartedAt = normalizeProcessingStartedAt(claimedProcessingStartedAt);
 
         slackInteractionInboxRepository.findById(inboxId)
                                        .ifPresentOrElse(
                                                claimedInbox -> processInTransaction(
                                                        claimedInbox,
-                                                       claimedProcessingStartedAt,
+                                                       normalizedClaimedProcessingStartedAt,
                                                        consumer,
                                                        interactionType
                                                ),
@@ -195,5 +197,9 @@ public class SlackInteractionInboxEntryProcessor {
                 claimedProcessingStartedAt,
                 actualProcessingStartedAt
         );
+    }
+
+    private Instant normalizeProcessingStartedAt(Instant processingStartedAt) {
+        return processingStartedAt.truncatedTo(ChronoUnit.MICROS);
     }
 }

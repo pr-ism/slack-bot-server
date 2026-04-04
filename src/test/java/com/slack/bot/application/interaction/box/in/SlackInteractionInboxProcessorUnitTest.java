@@ -272,4 +272,62 @@ class SlackInteractionInboxProcessorUnitTest {
                         payloadJson
                 );
     }
+
+    @Test
+    void claim시각은_DB_정밀도에_맞게_마이크로초로_정규화한다() {
+        // given
+        Instant rawClaimedProcessingStartedAt = Instant.parse("2026-02-18T00:00:00.123456789Z");
+        Instant normalizedClaimedProcessingStartedAt = Instant.parse("2026-02-18T00:00:00.123456Z");
+        Clock clock = Clock.fixed(rawClaimedProcessingStartedAt, ZoneOffset.UTC);
+        InteractionRetryProperties interactionRetryProperties = new InteractionRetryProperties(
+                new InteractionRetryProperties.InboxRetryProperties(2, 100L, 2.0, 1_000L),
+                new InteractionRetryProperties.OutboxRetryProperties(2, 100L, 2.0, 1_000L)
+        );
+        InteractionWorkerProperties interactionWorkerProperties = new InteractionWorkerProperties(
+                new InteractionWorkerProperties.InboxProperties(
+                        new InteractionWorkerProperties.BlockActionsProperties(
+                                200L,
+                                60000L,
+                                30000L,
+                                BLOCK_ACTION_RECOVERY_BATCH_SIZE
+                        ),
+                        new InteractionWorkerProperties.ViewSubmissionProperties(
+                                200L,
+                                60000L,
+                                30000L,
+                                VIEW_SUBMISSION_RECOVERY_BATCH_SIZE
+                        )
+                ),
+                new InteractionWorkerProperties.OutboxProperties()
+        );
+        slackInteractionInboxProcessor = new SlackInteractionInboxProcessor(
+                clock,
+                interactionRetryProperties,
+                interactionWorkerProperties,
+                slackInteractionInboxRepository,
+                idempotencyPayloadEncoder,
+                idempotencyKeyGenerator,
+                slackInteractionInboxEntryProcessor,
+                pollingHintPublisher
+        );
+        given(slackInteractionInboxRepository.claimNextId(
+                eq(SlackInteractionInboxType.BLOCK_ACTIONS),
+                eq(normalizedClaimedProcessingStartedAt),
+                anyCollection()
+        )).willReturn(Optional.of(1L));
+
+        // when
+        slackInteractionInboxProcessor.processPendingBlockActions(1);
+
+        // then
+        verify(slackInteractionInboxRepository).claimNextId(
+                eq(SlackInteractionInboxType.BLOCK_ACTIONS),
+                eq(normalizedClaimedProcessingStartedAt),
+                anyCollection()
+        );
+        verify(slackInteractionInboxEntryProcessor).processClaimedBlockAction(
+                1L,
+                normalizedClaimedProcessingStartedAt
+        );
+    }
 }

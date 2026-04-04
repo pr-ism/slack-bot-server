@@ -12,6 +12,7 @@ import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -126,7 +127,7 @@ public class SlackInteractionInboxProcessor {
             Set<Long> claimedInboxIds,
             int claimedCount
     ) {
-        Instant claimedProcessingStartedAt = clock.instant();
+        Instant claimedProcessingStartedAt = normalizeProcessingStartedAt(clock.instant());
         return slackInteractionInboxRepository.claimNextId(
                     interactionType,
                     claimedProcessingStartedAt,
@@ -145,6 +146,10 @@ public class SlackInteractionInboxProcessor {
                 SlackInteractionInboxType.BLOCK_ACTIONS,
                 interactionWorkerProperties.inbox().blockActions().processingTimeoutMs()
         );
+    }
+
+    private Instant normalizeProcessingStartedAt(Instant processingStartedAt) {
+        return processingStartedAt.truncatedTo(ChronoUnit.MICROS);
     }
 
     public int recoverViewSubmissionTimeoutProcessing() {

@@ -129,6 +129,30 @@ class SlackInteractionInboxEntryProcessorUnitTest {
     }
 
     @Test
+    void 나노초를_포함한_claimedProcessingStartedAt도_DB_정밀도에_맞춰_정상_처리한다() {
+        // given
+        Instant claimedProcessingStartedAt = Instant.parse("2026-02-15T00:00:00.123456789Z");
+        Instant persistedProcessingStartedAt = Instant.parse("2026-02-15T00:00:00.123456Z");
+        SlackInteractionInbox actual = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "normalized-lease",
+                "{}"
+        );
+        setProcessingState(actual, persistedProcessingStartedAt, 1);
+
+        given(slackInteractionInboxRepository.findById(18L)).willReturn(Optional.of(actual));
+        given(slackInteractionInboxRepository.saveIfProcessingLeaseMatched(eq(actual), any(), eq(persistedProcessingStartedAt)))
+                .willReturn(true);
+
+        // when
+        slackInteractionInboxEntryProcessor.processClaimedBlockAction(18L, claimedProcessingStartedAt);
+
+        // then
+        verify(blockActionInteractionService).handle(any());
+        verify(slackInteractionInboxRepository).saveIfProcessingLeaseMatched(eq(actual), any(), eq(persistedProcessingStartedAt));
+    }
+
+    @Test
     void claimed_lease가_없는_inbox는_처리를_건너뛴다() {
         // given
         SlackInteractionInbox actual = SlackInteractionInbox.pending(
