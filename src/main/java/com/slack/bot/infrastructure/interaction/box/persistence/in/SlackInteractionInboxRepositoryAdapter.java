@@ -363,6 +363,84 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
 
     @Override
     @Transactional
+    public boolean saveIfProcessingLeaseMatched(
+            SlackInteractionInbox inbox,
+            Instant claimedProcessingStartedAt
+    ) {
+        return saveIfProcessingLeaseMatched(inbox, null, claimedProcessingStartedAt);
+    }
+
+    @Override
+    @Transactional
+    public boolean saveIfProcessingLeaseMatched(
+            SlackInteractionInbox inbox,
+            SlackInteractionInboxHistory history,
+            Instant claimedProcessingStartedAt
+    ) {
+        validateSaveIfProcessingLeaseMatchedArguments(inbox, claimedProcessingStartedAt);
+
+        Timestamp processingStartedAt = null;
+        if (inbox.getProcessingLease().isClaimed()) {
+            processingStartedAt = Timestamp.from(inbox.getProcessingLease().startedAt());
+        }
+
+        Timestamp processedAt = null;
+        if (inbox.getProcessedTime().isPresent()) {
+            processedAt = Timestamp.from(inbox.getProcessedTime().occurredAt());
+        }
+
+        Timestamp failedAt = null;
+        if (inbox.getFailedTime().isPresent()) {
+            failedAt = Timestamp.from(inbox.getFailedTime().occurredAt());
+        }
+
+        String failureReason = null;
+        String failureType = null;
+        if (inbox.getFailure().isPresent()) {
+            failureReason = inbox.getFailure().reason();
+            failureType = inbox.getFailure().type().name();
+        }
+
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("status", inbox.getStatus().name())
+                .addValue("processingStartedAt", processingStartedAt)
+                .addValue("processedAt", processedAt)
+                .addValue("failedAt", failedAt)
+                .addValue("failureReason", failureReason)
+                .addValue("failureType", failureType)
+                .addValue("inboxId", inbox.getId())
+                .addValue("processingStatus", SlackInteractionInboxStatus.PROCESSING.name())
+                .addValue("claimedProcessingStartedAt", Timestamp.from(claimedProcessingStartedAt));
+
+        int updatedCount = namedParameterJdbcTemplate.update(
+                """
+                UPDATE slack_interaction_inbox
+                SET updated_at = CURRENT_TIMESTAMP(6),
+                    status = :status,
+                    processing_started_at = :processingStartedAt,
+                    processed_at = :processedAt,
+                    failed_at = :failedAt,
+                    failure_reason = :failureReason,
+                    failure_type = :failureType
+                WHERE id = :inboxId
+                  AND status = :processingStatus
+                  AND processing_started_at = :claimedProcessingStartedAt
+                """,
+                parameters
+        );
+        if (updatedCount == 0) {
+            return false;
+        }
+
+        if (history != null) {
+            saveHistory(history.bindInboxId(inbox.getId()));
+        }
+
+        return true;
+    }
+
+    @Override
+    @Transactional
     public SlackInteractionInbox save(SlackInteractionInbox inbox, SlackInteractionInboxHistory history) {
         SlackInteractionInbox saved = save(inbox);
         if (history != null) {
@@ -384,6 +462,20 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
         SlackInteractionInboxHistoryJpaEntity entity = new SlackInteractionInboxHistoryJpaEntity();
         entity.apply(history);
         historyRepository.save(entity);
+    }
+
+    private void validateSaveIfProcessingLeaseMatchedArguments(
+            SlackInteractionInbox inbox,
+            Instant claimedProcessingStartedAt
+    ) {
+        if (inbox == null) {
+            throw new IllegalArgumentException("inbox는 비어 있을 수 없습니다.");
+        }
+        if (inbox.getId() == null || inbox.getId() <= 0) {
+            throw new IllegalArgumentException("inboxId는 비어 있을 수 없습니다.");
+        }
+
+        validateProcessingStartedAt(claimedProcessingStartedAt);
     }
 
     private record TimeoutRecoveryCandidate(

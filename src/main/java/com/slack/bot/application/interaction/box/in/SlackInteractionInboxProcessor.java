@@ -14,7 +14,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.function.LongConsumer;
+import java.util.function.BiConsumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -59,7 +59,10 @@ public class SlackInteractionInboxProcessor {
         return processPending(
                 SlackInteractionInboxType.BLOCK_ACTIONS,
                 limit,
-                inboxId -> slackInteractionInboxEntryProcessor.processClaimedBlockAction(inboxId)
+                (inboxId, claimedProcessingStartedAt) -> slackInteractionInboxEntryProcessor.processClaimedBlockAction(
+                        inboxId,
+                        claimedProcessingStartedAt
+                )
         );
     }
 
@@ -86,14 +89,17 @@ public class SlackInteractionInboxProcessor {
         return processPending(
                 SlackInteractionInboxType.VIEW_SUBMISSION,
                 limit,
-                inboxId -> slackInteractionInboxEntryProcessor.processClaimedViewSubmission(inboxId)
+                (inboxId, claimedProcessingStartedAt) -> slackInteractionInboxEntryProcessor.processClaimedViewSubmission(
+                        inboxId,
+                        claimedProcessingStartedAt
+                )
         );
     }
 
     private int processPending(
             SlackInteractionInboxType interactionType,
             int limit,
-            LongConsumer action
+            BiConsumer<Long, Instant> action
     ) {
         Set<Long> claimedInboxIds = new HashSet<>();
         int claimedCount = 0;
@@ -116,18 +122,19 @@ public class SlackInteractionInboxProcessor {
 
     private int processNextClaimedInbox(
             SlackInteractionInboxType interactionType,
-            LongConsumer action,
+            BiConsumer<Long, Instant> action,
             Set<Long> claimedInboxIds,
             int claimedCount
     ) {
+        Instant claimedProcessingStartedAt = clock.instant();
         return slackInteractionInboxRepository.claimNextId(
                     interactionType,
-                    clock.instant(),
+                    claimedProcessingStartedAt,
                     claimedInboxIds
             )
             .map(inboxId -> {
                 claimedInboxIds.add(inboxId);
-                processSafely(inboxId, action, interactionType);
+                processSafely(inboxId, claimedProcessingStartedAt, action, interactionType);
                 return claimedCount + 1;
             })
             .orElse(claimedCount);
@@ -184,11 +191,12 @@ public class SlackInteractionInboxProcessor {
 
     private void processSafely(
             Long inboxId,
-            LongConsumer action,
+            Instant claimedProcessingStartedAt,
+            BiConsumer<Long, Instant> action,
             SlackInteractionInboxType interactionType
     ) {
         try {
-            action.accept(inboxId);
+            action.accept(inboxId, claimedProcessingStartedAt);
         } catch (Exception e) {
             log.error(
                     "{} inbox 엔트리 처리 중 예상치 못한 오류가 발생했습니다. inboxId={}",

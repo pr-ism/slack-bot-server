@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
@@ -15,6 +16,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interaction.block.BlockActionType;
+import com.slack.bot.application.interaction.box.in.exception.InboxProcessingLeaseLostException;
 import com.slack.bot.application.interaction.client.NotificationApiClient;
 import com.slack.bot.domain.reservation.ReservationStatus;
 import com.slack.bot.domain.reservation.ReviewReservation;
@@ -33,17 +35,22 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
-import org.springframework.dao.DataAccessException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @IntegrationTest
 @MockitoSpyBean(types = SlackInteractionInboxRepository.class)
 @SuppressWarnings("NonAsciiCharacters")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class SlackInteractionInboxEntryProcessorTest {
+
+    private static final Instant CLAIMED_PROCESSING_STARTED_AT = Instant.parse("2026-02-15T00:00:00Z");
 
     @Autowired
     SlackInteractionInboxEntryProcessor slackInteractionInboxEntryProcessor;
@@ -66,6 +73,9 @@ class SlackInteractionInboxEntryProcessorTest {
     @Autowired
     ObjectMapper objectMapper;
 
+    @Autowired
+    PlatformTransactionManager transactionManager;
+
     @Test
     @Sql(scripts = {
             "classpath:sql/fixtures/notification/workspace_t1.sql",
@@ -79,7 +89,7 @@ class SlackInteractionInboxEntryProcessorTest {
         SlackInteractionInbox inbox = savePendingInbox(SlackInteractionInboxType.BLOCK_ACTIONS, payloadJson);
 
         // when
-        slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId());
+        slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId(), CLAIMED_PROCESSING_STARTED_AT);
 
         // then
         SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
@@ -114,7 +124,7 @@ class SlackInteractionInboxEntryProcessorTest {
         SlackInteractionInbox inbox = savePendingInbox(SlackInteractionInboxType.BLOCK_ACTIONS, payloadJson);
 
         // when
-        slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId());
+        slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId(), CLAIMED_PROCESSING_STARTED_AT);
 
         // then
         SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
@@ -146,7 +156,7 @@ class SlackInteractionInboxEntryProcessorTest {
         SlackInteractionInbox inbox = savePendingInbox(SlackInteractionInboxType.VIEW_SUBMISSION, payloadJson);
 
         // when
-        slackInteractionInboxEntryProcessor.processClaimedViewSubmission(inbox.getId());
+        slackInteractionInboxEntryProcessor.processClaimedViewSubmission(inbox.getId(), CLAIMED_PROCESSING_STARTED_AT);
 
         // then
         SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
@@ -166,7 +176,7 @@ class SlackInteractionInboxEntryProcessorTest {
         SlackInteractionInbox inbox = savePendingInbox(SlackInteractionInboxType.BLOCK_ACTIONS, "{invalid-json");
 
         // when
-        slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId());
+        slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId(), CLAIMED_PROCESSING_STARTED_AT);
 
         // then
         SlackInteractionInbox actual = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
@@ -193,13 +203,17 @@ class SlackInteractionInboxEntryProcessorTest {
 
         doThrow(new IllegalStateException("forced save failure"))
                 .when(slackInteractionInboxRepository)
-                .save(
+                .saveIfProcessingLeaseMatched(
                         argThat(savedInbox -> savedInbox != null && inbox.getId().equals(savedInbox.getId())),
-                        any()
+                        any(),
+                        eq(CLAIMED_PROCESSING_STARTED_AT)
                 );
 
         // when & then
-        assertThatThrownBy(() -> slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId()))
+        assertThatThrownBy(() -> slackInteractionInboxEntryProcessor.processClaimedBlockAction(
+                inbox.getId(),
+                CLAIMED_PROCESSING_STARTED_AT
+        ))
                 .isInstanceOf(DataAccessException.class)
                 .hasMessageContaining("forced save failure");
 
@@ -235,7 +249,7 @@ class SlackInteractionInboxEntryProcessorTest {
         SlackInteractionInbox inbox = savePendingInbox(SlackInteractionInboxType.BLOCK_ACTIONS, payloadJson);
 
         // when
-        slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId());
+        slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId(), CLAIMED_PROCESSING_STARTED_AT);
 
         // then
         SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
@@ -262,10 +276,74 @@ class SlackInteractionInboxEntryProcessorTest {
         );
     }
 
+    @Test
+    @Sql(scripts = {
+            "classpath:sql/fixtures/notification/workspace_t1.sql",
+            "classpath:sql/fixtures/interaction/active_review_reservation_t1_project_123_u1.sql"
+    })
+    void timeout_recovery가_먼저_반영되면_늦은_완료는_최종_상태를_덮어쓰지_못한다() throws Exception {
+        // given
+        given(notificationApiClient.openDirectMessageChannel("xoxb-test-token", "U1"))
+                .willReturn("D-REVIEWER");
+        String payloadJson = objectMapper.writeValueAsString(cancelReservationPayload("100"));
+        SlackInteractionInbox inbox = savePendingInbox(SlackInteractionInboxType.BLOCK_ACTIONS, payloadJson);
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
+        willAnswer(invocation -> {
+            transactionTemplate.executeWithoutResult(status -> slackInteractionInboxRepository.recoverTimeoutProcessing(
+                    SlackInteractionInboxType.BLOCK_ACTIONS,
+                    CLAIMED_PROCESSING_STARTED_AT.plusSeconds(1),
+                    CLAIMED_PROCESSING_STARTED_AT.plusSeconds(2),
+                    "timeout",
+                    3,
+                    10
+            ));
+            return null;
+        }).given(notificationApiClient).sendBlockMessage(
+                eq("xoxb-test-token"),
+                eq("D-REVIEWER"),
+                any(),
+                any()
+        );
+
+        // when & then
+        assertThatThrownBy(() -> slackInteractionInboxEntryProcessor.processClaimedBlockAction(
+                inbox.getId(),
+                CLAIMED_PROCESSING_STARTED_AT
+        ))
+                .isInstanceOf(InboxProcessingLeaseLostException.class)
+                .hasMessageContaining("processing lease");
+
+        // then
+        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
+        List<SlackInteractionInboxHistory> histories = historiesOf(inbox.getId());
+
+        assertAll(
+                () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
+                () -> assertThat(actualInbox.getProcessingAttempt()).isEqualTo(1),
+                () -> assertThat(actualInbox.getFailure().type()).isEqualTo(SlackInteractionFailureType.PROCESSING_TIMEOUT),
+                () -> assertThat(histories).hasSize(1),
+                () -> assertThat(histories.getFirst().getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
+                () -> assertThat(histories.getFirst().getFailure().type())
+                        .isEqualTo(SlackInteractionFailureType.PROCESSING_TIMEOUT),
+                () -> assertThat(reviewReservationRepository.findById(100L))
+                        .map(reservation -> reservation.getStatus())
+                        .hasValue(ReservationStatus.ACTIVE)
+        );
+        verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1");
+        verify(notificationApiClient).sendBlockMessage(
+                eq("xoxb-test-token"),
+                eq("D-REVIEWER"),
+                any(),
+                any()
+        );
+    }
+
     private SlackInteractionInbox savePendingInbox(SlackInteractionInboxType interactionType, String payloadJson) {
         String idempotencyKey = interactionType + "-entry-" + System.nanoTime();
         SlackInteractionInbox inbox = SlackInteractionInbox.pending(interactionType, idempotencyKey, payloadJson);
-        inbox.claim(Instant.parse("2026-02-15T00:00:00Z"));
+        inbox.claim(CLAIMED_PROCESSING_STARTED_AT);
         ReflectionTestUtils.setField(inbox, "processingAttempt", 1);
         return slackInteractionInboxRepository.save(inbox);
     }

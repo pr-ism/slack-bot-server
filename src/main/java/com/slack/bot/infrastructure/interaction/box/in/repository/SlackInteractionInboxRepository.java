@@ -28,6 +28,17 @@ public interface SlackInteractionInboxRepository {
             int recoveryBatchSize
     );
 
+    boolean saveIfProcessingLeaseMatched(
+            SlackInteractionInbox inbox,
+            Instant claimedProcessingStartedAt
+    );
+
+    boolean saveIfProcessingLeaseMatched(
+            SlackInteractionInbox inbox,
+            SlackInteractionInboxHistory history,
+            Instant claimedProcessingStartedAt
+    );
+
     SlackInteractionInbox save(SlackInteractionInbox inbox);
 
     SlackInteractionInbox save(SlackInteractionInbox inbox, SlackInteractionInboxHistory history);

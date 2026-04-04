@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interaction.BlockActionInteractionService;
 import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
 import com.slack.bot.application.interaction.box.aop.BindInboxToOutboxSource;
+import com.slack.bot.application.interaction.box.in.exception.InboxProcessingLeaseLostException;
 import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
 import com.slack.bot.application.interaction.view.ViewSubmissionInteractionCoordinator;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
@@ -14,6 +15,7 @@ import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxHist
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,9 +42,10 @@ public class SlackInteractionInboxEntryProcessor {
 
     @BindInboxToOutboxSource
     @Transactional
-    public void processClaimedBlockAction(Long inboxId) {
+    public void processClaimedBlockAction(Long inboxId, Instant claimedProcessingStartedAt) {
         processClaimedInbox(
                 inboxId,
+                claimedProcessingStartedAt,
                 payload -> blockActionInteractionService.handle(payload),
                 SlackInteractionInboxType.BLOCK_ACTIONS
         );
@@ -50,9 +53,10 @@ public class SlackInteractionInboxEntryProcessor {
 
     @BindInboxToOutboxSource
     @Transactional
-    public void processClaimedViewSubmission(Long inboxId) {
+    public void processClaimedViewSubmission(Long inboxId, Instant claimedProcessingStartedAt) {
         processClaimedInbox(
                 inboxId,
+                claimedProcessingStartedAt,
                 payload -> viewSubmissionInteractionCoordinator.handleEnqueued(payload),
                 SlackInteractionInboxType.VIEW_SUBMISSION
         );
@@ -60,10 +64,11 @@ public class SlackInteractionInboxEntryProcessor {
 
     private void processClaimedInbox(
             Long inboxId,
+            Instant claimedProcessingStartedAt,
             Consumer<JsonNode> consumer,
             SlackInteractionInboxType interactionType
     ) {
-        if (inboxId == null) {
+        if (inboxId == null || claimedProcessingStartedAt == null) {
             return;
         }
 
@@ -71,6 +76,7 @@ public class SlackInteractionInboxEntryProcessor {
                                        .ifPresentOrElse(
                                                claimedInbox -> processInTransaction(
                                                        claimedInbox,
+                                                       claimedProcessingStartedAt,
                                                        consumer,
                                                        interactionType
                                                ),
@@ -83,9 +89,15 @@ public class SlackInteractionInboxEntryProcessor {
 
     private void processInTransaction(
             SlackInteractionInbox claimedInbox,
+            Instant claimedProcessingStartedAt,
             Consumer<JsonNode> consumer,
             SlackInteractionInboxType interactionType
     ) {
+        if (!hasProcessingLease(claimedInbox, claimedProcessingStartedAt)) {
+            logLeaseLost(claimedInbox.getId(), claimedProcessingStartedAt, claimedInbox);
+            return;
+        }
+
         SlackInteractionInboxHistory history;
 
         try {
@@ -107,7 +119,26 @@ public class SlackInteractionInboxEntryProcessor {
             history = markFailureStatus(claimedInbox, e);
         }
 
-        slackInteractionInboxRepository.save(claimedInbox, history);
+        persistWithLeaseCheck(claimedInbox, history, claimedProcessingStartedAt);
+    }
+
+    private void persistWithLeaseCheck(
+            SlackInteractionInbox inbox,
+            SlackInteractionInboxHistory history,
+            Instant claimedProcessingStartedAt
+    ) {
+        boolean updated = slackInteractionInboxRepository.saveIfProcessingLeaseMatched(
+                inbox,
+                history,
+                claimedProcessingStartedAt
+        );
+        if (updated) {
+            return;
+        }
+
+        throw new InboxProcessingLeaseLostException(
+                "slack interaction inbox processing lease를 상실했습니다. inboxId=" + inbox.getId()
+        );
     }
 
     private SlackInteractionInboxHistory markFailureStatus(SlackInteractionInbox inbox, Exception e) {
@@ -132,5 +163,34 @@ public class SlackInteractionInboxEntryProcessor {
         }
 
         return reason;
+    }
+
+    private boolean hasProcessingLease(
+            SlackInteractionInbox inbox,
+            Instant claimedProcessingStartedAt
+    ) {
+        if (!inbox.getProcessingLease().isClaimed()) {
+            return false;
+        }
+
+        return claimedProcessingStartedAt.equals(inbox.getProcessingLease().startedAt());
+    }
+
+    private void logLeaseLost(
+            Long inboxId,
+            Instant claimedProcessingStartedAt,
+            SlackInteractionInbox inbox
+    ) {
+        Object actualProcessingStartedAt = "ABSENT";
+        if (inbox.getProcessingLease().isClaimed()) {
+            actualProcessingStartedAt = inbox.getProcessingLease().startedAt();
+        }
+
+        log.warn(
+                "slack interaction inbox 처리 lease를 상실해 처리를 건너뜁니다. inboxId={}, claimedProcessingStartedAt={}, actualProcessingStartedAt={}",
+                inboxId,
+                claimedProcessingStartedAt,
+                actualProcessingStartedAt
+        );
     }
 }

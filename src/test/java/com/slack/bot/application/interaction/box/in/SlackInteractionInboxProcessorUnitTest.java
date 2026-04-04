@@ -39,6 +39,7 @@ class SlackInteractionInboxProcessorUnitTest {
 
     private static final int BLOCK_ACTION_RECOVERY_BATCH_SIZE = 41;
     private static final int VIEW_SUBMISSION_RECOVERY_BATCH_SIZE = 42;
+    private static final Instant CLAIMED_PROCESSING_STARTED_AT = Instant.parse("2026-02-18T00:00:00Z");
 
     @Mock
     SlackInteractionInboxRepository slackInteractionInboxRepository;
@@ -59,7 +60,7 @@ class SlackInteractionInboxProcessorUnitTest {
 
     @BeforeEach
     void setUp() {
-        Clock clock = Clock.fixed(Instant.parse("2026-02-18T00:00:00Z"), ZoneOffset.UTC);
+        Clock clock = Clock.fixed(CLAIMED_PROCESSING_STARTED_AT, ZoneOffset.UTC);
         InteractionRetryProperties interactionRetryProperties = new InteractionRetryProperties(
                 new InteractionRetryProperties.InboxRetryProperties(2, 100L, 2.0, 1_000L),
                 new InteractionRetryProperties.OutboxRetryProperties(2, 100L, 2.0, 1_000L)
@@ -178,16 +179,16 @@ class SlackInteractionInboxProcessorUnitTest {
                 .willReturn(Optional.of(1L), Optional.of(2L), Optional.of(3L));
         willThrow(new RuntimeException("db failure"))
                 .given(slackInteractionInboxEntryProcessor)
-                .processClaimedBlockAction(1L);
+                .processClaimedBlockAction(1L, CLAIMED_PROCESSING_STARTED_AT);
 
         InOrder inOrder = inOrder(slackInteractionInboxEntryProcessor);
 
         // when & then
         assertThatCode(() -> slackInteractionInboxProcessor.processPendingBlockActions(3))
                 .doesNotThrowAnyException();
-        inOrder.verify(slackInteractionInboxEntryProcessor).processClaimedBlockAction(1L);
-        inOrder.verify(slackInteractionInboxEntryProcessor).processClaimedBlockAction(2L);
-        inOrder.verify(slackInteractionInboxEntryProcessor).processClaimedBlockAction(3L);
+        inOrder.verify(slackInteractionInboxEntryProcessor).processClaimedBlockAction(1L, CLAIMED_PROCESSING_STARTED_AT);
+        inOrder.verify(slackInteractionInboxEntryProcessor).processClaimedBlockAction(2L, CLAIMED_PROCESSING_STARTED_AT);
+        inOrder.verify(slackInteractionInboxEntryProcessor).processClaimedBlockAction(3L, CLAIMED_PROCESSING_STARTED_AT);
     }
 
     @Test
@@ -231,15 +232,15 @@ class SlackInteractionInboxProcessorUnitTest {
                 .willReturn(Optional.of(11L), Optional.of(12L));
         willThrow(new RuntimeException("db failure"))
                 .given(slackInteractionInboxEntryProcessor)
-                .processClaimedViewSubmission(11L);
+                .processClaimedViewSubmission(11L, CLAIMED_PROCESSING_STARTED_AT);
 
         InOrder inOrder = inOrder(slackInteractionInboxEntryProcessor);
 
         // when & then
         assertThatCode(() -> slackInteractionInboxProcessor.processPendingViewSubmissions(2))
                 .doesNotThrowAnyException();
-        inOrder.verify(slackInteractionInboxEntryProcessor).processClaimedViewSubmission(11L);
-        inOrder.verify(slackInteractionInboxEntryProcessor).processClaimedViewSubmission(12L);
+        inOrder.verify(slackInteractionInboxEntryProcessor).processClaimedViewSubmission(11L, CLAIMED_PROCESSING_STARTED_AT);
+        inOrder.verify(slackInteractionInboxEntryProcessor).processClaimedViewSubmission(12L, CLAIMED_PROCESSING_STARTED_AT);
     }
 
     @Test
