@@ -106,9 +106,7 @@ public class SlackNotificationOutboxHistory {
         if (status == null) {
             throw new IllegalArgumentException("status는 비어 있을 수 없습니다.");
         }
-        if (status == SlackNotificationOutboxStatus.PENDING || status == SlackNotificationOutboxStatus.PROCESSING) {
-            throw new IllegalArgumentException("history status는 완료된 상태여야 합니다.");
-        }
+        status.validateHistoryStatus();
     }
 
     private static void validateCompletedAt(Instant completedAt) {
@@ -121,34 +119,6 @@ public class SlackNotificationOutboxHistory {
             SlackNotificationOutboxStatus status,
             BoxFailureSnapshot<SlackInteractionFailureType> failure
     ) {
-        if (failure == null) {
-            throw new IllegalArgumentException("failure는 비어 있을 수 없습니다.");
-        }
-
-        if (status == SlackNotificationOutboxStatus.SENT) {
-            if (failure.isPresent()) {
-                throw new IllegalArgumentException("SENT history에는 실패 정보가 없어야 합니다.");
-            }
-            return;
-        }
-
-        if (!failure.isPresent()) {
-            throw new IllegalArgumentException("완료 실패 정보는 비어 있을 수 없습니다.");
-        }
-
-        SlackInteractionFailureType failureType = failure.type();
-        if (failureType == SlackInteractionFailureType.ABSENT || failureType == SlackInteractionFailureType.NONE) {
-            throw new IllegalArgumentException("완료 실패 정보의 failureType이 올바르지 않습니다.");
-        }
-        if (status == SlackNotificationOutboxStatus.RETRY_PENDING
-                && failureType != SlackInteractionFailureType.RETRYABLE
-                && failureType != SlackInteractionFailureType.PROCESSING_TIMEOUT) {
-            throw new IllegalArgumentException("RETRY_PENDING history의 failureType이 올바르지 않습니다.");
-        }
-        if (status == SlackNotificationOutboxStatus.FAILED
-                && failureType != SlackInteractionFailureType.BUSINESS_INVARIANT
-                && failureType != SlackInteractionFailureType.RETRY_EXHAUSTED) {
-            throw new IllegalArgumentException("FAILED history의 failureType이 올바르지 않습니다.");
-        }
+        status.validateHistoryFailure(failure);
     }
 }
