@@ -186,16 +186,20 @@ public class SlackInteractionInboxEntryProcessor {
             Instant claimedProcessingStartedAt,
             SlackInteractionInbox inbox
     ) {
-        Object actualProcessingStartedAt = "ABSENT";
         if (inbox.getProcessingLease().isClaimed()) {
-            actualProcessingStartedAt = inbox.getProcessingLease().startedAt();
+            log.warn(
+                    "slack interaction inbox 처리 lease를 상실해 처리를 건너뜁니다. inboxId={}, claimedProcessingStartedAt={}, actualProcessingLeaseClaimed=true, actualProcessingStartedAt={}",
+                    inboxId,
+                    claimedProcessingStartedAt,
+                    inbox.getProcessingLease().startedAt()
+            );
+            return;
         }
 
         log.warn(
-                "slack interaction inbox 처리 lease를 상실해 처리를 건너뜁니다. inboxId={}, claimedProcessingStartedAt={}, actualProcessingStartedAt={}",
+                "slack interaction inbox 처리 lease를 상실해 처리를 건너뜁니다. inboxId={}, claimedProcessingStartedAt={}, actualProcessingLeaseClaimed=false",
                 inboxId,
-                claimedProcessingStartedAt,
-                actualProcessingStartedAt
+                claimedProcessingStartedAt
         );
     }
 

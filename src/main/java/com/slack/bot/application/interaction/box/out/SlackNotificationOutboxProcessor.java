@@ -120,7 +120,7 @@ public class SlackNotificationOutboxProcessor {
             Instant claimedProcessingStartedAt
     ) {
         if (!hasProcessingLease(outbox, claimedProcessingStartedAt)) {
-            logLeaseLost(outbox.getId(), claimedProcessingStartedAt, describeActualProcessingLease(outbox));
+            logLeaseLost(outbox.getId(), claimedProcessingStartedAt, outbox.getProcessingLease());
             return;
         }
 
@@ -171,7 +171,7 @@ public class SlackNotificationOutboxProcessor {
             return;
         }
 
-        logLeaseLost(outbox.getId(), claimedProcessingStartedAt, describeActualProcessingLease(outbox));
+        logLeaseLost(outbox.getId(), claimedProcessingStartedAt, outbox.getProcessingLease());
     }
 
     private void persistFailureStatus(
@@ -197,7 +197,7 @@ public class SlackNotificationOutboxProcessor {
             return;
         }
 
-        logLeaseLost(outbox.getId(), claimedProcessingStartedAt, describeActualProcessingLease(outbox));
+        logLeaseLost(outbox.getId(), claimedProcessingStartedAt, outbox.getProcessingLease());
     }
 
     private void logMissingOutbox(Long outboxId) {
@@ -306,7 +306,7 @@ public class SlackNotificationOutboxProcessor {
                 renewedProcessingStartedAt
         );
         if (!renewed) {
-            logLeaseLost(outbox.getId(), currentProcessingStartedAt.get(), renewedProcessingStartedAt.toString());
+            logLeaseRenewLost(outbox.getId(), currentProcessingStartedAt.get(), renewedProcessingStartedAt);
             throw new OutboxProcessingLeaseLostException("outbox processing lease를 상실했습니다.");
         }
 
@@ -326,25 +326,38 @@ public class SlackNotificationOutboxProcessor {
         return claimedProcessingStartedAt.equals(processingLease.startedAt());
     }
 
-    private String describeActualProcessingLease(SlackNotificationOutbox outbox) {
-        BoxProcessingLease processingLease = outbox.getProcessingLease();
-        if (!processingLease.isClaimed()) {
-            return "IDLE";
-        }
-
-        return processingLease.startedAt().toString();
-    }
-
     private void logLeaseLost(
             Long outboxId,
             Instant claimedProcessingStartedAt,
-            String actualProcessingLease
+            BoxProcessingLease actualProcessingLease
+    ) {
+        if (actualProcessingLease.isClaimed()) {
+            log.warn(
+                    "outbox 처리 lease를 상실해 최종 상태 저장을 건너뜁니다. outboxId={}, claimedProcessingStartedAt={}, actualProcessingLeaseClaimed=true, actualProcessingStartedAt={}",
+                    outboxId,
+                    claimedProcessingStartedAt,
+                    actualProcessingLease.startedAt()
+            );
+            return;
+        }
+
+        log.warn(
+                "outbox 처리 lease를 상실해 최종 상태 저장을 건너뜁니다. outboxId={}, claimedProcessingStartedAt={}, actualProcessingLeaseClaimed=false",
+                outboxId,
+                claimedProcessingStartedAt
+        );
+    }
+
+    private void logLeaseRenewLost(
+            Long outboxId,
+            Instant claimedProcessingStartedAt,
+            Instant renewedProcessingStartedAt
     ) {
         log.warn(
-                "outbox 처리 lease를 상실해 최종 상태 저장을 건너뜁니다. outboxId={}, claimedProcessingStartedAt={}, actualProcessingLease={}",
+                "outbox 처리 lease 갱신 중 lease를 상실했습니다. outboxId={}, claimedProcessingStartedAt={}, renewedProcessingStartedAt={}",
                 outboxId,
                 claimedProcessingStartedAt,
-                actualProcessingLease
+                renewedProcessingStartedAt
         );
     }
 }
