@@ -11,7 +11,6 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 
 import com.slack.bot.application.IntegrationTest;
-import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
@@ -76,7 +75,7 @@ class SlackNotificationOutboxLeaseIntegrationTest {
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.SENT),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
+                () -> assertThat(actual.getFailure().isPresent()).isFalse()
         );
         verify(notificationTransportApiClient).sendMessage("xoxb-test-token", "C1", "hello-102");
     }
@@ -104,7 +103,7 @@ class SlackNotificationOutboxLeaseIntegrationTest {
                 () -> assertThat(recoveredCount).isEqualTo(1),
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.RETRY_PENDING),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actual.getFailureReason()).isNotBlank()
+                () -> assertThat(actual.getFailure().reason()).isNotBlank()
         );
         verify(notificationTransportApiClient, never()).sendMessage(anyString(), anyString(), anyString());
     }

@@ -9,7 +9,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interaction.box.out.exception.SlackBlocksSerializationException;
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
+import com.slack.bot.infrastructure.common.BoxEventTime;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
+import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
@@ -205,7 +207,7 @@ class SlackNotificationOutboxWriterTest {
                 ))
                         .isInstanceOf(SlackBlocksSerializationException.class)
                         .hasMessage("blocks JSON 직렬화에 실패했습니다.");
-        List<SlackNotificationOutbox> actual = jpaSlackNotificationOutboxRepository.findAll();
+        List<SlackNotificationOutbox> actual = jpaSlackNotificationOutboxRepository.findAllDomains();
         assertThat(actual).isEmpty();
     }
 
@@ -229,7 +231,7 @@ class SlackNotificationOutboxWriterTest {
                 ))
                         .isInstanceOf(SlackBlocksSerializationException.class)
                         .hasMessage("blocks JSON 직렬화에 실패했습니다.");
-        List<SlackNotificationOutbox> actual = jpaSlackNotificationOutboxRepository.findAll();
+        List<SlackNotificationOutbox> actual = jpaSlackNotificationOutboxRepository.findAllDomains();
         assertThat(actual).isEmpty();
     }
 
@@ -252,7 +254,7 @@ class SlackNotificationOutboxWriterTest {
                 ))
                         .isInstanceOf(IllegalArgumentException.class)
                         .hasMessage("blocks는 null일 수 없습니다.");
-        List<SlackNotificationOutbox> actual = jpaSlackNotificationOutboxRepository.findAll();
+        List<SlackNotificationOutbox> actual = jpaSlackNotificationOutboxRepository.findAllDomains();
         assertThat(actual).isEmpty();
     }
 
@@ -273,7 +275,7 @@ class SlackNotificationOutboxWriterTest {
                 ))
                         .isInstanceOf(IllegalArgumentException.class)
                         .hasMessage("blocks는 null일 수 없습니다.");
-        List<SlackNotificationOutbox> actual = jpaSlackNotificationOutboxRepository.findAll();
+        List<SlackNotificationOutbox> actual = jpaSlackNotificationOutboxRepository.findAllDomains();
         assertThat(actual).isEmpty();
     }
 
@@ -295,7 +297,7 @@ class SlackNotificationOutboxWriterTest {
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("text는 null일 수 없습니다.");
-        List<SlackNotificationOutbox> actual = jpaSlackNotificationOutboxRepository.findAll();
+        List<SlackNotificationOutbox> actual = jpaSlackNotificationOutboxRepository.findAllDomains();
         assertThat(actual).isEmpty();
     }
 
@@ -315,7 +317,7 @@ class SlackNotificationOutboxWriterTest {
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("text는 null일 수 없습니다.");
-        List<SlackNotificationOutbox> actual = jpaSlackNotificationOutboxRepository.findAll();
+        List<SlackNotificationOutbox> actual = jpaSlackNotificationOutboxRepository.findAllDomains();
         assertThat(actual).isEmpty();
     }
 
@@ -434,7 +436,7 @@ class SlackNotificationOutboxWriterTest {
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() ->
                 assertThat(jpaSlackNotificationOutboxRepository.findAll()).hasSize(1)
         );
-        return jpaSlackNotificationOutboxRepository.findAll().getFirst();
+        return jpaSlackNotificationOutboxRepository.findAllDomains().getFirst();
     }
 
     private SlackNotificationOutboxWriter targetWriter() {
@@ -447,11 +449,10 @@ class SlackNotificationOutboxWriterTest {
             int processingAttempt
     ) {
         ReflectionTestUtils.setField(outbox, "status", SlackNotificationOutboxStatus.PROCESSING);
-        ReflectionTestUtils.setField(outbox, "processingStartedAt", processingStartedAt);
-        ReflectionTestUtils.setField(outbox, "sentAt", FailureSnapshotDefaults.NO_SENT_AT);
+        ReflectionTestUtils.setField(outbox, "processingLease", BoxProcessingLease.claimed(processingStartedAt));
+        ReflectionTestUtils.setField(outbox, "sentTime", BoxEventTime.absent());
         ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(outbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
-        ReflectionTestUtils.setField(outbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
-        ReflectionTestUtils.setField(outbox, "failureType", SlackInteractionFailureType.NONE);
+        ReflectionTestUtils.setField(outbox, "failedTime", BoxEventTime.absent());
+        ReflectionTestUtils.setField(outbox, "failure", BoxFailureSnapshot.absent());
     }
 }

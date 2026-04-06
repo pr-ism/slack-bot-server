@@ -24,6 +24,7 @@ import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.global.config.properties.InteractionWorkerProperties;
+import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
@@ -186,12 +187,7 @@ class SlackNotificationOutboxProcessorUnitTest {
         SlackNotificationOutbox outbox = mock(SlackNotificationOutbox.class);
         given(outbox.getId()).willReturn(10L);
         given(outbox.getMessageType()).willReturn(null);
-        given(outbox.getTeamId()).willReturn("T1");
-        given(outbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
-
-        Workspace workspace = mock(Workspace.class);
-        given(workspace.getAccessToken()).willReturn("xoxb-test-token");
-        given(workspaceRepository.findByTeamId("T1")).willReturn(Optional.of(workspace));
+        given(outbox.getProcessingLease()).willReturn(BoxProcessingLease.claimed(CLAIMED_PROCESSING_STARTED_AT));
 
         given(slackNotificationOutboxRepository.claimNextId(any(), anyCollection()))
                 .willReturn(Optional.of(10L), Optional.empty());
@@ -233,8 +229,8 @@ class SlackNotificationOutboxProcessorUnitTest {
         given(outbox.getMessageType()).willReturn(SlackNotificationOutboxMessageType.CHANNEL_TEXT);
         given(outbox.getTeamId()).willReturn("T1");
         given(outbox.getChannelId()).willReturn("C1");
-        given(outbox.getText()).willReturn("hello");
-        given(outbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
+        given(outbox.requiredText()).willReturn("hello");
+        given(outbox.getProcessingLease()).willReturn(BoxProcessingLease.claimed(CLAIMED_PROCESSING_STARTED_AT));
 
         Workspace workspace = mock(Workspace.class);
         given(workspace.getAccessToken()).willReturn("xoxb-test-token");
@@ -262,8 +258,11 @@ class SlackNotificationOutboxProcessorUnitTest {
         given(outbox.getMessageType()).willReturn(SlackNotificationOutboxMessageType.CHANNEL_TEXT);
         given(outbox.getTeamId()).willReturn("T1");
         given(outbox.getChannelId()).willReturn("C1");
-        given(outbox.getText()).willReturn("hello");
-        given(outbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
+        given(outbox.requiredText()).willReturn("hello");
+        given(outbox.getProcessingLease()).willReturn(
+                BoxProcessingLease.claimed(CLAIMED_PROCESSING_STARTED_AT),
+                BoxProcessingLease.idle()
+        );
 
         Workspace workspace = mock(Workspace.class);
         given(workspace.getAccessToken()).willReturn("xoxb-test-token");
@@ -291,8 +290,8 @@ class SlackNotificationOutboxProcessorUnitTest {
         given(outbox.getMessageType()).willReturn(SlackNotificationOutboxMessageType.CHANNEL_TEXT);
         given(outbox.getTeamId()).willReturn("T1");
         given(outbox.getChannelId()).willReturn("C1");
-        given(outbox.getText()).willReturn("hello");
-        given(outbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
+        given(outbox.requiredText()).willReturn("hello");
+        given(outbox.getProcessingLease()).willReturn(BoxProcessingLease.claimed(CLAIMED_PROCESSING_STARTED_AT));
 
         Workspace workspace = mock(Workspace.class);
         given(workspace.getAccessToken()).willReturn("xoxb-test-token");
@@ -321,8 +320,8 @@ class SlackNotificationOutboxProcessorUnitTest {
         given(outbox.getMessageType()).willReturn(SlackNotificationOutboxMessageType.CHANNEL_TEXT);
         given(outbox.getTeamId()).willReturn("T1");
         given(outbox.getChannelId()).willReturn("C1");
-        given(outbox.getText()).willReturn("hello");
-        given(outbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
+        given(outbox.requiredText()).willReturn("hello");
+        given(outbox.getProcessingLease()).willReturn(BoxProcessingLease.claimed(CLAIMED_PROCESSING_STARTED_AT));
 
         Workspace workspace = mock(Workspace.class);
         given(workspace.getAccessToken()).willReturn("xoxb-test-token");
@@ -355,8 +354,11 @@ class SlackNotificationOutboxProcessorUnitTest {
         given(outbox.getMessageType()).willReturn(SlackNotificationOutboxMessageType.CHANNEL_TEXT);
         given(outbox.getTeamId()).willReturn("T1");
         given(outbox.getChannelId()).willReturn("C1");
-        given(outbox.getText()).willReturn("hello");
-        given(outbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
+        given(outbox.requiredText()).willReturn("hello");
+        given(outbox.getProcessingLease()).willReturn(
+                BoxProcessingLease.claimed(CLAIMED_PROCESSING_STARTED_AT),
+                BoxProcessingLease.idle()
+        );
 
         Workspace workspace = mock(Workspace.class);
         given(workspace.getAccessToken()).willReturn("xoxb-test-token");
@@ -387,15 +389,15 @@ class SlackNotificationOutboxProcessorUnitTest {
         given(firstOutbox.getMessageType()).willReturn(SlackNotificationOutboxMessageType.CHANNEL_TEXT);
         given(firstOutbox.getTeamId()).willReturn("T1");
         given(firstOutbox.getChannelId()).willReturn("C1");
-        given(firstOutbox.getText()).willReturn("first");
-        given(firstOutbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
+        given(firstOutbox.requiredText()).willReturn("first");
+        given(firstOutbox.getProcessingLease()).willReturn(BoxProcessingLease.claimed(CLAIMED_PROCESSING_STARTED_AT));
 
         given(secondOutbox.getId()).willReturn(20L);
         given(secondOutbox.getMessageType()).willReturn(SlackNotificationOutboxMessageType.CHANNEL_TEXT);
         given(secondOutbox.getTeamId()).willReturn("T1");
         given(secondOutbox.getChannelId()).willReturn("C2");
-        given(secondOutbox.getText()).willReturn("second");
-        given(secondOutbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
+        given(secondOutbox.requiredText()).willReturn("second");
+        given(secondOutbox.getProcessingLease()).willReturn(BoxProcessingLease.claimed(CLAIMED_PROCESSING_STARTED_AT));
 
         Workspace workspace = mock(Workspace.class);
         given(workspace.getAccessToken()).willReturn("xoxb-test-token");
@@ -434,14 +436,14 @@ class SlackNotificationOutboxProcessorUnitTest {
         given(firstOutbox.getMessageType()).willReturn(SlackNotificationOutboxMessageType.CHANNEL_TEXT);
         given(firstOutbox.getTeamId()).willReturn("T1");
         given(firstOutbox.getChannelId()).willReturn("C1");
-        given(firstOutbox.getText()).willReturn("first");
-        given(firstOutbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
+        given(firstOutbox.requiredText()).willReturn("first");
+        given(firstOutbox.getProcessingLease()).willReturn(BoxProcessingLease.claimed(CLAIMED_PROCESSING_STARTED_AT));
 
         given(secondOutbox.getMessageType()).willReturn(SlackNotificationOutboxMessageType.CHANNEL_TEXT);
         given(secondOutbox.getTeamId()).willReturn("T1");
         given(secondOutbox.getChannelId()).willReturn("C2");
-        given(secondOutbox.getText()).willReturn("second");
-        given(secondOutbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
+        given(secondOutbox.requiredText()).willReturn("second");
+        given(secondOutbox.getProcessingLease()).willReturn(BoxProcessingLease.claimed(CLAIMED_PROCESSING_STARTED_AT));
 
         Workspace workspace = mock(Workspace.class);
         given(workspace.getAccessToken()).willReturn("xoxb-test-token");
@@ -475,7 +477,9 @@ class SlackNotificationOutboxProcessorUnitTest {
         // given
         SlackNotificationOutbox outbox = mock(SlackNotificationOutbox.class);
         given(outbox.getId()).willReturn(10L);
-        given(outbox.getProcessingStartedAt()).willReturn(Instant.parse("2026-03-24T00:00:01Z"));
+        given(outbox.getProcessingLease()).willReturn(
+                BoxProcessingLease.claimed(Instant.parse("2026-03-24T00:00:01Z"))
+        );
         given(slackNotificationOutboxRepository.claimNextId(any(), anyCollection()))
                 .willReturn(Optional.of(10L), Optional.empty());
         given(slackNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(outbox));
@@ -494,7 +498,7 @@ class SlackNotificationOutboxProcessorUnitTest {
         // given
         SlackNotificationOutbox outbox = mock(SlackNotificationOutbox.class);
         given(outbox.getId()).willReturn(10L);
-        given(outbox.getProcessingStartedAt()).willReturn(CLAIMED_PROCESSING_STARTED_AT);
+        given(outbox.getProcessingLease()).willReturn(BoxProcessingLease.claimed(CLAIMED_PROCESSING_STARTED_AT));
         given(slackNotificationOutboxRepository.claimNextId(any(), anyCollection()))
                 .willReturn(Optional.of(10L), Optional.empty());
         given(slackNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(outbox));

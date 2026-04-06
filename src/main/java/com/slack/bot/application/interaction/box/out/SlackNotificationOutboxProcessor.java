@@ -14,6 +14,7 @@ import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.global.config.properties.InteractionWorkerProperties;
+import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxHistory;
@@ -119,7 +120,7 @@ public class SlackNotificationOutboxProcessor {
             Instant claimedProcessingStartedAt
     ) {
         if (!hasProcessingLease(outbox, claimedProcessingStartedAt)) {
-            logLeaseLost(outbox.getId(), claimedProcessingStartedAt, outbox.getProcessingStartedAt());
+            logLeaseLost(outbox.getId(), claimedProcessingStartedAt, describeActualProcessingLease(outbox));
             return;
         }
 
@@ -170,7 +171,7 @@ public class SlackNotificationOutboxProcessor {
             return;
         }
 
-        logLeaseLost(outbox.getId(), claimedProcessingStartedAt, outbox.getProcessingStartedAt());
+        logLeaseLost(outbox.getId(), claimedProcessingStartedAt, describeActualProcessingLease(outbox));
     }
 
     private void persistFailureStatus(
@@ -196,7 +197,7 @@ public class SlackNotificationOutboxProcessor {
             return;
         }
 
-        logLeaseLost(outbox.getId(), claimedProcessingStartedAt, outbox.getProcessingStartedAt());
+        logLeaseLost(outbox.getId(), claimedProcessingStartedAt, describeActualProcessingLease(outbox));
     }
 
     private void logMissingOutbox(Long outboxId) {
@@ -208,42 +209,51 @@ public class SlackNotificationOutboxProcessor {
 
     private void dispatch(SlackNotificationOutbox outbox) throws JsonProcessingException {
         SlackNotificationOutboxMessageType messageType = outbox.getMessageType();
+        if (messageType == null) {
+            throw new UnsupportedSlackNotificationOutboxMessageTypeException(null);
+        }
         String token = resolveToken(outbox.getTeamId());
+        messageType.dispatch(new SlackNotificationOutboxMessageType.Dispatcher() {
+            @Override
+            public void dispatchEphemeralText() {
+                notificationTransportApiClient.sendEphemeralMessage(
+                        token,
+                        outbox.getChannelId(),
+                        outbox.requiredUserId(),
+                        outbox.requiredText()
+                );
+            }
 
-        if (messageType == SlackNotificationOutboxMessageType.EPHEMERAL_TEXT) {
-            notificationTransportApiClient.sendEphemeralMessage(
-                    token,
-                    outbox.getChannelId(),
-                    outbox.getUserId(),
-                    outbox.getText()
-            );
-            return;
-        }
-        if (messageType == SlackNotificationOutboxMessageType.EPHEMERAL_BLOCKS) {
-            notificationTransportApiClient.sendEphemeralBlockMessage(
-                    token,
-                    outbox.getChannelId(),
-                    outbox.getUserId(),
-                    readBlocks(outbox.getBlocksJson()),
-                    outbox.getFallbackText()
-            );
-            return;
-        }
-        if (messageType == SlackNotificationOutboxMessageType.CHANNEL_TEXT) {
-            notificationTransportApiClient.sendMessage(token, outbox.getChannelId(), outbox.getText());
-            return;
-        }
-        if (messageType == SlackNotificationOutboxMessageType.CHANNEL_BLOCKS) {
-            notificationTransportApiClient.sendBlockMessage(
-                    token,
-                    outbox.getChannelId(),
-                    readBlocks(outbox.getBlocksJson()),
-                    outbox.getFallbackText()
-            );
-            return;
-        }
+            @Override
+            public void dispatchEphemeralBlocks() throws JsonProcessingException {
+                notificationTransportApiClient.sendEphemeralBlockMessage(
+                        token,
+                        outbox.getChannelId(),
+                        outbox.requiredUserId(),
+                        readBlocks(outbox.requiredBlocksJson()),
+                        outbox.fallbackTextOrBlank()
+                );
+            }
 
-        throw new UnsupportedSlackNotificationOutboxMessageTypeException(messageType);
+            @Override
+            public void dispatchChannelText() {
+                notificationTransportApiClient.sendMessage(
+                        token,
+                        outbox.getChannelId(),
+                        outbox.requiredText()
+                );
+            }
+
+            @Override
+            public void dispatchChannelBlocks() throws JsonProcessingException {
+                notificationTransportApiClient.sendBlockMessage(
+                        token,
+                        outbox.getChannelId(),
+                        readBlocks(outbox.requiredBlocksJson()),
+                        outbox.fallbackTextOrBlank()
+                );
+            }
+        });
     }
 
     private JsonNode readBlocks(String blocksJson) throws JsonProcessingException {
@@ -296,7 +306,7 @@ public class SlackNotificationOutboxProcessor {
                 renewedProcessingStartedAt
         );
         if (!renewed) {
-            logLeaseLost(outbox.getId(), currentProcessingStartedAt.get(), renewedProcessingStartedAt);
+            logLeaseLost(outbox.getId(), currentProcessingStartedAt.get(), renewedProcessingStartedAt.toString());
             throw new OutboxProcessingLeaseLostException("outbox processing lease를 상실했습니다.");
         }
 
@@ -308,21 +318,33 @@ public class SlackNotificationOutboxProcessor {
             SlackNotificationOutbox outbox,
             Instant claimedProcessingStartedAt
     ) {
-        Instant actualProcessingStartedAt = outbox.getProcessingStartedAt();
+        BoxProcessingLease processingLease = outbox.getProcessingLease();
+        if (!processingLease.isClaimed()) {
+            return false;
+        }
 
-        return claimedProcessingStartedAt.equals(actualProcessingStartedAt);
+        return claimedProcessingStartedAt.equals(processingLease.startedAt());
+    }
+
+    private String describeActualProcessingLease(SlackNotificationOutbox outbox) {
+        BoxProcessingLease processingLease = outbox.getProcessingLease();
+        if (!processingLease.isClaimed()) {
+            return "IDLE";
+        }
+
+        return processingLease.startedAt().toString();
     }
 
     private void logLeaseLost(
             Long outboxId,
             Instant claimedProcessingStartedAt,
-            Instant actualProcessingStartedAt
+            String actualProcessingLease
     ) {
         log.warn(
-                "outbox 처리 lease를 상실해 최종 상태 저장을 건너뜁니다. outboxId={}, claimedProcessingStartedAt={}, actualProcessingStartedAt={}",
+                "outbox 처리 lease를 상실해 최종 상태 저장을 건너뜁니다. outboxId={}, claimedProcessingStartedAt={}, actualProcessingLease={}",
                 outboxId,
                 claimedProcessingStartedAt,
-                actualProcessingStartedAt
+                actualProcessingLease
         );
     }
 }
