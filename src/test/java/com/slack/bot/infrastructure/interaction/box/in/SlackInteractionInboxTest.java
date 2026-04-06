@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
+import com.slack.bot.infrastructure.common.BoxEventTime;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
+import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -32,7 +34,10 @@ class SlackInteractionInboxTest {
                 () -> assertThat(actual.getPayloadJson()).isEqualTo("{\"type\":\"block_actions\"}"),
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackInteractionInboxStatus.PENDING),
                 () -> assertThat(actual.getProcessingAttempt()).isZero(),
-                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
+                () -> assertThat(actual.getProcessingLease().isClaimed()).isFalse(),
+                () -> assertThat(actual.getProcessedTime().isPresent()).isFalse(),
+                () -> assertThat(actual.getFailedTime().isPresent()).isFalse(),
+                () -> assertThat(actual.getFailure().isPresent()).isFalse()
         );
     }
 
@@ -77,6 +82,132 @@ class SlackInteractionInboxTest {
     }
 
     @Test
+    void rehydrate는_PENDING과_0이_아닌_processingAttempt_조합을_허용하지_않는다() {
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInbox.rehydrate(
+                1L,
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}",
+                SlackInteractionInboxStatus.PENDING,
+                1,
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.absent(),
+                BoxFailureSnapshot.absent()
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("PENDING 상태의 processingAttempt는 0이어야 합니다.");
+    }
+
+    @Test
+    void rehydrate는_PROCESSING과_idle_processingLease_조합을_허용하지_않는다() {
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInbox.rehydrate(
+                1L,
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}",
+                SlackInteractionInboxStatus.PROCESSING,
+                1,
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.absent(),
+                BoxFailureSnapshot.absent()
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("PROCESSING 상태는 processingLease를 보유해야 합니다.");
+    }
+
+    @Test
+    void rehydrate는_PROCESSED와_absent_processedTime_조합을_허용하지_않는다() {
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInbox.rehydrate(
+                1L,
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}",
+                SlackInteractionInboxStatus.PROCESSED,
+                1,
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.absent(),
+                BoxFailureSnapshot.absent()
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("PROCESSED 상태는 processedTime이 있어야 합니다.");
+    }
+
+    @Test
+    void rehydrate는_RETRY_PENDING과_absent_failedTime_조합을_허용하지_않는다() {
+        // given
+        BoxFailureSnapshot<SlackInteractionFailureType> failure = BoxFailureSnapshot.present(
+                "retryable",
+                SlackInteractionFailureType.RETRYABLE
+        );
+
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInbox.rehydrate(
+                1L,
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}",
+                SlackInteractionInboxStatus.RETRY_PENDING,
+                1,
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.absent(),
+                failure
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("RETRY_PENDING 상태는 failedTime이 있어야 합니다.");
+    }
+
+    @Test
+    void rehydrate는_FAILED와_absent_failure_조합을_허용하지_않는다() {
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInbox.rehydrate(
+                1L,
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}",
+                SlackInteractionInboxStatus.FAILED,
+                1,
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.present(Instant.parse("2026-02-15T01:00:00Z")),
+                BoxFailureSnapshot.absent()
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("FAILED 상태는 failure가 있어야 합니다.");
+    }
+
+    @Test
+    void rehydrate는_FAILED와_RETRYABLE_failureType_조합을_허용하지_않는다() {
+        // given
+        BoxFailureSnapshot<SlackInteractionFailureType> failure = BoxFailureSnapshot.present(
+                "retryable",
+                SlackInteractionFailureType.RETRYABLE
+        );
+
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInbox.rehydrate(
+                1L,
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}",
+                SlackInteractionInboxStatus.FAILED,
+                1,
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.present(Instant.parse("2026-02-15T01:00:00Z")),
+                failure
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("FAILED 상태의 failureType이 올바르지 않습니다.");
+    }
+
+    @Test
     void markProcessed를_호출하면_처리완료_상태와_처리시각이_저장된다() {
         // given
         SlackInteractionInbox inbox = SlackInteractionInbox.pending(
@@ -93,15 +224,14 @@ class SlackInteractionInboxTest {
         // then
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
-                () -> assertThat(inbox.getProcessedAt()).isEqualTo(processedAt),
-                () -> assertThat(inbox.getProcessingStartedAt()).isEqualTo(
-                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
-                ),
+                () -> assertThat(inbox.getProcessedTime().occurredAt()).isEqualTo(processedAt),
+                () -> assertThat(inbox.getProcessingLease().isClaimed()).isFalse(),
+                () -> assertThat(inbox.getFailedTime().isPresent()).isFalse(),
                 () -> assertThat(history).isNotNull(),
                 () -> assertThat(history.getInboxId()).isNull(),
-                () -> assertThat(inbox.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE),
+                () -> assertThat(inbox.getFailure().isPresent()).isFalse(),
                 () -> assertThat(history.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
-                () -> assertThat(history.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
+                () -> assertThat(history.getFailure().isPresent()).isFalse()
         );
     }
 
@@ -126,16 +256,15 @@ class SlackInteractionInboxTest {
         // then
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
-                () -> assertThat(inbox.getProcessingStartedAt()).isEqualTo(
-                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
-                ),
-                () -> assertThat(inbox.getProcessedAt()).isEqualTo(FailureSnapshotDefaults.NO_PROCESSED_AT),
-                () -> assertThat(inbox.getFailedAt()).isEqualTo(failedAt),
-                () -> assertThat(inbox.getFailureReason()).isEqualTo("failure"),
-                () -> assertThat(inbox.getFailureType()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
+                () -> assertThat(inbox.getProcessingLease().isClaimed()).isFalse(),
+                () -> assertThat(inbox.getProcessedTime().isPresent()).isFalse(),
+                () -> assertThat(inbox.getFailedTime().occurredAt()).isEqualTo(failedAt),
+                () -> assertThat(inbox.getFailure().reason()).isEqualTo("failure"),
+                () -> assertThat(inbox.getFailure().type()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
                 () -> assertThat(history).isNotNull(),
                 () -> assertThat(history.getInboxId()).isNull(),
-                () -> assertThat(history.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED)
+                () -> assertThat(history.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
+                () -> assertThat(history.getFailure().type()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT)
         );
     }
 
@@ -156,17 +285,15 @@ class SlackInteractionInboxTest {
         // then
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
-                () -> assertThat(inbox.getProcessingStartedAt()).isEqualTo(
-                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
-                ),
-                () -> assertThat(inbox.getProcessedAt()).isEqualTo(FailureSnapshotDefaults.NO_PROCESSED_AT),
-                () -> assertThat(inbox.getFailedAt()).isEqualTo(failedAt),
-                () -> assertThat(inbox.getFailureReason()).isEqualTo("retry"),
-                () -> assertThat(inbox.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE),
+                () -> assertThat(inbox.getProcessingLease().isClaimed()).isFalse(),
+                () -> assertThat(inbox.getProcessedTime().isPresent()).isFalse(),
+                () -> assertThat(inbox.getFailedTime().occurredAt()).isEqualTo(failedAt),
+                () -> assertThat(inbox.getFailure().reason()).isEqualTo("retry"),
+                () -> assertThat(inbox.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRYABLE),
                 () -> assertThat(history).isNotNull(),
                 () -> assertThat(history.getInboxId()).isNull(),
                 () -> assertThat(history.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
-                () -> assertThat(history.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
+                () -> assertThat(history.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRYABLE)
         );
     }
 
@@ -280,7 +407,7 @@ class SlackInteractionInboxTest {
     }
 
     @Test
-    void markFailed는_failureType이_NONE이면_예외를_던진다() {
+    void markFailed는_failureType이_ABSENT이면_예외를_던진다() {
         // given
         SlackInteractionInbox inbox = SlackInteractionInbox.pending(
                 SlackInteractionInboxType.BLOCK_ACTIONS,
@@ -290,9 +417,26 @@ class SlackInteractionInboxTest {
         Instant failedAt = Instant.parse("2026-02-15T01:00:00Z");
 
         // when & then
-        assertThatThrownBy(() -> inbox.markFailed(failedAt, "failure", SlackInteractionFailureType.NONE))
+        assertThatThrownBy(() -> inbox.markFailed(failedAt, "failure", SlackInteractionFailureType.ABSENT))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("failureType은 NONE일 수 없습니다.");
+                .hasMessage("failureType은 ABSENT일 수 없습니다.");
+    }
+
+    @Test
+    void markFailed는_RETRYABLE_failureType을_허용하지_않는다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+        setProcessingState(inbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
+        Instant failedAt = Instant.parse("2026-02-15T01:00:00Z");
+
+        // when & then
+        assertThatThrownBy(() -> inbox.markFailed(failedAt, "failure", SlackInteractionFailureType.RETRYABLE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("FAILED failureType이 올바르지 않습니다.");
     }
 
     @Test
@@ -350,12 +494,7 @@ class SlackInteractionInboxTest {
             Instant processingStartedAt,
             int processingAttempt
     ) {
-        ReflectionTestUtils.setField(inbox, "status", SlackInteractionInboxStatus.PROCESSING);
-        ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
-        ReflectionTestUtils.setField(inbox, "processedAt", FailureSnapshotDefaults.NO_PROCESSED_AT);
+        inbox.claim(processingStartedAt);
         ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(inbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
-        ReflectionTestUtils.setField(inbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
-        ReflectionTestUtils.setField(inbox, "failureType", SlackInteractionFailureType.NONE);
     }
 }

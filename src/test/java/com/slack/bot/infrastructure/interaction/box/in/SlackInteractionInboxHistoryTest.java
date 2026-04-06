@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -23,15 +23,15 @@ class SlackInteractionInboxHistoryTest {
                 1,
                 SlackInteractionInboxStatus.RETRY_PENDING,
                 Instant.parse("2026-03-27T00:00:00Z"),
-                "failure",
-                SlackInteractionFailureType.NONE
+                BoxFailureSnapshot.present("failure", SlackInteractionFailureType.RETRYABLE)
         );
 
         // then
         assertAll(
                 () -> assertThat(history.getInboxId()).isNull(),
                 () -> assertThat(history.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(history.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING)
+                () -> assertThat(history.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
+                () -> assertThat(history.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRYABLE)
         );
     }
 
@@ -43,8 +43,7 @@ class SlackInteractionInboxHistoryTest {
                 1,
                 SlackInteractionInboxStatus.FAILED,
                 Instant.parse("2026-03-27T00:00:00Z"),
-                "failure",
-                SlackInteractionFailureType.BUSINESS_INVARIANT
+                BoxFailureSnapshot.present("failure", SlackInteractionFailureType.BUSINESS_INVARIANT)
         );
 
         // when
@@ -54,7 +53,7 @@ class SlackInteractionInboxHistoryTest {
         assertAll(
                 () -> assertThat(actual.getInboxId()).isEqualTo(10L),
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
-                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT)
+                () -> assertThat(actual.getFailure().type()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT)
         );
     }
 
@@ -66,8 +65,7 @@ class SlackInteractionInboxHistoryTest {
                 1,
                 SlackInteractionInboxStatus.PROCESSED,
                 Instant.parse("2026-03-27T00:00:00Z"),
-                FailureSnapshotDefaults.NO_FAILURE_REASON,
-                SlackInteractionFailureType.NONE
+                BoxFailureSnapshot.absent()
         );
 
         // when & then
@@ -84,14 +82,72 @@ class SlackInteractionInboxHistoryTest {
                 1,
                 SlackInteractionInboxStatus.RETRY_PENDING,
                 Instant.parse("2026-03-27T00:00:00Z"),
-                "timeout",
-                SlackInteractionFailureType.PROCESSING_TIMEOUT
+                BoxFailureSnapshot.present("timeout", SlackInteractionFailureType.PROCESSING_TIMEOUT)
         );
 
         // then
         assertAll(
                 () -> assertThat(history.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
-                () -> assertThat(history.getFailureType()).isEqualTo(SlackInteractionFailureType.PROCESSING_TIMEOUT)
+                () -> assertThat(history.getFailure().type()).isEqualTo(SlackInteractionFailureType.PROCESSING_TIMEOUT)
         );
+    }
+
+    @Test
+    void completed는_null_failure을_허용하지_않는다() {
+        // given
+        Instant completedAt = Instant.parse("2026-03-27T00:00:00Z");
+
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInboxHistory.completed(
+                10L,
+                1,
+                SlackInteractionInboxStatus.FAILED,
+                completedAt,
+                null
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("failure는 비어 있을 수 없습니다.");
+    }
+
+    @Test
+    void FAILED_history는_RETRYABLE_failureType을_허용하지_않는다() {
+        // given
+        Instant completedAt = Instant.parse("2026-03-27T00:00:00Z");
+        BoxFailureSnapshot<SlackInteractionFailureType> failure = BoxFailureSnapshot.present(
+                "retryable",
+                SlackInteractionFailureType.RETRYABLE
+        );
+
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInboxHistory.completed(
+                10L,
+                1,
+                SlackInteractionInboxStatus.FAILED,
+                completedAt,
+                failure
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("FAILED history의 failureType이 올바르지 않습니다.");
+    }
+
+    @Test
+    void FAILED_history는_PROCESSING_TIMEOUT_failureType을_허용하지_않는다() {
+        // given
+        Instant completedAt = Instant.parse("2026-03-27T00:00:00Z");
+        BoxFailureSnapshot<SlackInteractionFailureType> failure = BoxFailureSnapshot.present(
+                "processing-timeout",
+                SlackInteractionFailureType.PROCESSING_TIMEOUT
+        );
+
+        // when & then
+        assertThatThrownBy(() -> SlackInteractionInboxHistory.completed(
+                10L,
+                1,
+                SlackInteractionInboxStatus.FAILED,
+                completedAt,
+                failure
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("FAILED history의 failureType이 올바르지 않습니다.");
     }
 }

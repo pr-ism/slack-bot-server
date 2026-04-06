@@ -12,9 +12,10 @@ import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.function.LongConsumer;
+import java.util.function.BiConsumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -59,7 +60,10 @@ public class SlackInteractionInboxProcessor {
         return processPending(
                 SlackInteractionInboxType.BLOCK_ACTIONS,
                 limit,
-                inboxId -> slackInteractionInboxEntryProcessor.processClaimedBlockAction(inboxId)
+                (inboxId, claimedProcessingStartedAt) -> slackInteractionInboxEntryProcessor.processClaimedBlockAction(
+                        inboxId,
+                        claimedProcessingStartedAt
+                )
         );
     }
 
@@ -86,33 +90,59 @@ public class SlackInteractionInboxProcessor {
         return processPending(
                 SlackInteractionInboxType.VIEW_SUBMISSION,
                 limit,
-                inboxId -> slackInteractionInboxEntryProcessor.processClaimedViewSubmission(inboxId)
+                (inboxId, claimedProcessingStartedAt) -> slackInteractionInboxEntryProcessor.processClaimedViewSubmission(
+                        inboxId,
+                        claimedProcessingStartedAt
+                )
         );
     }
 
     private int processPending(
             SlackInteractionInboxType interactionType,
             int limit,
-            LongConsumer action
+            BiConsumer<Long, Instant> action
     ) {
         Set<Long> claimedInboxIds = new HashSet<>();
         int claimedCount = 0;
         for (int count = 0; count < limit; count++) {
-            Long claimedInboxId = slackInteractionInboxRepository.claimNextId(
+            ClaimStep nextClaimStep = processNextClaimedInbox(
                     interactionType,
-                    clock.instant(),
-                    claimedInboxIds
-            ).orElse(null);
-            if (claimedInboxId == null) {
+                    action,
+                    claimedInboxIds,
+                    claimedCount
+            );
+            if (nextClaimStep.isUnchangedFrom(claimedCount)) {
                 return claimedCount;
             }
 
-            claimedInboxIds.add(claimedInboxId);
-            claimedCount++;
-            processSafely(claimedInboxId, action, interactionType);
+            claimedInboxIds = nextClaimStep.claimedInboxIds();
+            claimedCount = nextClaimStep.claimedCount();
         }
 
         return claimedCount;
+    }
+
+    private ClaimStep processNextClaimedInbox(
+            SlackInteractionInboxType interactionType,
+            BiConsumer<Long, Instant> action,
+            Set<Long> claimedInboxIds,
+            int claimedCount
+    ) {
+        Instant claimedProcessingStartedAt = normalizeProcessingStartedAt(clock.instant());
+        return slackInteractionInboxRepository.claimNextId(
+                interactionType,
+                claimedProcessingStartedAt,
+                claimedInboxIds
+        )
+                .map(inboxId -> createClaimStep(
+                        inboxId,
+                        claimedProcessingStartedAt,
+                        action,
+                        interactionType,
+                        claimedInboxIds,
+                        claimedCount
+                ))
+                .orElseGet(() -> new ClaimStep(claimedInboxIds, claimedCount));
     }
 
     public int recoverBlockActionTimeoutProcessing() {
@@ -120,6 +150,24 @@ public class SlackInteractionInboxProcessor {
                 SlackInteractionInboxType.BLOCK_ACTIONS,
                 interactionWorkerProperties.inbox().blockActions().processingTimeoutMs()
         );
+    }
+
+    private Instant normalizeProcessingStartedAt(Instant processingStartedAt) {
+        return processingStartedAt.truncatedTo(ChronoUnit.MICROS);
+    }
+
+    private ClaimStep createClaimStep(
+            Long inboxId,
+            Instant claimedProcessingStartedAt,
+            BiConsumer<Long, Instant> action,
+            SlackInteractionInboxType interactionType,
+            Set<Long> claimedInboxIds,
+            int claimedCount
+    ) {
+        Set<Long> nextClaimedInboxIds = new HashSet<>(claimedInboxIds);
+        nextClaimedInboxIds.add(inboxId);
+        processSafely(inboxId, claimedProcessingStartedAt, action, interactionType);
+        return new ClaimStep(nextClaimedInboxIds, claimedCount + 1);
     }
 
     public int recoverViewSubmissionTimeoutProcessing() {
@@ -166,11 +214,12 @@ public class SlackInteractionInboxProcessor {
 
     private void processSafely(
             Long inboxId,
-            LongConsumer action,
+            Instant claimedProcessingStartedAt,
+            BiConsumer<Long, Instant> action,
             SlackInteractionInboxType interactionType
     ) {
         try {
-            action.accept(inboxId);
+            action.accept(inboxId, claimedProcessingStartedAt);
         } catch (Exception e) {
             log.error(
                     "{} inbox 엔트리 처리 중 예상치 못한 오류가 발생했습니다. inboxId={}",
@@ -178,6 +227,15 @@ public class SlackInteractionInboxProcessor {
                     inboxId,
                     e
             );
+        }
+    }
+
+    private record ClaimStep(
+            Set<Long> claimedInboxIds,
+            int claimedCount
+    ) {
+        private boolean isUnchangedFrom(int claimedCount) {
+            return this.claimedCount == claimedCount;
         }
     }
 }

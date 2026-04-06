@@ -23,11 +23,11 @@ public class H2SlackInteractionInboxRepositoryAdapter extends SlackInteractionIn
                         :payloadJson,
                         :pendingStatus,
                         :processingAttempt,
-                        :noProcessingStartedAt,
-                        :noProcessedAt,
-                        :noFailureAt,
-                        :noFailureReason,
-                        :noneFailureType
+                        :processingStartedAt,
+                        :processedAt,
+                        :failedAt,
+                        :failureReason,
+                        :failureType
                     )
                 ) AS source (
                     interaction_type,

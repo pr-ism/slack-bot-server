@@ -3,6 +3,7 @@ package com.slack.bot.application.interaction.box.in;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.MissingNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -17,7 +18,7 @@ public class SlackInteractionInboxIdempotencyPayloadEncoder {
     public String encodeBlockAction(String payloadJson) {
         JsonNode payload = parsePayload(payloadJson);
 
-        if (payload == null) {
+        if (payload.isMissingNode()) {
             return payloadJson;
         }
 
@@ -26,11 +27,11 @@ public class SlackInteractionInboxIdempotencyPayloadEncoder {
         return encode(
                 new BlockActionIdempotencySource(
                         resolveTeamId(payload),
-                        payload.path("channel").path("id").asText(""),
-                        payload.path("user").path("id").asText(""),
-                        action.path("action_id").asText(""),
-                        action.path("value").asText(""),
-                        payload.path("view").path("id").asText("")
+                        resolveText(payload.path("channel").path("id")),
+                        resolveText(payload.path("user").path("id")),
+                        resolveText(action.path("action_id")),
+                        resolveText(action.path("value")),
+                        resolveText(payload.path("view").path("id"))
                 ),
                 payloadJson
         );
@@ -39,7 +40,7 @@ public class SlackInteractionInboxIdempotencyPayloadEncoder {
     public String encodeViewSubmission(String payloadJson) {
         JsonNode payload = parsePayload(payloadJson);
 
-        if (payload == null) {
+        if (payload.isMissingNode()) {
             return payloadJson;
         }
 
@@ -48,10 +49,10 @@ public class SlackInteractionInboxIdempotencyPayloadEncoder {
         return encode(
                 new ViewSubmissionIdempotencySource(
                         resolveTeamId(payload),
-                        payload.path("user").path("id").asText(""),
-                        view.path("id").asText(""),
-                        view.path("callback_id").asText(""),
-                        view.path("private_metadata").asText("")
+                        resolveText(payload.path("user").path("id")),
+                        resolveText(view.path("id")),
+                        resolveText(view.path("callback_id")),
+                        resolveText(view.path("private_metadata"))
                 ),
                 payloadJson
         );
@@ -59,7 +60,7 @@ public class SlackInteractionInboxIdempotencyPayloadEncoder {
 
     private JsonNode parsePayload(String payloadJson) {
         if (payloadJson == null || payloadJson.isBlank()) {
-            return null;
+            return MissingNode.getInstance();
         }
 
         try {
@@ -70,7 +71,7 @@ public class SlackInteractionInboxIdempotencyPayloadEncoder {
                     payloadJson.length(),
                     exception
             );
-            return null;
+            return MissingNode.getInstance();
         }
     }
 
@@ -85,17 +86,28 @@ public class SlackInteractionInboxIdempotencyPayloadEncoder {
     }
 
     private String resolveTeamId(JsonNode payload) {
-        String teamId = payload.path("team_id").asText("");
+        String teamId = resolveText(payload.path("team_id"));
         if (!teamId.isBlank()) {
             return teamId;
         }
 
-        teamId = payload.path("team").path("id").asText("");
+        teamId = resolveText(payload.path("team").path("id"));
         if (!teamId.isBlank()) {
             return teamId;
         }
 
-        return payload.path("user").path("team_id").asText("");
+        return resolveText(payload.path("user").path("team_id"));
+    }
+
+    private String resolveText(JsonNode node) {
+        if (node == null) {
+            return "";
+        }
+        if (node.isMissingNode() || node.isNull() || !node.isValueNode()) {
+            return "";
+        }
+
+        return node.asText("");
     }
 
     private String encode(Object source, String fallbackJson) {

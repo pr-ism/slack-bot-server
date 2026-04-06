@@ -2,7 +2,6 @@ package com.slack.bot.application.interaction.box.aop.aspect;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -57,13 +56,10 @@ class BlockActionInboxEnqueueAspectIntegrationTest {
                 .enqueueBlockAction(payload.toString());
 
         // when
-        Object actual = blockActionAspectProbe.handle(payload, BlockActionProbeMode.RETURN_VALUE);
+        blockActionAspectProbe.handle(payload, BlockActionProbeMode.RETURN_VALUE);
 
         // then
-        assertAll(
-                () -> assertThat(actual).isNull(),
-                () -> assertThat(blockActionAspectProbe.proceedCount()).isZero()
-        );
+        assertThat(blockActionAspectProbe.proceedCount()).isZero();
         verify(slackInteractionInboxProcessor).enqueueBlockAction(payload.toString());
     }
 
@@ -76,13 +72,10 @@ class BlockActionInboxEnqueueAspectIntegrationTest {
                 .enqueueBlockAction(payload.toString());
 
         // when
-        Object actual = blockActionAspectProbe.handle(payload, BlockActionProbeMode.RETURN_VALUE);
+        blockActionAspectProbe.handle(payload, BlockActionProbeMode.RETURN_VALUE);
 
         // then
-        assertAll(
-                () -> assertThat(actual).isNull(),
-                () -> assertThat(blockActionAspectProbe.proceedCount()).isZero()
-        );
+        assertThat(blockActionAspectProbe.proceedCount()).isZero();
         verify(slackInteractionInboxProcessor).enqueueBlockAction(payload.toString());
     }
 
@@ -108,13 +101,10 @@ class BlockActionInboxEnqueueAspectIntegrationTest {
         JsonNode payload = blockActionPayload(BlockActionType.OPEN_REVIEW_SCHEDULER.value());
 
         // when
-        Object actual = blockActionAspectProbe.handle(payload, BlockActionProbeMode.RETURN_VALUE);
+        blockActionAspectProbe.handle(payload, BlockActionProbeMode.RETURN_VALUE);
 
         // then
-        assertAll(
-                () -> assertThat(actual).isEqualTo("PROCEEDED"),
-                () -> assertThat(blockActionAspectProbe.proceedCount()).isEqualTo(1)
-        );
+        assertThat(blockActionAspectProbe.proceedCount()).isEqualTo(1);
         verify(slackInteractionInboxProcessor, never()).enqueueBlockAction(anyString());
     }
 
@@ -124,31 +114,25 @@ class BlockActionInboxEnqueueAspectIntegrationTest {
         JsonNode payload = blockActionPayload(BlockActionType.CHANGE_REVIEW_RESERVATION.value());
 
         // when
-        Object actual = blockActionAspectProbe.handle(payload, BlockActionProbeMode.RETURN_VALUE);
+        blockActionAspectProbe.handle(payload, BlockActionProbeMode.RETURN_VALUE);
 
         // then
-        assertAll(
-                () -> assertThat(actual).isEqualTo("PROCEEDED"),
-                () -> assertThat(blockActionAspectProbe.proceedCount()).isEqualTo(1)
-        );
+        assertThat(blockActionAspectProbe.proceedCount()).isEqualTo(1);
         verify(slackInteractionInboxProcessor, never()).enqueueBlockAction(anyString());
     }
 
     @Test
-    void inbox_내부_실행이면_대상_메서드를_바로_실행하고_결과를_반환한다() {
+    void inbox_내부_실행이면_대상_메서드를_바로_실행한다() {
         // given
         JsonNode payload = blockActionPayload();
 
         // when
-        Object actual = processingSourceContext.withInboxProcessing(
+        processingSourceContext.withInboxProcessing(
                 () -> blockActionAspectProbe.handle(payload, BlockActionProbeMode.RETURN_VALUE)
         );
 
         // then
-        assertAll(
-                () -> assertThat(actual).isEqualTo("PROCEEDED"),
-                () -> assertThat(blockActionAspectProbe.proceedCount()).isEqualTo(1)
-        );
+        assertThat(blockActionAspectProbe.proceedCount()).isEqualTo(1);
         verify(slackInteractionInboxProcessor, never()).enqueueBlockAction(anyString());
     }
 

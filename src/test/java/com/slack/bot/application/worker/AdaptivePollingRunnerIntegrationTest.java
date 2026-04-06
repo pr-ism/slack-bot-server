@@ -17,6 +17,7 @@ import com.slack.bot.domain.reservation.repository.ReviewReservationRepository;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStatus;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
+import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import com.slack.bot.infrastructure.interaction.box.persistence.in.JpaSlackInteractionInboxRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -45,6 +46,9 @@ class AdaptivePollingRunnerIntegrationTest {
 
     @Autowired
     JpaSlackInteractionInboxRepository jpaSlackInteractionInboxRepository;
+
+    @Autowired
+    SlackInteractionInboxRepository slackInteractionInboxRepository;
 
     @Autowired
     ObjectMapper objectMapper;
@@ -83,17 +87,15 @@ class AdaptivePollingRunnerIntegrationTest {
 
             // when
             await().atMost(Duration.ofSeconds(3L)).untilAsserted(() -> {
-                SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
+                SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
 
                 // then
                 assertAll(
                         () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
                         () -> assertThat(actualInbox.getProcessingAttempt()).isEqualTo(1),
                         () -> assertThat(reviewReservationRepository.findById(100L))
-                                .isPresent()
-                                .get()
-                                .extracting(reservation -> reservation.getStatus())
-                                .isEqualTo(ReservationStatus.CANCELLED),
+                                .map(reservation -> reservation.getStatus())
+                                .hasValue(ReservationStatus.CANCELLED),
                         () -> assertThat(pollCount.get()).isGreaterThanOrEqualTo(2)
                 );
             });
@@ -155,18 +157,16 @@ class AdaptivePollingRunnerIntegrationTest {
 
             // then
             await().atMost(Duration.ofSeconds(4L)).untilAsserted(() -> {
-                SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
+                SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
 
                 assertAll(
                         () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
-                        () -> assertThat(actualInbox.getProcessedAt()).isAfterOrEqualTo(wakeUpRequestedAt),
-                        () -> assertThat(Duration.between(wakeUpRequestedAt, actualInbox.getProcessedAt()))
+                        () -> assertThat(actualInbox.getProcessedTime().occurredAt()).isAfterOrEqualTo(wakeUpRequestedAt),
+                        () -> assertThat(Duration.between(wakeUpRequestedAt, actualInbox.getProcessedTime().occurredAt()))
                                 .isLessThan(pollInterval),
                         () -> assertThat(reviewReservationRepository.findById(100L))
-                                .isPresent()
-                                .get()
-                                .extracting(reservation -> reservation.getStatus())
-                                .isEqualTo(ReservationStatus.CANCELLED),
+                                .map(reservation -> reservation.getStatus())
+                                .hasValue(ReservationStatus.CANCELLED),
                         () -> assertThat(pollCount.get()).isGreaterThanOrEqualTo(2)
                 );
             });
@@ -176,7 +176,7 @@ class AdaptivePollingRunnerIntegrationTest {
     }
 
     private SlackInteractionInbox savePendingBlockActionInbox(ObjectNode payload) {
-        return jpaSlackInteractionInboxRepository.save(
+        return slackInteractionInboxRepository.save(
                 SlackInteractionInbox.pending(
                         SlackInteractionInboxType.BLOCK_ACTIONS,
                         "adaptive-polling-" + System.nanoTime(),
