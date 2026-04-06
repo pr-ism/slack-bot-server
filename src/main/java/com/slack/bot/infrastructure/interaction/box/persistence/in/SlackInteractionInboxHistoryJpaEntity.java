@@ -50,12 +50,20 @@ public class SlackInteractionInboxHistoryJpaEntity extends BaseTimeEntity {
         this.processingAttempt = history.getProcessingAttempt();
         this.status = history.getStatus();
         this.completedAt = history.getCompletedAt();
-        this.failureReason = history.getFailure().isPresent()
-                ? history.getFailure().reason()
-                : null;
-        this.failureType = history.getFailure().isPresent()
-                ? history.getFailure().type()
-                : null;
+        applyFailure(history);
+    }
+
+    private void applyFailure(SlackInteractionInboxHistory history) {
+        this.failureReason = null;
+        this.failureType = null;
+
+        BoxFailureSnapshot<SlackInteractionFailureType> failure = history.getFailure();
+        if (!failure.isPresent()) {
+            return;
+        }
+
+        this.failureReason = failure.reason();
+        this.failureType = failure.type();
     }
 
     private BoxFailureSnapshot<SlackInteractionFailureType> toFailure() {

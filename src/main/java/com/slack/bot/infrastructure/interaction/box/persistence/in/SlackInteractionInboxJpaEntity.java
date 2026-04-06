@@ -67,21 +67,44 @@ public class SlackInteractionInboxJpaEntity extends BaseTimeEntity {
         this.payloadJson = inbox.getPayloadJson();
         this.status = inbox.getStatus();
         this.processingAttempt = inbox.getProcessingAttempt();
-        this.processingStartedAt = inbox.getProcessingLease().isClaimed()
-                ? inbox.getProcessingLease().startedAt()
-                : null;
-        this.processedAt = inbox.getProcessedTime().isPresent()
-                ? inbox.getProcessedTime().occurredAt()
-                : null;
-        this.failedAt = inbox.getFailedTime().isPresent()
-                ? inbox.getFailedTime().occurredAt()
-                : null;
-        this.failureReason = inbox.getFailure().isPresent()
-                ? inbox.getFailure().reason()
-                : null;
-        this.failureType = inbox.getFailure().isPresent()
-                ? inbox.getFailure().type()
-                : null;
+        applyProcessingLease(inbox);
+        applyProcessedTime(inbox);
+        applyFailedTime(inbox);
+        applyFailure(inbox);
+    }
+
+    private void applyProcessingLease(SlackInteractionInbox inbox) {
+        this.processingStartedAt = null;
+        if (inbox.getProcessingLease().isClaimed()) {
+            this.processingStartedAt = inbox.getProcessingLease().startedAt();
+        }
+    }
+
+    private void applyProcessedTime(SlackInteractionInbox inbox) {
+        this.processedAt = null;
+        if (inbox.getProcessedTime().isPresent()) {
+            this.processedAt = inbox.getProcessedTime().occurredAt();
+        }
+    }
+
+    private void applyFailedTime(SlackInteractionInbox inbox) {
+        this.failedAt = null;
+        if (inbox.getFailedTime().isPresent()) {
+            this.failedAt = inbox.getFailedTime().occurredAt();
+        }
+    }
+
+    private void applyFailure(SlackInteractionInbox inbox) {
+        this.failureReason = null;
+        this.failureType = null;
+
+        BoxFailureSnapshot<SlackInteractionFailureType> failure = inbox.getFailure();
+        if (!failure.isPresent()) {
+            return;
+        }
+
+        this.failureReason = failure.reason();
+        this.failureType = failure.type();
     }
 
     private BoxProcessingLease toProcessingLease() {
