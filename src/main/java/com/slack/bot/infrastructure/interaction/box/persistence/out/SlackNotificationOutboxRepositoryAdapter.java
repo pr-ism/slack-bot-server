@@ -5,7 +5,6 @@ import com.slack.bot.infrastructure.common.BoxFailureState;
 import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.infrastructure.common.BoxProcessingLeaseState;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
-import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxFieldState;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxHistory;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
@@ -37,14 +36,14 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                 .addValue("idempotencyKey", outbox.getIdempotencyKey())
                 .addValue("teamId", outbox.getTeamId())
                 .addValue("channelId", outbox.getChannelId())
-                .addValue("userIdState", resolvePayloadState(outbox.getUserId()).name())
-                .addValue("userId", resolvePayloadValue(outbox.getUserId()))
-                .addValue("textState", resolvePayloadState(outbox.getText()).name())
-                .addValue("text", resolvePayloadValue(outbox.getText()))
-                .addValue("blocksJsonState", resolvePayloadState(outbox.getBlocksJson()).name())
-                .addValue("blocksJson", resolvePayloadValue(outbox.getBlocksJson()))
-                .addValue("fallbackTextState", resolvePayloadState(outbox.getFallbackText()).name())
-                .addValue("fallbackText", resolvePayloadValue(outbox.getFallbackText()))
+                .addValue("userIdState", outbox.getUserId().getState().name())
+                .addValue("userId", outbox.getUserId().valueOrBlank())
+                .addValue("textState", outbox.getText().getState().name())
+                .addValue("text", outbox.getText().valueOrBlank())
+                .addValue("blocksJsonState", outbox.getBlocksJson().getState().name())
+                .addValue("blocksJson", outbox.getBlocksJson().valueOrBlank())
+                .addValue("fallbackTextState", outbox.getFallbackText().getState().name())
+                .addValue("fallbackText", outbox.getFallbackText().valueOrBlank())
                 .addValue("pendingStatus", outbox.getStatus().name())
                 .addValue("processingAttempt", outbox.getProcessingAttempt())
                 .addValue("processingLeaseState", BoxProcessingLeaseState.IDLE.name())
@@ -55,22 +54,6 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
         int updatedCount = namedParameterJdbcTemplate.update(buildEnqueueSql(), parameters);
 
         return updatedCount > 0;
-    }
-
-    private SlackNotificationOutboxFieldState resolvePayloadState(String value) {
-        if (value == null) {
-            return SlackNotificationOutboxFieldState.ABSENT;
-        }
-
-        return SlackNotificationOutboxFieldState.PRESENT;
-    }
-
-    private String resolvePayloadValue(String value) {
-        if (value == null) {
-            return "";
-        }
-
-        return value;
     }
 
     @Override

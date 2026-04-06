@@ -16,10 +16,10 @@ public class SlackNotificationOutbox {
     private final String idempotencyKey;
     private final String teamId;
     private final String channelId;
-    private final String userId;
-    private final String text;
-    private final String blocksJson;
-    private final String fallbackText;
+    private final SlackNotificationOutboxStringField userId;
+    private final SlackNotificationOutboxStringField text;
+    private final SlackNotificationOutboxStringField blocksJson;
+    private final SlackNotificationOutboxStringField fallbackText;
 
     private SlackNotificationOutboxStatus status;
     private int processingAttempt;
@@ -34,26 +34,37 @@ public class SlackNotificationOutbox {
             String idempotencyKey,
             String teamId,
             String channelId,
-            String userId,
-            String text,
-            String blocksJson,
-            String fallbackText
+            SlackNotificationOutboxStringField userId,
+            SlackNotificationOutboxStringField text,
+            SlackNotificationOutboxStringField blocksJson,
+            SlackNotificationOutboxStringField fallbackText
     ) {
+        SlackNotificationOutboxStringField normalizedUserId = normalizeField(userId);
+        SlackNotificationOutboxStringField normalizedText = normalizeField(text);
+        SlackNotificationOutboxStringField normalizedBlocksJson = normalizeField(blocksJson);
+        SlackNotificationOutboxStringField normalizedFallbackText = normalizeField(fallbackText);
+
         validateMessageType(messageType);
         validateIdempotencyKey(idempotencyKey);
         validateTeamId(teamId);
         validateChannelId(channelId);
-        validateMessagePayload(messageType, userId, text, blocksJson, fallbackText);
+        validateMessagePayload(
+                messageType,
+                normalizedUserId,
+                normalizedText,
+                normalizedBlocksJson,
+                normalizedFallbackText
+        );
 
         this.identity = SlackNotificationOutboxId.unassigned();
         this.messageType = messageType;
         this.idempotencyKey = idempotencyKey;
         this.teamId = teamId;
         this.channelId = channelId;
-        this.userId = userId;
-        this.text = text;
-        this.blocksJson = blocksJson;
-        this.fallbackText = fallbackText;
+        this.userId = normalizedUserId;
+        this.text = normalizedText;
+        this.blocksJson = normalizedBlocksJson;
+        this.fallbackText = normalizedFallbackText;
         this.status = SlackNotificationOutboxStatus.PENDING;
         this.processingAttempt = 0;
         this.processingLease = BoxProcessingLease.idle();
@@ -68,10 +79,10 @@ public class SlackNotificationOutbox {
             String idempotencyKey,
             String teamId,
             String channelId,
-            String userId,
-            String text,
-            String blocksJson,
-            String fallbackText,
+            SlackNotificationOutboxStringField userId,
+            SlackNotificationOutboxStringField text,
+            SlackNotificationOutboxStringField blocksJson,
+            SlackNotificationOutboxStringField fallbackText,
             SlackNotificationOutboxStatus status,
             int processingAttempt,
             BoxProcessingLease processingLease,
@@ -79,11 +90,22 @@ public class SlackNotificationOutbox {
             BoxEventTime failedTime,
             BoxFailureSnapshot<SlackInteractionFailureType> failure
     ) {
+        SlackNotificationOutboxStringField normalizedUserId = normalizeField(userId);
+        SlackNotificationOutboxStringField normalizedText = normalizeField(text);
+        SlackNotificationOutboxStringField normalizedBlocksJson = normalizeField(blocksJson);
+        SlackNotificationOutboxStringField normalizedFallbackText = normalizeField(fallbackText);
+
         validateMessageType(messageType);
         validateIdempotencyKey(idempotencyKey);
         validateTeamId(teamId);
         validateChannelId(channelId);
-        validateMessagePayload(messageType, userId, text, blocksJson, fallbackText);
+        validateMessagePayload(
+                messageType,
+                normalizedUserId,
+                normalizedText,
+                normalizedBlocksJson,
+                normalizedFallbackText
+        );
         validateStatus(status);
         validateProcessingAttempt(processingAttempt);
         validateProcessingLease(processingLease);
@@ -98,10 +120,10 @@ public class SlackNotificationOutbox {
                 idempotencyKey,
                 teamId,
                 channelId,
-                userId,
-                text,
-                blocksJson,
-                fallbackText,
+                normalizedUserId,
+                normalizedText,
+                normalizedBlocksJson,
+                normalizedFallbackText,
                 status,
                 processingAttempt,
                 processingLease,
@@ -117,10 +139,10 @@ public class SlackNotificationOutbox {
             String idempotencyKey,
             String teamId,
             String channelId,
-            String userId,
-            String text,
-            String blocksJson,
-            String fallbackText,
+            SlackNotificationOutboxStringField userId,
+            SlackNotificationOutboxStringField text,
+            SlackNotificationOutboxStringField blocksJson,
+            SlackNotificationOutboxStringField fallbackText,
             SlackNotificationOutboxStatus status,
             int processingAttempt,
             BoxProcessingLease processingLease,
@@ -146,7 +168,7 @@ public class SlackNotificationOutbox {
     }
 
     public String requiredUserId() {
-        return userId;
+        return userId.value();
     }
 
     public Long getId() {
@@ -158,19 +180,15 @@ public class SlackNotificationOutbox {
     }
 
     public String requiredText() {
-        return text;
+        return text.value();
     }
 
     public String requiredBlocksJson() {
-        return blocksJson;
+        return blocksJson.value();
     }
 
     public String fallbackTextOrBlank() {
-        if (fallbackText == null) {
-            return "";
-        }
-
-        return fallbackText;
+        return fallbackText.valueOrBlank();
     }
 
     public SlackNotificationOutboxHistory markSent(Instant sentAt) {
@@ -291,10 +309,10 @@ public class SlackNotificationOutbox {
 
     private static void validateMessagePayload(
             SlackNotificationOutboxMessageType messageType,
-            String userId,
-            String text,
-            String blocksJson,
-            String fallbackText
+            SlackNotificationOutboxStringField userId,
+            SlackNotificationOutboxStringField text,
+            SlackNotificationOutboxStringField blocksJson,
+            SlackNotificationOutboxStringField fallbackText
     ) {
         validateUserIdForEphemeral(messageType, userId);
         validateTextForTextType(messageType, text);
@@ -494,8 +512,11 @@ public class SlackNotificationOutbox {
 
     private static void validateUserIdForEphemeral(
             SlackNotificationOutboxMessageType messageType,
-            String userId
+            SlackNotificationOutboxStringField userId
     ) {
+        if (messageType.supportsUserId() && !userId.isPresent()) {
+            throw new IllegalArgumentException("EPHEMERAL 메시지는 userId가 비어 있을 수 없습니다.");
+        }
         if (messageType.supportsUserId() && isBlank(userId)) {
             throw new IllegalArgumentException("EPHEMERAL 메시지는 userId가 비어 있을 수 없습니다.");
         }
@@ -503,8 +524,11 @@ public class SlackNotificationOutbox {
 
     private static void validateTextForTextType(
             SlackNotificationOutboxMessageType messageType,
-            String text
+            SlackNotificationOutboxStringField text
     ) {
+        if (messageType.supportsText() && !text.isPresent()) {
+            throw new IllegalArgumentException("TEXT 타입 메시지는 text가 비어 있을 수 없습니다.");
+        }
         if (messageType.supportsText() && isBlank(text)) {
             throw new IllegalArgumentException("TEXT 타입 메시지는 text가 비어 있을 수 없습니다.");
         }
@@ -512,8 +536,11 @@ public class SlackNotificationOutbox {
 
     private static void validateBlocksJsonForBlocksType(
             SlackNotificationOutboxMessageType messageType,
-            String blocksJson
+            SlackNotificationOutboxStringField blocksJson
     ) {
+        if (messageType.supportsBlocksJson() && !blocksJson.isPresent()) {
+            throw new IllegalArgumentException("BLOCKS 타입 메시지는 blocksJson이 비어 있을 수 없습니다.");
+        }
         if (messageType.supportsBlocksJson() && isBlank(blocksJson)) {
             throw new IllegalArgumentException("BLOCKS 타입 메시지는 blocksJson이 비어 있을 수 없습니다.");
         }
@@ -521,42 +548,50 @@ public class SlackNotificationOutbox {
 
     private static void validateNoUnexpectedUserId(
             SlackNotificationOutboxMessageType messageType,
-            String userId
+            SlackNotificationOutboxStringField userId
     ) {
-        if (!messageType.supportsUserId() && userId != null) {
+        if (!messageType.supportsUserId() && userId.isPresent()) {
             throw new IllegalArgumentException("CHANNEL 메시지는 userId를 가질 수 없습니다.");
         }
     }
 
     private static void validateNoUnexpectedText(
             SlackNotificationOutboxMessageType messageType,
-            String text
+            SlackNotificationOutboxStringField text
     ) {
-        if (!messageType.supportsText() && text != null) {
+        if (!messageType.supportsText() && text.isPresent()) {
             throw new IllegalArgumentException("BLOCKS 타입 메시지는 text를 가질 수 없습니다.");
         }
     }
 
     private static void validateNoUnexpectedBlocksJson(
             SlackNotificationOutboxMessageType messageType,
-            String blocksJson
+            SlackNotificationOutboxStringField blocksJson
     ) {
-        if (!messageType.supportsBlocksJson() && blocksJson != null) {
+        if (!messageType.supportsBlocksJson() && blocksJson.isPresent()) {
             throw new IllegalArgumentException("TEXT 타입 메시지는 blocksJson을 가질 수 없습니다.");
         }
     }
 
     private static void validateNoUnexpectedFallbackText(
             SlackNotificationOutboxMessageType messageType,
-            String fallbackText
+            SlackNotificationOutboxStringField fallbackText
     ) {
-        if (!messageType.supportsFallbackText() && fallbackText != null && !fallbackText.isBlank()) {
+        if (!messageType.supportsFallbackText() && fallbackText.isPresent()) {
             throw new IllegalArgumentException("TEXT 타입 메시지는 fallbackText를 가질 수 없습니다.");
         }
     }
 
-    private static boolean isBlank(String value) {
-        return value == null || value.isBlank();
+    private static SlackNotificationOutboxStringField normalizeField(SlackNotificationOutboxStringField field) {
+        if (field == null) {
+            return SlackNotificationOutboxStringField.absent();
+        }
+
+        return field;
+    }
+
+    private static boolean isBlank(SlackNotificationOutboxStringField field) {
+        return field.isPresent() && field.value().isBlank();
     }
 
     private void validateSentAt(Instant sentAt) {
@@ -631,4 +666,66 @@ public class SlackNotificationOutbox {
         );
     }
 
+    public static class SlackNotificationOutboxBuilder {
+
+        public SlackNotificationOutboxBuilder userIdField(SlackNotificationOutboxStringField userId) {
+            this.userId = userId;
+            return this;
+        }
+
+        public SlackNotificationOutboxBuilder textField(SlackNotificationOutboxStringField text) {
+            this.text = text;
+            return this;
+        }
+
+        public SlackNotificationOutboxBuilder blocksJsonField(SlackNotificationOutboxStringField blocksJson) {
+            this.blocksJson = blocksJson;
+            return this;
+        }
+
+        public SlackNotificationOutboxBuilder fallbackTextField(SlackNotificationOutboxStringField fallbackText) {
+            this.fallbackText = fallbackText;
+            return this;
+        }
+
+        public SlackNotificationOutboxBuilder userId(String userId) {
+            if (userId == null) {
+                this.userId = SlackNotificationOutboxStringField.absent();
+                return this;
+            }
+
+            this.userId = SlackNotificationOutboxStringField.present(userId);
+            return this;
+        }
+
+        public SlackNotificationOutboxBuilder text(String text) {
+            if (text == null) {
+                this.text = SlackNotificationOutboxStringField.absent();
+                return this;
+            }
+
+            this.text = SlackNotificationOutboxStringField.present(text);
+            return this;
+        }
+
+        public SlackNotificationOutboxBuilder blocksJson(String blocksJson) {
+            if (blocksJson == null) {
+                this.blocksJson = SlackNotificationOutboxStringField.absent();
+                return this;
+            }
+
+            this.blocksJson = SlackNotificationOutboxStringField.present(blocksJson);
+            return this;
+        }
+
+        public SlackNotificationOutboxBuilder fallbackText(String fallbackText) {
+            if (fallbackText == null || fallbackText.isBlank()) {
+                this.fallbackText = SlackNotificationOutboxStringField.absent();
+                return this;
+            }
+
+            this.fallbackText = SlackNotificationOutboxStringField.present(fallbackText);
+            return this;
+        }
+    }
 }

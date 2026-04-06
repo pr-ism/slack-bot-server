@@ -9,9 +9,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.interaction.box.out.exception.SlackBlocksSerializationException;
-import com.slack.bot.infrastructure.common.BoxEventTime;
-import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
-import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
@@ -64,8 +61,8 @@ class SlackNotificationOutboxWriterTest {
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.EPHEMERAL_TEXT),
                 () -> assertThat(actual.getTeamId()).isEqualTo(teamId),
                 () -> assertThat(actual.getChannelId()).isEqualTo(channelId),
-                () -> assertThat(actual.getUserId()).isEqualTo(userId),
-                () -> assertThat(actual.getText()).isEqualTo(text)
+                () -> assertThat(actual.getUserId().value()).isEqualTo(userId),
+                () -> assertThat(actual.getText().value()).isEqualTo(text)
         );
     }
 
@@ -89,9 +86,9 @@ class SlackNotificationOutboxWriterTest {
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.EPHEMERAL_BLOCKS),
                 () -> assertThat(actual.getTeamId()).isEqualTo(teamId),
                 () -> assertThat(actual.getChannelId()).isEqualTo(channelId),
-                () -> assertThat(actual.getUserId()).isEqualTo(userId),
-                () -> assertThat(actual.getBlocksJson()).isEqualTo("[]"),
-                () -> assertThat(actual.getFallbackText()).isEqualTo(fallbackText)
+                () -> assertThat(actual.getUserId().value()).isEqualTo(userId),
+                () -> assertThat(actual.getBlocksJson().value()).isEqualTo("[]"),
+                () -> assertThat(actual.getFallbackText().value()).isEqualTo(fallbackText)
         );
     }
 
@@ -113,8 +110,8 @@ class SlackNotificationOutboxWriterTest {
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.CHANNEL_TEXT),
                 () -> assertThat(actual.getTeamId()).isEqualTo(teamId),
                 () -> assertThat(actual.getChannelId()).isEqualTo(channelId),
-                () -> assertThat(actual.getText()).isEqualTo(text),
-                () -> assertThat(actual.getUserId()).isNull()
+                () -> assertThat(actual.getText().value()).isEqualTo(text),
+                () -> assertThat(actual.getUserId().isPresent()).isFalse()
         );
     }
 
@@ -137,9 +134,9 @@ class SlackNotificationOutboxWriterTest {
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.CHANNEL_BLOCKS),
                 () -> assertThat(actual.getTeamId()).isEqualTo(teamId),
                 () -> assertThat(actual.getChannelId()).isEqualTo(channelId),
-                () -> assertThat(actual.getBlocksJson()).isEqualTo("[]"),
-                () -> assertThat(actual.getFallbackText()).isEqualTo(fallbackText),
-                () -> assertThat(actual.getUserId()).isNull()
+                () -> assertThat(actual.getBlocksJson().value()).isEqualTo("[]"),
+                () -> assertThat(actual.getFallbackText().value()).isEqualTo(fallbackText),
+                () -> assertThat(actual.getUserId().isPresent()).isFalse()
         );
     }
 
@@ -160,8 +157,8 @@ class SlackNotificationOutboxWriterTest {
 
         assertAll(
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.CHANNEL_BLOCKS),
-                () -> assertThat(actual.getBlocksJson()).isEqualTo("[]"),
-                () -> assertThat(actual.getFallbackText()).isEqualTo(fallbackText)
+                () -> assertThat(actual.getBlocksJson().value()).isEqualTo("[]"),
+                () -> assertThat(actual.getFallbackText().value()).isEqualTo(fallbackText)
         );
     }
 
@@ -183,9 +180,9 @@ class SlackNotificationOutboxWriterTest {
 
         assertAll(
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.EPHEMERAL_BLOCKS),
-                () -> assertThat(actual.getUserId()).isEqualTo(userId),
-                () -> assertThat(actual.getBlocksJson()).isEqualTo("[]"),
-                () -> assertThat(actual.getFallbackText()).isEqualTo(fallbackText)
+                () -> assertThat(actual.getUserId().value()).isEqualTo(userId),
+                () -> assertThat(actual.getBlocksJson().value()).isEqualTo("[]"),
+                () -> assertThat(actual.getFallbackText().value()).isEqualTo(fallbackText)
         );
     }
 
@@ -335,7 +332,7 @@ class SlackNotificationOutboxWriterTest {
 
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() ->
-                assertThat(jpaSlackNotificationOutboxRepository.findAll()).hasSize(1)
+                assertThat(jpaSlackNotificationOutboxRepository.findAllDomains()).hasSize(1)
         );
     }
 
@@ -359,7 +356,7 @@ class SlackNotificationOutboxWriterTest {
 
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() ->
-                assertThat(jpaSlackNotificationOutboxRepository.findAll()).hasSize(1)
+                assertThat(jpaSlackNotificationOutboxRepository.findAllDomains()).hasSize(1)
         );
         SlackNotificationOutboxStatus actualStatus = actualSlackNotificationOutboxRepository.findById(existing.getId())
                                                                                             .orElseThrow()
@@ -388,7 +385,7 @@ class SlackNotificationOutboxWriterTest {
 
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() ->
-                assertThat(jpaSlackNotificationOutboxRepository.findAll()).hasSize(1)
+                assertThat(jpaSlackNotificationOutboxRepository.findAllDomains()).hasSize(1)
         );
         SlackNotificationOutboxStatus actualStatus = actualSlackNotificationOutboxRepository.findById(existing.getId())
                                                                                             .orElseThrow()
@@ -422,7 +419,7 @@ class SlackNotificationOutboxWriterTest {
 
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() ->
-                assertThat(jpaSlackNotificationOutboxRepository.findAll()).hasSize(1)
+                assertThat(jpaSlackNotificationOutboxRepository.findAllDomains()).hasSize(1)
         );
         SlackNotificationOutboxStatus actualStatus = actualSlackNotificationOutboxRepository.findById(existing.getId())
                                                                                             .orElseThrow()
@@ -434,7 +431,7 @@ class SlackNotificationOutboxWriterTest {
 
     private SlackNotificationOutbox awaitSingleOutbox() {
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() ->
-                assertThat(jpaSlackNotificationOutboxRepository.findAll()).hasSize(1)
+                assertThat(jpaSlackNotificationOutboxRepository.findAllDomains()).hasSize(1)
         );
         return jpaSlackNotificationOutboxRepository.findAllDomains().getFirst();
     }
@@ -448,11 +445,7 @@ class SlackNotificationOutboxWriterTest {
             Instant processingStartedAt,
             int processingAttempt
     ) {
-        ReflectionTestUtils.setField(outbox, "status", SlackNotificationOutboxStatus.PROCESSING);
-        ReflectionTestUtils.setField(outbox, "processingLease", BoxProcessingLease.claimed(processingStartedAt));
-        ReflectionTestUtils.setField(outbox, "sentTime", BoxEventTime.absent());
+        outbox.claim(processingStartedAt);
         ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(outbox, "failedTime", BoxEventTime.absent());
-        ReflectionTestUtils.setField(outbox, "failure", BoxFailureSnapshot.absent());
     }
 }

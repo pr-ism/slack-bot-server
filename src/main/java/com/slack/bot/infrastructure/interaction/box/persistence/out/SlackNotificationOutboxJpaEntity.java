@@ -12,6 +12,7 @@ import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
+import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStringField;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -91,10 +92,10 @@ public class SlackNotificationOutboxJpaEntity extends BaseTimeEntity {
                 idempotencyKey,
                 teamId,
                 channelId,
-                toFieldValue(userIdState, userId),
-                toFieldValue(textState, text),
-                toFieldValue(blocksJsonState, blocksJson),
-                toFieldValue(fallbackTextState, fallbackText),
+                toStringField(userIdState, userId),
+                toStringField(textState, text),
+                toStringField(blocksJsonState, blocksJson),
+                toStringField(fallbackTextState, fallbackText),
                 status,
                 processingAttempt,
                 toProcessingLease(),
@@ -109,10 +110,10 @@ public class SlackNotificationOutboxJpaEntity extends BaseTimeEntity {
         this.idempotencyKey = outbox.getIdempotencyKey();
         this.teamId = outbox.getTeamId();
         this.channelId = outbox.getChannelId();
-        applyField(outbox.getUserId(), FieldType.USER_ID);
-        applyField(outbox.getText(), FieldType.TEXT);
-        applyField(outbox.getBlocksJson(), FieldType.BLOCKS_JSON);
-        applyField(outbox.getFallbackText(), FieldType.FALLBACK_TEXT);
+        applyStringField(outbox.getUserId(), FieldType.USER_ID);
+        applyStringField(outbox.getText(), FieldType.TEXT);
+        applyStringField(outbox.getBlocksJson(), FieldType.BLOCKS_JSON);
+        applyStringField(outbox.getFallbackText(), FieldType.FALLBACK_TEXT);
         this.status = outbox.getStatus();
         this.processingAttempt = outbox.getProcessingAttempt();
         applyProcessingLease(outbox);
@@ -206,57 +207,45 @@ public class SlackNotificationOutboxJpaEntity extends BaseTimeEntity {
         return BoxFailureSnapshot.present(failureReason, failureType);
     }
 
-    private void applyField(String field, FieldType fieldType) {
-        SlackNotificationOutboxFieldState state = resolveFieldState(field);
-        String value = resolveFieldValue(field);
+    private void applyStringField(
+            SlackNotificationOutboxStringField field,
+            FieldType fieldType
+    ) {
         if (fieldType == FieldType.USER_ID) {
-            this.userIdState = state;
-            this.userId = value;
+            this.userIdState = field.getState();
+            this.userId = field.valueOrBlank();
             return;
         }
         if (fieldType == FieldType.TEXT) {
-            this.textState = state;
-            this.text = value;
+            this.textState = field.getState();
+            this.text = field.valueOrBlank();
             return;
         }
         if (fieldType == FieldType.BLOCKS_JSON) {
-            this.blocksJsonState = state;
-            this.blocksJson = value;
+            this.blocksJsonState = field.getState();
+            this.blocksJson = field.valueOrBlank();
             return;
         }
 
-        this.fallbackTextState = state;
-        this.fallbackText = value;
+        this.fallbackTextState = field.getState();
+        this.fallbackText = field.valueOrBlank();
     }
 
-    private String toFieldValue(SlackNotificationOutboxFieldState state, String value) {
+    private SlackNotificationOutboxStringField toStringField(
+            SlackNotificationOutboxFieldState state,
+            String value
+    ) {
         if (state == null) {
             throw new IllegalStateException("payload field state가 비어 있을 수 없습니다.");
-        }
-        if (state == SlackNotificationOutboxFieldState.ABSENT) {
-            return null;
         }
         if (value == null) {
             throw new IllegalStateException("payload field value가 비어 있을 수 없습니다.");
         }
-
-        return value;
-    }
-
-    private SlackNotificationOutboxFieldState resolveFieldState(String value) {
-        if (value == null) {
-            return SlackNotificationOutboxFieldState.ABSENT;
+        if (state == SlackNotificationOutboxFieldState.ABSENT) {
+            return SlackNotificationOutboxStringField.absent();
         }
 
-        return SlackNotificationOutboxFieldState.PRESENT;
-    }
-
-    private String resolveFieldValue(String value) {
-        if (value == null) {
-            return "";
-        }
-
-        return value;
+        return SlackNotificationOutboxStringField.present(value);
     }
 
     private void validateProcessingLeaseState() {
