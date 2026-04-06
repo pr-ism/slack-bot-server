@@ -151,8 +151,46 @@ public class SlackInteractionInbox {
         this.failure = BoxFailureSnapshot.absent();
     }
 
+    public boolean hasClaimedProcessingLease() {
+        return processingLease.isClaimed();
+    }
+
+    public boolean hasClaimedProcessingLease(Instant processingStartedAt) {
+        if (!hasClaimedProcessingLease()) {
+            return false;
+        }
+
+        return processingLease.startedAt().equals(processingStartedAt);
+    }
+
+    public Instant currentProcessingLeaseStartedAt() {
+        if (!hasClaimedProcessingLease()) {
+            throw new IllegalStateException("processingLease를 보유하고 있지 않습니다.");
+        }
+
+        return processingLease.startedAt();
+    }
+
     public SlackInteractionInboxHistory markRetryPending(Instant failedAt, String failureReason) {
         return markRetryPending(failedAt, failureReason, SlackInteractionFailureType.RETRYABLE);
+    }
+
+    public SlackInteractionInboxHistory markFailure(
+            Instant failedAt,
+            String failureReason,
+            boolean retryable,
+            int maxAttempts
+    ) {
+        validateMaxAttempts(maxAttempts);
+
+        if (!retryable) {
+            return markFailed(failedAt, failureReason, SlackInteractionFailureType.BUSINESS_INVARIANT);
+        }
+        if (processingAttempt < maxAttempts) {
+            return markRetryPending(failedAt, failureReason);
+        }
+
+        return markFailed(failedAt, failureReason, SlackInteractionFailureType.RETRY_EXHAUSTED);
     }
 
     public SlackInteractionInboxHistory markRetryPending(
@@ -232,6 +270,12 @@ public class SlackInteractionInbox {
     private static void validateProcessingAttempt(int processingAttempt) {
         if (processingAttempt < 0) {
             throw new IllegalArgumentException("processingAttempt는 0 이상이어야 합니다.");
+        }
+    }
+
+    private static void validateMaxAttempts(int maxAttempts) {
+        if (maxAttempts <= 0) {
+            throw new IllegalArgumentException("maxAttempts는 0보다 커야 합니다.");
         }
     }
 

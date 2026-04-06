@@ -116,7 +116,7 @@ public class ReviewRequestInboxTransactionalProcessor {
 
         String reason = resolveFailureReason(e);
 
-        if (!retryExceptionClassifier.isRetryable(e)) {
+        if (retryExceptionClassifier.isNotRetryable(e)) {
             return inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.NON_RETRYABLE);
         }
 

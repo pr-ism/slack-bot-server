@@ -56,4 +56,12 @@ public class InteractionRetryExceptionClassifier {
 
         return false;
     }
+
+    public boolean isNotRetryable(Throwable throwable) {
+        if (isRetryable(throwable)) {
+            return false;
+        }
+
+        return true;
+    }
 }

@@ -60,6 +60,30 @@ class InteractionRetryExceptionClassifierTest {
         assertThat(actual).isFalse();
     }
 
+    @Test
+    void 일반_비즈니스_예외는_not_retryable로_판단한다() {
+        // given
+        InteractionRetryExceptionClassifier exceptionClassifier = InteractionRetryExceptionClassifier.create();
+
+        // when
+        boolean actual = exceptionClassifier.isNotRetryable(new IllegalArgumentException("invalid"));
+
+        // then
+        assertThat(actual).isTrue();
+    }
+
+    @Test
+    void 슬랙_전송_예외는_not_retryable로_판단하지_않는다() {
+        // given
+        InteractionRetryExceptionClassifier exceptionClassifier = InteractionRetryExceptionClassifier.create();
+
+        // when
+        boolean actual = exceptionClassifier.isNotRetryable(new SlackBotMessageDispatchException("temporary"));
+
+        // then
+        assertThat(actual).isFalse();
+    }
+
     private static class SelfCauseRuntimeException extends RuntimeException {
 
         private SelfCauseRuntimeException(String message) {

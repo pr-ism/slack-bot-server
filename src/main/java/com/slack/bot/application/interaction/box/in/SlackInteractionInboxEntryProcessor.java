@@ -148,16 +148,12 @@ public class SlackInteractionInboxEntryProcessor {
 
     private SlackInteractionInboxHistory markFailureStatus(SlackInteractionInbox inbox, Exception e) {
         String reason = resolveFailureReason(e);
-
-        if (!retryExceptionClassifier.isRetryable(e)) {
-            return inbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.BUSINESS_INVARIANT);
-        }
-
-        if (inbox.getProcessingAttempt() < interactionRetryProperties.inbox().maxAttempts()) {
-            return inbox.markRetryPending(clock.instant(), reason);
-        }
-
-        return inbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.RETRY_EXHAUSTED);
+        return inbox.markFailure(
+                clock.instant(),
+                reason,
+                retryExceptionClassifier.isRetryable(e),
+                interactionRetryProperties.inbox().maxAttempts()
+        );
     }
 
     private String resolveFailureReason(Exception e) {
@@ -174,11 +170,7 @@ public class SlackInteractionInboxEntryProcessor {
             SlackInteractionInbox inbox,
             Instant claimedProcessingStartedAt
     ) {
-        if (!inbox.getProcessingLease().isClaimed()) {
-            return false;
-        }
-
-        return claimedProcessingStartedAt.equals(inbox.getProcessingLease().startedAt());
+        return inbox.hasClaimedProcessingLease(claimedProcessingStartedAt);
     }
 
     private void logLeaseLost(
@@ -186,12 +178,12 @@ public class SlackInteractionInboxEntryProcessor {
             Instant claimedProcessingStartedAt,
             SlackInteractionInbox inbox
     ) {
-        if (inbox.getProcessingLease().isClaimed()) {
+        if (inbox.hasClaimedProcessingLease()) {
             log.warn(
                     "slack interaction inbox 처리 lease를 상실해 처리를 건너뜁니다. inboxId={}, claimedProcessingStartedAt={}, actualProcessingLeaseClaimed=true, actualProcessingStartedAt={}",
                     inboxId,
                     claimedProcessingStartedAt,
-                    inbox.getProcessingLease().startedAt()
+                    inbox.currentProcessingLeaseStartedAt()
             );
             return;
         }

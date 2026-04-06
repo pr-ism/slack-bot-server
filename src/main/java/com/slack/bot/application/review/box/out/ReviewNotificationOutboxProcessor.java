@@ -255,7 +255,7 @@ public class ReviewNotificationOutboxProcessor {
     ) {
         String reason = resolveFailureReason(exception);
 
-        if (!retryExceptionClassifier.isRetryable(exception)) {
+        if (retryExceptionClassifier.isNotRetryable(exception)) {
             return outbox.markFailed(clock.instant(), reason, SlackInteractionFailureType.BUSINESS_INVARIANT);
         }
 
