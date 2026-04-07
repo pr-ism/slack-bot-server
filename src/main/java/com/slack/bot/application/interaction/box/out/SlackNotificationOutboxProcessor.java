@@ -171,7 +171,7 @@ public class SlackNotificationOutboxProcessor {
             return;
         }
 
-        logLeaseLost(outbox.getId(), claimedProcessingStartedAt, outbox.getProcessingLease());
+        logPersistLeaseLost(outbox.getId(), claimedProcessingStartedAt);
     }
 
     private void persistFailureStatus(
@@ -197,7 +197,7 @@ public class SlackNotificationOutboxProcessor {
             return;
         }
 
-        logLeaseLost(outbox.getId(), claimedProcessingStartedAt, outbox.getProcessingLease());
+        logPersistLeaseLost(outbox.getId(), claimedProcessingStartedAt);
     }
 
     private void logMissingOutbox(Long outboxId) {
@@ -343,6 +343,35 @@ public class SlackNotificationOutboxProcessor {
 
         log.warn(
                 "outbox 처리 lease를 상실해 최종 상태 저장을 건너뜁니다. outboxId={}, claimedProcessingStartedAt={}, actualProcessingLeaseClaimed=false",
+                outboxId,
+                claimedProcessingStartedAt
+        );
+    }
+
+    private void logPersistLeaseLost(
+            Long outboxId,
+            Instant claimedProcessingStartedAt
+    ) {
+        slackNotificationOutboxRepository.findById(outboxId)
+                                         .ifPresentOrElse(
+                                                 actualOutbox -> logLeaseLost(
+                                                         outboxId,
+                                                         claimedProcessingStartedAt,
+                                                         actualOutbox.getProcessingLease()
+                                                 ),
+                                                 () -> logLeaseLostWithUnknownActualState(
+                                                         outboxId,
+                                                         claimedProcessingStartedAt
+                                                 )
+                                         );
+    }
+
+    private void logLeaseLostWithUnknownActualState(
+            Long outboxId,
+            Instant claimedProcessingStartedAt
+    ) {
+        log.warn(
+                "outbox 처리 lease를 상실해 최종 상태 저장을 건너뛰었지만 현재 row를 다시 조회하지 못했습니다. outboxId={}, claimedProcessingStartedAt={}",
                 outboxId,
                 claimedProcessingStartedAt
         );
