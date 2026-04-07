@@ -215,11 +215,18 @@ class SlackNotificationOutboxProcessorTest {
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
             SlackNotificationOutbox actual = slackNotificationOutboxRepository.findById(savedOutboxId)
                                                                               .orElseThrow();
+            List<SlackNotificationOutboxHistory> histories = historiesOf(savedOutboxId);
             assertAll(
                     () -> assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED),
                     () -> assertThat(actual.getProcessingAttempt()).isEqualTo(2),
                     () -> assertThat(actual.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
-                    () -> assertThat(actual.getFailure().reason()).isNotBlank()
+                    () -> assertThat(actual.getFailure().reason()).isNotBlank(),
+                    () -> assertThat(histories).hasSize(1),
+                    () -> assertThat(histories.getFirst().getOutboxId()).isEqualTo(savedOutboxId),
+                    () -> assertThat(histories.getFirst().getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED),
+                    () -> assertThat(histories.getFirst().getFailure().type()).isEqualTo(
+                            SlackInteractionFailureType.RETRY_EXHAUSTED
+                    )
             );
         });
     }
