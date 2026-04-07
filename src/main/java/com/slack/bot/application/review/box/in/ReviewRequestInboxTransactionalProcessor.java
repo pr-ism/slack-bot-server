@@ -83,8 +83,8 @@ public class ReviewRequestInboxTransactionalProcessor {
             );
         } catch (Exception e) {
             log.error("review_request inbox 처리에 실패했습니다. inboxId={}", inbox.getId(), e);
-            ReviewRequestInboxHistory history = markFailureStatus(inbox, e);
-            persistWithLeaseCheck(inbox, history, claimedProcessingStartedAt);
+            markFailureStatus(inbox, e)
+                    .ifPresent(history -> persistWithLeaseCheck(inbox, history, claimedProcessingStartedAt));
             return Optional.empty();
         }
     }
@@ -104,27 +104,31 @@ public class ReviewRequestInboxTransactionalProcessor {
         );
     }
 
-    private ReviewRequestInboxHistory markFailureStatus(ReviewRequestInbox inbox, Exception e) {
+    private Optional<ReviewRequestInboxHistory> markFailureStatus(ReviewRequestInbox inbox, Exception e) {
         if (inbox.getStatus() != ReviewRequestInboxStatus.PROCESSING) {
             log.warn(
                     "PROCESSING이 아닌 상태에서 실패 처리를 시도했습니다. inboxId={}, status={}",
                     inbox.getId(),
                     inbox.getStatus()
             );
-            return null;
+            return Optional.empty();
         }
 
         String reason = resolveFailureReason(e);
 
         if (retryExceptionClassifier.isNotRetryable(e)) {
-            return inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.NON_RETRYABLE);
+            return Optional.of(
+                    inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.NON_RETRYABLE)
+            );
         }
 
         if (inbox.getProcessingAttempt() < interactionRetryProperties.inbox().maxAttempts()) {
-            return inbox.markRetryPending(clock.instant(), reason);
+            return Optional.of(inbox.markRetryPending(clock.instant(), reason));
         }
 
-        return inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.RETRY_EXHAUSTED);
+        return Optional.of(
+                inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.RETRY_EXHAUSTED)
+        );
     }
 
     private String resolveFailureReason(Exception e) {

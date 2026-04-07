@@ -78,21 +78,12 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
         );
 
         return repository.findLockedById(outboxId)
-                .flatMap(entity -> {
-                    SlackNotificationOutbox outbox = entity.toDomain();
-                    if (outbox.getStatus() != SlackNotificationOutboxStatus.PROCESSING) {
-                        return Optional.empty();
-                    }
-                    if (!hasClaimedLease(outbox, currentProcessingStartedAt)) {
-                        return Optional.empty();
-                    }
-
-                    outbox.renewProcessingLease(renewedProcessingStartedAt);
-                    entity.apply(outbox);
-                    repository.save(entity);
-                    return Optional.of(Boolean.TRUE);
-                })
-                .orElse(Boolean.FALSE);
+                .map(entity -> renewProcessingLease(
+                        entity,
+                        currentProcessingStartedAt,
+                        renewedProcessingStartedAt
+                ))
+                .orElse(false);
     }
 
     @Override
@@ -394,6 +385,25 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
         }
 
         return processingLease.startedAt().equals(claimedProcessingStartedAt);
+    }
+
+    private boolean renewProcessingLease(
+            SlackNotificationOutboxJpaEntity entity,
+            Instant currentProcessingStartedAt,
+            Instant renewedProcessingStartedAt
+    ) {
+        SlackNotificationOutbox outbox = entity.toDomain();
+        if (outbox.getStatus() != SlackNotificationOutboxStatus.PROCESSING) {
+            return false;
+        }
+        if (!hasClaimedLease(outbox, currentProcessingStartedAt)) {
+            return false;
+        }
+
+        outbox.renewProcessingLease(renewedProcessingStartedAt);
+        entity.apply(outbox);
+        repository.save(entity);
+        return true;
     }
 
     private SlackNotificationOutboxJpaEntity findOutboxEntity(SlackNotificationOutbox outbox) {

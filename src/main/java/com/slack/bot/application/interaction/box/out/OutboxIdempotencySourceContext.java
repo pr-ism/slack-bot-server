@@ -18,15 +18,7 @@ public class OutboxIdempotencySourceContext {
     }
 
     public Optional<String> currentSourceKey() {
-        OutboxIdempotencySourceBinding sourceBinding = SOURCE.get();
-        if (!sourceBinding.isPresent()) {
-            return Optional.empty();
-        }
-        if (sourceBinding instanceof PresentOutboxIdempotencySourceBinding presentSourceBinding) {
-            return Optional.of(presentSourceBinding.value());
-        }
-
-        throw new IllegalStateException("source key binding 상태가 올바르지 않습니다.");
+        return SOURCE.get().currentSourceKey();
     }
 
     public void withInboxSource(Long inboxId, Runnable runnable) {
@@ -72,7 +64,7 @@ public class OutboxIdempotencySourceContext {
     private sealed interface OutboxIdempotencySourceBinding
             permits AbsentOutboxIdempotencySourceBinding, PresentOutboxIdempotencySourceBinding {
 
-        boolean isPresent();
+        Optional<String> currentSourceKey();
     }
 
     private static final class AbsentOutboxIdempotencySourceBinding implements OutboxIdempotencySourceBinding {
@@ -84,8 +76,8 @@ public class OutboxIdempotencySourceContext {
         }
 
         @Override
-        public boolean isPresent() {
-            return false;
+        public Optional<String> currentSourceKey() {
+            return Optional.empty();
         }
     }
 
@@ -104,8 +96,8 @@ public class OutboxIdempotencySourceContext {
         }
 
         @Override
-        public boolean isPresent() {
-            return true;
+        public Optional<String> currentSourceKey() {
+            return Optional.of(value);
         }
     }
 
