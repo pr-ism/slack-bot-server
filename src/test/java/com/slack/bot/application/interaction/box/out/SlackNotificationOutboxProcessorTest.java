@@ -18,7 +18,6 @@ import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxHistory;
-import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxId;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
@@ -202,17 +201,19 @@ class SlackNotificationOutboxProcessorTest {
                                                                        .text("hello-timeout-poison-pill")
                                                                        .build();
         Instant base = clock.instant();
-        setProcessingState(timeoutOutbox, base.minusSeconds(120), 1);
-        timeoutOutbox.markRetryPending(base.minusSeconds(110), "first failure");
-        setProcessingState(timeoutOutbox, base.minusSeconds(100), 2);
-        SlackNotificationOutbox saved = slackNotificationOutboxRepository.save(timeoutOutbox);
+        SlackNotificationOutbox saved = saveProcessingOutbox(timeoutOutbox, base.minusSeconds(120), 1);
+        saved.markRetryPending(base.minusSeconds(110), "first failure");
+        saved = slackNotificationOutboxRepository.save(saved);
+        setProcessingState(saved, base.minusSeconds(100), 2);
+        saved = slackNotificationOutboxRepository.save(saved);
+        Long savedOutboxId = saved.getId();
 
         // when
         slackNotificationOutboxProcessor.recoverTimeoutProcessing();
 
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
-            SlackNotificationOutbox actual = slackNotificationOutboxRepository.findById(saved.getId())
+            SlackNotificationOutbox actual = slackNotificationOutboxRepository.findById(savedOutboxId)
                                                                               .orElseThrow();
             assertAll(
                     () -> assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED),
@@ -237,8 +238,11 @@ class SlackNotificationOutboxProcessorTest {
                                                                            .channelId("C1")
                                                                            .text("hello-timeout-batch-" + index)
                                                                            .build();
-            setProcessingState(timeoutOutbox, base.minusSeconds(120L + index), 1);
-            SlackNotificationOutbox saved = slackNotificationOutboxRepository.save(timeoutOutbox);
+            SlackNotificationOutbox saved = saveProcessingOutbox(
+                    timeoutOutbox,
+                    base.minusSeconds(120L + index),
+                    1
+            );
             outboxIds.add(saved.getId());
         }
 
@@ -279,8 +283,11 @@ class SlackNotificationOutboxProcessorTest {
                                                                              .channelId("C1")
                                                                              .text("hello-timeout-mixed-retry-" + index)
                                                                              .build();
-            setProcessingState(retryableOutbox, base.minusSeconds(200L + index), 1);
-            SlackNotificationOutbox saved = slackNotificationOutboxRepository.save(retryableOutbox);
+            SlackNotificationOutbox saved = saveProcessingOutbox(
+                    retryableOutbox,
+                    base.minusSeconds(200L + index),
+                    1
+            );
             outboxIds.add(saved.getId());
         }
         for (int index = 0; index < 51; index++) {
@@ -291,8 +298,11 @@ class SlackNotificationOutboxProcessorTest {
                                                                              .channelId("C1")
                                                                              .text("hello-timeout-mixed-failed-" + index)
                                                                              .build();
-            setProcessingState(exhaustedOutbox, base.minusSeconds(100L + index), 2);
-            SlackNotificationOutbox saved = slackNotificationOutboxRepository.save(exhaustedOutbox);
+            SlackNotificationOutbox saved = saveProcessingOutbox(
+                    exhaustedOutbox,
+                    base.minusSeconds(100L + index),
+                    2
+            );
             outboxIds.add(saved.getId());
         }
 
@@ -335,8 +345,11 @@ class SlackNotificationOutboxProcessorTest {
                                                                        .channelId("C1")
                                                                        .text("hello-timeout-locked")
                                                                        .build();
-        setProcessingState(timeoutOutbox, Instant.parse("2026-03-24T00:01:00Z"), 1);
-        SlackNotificationOutbox saved = slackNotificationOutboxRepository.save(timeoutOutbox);
+        SlackNotificationOutbox saved = saveProcessingOutbox(
+                timeoutOutbox,
+                Instant.parse("2026-03-24T00:01:00Z"),
+                1
+        );
         CountDownLatch lockAcquired = new CountDownLatch(1);
         CountDownLatch releaseLock = new CountDownLatch(1);
 
@@ -519,10 +532,17 @@ class SlackNotificationOutboxProcessorTest {
             Instant processingStartedAt,
             int processingAttempt
     ) {
-        if (!outbox.hasId()) {
-            ReflectionTestUtils.setField(outbox, "identity", SlackNotificationOutboxId.assigned(999L));
-        }
         outbox.claim(processingStartedAt);
         ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
+    }
+
+    private SlackNotificationOutbox saveProcessingOutbox(
+            SlackNotificationOutbox outbox,
+            Instant processingStartedAt,
+            int processingAttempt
+    ) {
+        SlackNotificationOutbox saved = slackNotificationOutboxRepository.save(outbox);
+        setProcessingState(saved, processingStartedAt, processingAttempt);
+        return slackNotificationOutboxRepository.save(saved);
     }
 }

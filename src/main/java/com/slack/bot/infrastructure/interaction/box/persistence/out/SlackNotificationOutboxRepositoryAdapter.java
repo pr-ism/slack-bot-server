@@ -59,8 +59,7 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
     @Override
     @Transactional
     public SlackNotificationOutbox save(SlackNotificationOutbox outbox) {
-        SlackNotificationOutboxJpaEntity entity = findOutboxEntity(outbox)
-                .orElseGet(() -> new SlackNotificationOutboxJpaEntity());
+        SlackNotificationOutboxJpaEntity entity = findOutboxEntity(outbox);
         entity.apply(outbox);
         return repository.save(entity).toDomain();
     }
@@ -402,12 +401,13 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
         return processingLease.startedAt().equals(claimedProcessingStartedAt);
     }
 
-    private Optional<SlackNotificationOutboxJpaEntity> findOutboxEntity(SlackNotificationOutbox outbox) {
+    private SlackNotificationOutboxJpaEntity findOutboxEntity(SlackNotificationOutbox outbox) {
         if (!outbox.hasId()) {
-            return Optional.empty();
+            return new SlackNotificationOutboxJpaEntity();
         }
 
-        return repository.findById(outbox.getId());
+        return repository.findById(outbox.getId())
+                .orElseThrow(() -> new IllegalStateException("저장 대상 outbox를 찾을 수 없습니다. id=" + outbox.getId()));
     }
 
     private void saveHistory(SlackNotificationOutboxHistory history) {
