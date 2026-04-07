@@ -61,4 +61,23 @@ class SlackNotificationOutboxHistoryTest {
                 () -> assertThat(history.getFailure().type()).isEqualTo(SlackInteractionFailureType.PROCESSING_TIMEOUT)
         );
     }
+
+    @Test
+    void validateHistoryFailure는_완료되지_않은_outbox_status를_거부한다() {
+        // given
+        BoxFailureSnapshot<SlackInteractionFailureType> failure = BoxFailureSnapshot.present(
+                "failure",
+                SlackInteractionFailureType.RETRYABLE
+        );
+
+        // when & then
+        assertAll(
+                () -> assertThatThrownBy(() -> SlackNotificationOutboxStatus.PENDING.validateHistoryFailure(failure))
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessage("history status는 완료된 상태여야 합니다."),
+                () -> assertThatThrownBy(() -> SlackNotificationOutboxStatus.PROCESSING.validateHistoryFailure(failure))
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessage("history status는 완료된 상태여야 합니다.")
+        );
+    }
 }

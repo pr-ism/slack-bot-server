@@ -54,6 +54,7 @@ public enum SlackInteractionInboxStatus {
     }
 
     public void validateHistoryFailure(BoxFailureSnapshot<SlackInteractionFailureType> failure) {
+        validateHistoryStatus();
         if (failure == null) {
             throw new IllegalArgumentException("failure는 비어 있을 수 없습니다.");
         }
