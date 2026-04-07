@@ -213,32 +213,55 @@ public class SlackNotificationOutboxProcessor {
             throw new UnsupportedSlackNotificationOutboxMessageTypeException(null);
         }
         String token = resolveToken(outbox.getTeamId());
-        messageType.dispatch(
-                () -> notificationTransportApiClient.sendEphemeralMessage(
-                        token,
-                        outbox.getChannelId(),
-                        outbox.requiredUserId(),
-                        outbox.requiredText()
-                ),
-                () -> notificationTransportApiClient.sendEphemeralBlockMessage(
-                        token,
-                        outbox.getChannelId(),
-                        outbox.requiredUserId(),
-                        readBlocks(outbox.requiredBlocksJson()),
-                        outbox.fallbackTextOrBlank()
-                ),
-                () -> notificationTransportApiClient.sendMessage(
-                        token,
-                        outbox.getChannelId(),
-                        outbox.requiredText()
-                ),
-                () -> notificationTransportApiClient.sendBlockMessage(
-                        token,
-                        outbox.getChannelId(),
-                        readBlocks(outbox.requiredBlocksJson()),
-                        outbox.fallbackTextOrBlank()
-                )
-        );
+        SlackNotificationOutboxMessageType.Dispatcher dispatcher = createDispatcher(token, outbox);
+        messageType.dispatch(dispatcher);
+    }
+
+    private SlackNotificationOutboxMessageType.Dispatcher createDispatcher(
+            String token,
+            SlackNotificationOutbox outbox
+    ) {
+        SlackNotificationOutboxMessageType.DispatchAction dispatchEphemeralText = () -> {
+            String channelId = outbox.getChannelId();
+            String userId = outbox.requiredUserId();
+            String text = outbox.requiredText();
+
+            notificationTransportApiClient.sendEphemeralMessage(token, channelId, userId, text);
+        };
+        SlackNotificationOutboxMessageType.DispatchAction dispatchEphemeralBlocks = () -> {
+            String channelId = outbox.getChannelId();
+            String userId = outbox.requiredUserId();
+            JsonNode blocks = readBlocks(outbox.requiredBlocksJson());
+            String fallbackText = outbox.fallbackTextOrBlank();
+
+            notificationTransportApiClient.sendEphemeralBlockMessage(
+                    token,
+                    channelId,
+                    userId,
+                    blocks,
+                    fallbackText
+            );
+        };
+        SlackNotificationOutboxMessageType.DispatchAction dispatchChannelText = () -> {
+            String channelId = outbox.getChannelId();
+            String text = outbox.requiredText();
+
+            notificationTransportApiClient.sendMessage(token, channelId, text);
+        };
+        SlackNotificationOutboxMessageType.DispatchAction dispatchChannelBlocks = () -> {
+            String channelId = outbox.getChannelId();
+            JsonNode blocks = readBlocks(outbox.requiredBlocksJson());
+            String fallbackText = outbox.fallbackTextOrBlank();
+
+            notificationTransportApiClient.sendBlockMessage(token, channelId, blocks, fallbackText);
+        };
+
+        return SlackNotificationOutboxMessageType.Dispatcher.builder()
+                                                            .dispatchEphemeralText(dispatchEphemeralText)
+                                                            .dispatchEphemeralBlocks(dispatchEphemeralBlocks)
+                                                            .dispatchChannelText(dispatchChannelText)
+                                                            .dispatchChannelBlocks(dispatchChannelBlocks)
+                                                            .build();
     }
 
     private JsonNode readBlocks(String blocksJson) throws JsonProcessingException {
