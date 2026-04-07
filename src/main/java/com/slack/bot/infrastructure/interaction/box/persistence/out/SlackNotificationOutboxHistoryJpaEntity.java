@@ -3,6 +3,7 @@ package com.slack.bot.infrastructure.interaction.box.persistence.out;
 import com.slack.bot.domain.common.BaseTimeEntity;
 import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
 import com.slack.bot.infrastructure.common.BoxFailureState;
+import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxHistory;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
@@ -59,6 +60,8 @@ public class SlackNotificationOutboxHistoryJpaEntity extends BaseTimeEntity {
 
     private void applyFailure(SlackNotificationOutboxHistory history) {
         this.failureState = BoxFailureState.ABSENT;
+        this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
+        this.failureType = SlackInteractionFailureType.NONE;
 
         BoxFailureSnapshot<SlackInteractionFailureType> failure = history.getFailure();
         if (!failure.isPresent()) {
