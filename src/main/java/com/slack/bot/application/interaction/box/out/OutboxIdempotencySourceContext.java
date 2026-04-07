@@ -18,12 +18,8 @@ public class OutboxIdempotencySourceContext {
     private static final String BUSINESS_PREFIX = "BUSINESS";
 
     public String requireSourceKey() {
-        Optional<String> sourceKey = currentSourceKey();
-        if (sourceKey.isPresent()) {
-            return sourceKey.get();
-        }
-
-        throw new IllegalStateException("아웃박스 멱등성 source 키가 필요합니다.");
+        return currentSourceKey()
+                .orElseThrow(() -> new IllegalStateException("아웃박스 멱등성 source 키가 필요합니다."));
     }
 
     public Optional<String> currentSourceKey() {
@@ -139,7 +135,7 @@ public class OutboxIdempotencySourceContext {
     private record PresentOutboxSourceId(String value) implements OutboxSourceId {
 
         private PresentOutboxSourceId {
-            if (value == null) {
+            if (value == null || value.isBlank()) {
                 throw new IllegalArgumentException("sourceId는 비어 있을 수 없습니다.");
             }
         }
