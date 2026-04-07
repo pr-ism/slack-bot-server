@@ -15,7 +15,6 @@ import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -58,35 +57,29 @@ public class ReviewRequestInboxTransactionalProcessor {
             ReviewRequestInbox inbox,
             Instant claimedProcessingStartedAt
     ) {
-        deserializeRequest(inbox, claimedProcessingStartedAt).ifPresent(request -> {
-            String sourceKey = resolveSourceKey(inbox);
-            reviewNotificationSourceContext.withSourceKey(
-                    sourceKey,
-                    () -> reviewNotificationService.sendSimpleNotification(inbox.getApiKey(), request)
-            );
+        ReviewNotificationPayload request;
+        try {
+            request = deserializeRequest(inbox);
+        } catch (Exception e) {
+            handleFailure(inbox, claimedProcessingStartedAt, e);
+            return;
+        }
 
-            ReviewRequestInboxHistory history = inbox.markProcessed(clock.instant());
-            persistWithLeaseCheck(inbox, history, claimedProcessingStartedAt);
-        });
+        String sourceKey = resolveSourceKey(inbox);
+        reviewNotificationSourceContext.withSourceKey(
+                sourceKey,
+                () -> reviewNotificationService.sendSimpleNotification(inbox.getApiKey(), request)
+        );
+
+        ReviewRequestInboxHistory history = inbox.markProcessed(clock.instant());
+        persistWithLeaseCheck(inbox, history, claimedProcessingStartedAt);
     }
 
-    private Optional<ReviewNotificationPayload> deserializeRequest(
-            ReviewRequestInbox inbox,
-            Instant claimedProcessingStartedAt
-    ) {
-        try {
-            return Optional.of(
-                    objectMapper.readValue(
-                            inbox.getRequestJson(),
-                            ReviewNotificationPayload.class
-                    )
-            );
-        } catch (Exception e) {
-            log.error("review_request inbox 처리에 실패했습니다. inboxId={}", inbox.getId(), e);
-            markFailureStatus(inbox, e)
-                    .ifPresent(history -> persistWithLeaseCheck(inbox, history, claimedProcessingStartedAt));
-            return Optional.empty();
-        }
+    private ReviewNotificationPayload deserializeRequest(ReviewRequestInbox inbox) throws Exception {
+        return objectMapper.readValue(
+                inbox.getRequestJson(),
+                ReviewNotificationPayload.class
+        );
     }
 
     private void persistWithLeaseCheck(
@@ -104,31 +97,38 @@ public class ReviewRequestInboxTransactionalProcessor {
         );
     }
 
-    private Optional<ReviewRequestInboxHistory> markFailureStatus(ReviewRequestInbox inbox, Exception e) {
+    private void handleFailure(
+            ReviewRequestInbox inbox,
+            Instant claimedProcessingStartedAt,
+            Exception e
+    ) {
+        log.error("review_request inbox 처리에 실패했습니다. inboxId={}", inbox.getId(), e);
+
         if (inbox.getStatus() != ReviewRequestInboxStatus.PROCESSING) {
             log.warn(
                     "PROCESSING이 아닌 상태에서 실패 처리를 시도했습니다. inboxId={}, status={}",
                     inbox.getId(),
                     inbox.getStatus()
             );
-            return Optional.empty();
+            return;
         }
 
+        ReviewRequestInboxHistory history = markFailureStatus(inbox, e);
+        persistWithLeaseCheck(inbox, history, claimedProcessingStartedAt);
+    }
+
+    private ReviewRequestInboxHistory markFailureStatus(ReviewRequestInbox inbox, Exception e) {
         String reason = resolveFailureReason(e);
 
         if (retryExceptionClassifier.isNotRetryable(e)) {
-            return Optional.of(
-                    inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.NON_RETRYABLE)
-            );
+            return inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.NON_RETRYABLE);
         }
 
         if (inbox.getProcessingAttempt() < interactionRetryProperties.inbox().maxAttempts()) {
-            return Optional.of(inbox.markRetryPending(clock.instant(), reason));
+            return inbox.markRetryPending(clock.instant(), reason);
         }
 
-        return Optional.of(
-                inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.RETRY_EXHAUSTED)
-        );
+        return inbox.markFailed(clock.instant(), reason, ReviewRequestInboxFailureType.RETRY_EXHAUSTED);
     }
 
     private String resolveFailureReason(Exception e) {
