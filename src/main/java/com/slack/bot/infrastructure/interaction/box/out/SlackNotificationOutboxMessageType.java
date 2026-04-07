@@ -25,8 +25,13 @@ public enum SlackNotificationOutboxMessageType {
         }
 
         @Override
-        public void dispatch(Dispatcher dispatcher) throws JsonProcessingException {
-            dispatcher.dispatchEphemeralText();
+        public void dispatch(
+                DispatchAction dispatchEphemeralText,
+                DispatchAction dispatchEphemeralBlocks,
+                DispatchAction dispatchChannelText,
+                DispatchAction dispatchChannelBlocks
+        ) throws JsonProcessingException {
+            dispatchEphemeralText.run();
         }
     },
     EPHEMERAL_BLOCKS {
@@ -51,8 +56,13 @@ public enum SlackNotificationOutboxMessageType {
         }
 
         @Override
-        public void dispatch(Dispatcher dispatcher) throws JsonProcessingException {
-            dispatcher.dispatchEphemeralBlocks();
+        public void dispatch(
+                DispatchAction dispatchEphemeralText,
+                DispatchAction dispatchEphemeralBlocks,
+                DispatchAction dispatchChannelText,
+                DispatchAction dispatchChannelBlocks
+        ) throws JsonProcessingException {
+            dispatchEphemeralBlocks.run();
         }
     },
     CHANNEL_TEXT {
@@ -77,8 +87,13 @@ public enum SlackNotificationOutboxMessageType {
         }
 
         @Override
-        public void dispatch(Dispatcher dispatcher) throws JsonProcessingException {
-            dispatcher.dispatchChannelText();
+        public void dispatch(
+                DispatchAction dispatchEphemeralText,
+                DispatchAction dispatchEphemeralBlocks,
+                DispatchAction dispatchChannelText,
+                DispatchAction dispatchChannelBlocks
+        ) throws JsonProcessingException {
+            dispatchChannelText.run();
         }
     },
     CHANNEL_BLOCKS {
@@ -103,8 +118,13 @@ public enum SlackNotificationOutboxMessageType {
         }
 
         @Override
-        public void dispatch(Dispatcher dispatcher) throws JsonProcessingException {
-            dispatcher.dispatchChannelBlocks();
+        public void dispatch(
+                DispatchAction dispatchEphemeralText,
+                DispatchAction dispatchEphemeralBlocks,
+                DispatchAction dispatchChannelText,
+                DispatchAction dispatchChannelBlocks
+        ) throws JsonProcessingException {
+            dispatchChannelBlocks.run();
         }
     };
 
@@ -116,16 +136,16 @@ public enum SlackNotificationOutboxMessageType {
 
     public abstract boolean supportsFallbackText();
 
-    public abstract void dispatch(Dispatcher dispatcher) throws JsonProcessingException;
+    public abstract void dispatch(
+            DispatchAction dispatchEphemeralText,
+            DispatchAction dispatchEphemeralBlocks,
+            DispatchAction dispatchChannelText,
+            DispatchAction dispatchChannelBlocks
+    ) throws JsonProcessingException;
 
-    public interface Dispatcher {
+    @FunctionalInterface
+    public interface DispatchAction {
 
-        void dispatchEphemeralText() throws JsonProcessingException;
-
-        void dispatchEphemeralBlocks() throws JsonProcessingException;
-
-        void dispatchChannelText() throws JsonProcessingException;
-
-        void dispatchChannelBlocks() throws JsonProcessingException;
+        void run() throws JsonProcessingException;
     }
 }

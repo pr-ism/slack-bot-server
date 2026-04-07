@@ -8,12 +8,7 @@ import org.springframework.stereotype.Component;
 public class OutboxIdempotencySourceContext {
 
     private static final ThreadLocal<OutboxIdempotencySourceBinding> SOURCE =
-            new ThreadLocal<>() {
-                @Override
-                protected OutboxIdempotencySourceBinding initialValue() {
-                    return AbsentOutboxIdempotencySourceBinding.INSTANCE;
-                }
-            };
+            ThreadLocal.withInitial(() -> AbsentOutboxIdempotencySourceBinding.INSTANCE);
     private static final String INBOX_PREFIX = "INBOX";
     private static final String BUSINESS_PREFIX = "BUSINESS";
 

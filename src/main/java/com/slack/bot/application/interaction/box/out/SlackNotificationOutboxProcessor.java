@@ -213,47 +213,32 @@ public class SlackNotificationOutboxProcessor {
             throw new UnsupportedSlackNotificationOutboxMessageTypeException(null);
         }
         String token = resolveToken(outbox.getTeamId());
-        messageType.dispatch(new SlackNotificationOutboxMessageType.Dispatcher() {
-            @Override
-            public void dispatchEphemeralText() {
-                notificationTransportApiClient.sendEphemeralMessage(
+        messageType.dispatch(
+                () -> notificationTransportApiClient.sendEphemeralMessage(
                         token,
                         outbox.getChannelId(),
                         outbox.requiredUserId(),
                         outbox.requiredText()
-                );
-            }
-
-            @Override
-            public void dispatchEphemeralBlocks() throws JsonProcessingException {
-                notificationTransportApiClient.sendEphemeralBlockMessage(
+                ),
+                () -> notificationTransportApiClient.sendEphemeralBlockMessage(
                         token,
                         outbox.getChannelId(),
                         outbox.requiredUserId(),
                         readBlocks(outbox.requiredBlocksJson()),
                         outbox.fallbackTextOrBlank()
-                );
-            }
-
-            @Override
-            public void dispatchChannelText() {
-                notificationTransportApiClient.sendMessage(
+                ),
+                () -> notificationTransportApiClient.sendMessage(
                         token,
                         outbox.getChannelId(),
                         outbox.requiredText()
-                );
-            }
-
-            @Override
-            public void dispatchChannelBlocks() throws JsonProcessingException {
-                notificationTransportApiClient.sendBlockMessage(
+                ),
+                () -> notificationTransportApiClient.sendBlockMessage(
                         token,
                         outbox.getChannelId(),
                         readBlocks(outbox.requiredBlocksJson()),
                         outbox.fallbackTextOrBlank()
-                );
-            }
-        });
+                )
+        );
     }
 
     private JsonNode readBlocks(String blocksJson) throws JsonProcessingException {
