@@ -317,28 +317,23 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
             Instant claimedProcessingStartedAt
     ) {
         validateSaveIfProcessingLeaseMatchedArguments(outbox, claimedProcessingStartedAt);
-        Optional<SlackNotificationOutboxJpaEntity> entityOptional = repository.findLockedById(outbox.getId());
-        if (entityOptional.isEmpty()) {
-            return false;
-        }
+        return repository.findLockedById(outbox.getId())
+                .filter(entity -> {
+                    SlackNotificationOutbox persistedOutbox = entity.toDomain();
+                    return persistedOutbox.getStatus() == SlackNotificationOutboxStatus.PROCESSING
+                            && hasClaimedLease(persistedOutbox, claimedProcessingStartedAt);
+                })
+                .map(entity -> {
+                    entity.apply(outbox);
+                    repository.save(entity);
 
-        SlackNotificationOutboxJpaEntity entity = entityOptional.get();
-        SlackNotificationOutbox persistedOutbox = entity.toDomain();
-        if (persistedOutbox.getStatus() != SlackNotificationOutboxStatus.PROCESSING) {
-            return false;
-        }
-        if (!hasClaimedLease(persistedOutbox, claimedProcessingStartedAt)) {
-            return false;
-        }
+                    if (historyHolder.isPresent()) {
+                        saveHistory(historyHolder.value());
+                    }
 
-        entity.apply(outbox);
-        repository.save(entity);
-
-        if (historyHolder.isPresent()) {
-            saveHistory(historyHolder.value());
-        }
-
-        return true;
+                    return true;
+                })
+                .orElse(false);
     }
 
     protected String buildEnqueueSql() {
