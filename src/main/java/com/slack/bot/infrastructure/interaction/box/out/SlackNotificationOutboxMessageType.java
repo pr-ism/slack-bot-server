@@ -3,120 +3,74 @@ package com.slack.bot.infrastructure.interaction.box.out;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 public enum SlackNotificationOutboxMessageType {
-    EPHEMERAL_TEXT {
-        @Override
-        public boolean supportsUserId() {
-            return true;
-        }
+    EPHEMERAL_TEXT(
+            true,
+            true,
+            false,
+            false,
+            dispatcher -> dispatcher.dispatchEphemeralText()
+    ),
+    EPHEMERAL_BLOCKS(
+            true,
+            false,
+            true,
+            true,
+            dispatcher -> dispatcher.dispatchEphemeralBlocks()
+    ),
+    CHANNEL_TEXT(
+            false,
+            true,
+            false,
+            false,
+            dispatcher -> dispatcher.dispatchChannelText()
+    ),
+    CHANNEL_BLOCKS(
+            false,
+            false,
+            true,
+            true,
+            dispatcher -> dispatcher.dispatchChannelBlocks()
+    );
 
-        @Override
-        public boolean supportsText() {
-            return true;
-        }
+    private final boolean supportsUserId;
+    private final boolean supportsText;
+    private final boolean supportsBlocksJson;
+    private final boolean supportsFallbackText;
+    private final DispatchRouter dispatchRouter;
 
-        @Override
-        public boolean supportsBlocksJson() {
-            return false;
-        }
+    SlackNotificationOutboxMessageType(
+            boolean supportsUserId,
+            boolean supportsText,
+            boolean supportsBlocksJson,
+            boolean supportsFallbackText,
+            DispatchRouter dispatchRouter
+    ) {
+        this.supportsUserId = supportsUserId;
+        this.supportsText = supportsText;
+        this.supportsBlocksJson = supportsBlocksJson;
+        this.supportsFallbackText = supportsFallbackText;
+        this.dispatchRouter = dispatchRouter;
+    }
 
-        @Override
-        public boolean supportsFallbackText() {
-            return false;
-        }
+    public boolean supportsUserId() {
+        return supportsUserId;
+    }
 
-        @Override
-        public void dispatch(Dispatcher dispatcher) throws JsonProcessingException {
-            dispatcher.dispatchEphemeralText();
-        }
-    },
-    EPHEMERAL_BLOCKS {
-        @Override
-        public boolean supportsUserId() {
-            return true;
-        }
+    public boolean supportsText() {
+        return supportsText;
+    }
 
-        @Override
-        public boolean supportsText() {
-            return false;
-        }
+    public boolean supportsBlocksJson() {
+        return supportsBlocksJson;
+    }
 
-        @Override
-        public boolean supportsBlocksJson() {
-            return true;
-        }
+    public boolean supportsFallbackText() {
+        return supportsFallbackText;
+    }
 
-        @Override
-        public boolean supportsFallbackText() {
-            return true;
-        }
-
-        @Override
-        public void dispatch(Dispatcher dispatcher) throws JsonProcessingException {
-            dispatcher.dispatchEphemeralBlocks();
-        }
-    },
-    CHANNEL_TEXT {
-        @Override
-        public boolean supportsUserId() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsText() {
-            return true;
-        }
-
-        @Override
-        public boolean supportsBlocksJson() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsFallbackText() {
-            return false;
-        }
-
-        @Override
-        public void dispatch(Dispatcher dispatcher) throws JsonProcessingException {
-            dispatcher.dispatchChannelText();
-        }
-    },
-    CHANNEL_BLOCKS {
-        @Override
-        public boolean supportsUserId() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsText() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsBlocksJson() {
-            return true;
-        }
-
-        @Override
-        public boolean supportsFallbackText() {
-            return true;
-        }
-
-        @Override
-        public void dispatch(Dispatcher dispatcher) throws JsonProcessingException {
-            dispatcher.dispatchChannelBlocks();
-        }
-    };
-
-    public abstract boolean supportsUserId();
-
-    public abstract boolean supportsText();
-
-    public abstract boolean supportsBlocksJson();
-
-    public abstract boolean supportsFallbackText();
-
-    public abstract void dispatch(Dispatcher dispatcher) throws JsonProcessingException;
+    public void dispatch(Dispatcher dispatcher) throws JsonProcessingException {
+        dispatchRouter.route(dispatcher);
+    }
 
     public interface Dispatcher {
 
@@ -235,5 +189,11 @@ public enum SlackNotificationOutboxMessageType {
     public interface DispatchAction {
 
         void run() throws JsonProcessingException;
+    }
+
+    @FunctionalInterface
+    private interface DispatchRouter {
+
+        void route(Dispatcher dispatcher) throws JsonProcessingException;
     }
 }
