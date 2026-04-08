@@ -124,7 +124,7 @@ class ReviewRequestInboxTest {
         ReviewRequestInbox inbox = pendingInbox();
 
         // when & then
-        assertThatThrownBy(inbox::currentProcessingLeaseStartedAt)
+        assertThatThrownBy(() -> inbox.currentProcessingLeaseStartedAt())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("processingLease를 보유하고 있지 않습니다.");
     }

@@ -321,16 +321,25 @@ class ReviewReminderSlackDirectMessageClientTest {
                   .andExpect(method(POST))
                   .andExpect(header("Authorization", "Bearer " + token))
                   .andRespond(request -> withStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-                          .body(new InputStreamResource(new InputStream() {
-                              @Override
-                              public int read() throws IOException {
-                                  throw new IOException("boom");
-                              }
-                          }))
+                          .body(new InputStreamResource(new FailingInputStream("boom")))
                           .createResponse(request));
 
         assertThatThrownBy(() -> slackDirectMessageClient.send(token, userId, "message"))
                 .isInstanceOf(SlackDmException.class)
                 .hasMessageNotContaining("body=");
+    }
+
+    private static final class FailingInputStream extends InputStream {
+
+        private final String message;
+
+        private FailingInputStream(String message) {
+            this.message = message;
+        }
+
+        @Override
+        public int read() throws IOException {
+            throw new IOException(message);
+        }
     }
 }

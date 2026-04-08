@@ -163,9 +163,9 @@ class EqualJitterExponentialBackOffPolicyTest {
         AtomicLong initialInterval = new AtomicLong(100L);
         AtomicLong maxInterval = new AtomicLong(1_000L);
         AtomicInteger multiplierScale = new AtomicInteger(20);
-        backOffPolicy.initialIntervalSupplier(initialInterval::get);
+        backOffPolicy.initialIntervalSupplier(() -> initialInterval.get());
         backOffPolicy.multiplierSupplier(() -> multiplierScale.get() / 10.0d);
-        backOffPolicy.maxIntervalSupplier(maxInterval::get);
+        backOffPolicy.maxIntervalSupplier(() -> maxInterval.get());
         backOffPolicy.setSleeper(sleeper);
         BackOffContext backOffContext = backOffPolicy.start(null);
 

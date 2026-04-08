@@ -13,6 +13,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
@@ -406,8 +407,7 @@ class ReviewRequestInboxProcessorTest {
     void request_직렬화에_실패하면_enqueue는_예외를_던진다() throws Exception {
         // given
         ReviewNotificationPayload request = request(503L, "serialization-fail");
-        doThrow(new JsonProcessingException("serialize fail") {
-        }).when(objectMapper).writeValueAsString(any());
+        doThrow(new JsonMappingException(null, "serialize fail")).when(objectMapper).writeValueAsString(any());
 
         // when & then
         assertThatThrownBy(() -> reviewRequestInboxProcessor.enqueue("test-api-key", request, 0))

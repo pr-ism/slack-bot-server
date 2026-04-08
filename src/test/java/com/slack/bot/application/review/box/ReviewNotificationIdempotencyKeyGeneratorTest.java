@@ -37,17 +37,21 @@ class ReviewNotificationIdempotencyKeyGeneratorTest {
     @Test
     void SHA_256_알고리즘을_얻지_못하면_IllegalStateException을_던진다() {
         // given
-        ReviewNotificationIdempotencyKeyGenerator failingGenerator = new ReviewNotificationIdempotencyKeyGenerator() {
-            @Override
-            MessageDigest messageDigest() throws NoSuchAlgorithmException {
-                throw new NoSuchAlgorithmException("not supported");
-            }
-        };
+        ReviewNotificationIdempotencyKeyGenerator failingGenerator = new FailingReviewNotificationIdempotencyKeyGenerator();
 
         // when // then
         assertThatThrownBy(() -> failingGenerator.generate(ReviewNotificationIdempotencyScope.REVIEW_NOTIFICATION_OUTBOX, "payload"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("SHA-256 알고리즘을 사용할 수 없습니다.")
                 .hasCauseInstanceOf(NoSuchAlgorithmException.class);
+    }
+
+    private static final class FailingReviewNotificationIdempotencyKeyGenerator
+            extends ReviewNotificationIdempotencyKeyGenerator {
+
+        @Override
+        MessageDigest messageDigest() throws NoSuchAlgorithmException {
+            throw new NoSuchAlgorithmException("not supported");
+        }
     }
 }

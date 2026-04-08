@@ -10,8 +10,13 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.mock;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -668,7 +673,7 @@ class NotificationTransportApiClientTest {
     }
 
     @Test
-    void 모달_view_직렬화_실패시_원인_예외를_포함해_던진다() {
+    void 모달_view_직렬화_실패시_원인_예외를_포함해_던진다() throws Exception {
         // given
         String token = "xoxb-token";
         String triggerId = "TRIGGER_ID";
@@ -676,13 +681,10 @@ class NotificationTransportApiClientTest {
                 .type("modal")
                 .callbackId("review_time_submit")
         );
-        ObjectMapper failingObjectMapper = new ObjectMapper() {
-            @Override
-            public com.fasterxml.jackson.databind.JsonNode readTree(String content) throws JsonProcessingException {
-                throw new JsonProcessingException("readTree failed") {
-                };
-            }
-        };
+        ObjectMapper failingObjectMapper = mock(ObjectMapper.class);
+        willThrow(new JsonMappingException(null, "readTree failed"))
+                .given(failingObjectMapper)
+                .readTree(anyString());
         NotificationTransportApiClient failingClient = new NotificationTransportApiClient(
                 RestClient.builder().baseUrl("https://slack.com/api/").build(),
                 failingObjectMapper
@@ -811,12 +813,7 @@ class NotificationTransportApiClientTest {
                   .andExpect(method(POST))
                   .andExpect(header("Authorization", "Bearer " + token))
                   .andRespond(request -> withStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-                          .body(new InputStreamResource(new InputStream() {
-                              @Override
-                              public int read() throws IOException {
-                                  throw new IOException("Stream read failed");
-                              }
-                          }))
+                          .body(new InputStreamResource(new FailingInputStream("Stream read failed")))
                           .createResponse(request));
 
         // when & then
@@ -824,6 +821,20 @@ class NotificationTransportApiClientTest {
                 .isInstanceOf(SlackBotMessageDispatchException.class)
                 .hasMessageContaining("Slack API 요청 실패")
                 .hasMessageContaining("500");
+    }
+
+    private static final class FailingInputStream extends InputStream {
+
+        private final String message;
+
+        private FailingInputStream(String message) {
+            this.message = message;
+        }
+
+        @Override
+        public int read() throws IOException {
+            throw new IOException(message);
+        }
     }
 
     private ArrayNode sectionBlocks() {

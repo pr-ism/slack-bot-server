@@ -463,7 +463,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
         }
 
         history.map(historyEntry -> historyEntry.bindInboxId(inbox.getId()))
-               .ifPresent(this::saveHistory);
+               .ifPresent(historyEntry -> saveHistory(historyEntry));
 
         return true;
     }
@@ -471,7 +471,9 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
     @Override
     @Transactional
     public ReviewRequestInbox save(ReviewRequestInbox inbox) {
-        ReviewRequestInboxJpaEntity entity = findInboxEntity(inbox.getId()).orElseGet(ReviewRequestInboxJpaEntity::new);
+        ReviewRequestInboxJpaEntity entity = findInboxEntity(inbox.getId()).orElseGet(
+                () -> new ReviewRequestInboxJpaEntity()
+        );
         entity.apply(inbox);
         return reviewRequestInboxJpaRepository.save(entity).toDomain();
     }
