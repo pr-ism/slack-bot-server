@@ -92,10 +92,6 @@ public class SlackNotificationOutboxHistory {
         return outboxId.value();
     }
 
-    public boolean hasId() {
-        return historyId.isAssigned();
-    }
-
     private static void validateProcessingAttempt(int processingAttempt) {
         if (processingAttempt <= 0) {
             throw new IllegalArgumentException("processingAttempt는 1 이상이어야 합니다.");
