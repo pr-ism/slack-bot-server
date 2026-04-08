@@ -81,14 +81,7 @@ class ReviewRequestInboxEntryProcessorUnitTest {
     @Test
     void processingLease가_없으면_트랜잭션_처리를_건너뛴다() {
         // given
-        ReviewRequestInbox inbox = ReviewRequestInbox.pending(
-                "review-entry-no-lease",
-                "test-api-key",
-                111L,
-                "{}",
-                CLAIMED_PROCESSING_STARTED_AT
-        );
-        ReflectionTestUtils.setField(inbox, "id", 111L);
+        ReviewRequestInbox inbox = processingInboxWithoutLease(111L);
         given(reviewRequestInboxRepository.findById(111L)).willReturn(Optional.of(inbox));
 
         // when
@@ -140,6 +133,24 @@ class ReviewRequestInboxEntryProcessorUnitTest {
         ReflectionTestUtils.setField(inbox, "id", inboxId);
         ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
         ReflectionTestUtils.setField(inbox, "processingLease", BoxProcessingLease.claimed(processingStartedAt));
+        ReflectionTestUtils.setField(inbox, "processedTime", BoxEventTime.absent());
+        ReflectionTestUtils.setField(inbox, "failedTime", BoxEventTime.absent());
+        ReflectionTestUtils.setField(inbox, "failure", BoxFailureSnapshot.absent());
+        ReflectionTestUtils.setField(inbox, "processingAttempt", 1);
+        return inbox;
+    }
+
+    private ReviewRequestInbox processingInboxWithoutLease(Long inboxId) {
+        ReviewRequestInbox inbox = ReviewRequestInbox.pending(
+                "review-entry-" + inboxId + "-no-lease",
+                "test-api-key",
+                100L + inboxId,
+                "{}",
+                CLAIMED_PROCESSING_STARTED_AT
+        );
+        ReflectionTestUtils.setField(inbox, "id", inboxId);
+        ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
+        ReflectionTestUtils.setField(inbox, "processingLease", BoxProcessingLease.idle());
         ReflectionTestUtils.setField(inbox, "processedTime", BoxEventTime.absent());
         ReflectionTestUtils.setField(inbox, "failedTime", BoxEventTime.absent());
         ReflectionTestUtils.setField(inbox, "failure", BoxFailureSnapshot.absent());
