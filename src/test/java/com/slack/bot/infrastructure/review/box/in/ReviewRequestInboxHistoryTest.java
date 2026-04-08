@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -22,15 +22,15 @@ class ReviewRequestInboxHistoryTest {
                 1,
                 ReviewRequestInboxStatus.RETRY_PENDING,
                 Instant.parse("2026-03-27T00:00:00Z"),
-                "failure",
-                ReviewRequestInboxFailureType.NONE
+                BoxFailureSnapshot.present("failure", ReviewRequestInboxFailureType.RETRYABLE)
         );
 
         // then
         assertAll(
                 () -> assertThat(history.getInboxId()).isNull(),
                 () -> assertThat(history.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING)
+                () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
+                () -> assertThat(history.getFailure().type()).isEqualTo(ReviewRequestInboxFailureType.RETRYABLE)
         );
     }
 
@@ -42,8 +42,7 @@ class ReviewRequestInboxHistoryTest {
                 1,
                 ReviewRequestInboxStatus.FAILED,
                 Instant.parse("2026-03-27T00:00:00Z"),
-                "failure",
-                ReviewRequestInboxFailureType.NON_RETRYABLE
+                BoxFailureSnapshot.present("failure", ReviewRequestInboxFailureType.NON_RETRYABLE)
         );
 
         // when
@@ -53,7 +52,7 @@ class ReviewRequestInboxHistoryTest {
         assertAll(
                 () -> assertThat(actual.getInboxId()).isEqualTo(10L),
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
-                () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE)
+                () -> assertThat(actual.getFailure().type()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE)
         );
     }
 
@@ -65,8 +64,7 @@ class ReviewRequestInboxHistoryTest {
                 1,
                 ReviewRequestInboxStatus.PROCESSED,
                 Instant.parse("2026-03-27T00:00:00Z"),
-                FailureSnapshotDefaults.NO_FAILURE_REASON,
-                ReviewRequestInboxFailureType.NONE
+                BoxFailureSnapshot.absent()
         );
 
         // when & then
@@ -83,14 +81,30 @@ class ReviewRequestInboxHistoryTest {
                 1,
                 ReviewRequestInboxStatus.RETRY_PENDING,
                 Instant.parse("2026-03-27T00:00:00Z"),
-                "timeout",
-                ReviewRequestInboxFailureType.PROCESSING_TIMEOUT
+                BoxFailureSnapshot.present("timeout", ReviewRequestInboxFailureType.PROCESSING_TIMEOUT)
         );
 
         // then
         assertAll(
                 () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
-                () -> assertThat(history.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.PROCESSING_TIMEOUT)
+                () -> assertThat(history.getFailure().type()).isEqualTo(ReviewRequestInboxFailureType.PROCESSING_TIMEOUT)
         );
+    }
+
+    @Test
+    void completed는_null_failure을_허용하지_않는다() {
+        // given
+        Instant completedAt = Instant.parse("2026-03-27T00:00:00Z");
+
+        // when & then
+        assertThatThrownBy(() -> ReviewRequestInboxHistory.completed(
+                10L,
+                1,
+                ReviewRequestInboxStatus.FAILED,
+                completedAt,
+                null
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("failure는 비어 있을 수 없습니다.");
     }
 }

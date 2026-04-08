@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 import com.slack.bot.application.IntegrationTest;
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
+import com.slack.bot.infrastructure.common.BoxEventTime;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
+import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxHistory;
@@ -68,13 +70,10 @@ class ReviewRequestInboxRepositoryAdapterTest {
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING),
                 () -> assertThat(actual.getProcessingAttempt()).isZero(),
-                () -> assertThat(actual.getProcessingStartedAt()).isEqualTo(
-                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
-                ),
-                () -> assertThat(actual.getProcessedAt()).isEqualTo(FailureSnapshotDefaults.NO_PROCESSED_AT),
-                () -> assertThat(actual.getFailedAt()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_AT),
-                () -> assertThat(actual.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
-                () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
+                () -> assertThat(actual.hasClaimedProcessingLease()).isFalse(),
+                () -> assertThat(actual.getProcessedTime().isPresent()).isFalse(),
+                () -> assertThat(actual.getFailedTime().isPresent()).isFalse(),
+                () -> assertThat(actual.getFailure().isPresent()).isFalse(),
                 () -> assertThat(actual.getAvailableAt()).isEqualTo(availableAt)
         );
     }
@@ -108,7 +107,7 @@ class ReviewRequestInboxRepositoryAdapterTest {
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actual.getProcessingStartedAt()).isEqualTo(processingStartedAt),
+                () -> assertThat(actual.currentProcessingLeaseStartedAt()).isEqualTo(processingStartedAt),
                 () -> assertThat(actual.getApiKey()).isEqualTo("api-key"),
                 () -> assertThat(actual.getRequestJson()).isEqualTo("{\"pullRequestTitle\":\"old\"}"),
                 () -> assertThat(actual.getAvailableAt()).isEqualTo(oldAvailableAt)
@@ -144,13 +143,10 @@ class ReviewRequestInboxRepositoryAdapterTest {
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING),
                 () -> assertThat(actual.getProcessingAttempt()).isZero(),
-                () -> assertThat(actual.getProcessingStartedAt()).isEqualTo(
-                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
-                ),
-                () -> assertThat(actual.getProcessedAt()).isEqualTo(FailureSnapshotDefaults.NO_PROCESSED_AT),
-                () -> assertThat(actual.getFailedAt()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_AT),
-                () -> assertThat(actual.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
-                () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
+                () -> assertThat(actual.hasClaimedProcessingLease()).isFalse(),
+                () -> assertThat(actual.getProcessedTime().isPresent()).isFalse(),
+                () -> assertThat(actual.getFailedTime().isPresent()).isFalse(),
+                () -> assertThat(actual.getFailure().isPresent()).isFalse(),
                 () -> assertThat(actual.getRequestJson()).isEqualTo("{\"pullRequestTitle\":\"new\"}"),
                 () -> assertThat(actual.getAvailableAt()).isEqualTo(newAvailableAt)
         );
@@ -187,11 +183,11 @@ class ReviewRequestInboxRepositoryAdapterTest {
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(1),
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
-                () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
+                () -> assertThat(actual.getFailure().type()).isEqualTo(ReviewRequestInboxFailureType.PROCESSING_TIMEOUT),
                 () -> assertThat(actualEntity.getUpdatedAt()).isEqualTo(expectedUpdatedAt),
                 () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
-                () -> assertThat(history.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.PROCESSING_TIMEOUT),
-                () -> assertThat(history.getFailureReason()).isEqualTo("timeout"),
+                () -> assertThat(history.getFailure().type()).isEqualTo(ReviewRequestInboxFailureType.PROCESSING_TIMEOUT),
+                () -> assertThat(history.getFailure().reason()).isEqualTo("timeout"),
                 () -> assertThat(history.getCompletedAt()).isEqualTo(failedAt)
         );
     }
@@ -237,7 +233,7 @@ class ReviewRequestInboxRepositoryAdapterTest {
                 () -> assertThat(actualHistories).filteredOn(history -> history.getStatus() == ReviewRequestInboxStatus.RETRY_PENDING)
                         .hasSize(100),
                 () -> assertThat(actualHistories).filteredOn(
-                        history -> history.getFailureType() == ReviewRequestInboxFailureType.PROCESSING_TIMEOUT
+                        history -> history.getFailure().type() == ReviewRequestInboxFailureType.PROCESSING_TIMEOUT
                 ).hasSize(100)
         );
     }
@@ -298,10 +294,10 @@ class ReviewRequestInboxRepositoryAdapterTest {
                 () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == ReviewRequestInboxStatus.PROCESSING)
                         .hasSize(1),
                 () -> assertThat(actualHistories).filteredOn(
-                        history -> history.getFailureType() == ReviewRequestInboxFailureType.PROCESSING_TIMEOUT
+                        history -> history.getFailure().type() == ReviewRequestInboxFailureType.PROCESSING_TIMEOUT
                 ).hasSize(50),
                 () -> assertThat(actualHistories).filteredOn(
-                        history -> history.getFailureType() == ReviewRequestInboxFailureType.RETRY_EXHAUSTED
+                        history -> history.getFailure().type() == ReviewRequestInboxFailureType.RETRY_EXHAUSTED
                 ).hasSize(50)
         );
     }
@@ -367,12 +363,11 @@ class ReviewRequestInboxRepositoryAdapterTest {
 
     private void setProcessingState(ReviewRequestInbox inbox, Instant processingStartedAt, int processingAttempt) {
         ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
-        ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
-        ReflectionTestUtils.setField(inbox, "processedAt", FailureSnapshotDefaults.NO_PROCESSED_AT);
+        ReflectionTestUtils.setField(inbox, "processingLease", BoxProcessingLease.claimed(processingStartedAt));
+        ReflectionTestUtils.setField(inbox, "processedTime", BoxEventTime.absent());
         ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(inbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
-        ReflectionTestUtils.setField(inbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
-        ReflectionTestUtils.setField(inbox, "failureType", ReviewRequestInboxFailureType.NONE);
+        ReflectionTestUtils.setField(inbox, "failedTime", BoxEventTime.absent());
+        ReflectionTestUtils.setField(inbox, "failure", BoxFailureSnapshot.absent());
     }
 
     private ReviewRequestInbox findByIdempotencyKey(String idempotencyKey) {

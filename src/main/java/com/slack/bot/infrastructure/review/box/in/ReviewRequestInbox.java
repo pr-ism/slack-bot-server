@@ -1,6 +1,8 @@
 package com.slack.bot.infrastructure.review.box.in;
 
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
+import com.slack.bot.infrastructure.common.BoxEventTime;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
+import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import java.time.Instant;
 import lombok.Getter;
 
@@ -16,11 +18,10 @@ public class ReviewRequestInbox {
 
     private ReviewRequestInboxStatus status;
     private int processingAttempt;
-    private Instant processingStartedAt;
-    private Instant processedAt;
-    private Instant failedAt;
-    private String failureReason;
-    private ReviewRequestInboxFailureType failureType;
+    private BoxProcessingLease processingLease;
+    private BoxEventTime processedTime;
+    private BoxEventTime failedTime;
+    private BoxFailureSnapshot<ReviewRequestInboxFailureType> failure;
 
     public static ReviewRequestInbox pending(
             String idempotencyKey,
@@ -44,11 +45,10 @@ public class ReviewRequestInbox {
                 availableAt,
                 ReviewRequestInboxStatus.PENDING,
                 0,
-                FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT,
-                FailureSnapshotDefaults.NO_PROCESSED_AT,
-                FailureSnapshotDefaults.NO_FAILURE_AT,
-                FailureSnapshotDefaults.NO_FAILURE_REASON,
-                ReviewRequestInboxFailureType.NONE
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.absent(),
+                BoxFailureSnapshot.absent()
         );
     }
 
@@ -61,11 +61,10 @@ public class ReviewRequestInbox {
             Instant availableAt,
             ReviewRequestInboxStatus status,
             int processingAttempt,
-            Instant processingStartedAt,
-            Instant processedAt,
-            Instant failedAt,
-            String failureReason,
-            ReviewRequestInboxFailureType failureType
+            BoxProcessingLease processingLease,
+            BoxEventTime processedTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<ReviewRequestInboxFailureType> failure
     ) {
         validateIdempotencyKey(idempotencyKey);
         validateApiKey(apiKey);
@@ -74,11 +73,11 @@ public class ReviewRequestInbox {
         validateAvailableAt(availableAt);
         validateStatus(status);
         validateProcessingAttempt(processingAttempt);
-        validateProcessingStartedAt(processingStartedAt);
-        validateProcessedAt(processedAt);
-        validateFailedAt(failedAt);
-        validateFailureReasonSnapshot(failureReason);
-        validateFailureTypeSnapshot(failureType);
+        validateProcessingLease(processingLease);
+        validateProcessedTime(processedTime);
+        validateFailedTime(failedTime);
+        validateFailure(failure);
+        validateState(status, processingAttempt, processingLease, processedTime, failedTime, failure);
 
         return new ReviewRequestInbox(
                 id,
@@ -89,11 +88,10 @@ public class ReviewRequestInbox {
                 availableAt,
                 status,
                 processingAttempt,
-                processingStartedAt,
-                processedAt,
-                failedAt,
-                failureReason,
-                failureType
+                processingLease,
+                processedTime,
+                failedTime,
+                failure
         );
     }
 
@@ -106,11 +104,10 @@ public class ReviewRequestInbox {
             Instant availableAt,
             ReviewRequestInboxStatus status,
             int processingAttempt,
-            Instant processingStartedAt,
-            Instant processedAt,
-            Instant failedAt,
-            String failureReason,
-            ReviewRequestInboxFailureType failureType
+            BoxProcessingLease processingLease,
+            BoxEventTime processedTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<ReviewRequestInboxFailureType> failure
     ) {
         this.id = id;
         this.idempotencyKey = idempotencyKey;
@@ -120,60 +117,84 @@ public class ReviewRequestInbox {
         this.availableAt = availableAt;
         this.status = status;
         this.processingAttempt = processingAttempt;
-        this.processingStartedAt = processingStartedAt;
-        this.processedAt = processedAt;
-        this.failedAt = failedAt;
-        this.failureReason = failureReason;
-        this.failureType = failureType;
+        this.processingLease = processingLease;
+        this.processedTime = processedTime;
+        this.failedTime = failedTime;
+        this.failure = failure;
     }
 
     public ReviewRequestInboxHistory markProcessed(Instant processedAt) {
-        validatePresentProcessedAt(processedAt);
+        validateProcessedAt(processedAt);
         validateTransition(ReviewRequestInboxStatus.PROCESSING, "PROCESSED");
 
         this.status = ReviewRequestInboxStatus.PROCESSED;
-        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
-        this.processedAt = processedAt;
-        this.failedAt = FailureSnapshotDefaults.NO_FAILURE_AT;
-        this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
-        this.failureType = ReviewRequestInboxFailureType.NONE;
+        this.processingLease = BoxProcessingLease.idle();
+        this.processedTime = BoxEventTime.present(processedAt);
+        this.failedTime = BoxEventTime.absent();
+        this.failure = BoxFailureSnapshot.absent();
 
         return ReviewRequestInboxHistory.completed(
                 getId(),
                 this.processingAttempt,
                 ReviewRequestInboxStatus.PROCESSED,
                 processedAt,
-                FailureSnapshotDefaults.NO_FAILURE_REASON,
-                ReviewRequestInboxFailureType.NONE
+                BoxFailureSnapshot.absent()
         );
     }
 
     public void renewProcessingLease(Instant processingStartedAt) {
-        validatePresentProcessingStartedAt(processingStartedAt);
+        validateProcessingStartedAt(processingStartedAt);
         validateTransition(ReviewRequestInboxStatus.PROCESSING, "PROCESSING");
 
-        this.processingStartedAt = processingStartedAt;
+        this.processingLease = BoxProcessingLease.claimed(processingStartedAt);
+    }
+
+    public boolean hasClaimedProcessingLease() {
+        return processingLease.isClaimed();
+    }
+
+    public boolean hasClaimedProcessingLease(Instant processingStartedAt) {
+        if (!hasClaimedProcessingLease()) {
+            return false;
+        }
+
+        return processingLease.startedAt().equals(processingStartedAt);
+    }
+
+    public Instant currentProcessingLeaseStartedAt() {
+        if (!hasClaimedProcessingLease()) {
+            throw new IllegalStateException("processingLease를 보유하고 있지 않습니다.");
+        }
+
+        return processingLease.startedAt();
     }
 
     public ReviewRequestInboxHistory markRetryPending(Instant failedAt, String failureReason) {
-        validatePresentFailedAt(failedAt);
-        validatePresentFailureReason(failureReason);
+        return markRetryPending(failedAt, failureReason, ReviewRequestInboxFailureType.RETRYABLE);
+    }
+
+    public ReviewRequestInboxHistory markRetryPending(
+            Instant failedAt,
+            String failureReason,
+            ReviewRequestInboxFailureType failureType
+    ) {
+        validateFailedAt(failedAt);
+        validateFailureReason(failureReason);
+        validateRetryPendingFailureType(failureType);
         validateTransition(ReviewRequestInboxStatus.PROCESSING, "RETRY_PENDING");
 
         this.status = ReviewRequestInboxStatus.RETRY_PENDING;
-        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
-        this.processedAt = FailureSnapshotDefaults.NO_PROCESSED_AT;
-        this.failedAt = failedAt;
-        this.failureReason = failureReason;
-        this.failureType = ReviewRequestInboxFailureType.NONE;
+        this.processingLease = BoxProcessingLease.idle();
+        this.processedTime = BoxEventTime.absent();
+        this.failedTime = BoxEventTime.present(failedAt);
+        this.failure = BoxFailureSnapshot.present(failureReason, failureType);
 
         return ReviewRequestInboxHistory.completed(
                 getId(),
                 this.processingAttempt,
                 ReviewRequestInboxStatus.RETRY_PENDING,
                 failedAt,
-                failureReason,
-                ReviewRequestInboxFailureType.NONE
+                BoxFailureSnapshot.present(failureReason, failureType)
         );
     }
 
@@ -182,25 +203,23 @@ public class ReviewRequestInbox {
             String failureReason,
             ReviewRequestInboxFailureType failureType
     ) {
-        validatePresentFailedAt(failedAt);
-        validatePresentFailureReason(failureReason);
-        validatePresentFailureType(failureType);
+        validateFailedAt(failedAt);
+        validateFailureReason(failureReason);
+        validateFailedFailureType(failureType);
         validateTransition(ReviewRequestInboxStatus.PROCESSING, "FAILED");
 
         this.status = ReviewRequestInboxStatus.FAILED;
-        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
-        this.processedAt = FailureSnapshotDefaults.NO_PROCESSED_AT;
-        this.failedAt = failedAt;
-        this.failureReason = failureReason;
-        this.failureType = failureType;
+        this.processingLease = BoxProcessingLease.idle();
+        this.processedTime = BoxEventTime.absent();
+        this.failedTime = BoxEventTime.present(failedAt);
+        this.failure = BoxFailureSnapshot.present(failureReason, failureType);
 
         return ReviewRequestInboxHistory.completed(
                 getId(),
                 this.processingAttempt,
                 ReviewRequestInboxStatus.FAILED,
                 failedAt,
-                failureReason,
-                failureType
+                BoxFailureSnapshot.present(failureReason, failureType)
         );
     }
 
@@ -246,64 +265,225 @@ public class ReviewRequestInbox {
         }
     }
 
-    private static void validateProcessingStartedAt(Instant processingStartedAt) {
-        if (processingStartedAt == null) {
-            throw new IllegalArgumentException("processingStartedAt은 비어 있을 수 없습니다.");
+    private static void validateProcessingLease(BoxProcessingLease processingLease) {
+        if (processingLease == null) {
+            throw new IllegalArgumentException("processingLease는 비어 있을 수 없습니다.");
         }
     }
 
-    private static void validateProcessedAt(Instant processedAt) {
+    private static void validateProcessedTime(BoxEventTime processedTime) {
+        if (processedTime == null) {
+            throw new IllegalArgumentException("processedTime은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private static void validateFailedTime(BoxEventTime failedTime) {
+        if (failedTime == null) {
+            throw new IllegalArgumentException("failedTime은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private static void validateFailure(BoxFailureSnapshot<ReviewRequestInboxFailureType> failure) {
+        if (failure == null) {
+            throw new IllegalArgumentException("failure는 비어 있을 수 없습니다.");
+        }
+    }
+
+    private static void validateState(
+            ReviewRequestInboxStatus status,
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime processedTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<ReviewRequestInboxFailureType> failure
+    ) {
+        if (status == ReviewRequestInboxStatus.PENDING) {
+            validatePendingState(processingAttempt, processingLease, processedTime, failedTime, failure);
+            return;
+        }
+        if (status == ReviewRequestInboxStatus.PROCESSING) {
+            validateProcessingState(processingAttempt, processingLease, processedTime, failedTime, failure);
+            return;
+        }
+        if (status == ReviewRequestInboxStatus.PROCESSED) {
+            validateProcessedState(processingAttempt, processingLease, processedTime, failedTime, failure);
+            return;
+        }
+        if (status == ReviewRequestInboxStatus.RETRY_PENDING) {
+            validateRetryPendingState(processingAttempt, processingLease, processedTime, failedTime, failure);
+            return;
+        }
+
+        validateFailedState(processingAttempt, processingLease, processedTime, failedTime, failure);
+    }
+
+    private static void validatePendingState(
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime processedTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<ReviewRequestInboxFailureType> failure
+    ) {
+        if (processingAttempt != 0) {
+            throw new IllegalArgumentException("PENDING 상태의 processingAttempt는 0이어야 합니다.");
+        }
+        validateIdleLease(processingLease, "PENDING");
+        validateProcessedTimeAbsent(processedTime, "PENDING");
+        validateFailedStateAbsent(failedTime, failure, "PENDING");
+    }
+
+    private static void validateProcessingState(
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime processedTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<ReviewRequestInboxFailureType> failure
+    ) {
+        validateProcessedAttemptStarted(processingAttempt, "PROCESSING");
+        if (!processingLease.isClaimed()) {
+            throw new IllegalArgumentException("PROCESSING 상태는 processingLease를 보유해야 합니다.");
+        }
+        validateProcessedTimeAbsent(processedTime, "PROCESSING");
+        validateFailedStateAbsent(failedTime, failure, "PROCESSING");
+    }
+
+    private static void validateProcessedState(
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime processedTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<ReviewRequestInboxFailureType> failure
+    ) {
+        validateProcessedAttemptStarted(processingAttempt, "PROCESSED");
+        validateIdleLease(processingLease, "PROCESSED");
+        if (!processedTime.isPresent()) {
+            throw new IllegalArgumentException("PROCESSED 상태는 processedTime이 있어야 합니다.");
+        }
+        validateFailedStateAbsent(failedTime, failure, "PROCESSED");
+    }
+
+    private static void validateRetryPendingState(
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime processedTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<ReviewRequestInboxFailureType> failure
+    ) {
+        validateProcessedAttemptStarted(processingAttempt, "RETRY_PENDING");
+        validateIdleLease(processingLease, "RETRY_PENDING");
+        validateProcessedTimeAbsent(processedTime, "RETRY_PENDING");
+        validateFailedStatePresent(failedTime, failure, "RETRY_PENDING");
+
+        ReviewRequestInboxFailureType failureType = failure.type();
+        if (failureType != ReviewRequestInboxFailureType.RETRYABLE
+                && failureType != ReviewRequestInboxFailureType.PROCESSING_TIMEOUT) {
+            throw new IllegalArgumentException("RETRY_PENDING 상태의 failureType이 올바르지 않습니다.");
+        }
+    }
+
+    private static void validateFailedState(
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime processedTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<ReviewRequestInboxFailureType> failure
+    ) {
+        validateProcessedAttemptStarted(processingAttempt, "FAILED");
+        validateIdleLease(processingLease, "FAILED");
+        validateProcessedTimeAbsent(processedTime, "FAILED");
+        validateFailedStatePresent(failedTime, failure, "FAILED");
+
+        ReviewRequestInboxFailureType failureType = failure.type();
+        if (failureType != ReviewRequestInboxFailureType.NON_RETRYABLE
+                && failureType != ReviewRequestInboxFailureType.RETRY_EXHAUSTED) {
+            throw new IllegalArgumentException("FAILED 상태의 failureType이 올바르지 않습니다.");
+        }
+    }
+
+    private static void validateProcessedAttemptStarted(int processingAttempt, String statusName) {
+        if (processingAttempt <= 0) {
+            throw new IllegalArgumentException(statusName + " 상태의 processingAttempt는 1 이상이어야 합니다.");
+        }
+    }
+
+    private static void validateIdleLease(BoxProcessingLease processingLease, String statusName) {
+        if (processingLease.isClaimed()) {
+            throw new IllegalArgumentException(statusName + " 상태는 processingLease가 비어 있어야 합니다.");
+        }
+    }
+
+    private static void validateProcessedTimeAbsent(BoxEventTime processedTime, String statusName) {
+        if (processedTime.isPresent()) {
+            throw new IllegalArgumentException(statusName + " 상태는 processedTime이 비어 있어야 합니다.");
+        }
+    }
+
+    private static void validateFailedStateAbsent(
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<ReviewRequestInboxFailureType> failure,
+            String statusName
+    ) {
+        if (failedTime.isPresent()) {
+            throw new IllegalArgumentException(statusName + " 상태는 failedTime이 비어 있어야 합니다.");
+        }
+        if (failure.isPresent()) {
+            throw new IllegalArgumentException(statusName + " 상태는 failure가 비어 있어야 합니다.");
+        }
+    }
+
+    private static void validateFailedStatePresent(
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<ReviewRequestInboxFailureType> failure,
+            String statusName
+    ) {
+        if (!failedTime.isPresent()) {
+            throw new IllegalArgumentException(statusName + " 상태는 failedTime이 있어야 합니다.");
+        }
+        if (!failure.isPresent()) {
+            throw new IllegalArgumentException(statusName + " 상태는 failure가 있어야 합니다.");
+        }
+    }
+
+    private void validateProcessedAt(Instant processedAt) {
         if (processedAt == null) {
             throw new IllegalArgumentException("processedAt은 비어 있을 수 없습니다.");
         }
     }
 
-    private static void validateFailedAt(Instant failedAt) {
-        if (failedAt == null) {
-            throw new IllegalArgumentException("failedAt은 비어 있을 수 없습니다.");
-        }
-    }
-
-    private static void validateFailureReasonSnapshot(String failureReason) {
-        if (failureReason == null) {
-            throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
-        }
-    }
-
-    private static void validateFailureTypeSnapshot(ReviewRequestInboxFailureType failureType) {
-        if (failureType == null) {
-            throw new IllegalArgumentException("failureType은 비어 있을 수 없습니다.");
-        }
-    }
-
-    private void validatePresentProcessedAt(Instant processedAt) {
-        if (processedAt == null) {
-            throw new IllegalArgumentException("processedAt은 비어 있을 수 없습니다.");
-        }
-    }
-
-    private void validatePresentProcessingStartedAt(Instant processingStartedAt) {
+    private void validateProcessingStartedAt(Instant processingStartedAt) {
         if (processingStartedAt == null) {
             throw new IllegalArgumentException("processingStartedAt은 비어 있을 수 없습니다.");
         }
     }
 
-    private void validatePresentFailedAt(Instant failedAt) {
+    private void validateFailedAt(Instant failedAt) {
         if (failedAt == null) {
             throw new IllegalArgumentException("failedAt은 비어 있을 수 없습니다.");
         }
     }
 
-    private void validatePresentFailureReason(String failureReason) {
+    private void validateFailureReason(String failureReason) {
         if (failureReason == null || failureReason.isBlank()) {
             throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
         }
     }
 
-    private void validatePresentFailureType(ReviewRequestInboxFailureType failureType) {
-        if (failureType == null || failureType == ReviewRequestInboxFailureType.NONE) {
-            throw new IllegalArgumentException("failureType은 NONE일 수 없습니다.");
+    private void validateRetryPendingFailureType(ReviewRequestInboxFailureType failureType) {
+        if (failureType == ReviewRequestInboxFailureType.RETRYABLE
+                || failureType == ReviewRequestInboxFailureType.PROCESSING_TIMEOUT) {
+            return;
         }
+
+        throw new IllegalArgumentException("RETRY_PENDING failureType이 올바르지 않습니다.");
+    }
+
+    private void validateFailedFailureType(ReviewRequestInboxFailureType failureType) {
+        if (failureType == ReviewRequestInboxFailureType.NON_RETRYABLE
+                || failureType == ReviewRequestInboxFailureType.RETRY_EXHAUSTED) {
+            return;
+        }
+
+        throw new IllegalArgumentException("FAILED failureType이 올바르지 않습니다.");
     }
 
     private void validateTransition(ReviewRequestInboxStatus expectedStatus, String targetStatus) {

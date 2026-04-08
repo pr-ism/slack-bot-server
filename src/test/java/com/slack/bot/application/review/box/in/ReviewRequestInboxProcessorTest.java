@@ -20,7 +20,9 @@ import com.slack.bot.application.review.box.out.ReviewNotificationOutboxEnqueuer
 import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.application.worker.PollingHintPublisher;
 import com.slack.bot.application.worker.PollingHintTarget;
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
+import com.slack.bot.infrastructure.common.BoxEventTime;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
+import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.infrastructure.review.batch.SpyReviewNotificationService;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
@@ -122,7 +124,7 @@ class ReviewRequestInboxProcessorTest {
                     () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
                     () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
                     () -> assertThat(inbox.getIdempotencyKey()).hasSize(64),
-                    () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
+                    () -> assertThat(inbox.getFailure().isPresent()).isFalse(),
                     () -> assertThat(reviewNotificationSourceContext.currentSourceKey()).isEmpty()
             );
         });
@@ -183,8 +185,8 @@ class ReviewRequestInboxProcessorTest {
                 () -> assertThat(spyReviewNotificationService.getSendCount()).isZero(),
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
                 () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE),
-                () -> assertThat(inbox.getFailureReason()).isNotBlank(),
+                () -> assertThat(inbox.getFailure().type()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE),
+                () -> assertThat(inbox.getFailure().reason()).isNotBlank(),
                 () -> assertThat(reviewNotificationSourceContext.currentSourceKey()).isEmpty()
         );
     }
@@ -222,7 +224,7 @@ class ReviewRequestInboxProcessorTest {
                     () -> assertThat(spyReviewNotificationService.getSendCount()).isEqualTo(1),
                     () -> assertThat(processed.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
                     () -> assertThat(processed.getProcessingAttempt()).isEqualTo(2),
-                    () -> assertThat(processed.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
+                    () -> assertThat(processed.getFailure().isPresent()).isFalse(),
                     () -> assertThat(histories).hasSize(2),
                     () -> assertThat(histories).extracting(history -> history.getStatus())
                             .containsExactly(
@@ -259,8 +261,8 @@ class ReviewRequestInboxProcessorTest {
                 () -> assertThat(spyReviewNotificationService.getSendCount()).isZero(),
                 () -> assertThat(failed.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
                 () -> assertThat(failed.getProcessingAttempt()).isEqualTo(2),
-                () -> assertThat(failed.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.RETRY_EXHAUSTED),
-                () -> assertThat(failed.getFailureReason()).isNotBlank()
+                () -> assertThat(failed.getFailure().type()).isEqualTo(ReviewRequestInboxFailureType.RETRY_EXHAUSTED),
+                () -> assertThat(failed.getFailure().reason()).isNotBlank()
         );
     }
 
@@ -450,8 +452,7 @@ class ReviewRequestInboxProcessorTest {
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
-                () -> assertThat(inbox.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
+                () -> assertThat(inbox.getFailure().isPresent()).isFalse(),
                 () -> assertThat(jpaReviewNotificationOutboxRepository.findAll()).isEmpty()
         );
     }
@@ -495,8 +496,7 @@ class ReviewRequestInboxProcessorTest {
         assertAll(
                 () -> assertThat(failed.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(failed.getProcessingAttempt()).isEqualTo(2),
-                () -> assertThat(failed.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
-                () -> assertThat(failed.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
+                () -> assertThat(failed.getFailure().isPresent()).isFalse(),
                 () -> assertThat(jpaReviewNotificationOutboxRepository.findAll()).isEmpty()
         );
     }
@@ -574,12 +574,11 @@ class ReviewRequestInboxProcessorTest {
 
     private void setProcessingState(ReviewRequestInbox inbox, Instant processingStartedAt, int processingAttempt) {
         ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
-        ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
-        ReflectionTestUtils.setField(inbox, "processedAt", FailureSnapshotDefaults.NO_PROCESSED_AT);
+        ReflectionTestUtils.setField(inbox, "processingLease", BoxProcessingLease.claimed(processingStartedAt));
+        ReflectionTestUtils.setField(inbox, "processedTime", BoxEventTime.absent());
+        ReflectionTestUtils.setField(inbox, "failedTime", BoxEventTime.absent());
+        ReflectionTestUtils.setField(inbox, "failure", BoxFailureSnapshot.absent());
         ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(inbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
-        ReflectionTestUtils.setField(inbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
-        ReflectionTestUtils.setField(inbox, "failureType", ReviewRequestInboxFailureType.NONE);
     }
 
     private ReviewRequestInbox findOnlyInbox() {

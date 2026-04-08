@@ -1,6 +1,9 @@
 package com.slack.bot.infrastructure.review.persistence.box.in;
 
 import com.slack.bot.domain.common.BaseTimeEntity;
+import com.slack.bot.infrastructure.common.BoxEventTime;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
+import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
@@ -55,11 +58,10 @@ public class ReviewRequestInboxJpaEntity extends BaseTimeEntity {
                 availableAt,
                 status,
                 processingAttempt,
-                processingStartedAt,
-                processedAt,
-                failedAt,
-                failureReason,
-                failureType
+                toProcessingLease(),
+                toProcessedTime(),
+                toFailedTime(),
+                toFailure()
         );
     }
 
@@ -71,10 +73,78 @@ public class ReviewRequestInboxJpaEntity extends BaseTimeEntity {
         this.availableAt = inbox.getAvailableAt();
         this.status = inbox.getStatus();
         this.processingAttempt = inbox.getProcessingAttempt();
-        this.processingStartedAt = inbox.getProcessingStartedAt();
-        this.processedAt = inbox.getProcessedAt();
-        this.failedAt = inbox.getFailedAt();
-        this.failureReason = inbox.getFailureReason();
-        this.failureType = inbox.getFailureType();
+        applyProcessingLease(inbox);
+        applyProcessedTime(inbox);
+        applyFailedTime(inbox);
+        applyFailure(inbox);
+    }
+
+    private void applyProcessingLease(ReviewRequestInbox inbox) {
+        this.processingStartedAt = null;
+        if (inbox.getProcessingLease().isClaimed()) {
+            this.processingStartedAt = inbox.getProcessingLease().startedAt();
+        }
+    }
+
+    private void applyProcessedTime(ReviewRequestInbox inbox) {
+        this.processedAt = null;
+        if (inbox.getProcessedTime().isPresent()) {
+            this.processedAt = inbox.getProcessedTime().occurredAt();
+        }
+    }
+
+    private void applyFailedTime(ReviewRequestInbox inbox) {
+        this.failedAt = null;
+        if (inbox.getFailedTime().isPresent()) {
+            this.failedAt = inbox.getFailedTime().occurredAt();
+        }
+    }
+
+    private void applyFailure(ReviewRequestInbox inbox) {
+        this.failureReason = null;
+        this.failureType = null;
+
+        BoxFailureSnapshot<ReviewRequestInboxFailureType> failure = inbox.getFailure();
+        if (!failure.isPresent()) {
+            return;
+        }
+
+        this.failureReason = failure.reason();
+        this.failureType = failure.type();
+    }
+
+    private BoxProcessingLease toProcessingLease() {
+        if (processingStartedAt == null) {
+            return BoxProcessingLease.idle();
+        }
+
+        return BoxProcessingLease.claimed(processingStartedAt);
+    }
+
+    private BoxEventTime toProcessedTime() {
+        if (processedAt == null) {
+            return BoxEventTime.absent();
+        }
+
+        return BoxEventTime.present(processedAt);
+    }
+
+    private BoxEventTime toFailedTime() {
+        if (failedAt == null) {
+            return BoxEventTime.absent();
+        }
+
+        return BoxEventTime.present(failedAt);
+    }
+
+    private BoxFailureSnapshot<ReviewRequestInboxFailureType> toFailure() {
+        if (failureReason == null && failureType == null) {
+            return BoxFailureSnapshot.absent();
+        }
+        if (failureReason == null || failureType == null) {
+            throw new IllegalStateException("failure 상태가 올바르지 않습니다.");
+        }
+
+        return BoxFailureSnapshot.present(failureReason, failureType);
     }
 }

@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
+import com.slack.bot.infrastructure.common.BoxEventTime;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
+import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -16,7 +18,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class ReviewRequestInboxTest {
 
     @Test
-    void pending으로_생성하면_기본값은_PENDING이고_시도횟수는_0이다() {
+    void pending으로_생성하면_기본값은_PENDING이고_상태상세값은_비어있다() {
         // when
         ReviewRequestInbox inbox = pendingInbox();
 
@@ -29,156 +31,57 @@ class ReviewRequestInboxTest {
                 () -> assertThat(inbox.getAvailableAt()).isEqualTo(Instant.parse("2026-02-24T00:00:00Z")),
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING),
                 () -> assertThat(inbox.getProcessingAttempt()).isZero(),
-                () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE)
+                () -> assertThat(inbox.hasClaimedProcessingLease()).isFalse(),
+                () -> assertThat(inbox.getProcessedTime().isPresent()).isFalse(),
+                () -> assertThat(inbox.getFailedTime().isPresent()).isFalse(),
+                () -> assertThat(inbox.getFailure().isPresent()).isFalse()
         );
     }
 
     @Test
-    void pending은_idempotencyKey가_null이면_예외를_던진다() {
+    void rehydrate는_PROCESSING과_idle_processingLease_조합을_허용하지_않는다() {
         // when & then
-        assertThatThrownBy(
-                () -> ReviewRequestInbox.pending(
-                        null,
-                        "api-key",
-                        42L,
-                        "{\"githubPullRequestId\":42}",
-                        Instant.parse("2026-02-24T00:00:00Z")
-                )
-        )
+        assertThatThrownBy(() -> ReviewRequestInbox.rehydrate(
+                1L,
+                "api-key:42",
+                "api-key",
+                42L,
+                "{}",
+                Instant.parse("2026-02-24T00:00:00Z"),
+                ReviewRequestInboxStatus.PROCESSING,
+                1,
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.absent(),
+                BoxFailureSnapshot.absent()
+        ))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("idempotencyKey는 비어 있을 수 없습니다.");
+                .hasMessage("PROCESSING 상태는 processingLease를 보유해야 합니다.");
     }
 
     @Test
-    void pending은_idempotencyKey가_공백이면_예외를_던진다() {
+    void rehydrate는_RETRY_PENDING과_absent_failure_조합을_허용하지_않는다() {
         // when & then
-        assertThatThrownBy(
-                () -> ReviewRequestInbox.pending(
-                        " ",
-                        "api-key",
-                        42L,
-                        "{\"githubPullRequestId\":42}",
-                        Instant.parse("2026-02-24T00:00:00Z")
-                )
-        )
+        assertThatThrownBy(() -> ReviewRequestInbox.rehydrate(
+                1L,
+                "api-key:42",
+                "api-key",
+                42L,
+                "{}",
+                Instant.parse("2026-02-24T00:00:00Z"),
+                ReviewRequestInboxStatus.RETRY_PENDING,
+                1,
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.present(Instant.parse("2026-02-24T00:01:00Z")),
+                BoxFailureSnapshot.absent()
+        ))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("idempotencyKey는 비어 있을 수 없습니다.");
+                .hasMessage("RETRY_PENDING 상태는 failure가 있어야 합니다.");
     }
 
     @Test
-    void pending은_apiKey가_null이면_예외를_던진다() {
-        // when & then
-        assertThatThrownBy(
-                () -> ReviewRequestInbox.pending(
-                        "api-key:42",
-                        null,
-                        42L,
-                        "{\"githubPullRequestId\":42}",
-                        Instant.parse("2026-02-24T00:00:00Z")
-                )
-        )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("apiKey는 비어 있을 수 없습니다.");
-    }
-
-    @Test
-    void pending은_apiKey가_공백이면_예외를_던진다() {
-        // when & then
-        assertThatThrownBy(
-                () -> ReviewRequestInbox.pending(
-                        "api-key:42",
-                        " ",
-                        42L,
-                        "{\"githubPullRequestId\":42}",
-                        Instant.parse("2026-02-24T00:00:00Z")
-                )
-        )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("apiKey는 비어 있을 수 없습니다.");
-    }
-
-    @Test
-    void pending은_githubPullRequestId가_null이면_예외를_던진다() {
-        // when & then
-        assertThatThrownBy(
-                () -> ReviewRequestInbox.pending(
-                        "api-key:42",
-                        "api-key",
-                        null,
-                        "{\"githubPullRequestId\":42}",
-                        Instant.parse("2026-02-24T00:00:00Z")
-                )
-        )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("githubPullRequestId는 비어 있을 수 없습니다.");
-    }
-
-    @Test
-    void pending은_githubPullRequestId가_0이면_예외를_던진다() {
-        // when & then
-        assertThatThrownBy(
-                () -> ReviewRequestInbox.pending(
-                        "api-key:42",
-                        "api-key",
-                        0L,
-                        "{\"githubPullRequestId\":42}",
-                        Instant.parse("2026-02-24T00:00:00Z")
-                )
-        )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("githubPullRequestId는 비어 있을 수 없습니다.");
-    }
-
-    @Test
-    void pending은_requestJson이_null이면_예외를_던진다() {
-        // when & then
-        assertThatThrownBy(
-                () -> ReviewRequestInbox.pending(
-                        "api-key:42",
-                        "api-key",
-                        42L,
-                        null,
-                        Instant.parse("2026-02-24T00:00:00Z")
-                )
-        )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("requestJson은 비어 있을 수 없습니다.");
-    }
-
-    @Test
-    void pending은_requestJson이_공백이면_예외를_던진다() {
-        // when & then
-        assertThatThrownBy(
-                () -> ReviewRequestInbox.pending(
-                        "api-key:42",
-                        "api-key",
-                        42L,
-                        " ",
-                        Instant.parse("2026-02-24T00:00:00Z")
-                )
-        )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("requestJson은 비어 있을 수 없습니다.");
-    }
-
-    @Test
-    void pending은_availableAt이_null이면_예외를_던진다() {
-        // when & then
-        assertThatThrownBy(
-                () -> ReviewRequestInbox.pending(
-                        "api-key:42",
-                        "api-key",
-                        42L,
-                        "{\"githubPullRequestId\":42}",
-                        null
-                )
-        )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("availableAt은 비어 있을 수 없습니다.");
-    }
-
-    @Test
-    void markProcessed를_호출하면_PROCESSED_상태와_처리시각이_저장된다() {
+    void markProcessed를_호출하면_처리완료_상태와_처리시각이_저장된다() {
         // given
         ReviewRequestInbox inbox = pendingInbox();
         setProcessingState(inbox, Instant.parse("2026-02-24T00:10:00Z"), 1);
@@ -190,41 +93,40 @@ class ReviewRequestInboxTest {
         // then
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
-                () -> assertThat(inbox.getProcessedAt()).isEqualTo(processedAt),
-                () -> assertThat(inbox.getProcessingStartedAt()).isEqualTo(
-                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
-                ),
-                () -> assertThat(inbox.getFailedAt()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_AT),
-                () -> assertThat(inbox.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
-                () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
-                () -> assertThat(history).isNotNull(),
-                () -> assertThat(history.getInboxId()).isNull(),
+                () -> assertThat(inbox.hasClaimedProcessingLease()).isFalse(),
+                () -> assertThat(inbox.getProcessedTime().occurredAt()).isEqualTo(processedAt),
+                () -> assertThat(inbox.getFailedTime().isPresent()).isFalse(),
+                () -> assertThat(inbox.getFailure().isPresent()).isFalse(),
                 () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
-                () -> assertThat(history.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE)
+                () -> assertThat(history.getFailure().isPresent()).isFalse()
         );
     }
 
     @Test
-    void markProcessed는_processedAt이_null이면_예외를_던진다() {
+    void hasClaimedProcessingLease는_현재_lease_보유_여부와_시작시각_일치_여부를_제공한다() {
         // given
         ReviewRequestInbox inbox = pendingInbox();
-        setProcessingState(inbox, Instant.parse("2026-02-24T00:10:00Z"), 1);
+        Instant processingStartedAt = Instant.parse("2026-02-24T00:10:00Z");
+        setProcessingState(inbox, processingStartedAt, 1);
 
         // when & then
-        assertThatThrownBy(() -> inbox.markProcessed(null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("processedAt은 비어 있을 수 없습니다.");
+        assertAll(
+                () -> assertThat(inbox.hasClaimedProcessingLease()).isTrue(),
+                () -> assertThat(inbox.hasClaimedProcessingLease(processingStartedAt)).isTrue(),
+                () -> assertThat(inbox.hasClaimedProcessingLease(processingStartedAt.plusSeconds(1))).isFalse(),
+                () -> assertThat(inbox.currentProcessingLeaseStartedAt()).isEqualTo(processingStartedAt)
+        );
     }
 
     @Test
-    void markProcessed는_PROCESSING_상태가_아니면_예외를_던진다() {
+    void currentProcessingLeaseStartedAt는_lease가_없으면_예외를_던진다() {
         // given
         ReviewRequestInbox inbox = pendingInbox();
 
         // when & then
-        assertThatThrownBy(() -> inbox.markProcessed(Instant.parse("2026-02-24T00:13:00Z")))
+        assertThatThrownBy(inbox::currentProcessingLeaseStartedAt)
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("PROCESSED 전이는 PROCESSING 상태에서만 가능합니다.");
+                .hasMessage("processingLease를 보유하고 있지 않습니다.");
     }
 
     @Test
@@ -240,65 +142,33 @@ class ReviewRequestInboxTest {
         // then
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
-                () -> assertThat(inbox.getProcessingStartedAt()).isEqualTo(
-                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
-                ),
-                () -> assertThat(inbox.getProcessedAt()).isEqualTo(FailureSnapshotDefaults.NO_PROCESSED_AT),
-                () -> assertThat(inbox.getFailedAt()).isEqualTo(failedAt),
-                () -> assertThat(inbox.getFailureReason()).isEqualTo("retry"),
-                () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
-                () -> assertThat(history).isNotNull(),
-                () -> assertThat(history.getInboxId()).isNull(),
-                () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
-                () -> assertThat(history.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE)
+                () -> assertThat(inbox.hasClaimedProcessingLease()).isFalse(),
+                () -> assertThat(inbox.getProcessedTime().isPresent()).isFalse(),
+                () -> assertThat(inbox.getFailedTime().occurredAt()).isEqualTo(failedAt),
+                () -> assertThat(inbox.getFailure().reason()).isEqualTo("retry"),
+                () -> assertThat(inbox.getFailure().type()).isEqualTo(ReviewRequestInboxFailureType.RETRYABLE),
+                () -> assertThat(history.getFailure().type()).isEqualTo(ReviewRequestInboxFailureType.RETRYABLE)
         );
     }
 
     @Test
-    void markRetryPending은_failedAt이_null이면_예외를_던진다() {
+    void markRetryPending은_PROCESSING_TIMEOUT_failureType을_허용한다() {
         // given
         ReviewRequestInbox inbox = pendingInbox();
         setProcessingState(inbox, Instant.parse("2026-02-24T00:10:00Z"), 1);
 
-        // when & then
-        assertThatThrownBy(() -> inbox.markRetryPending(null, "retry"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("failedAt은 비어 있을 수 없습니다.");
-    }
+        // when
+        ReviewRequestInboxHistory history = inbox.markRetryPending(
+                Instant.parse("2026-02-24T00:14:00Z"),
+                "timeout",
+                ReviewRequestInboxFailureType.PROCESSING_TIMEOUT
+        );
 
-    @Test
-    void markRetryPending은_failureReason이_null이면_예외를_던진다() {
-        // given
-        ReviewRequestInbox inbox = pendingInbox();
-        setProcessingState(inbox, Instant.parse("2026-02-24T00:10:00Z"), 1);
-
-        // when & then
-        assertThatThrownBy(() -> inbox.markRetryPending(Instant.parse("2026-02-24T00:14:00Z"), null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("failureReason은 비어 있을 수 없습니다.");
-    }
-
-    @Test
-    void markRetryPending은_failureReason이_공백이면_예외를_던진다() {
-        // given
-        ReviewRequestInbox inbox = pendingInbox();
-        setProcessingState(inbox, Instant.parse("2026-02-24T00:10:00Z"), 1);
-
-        // when & then
-        assertThatThrownBy(() -> inbox.markRetryPending(Instant.parse("2026-02-24T00:14:00Z"), " "))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("failureReason은 비어 있을 수 없습니다.");
-    }
-
-    @Test
-    void markRetryPending은_PROCESSING_상태가_아니면_예외를_던진다() {
-        // given
-        ReviewRequestInbox inbox = pendingInbox();
-
-        // when & then
-        assertThatThrownBy(() -> inbox.markRetryPending(Instant.parse("2026-02-24T00:14:00Z"), "retry"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("RETRY_PENDING 전이는 PROCESSING 상태에서만 가능합니다.");
+        // then
+        assertAll(
+                () -> assertThat(inbox.getFailure().type()).isEqualTo(ReviewRequestInboxFailureType.PROCESSING_TIMEOUT),
+                () -> assertThat(history.getFailure().type()).isEqualTo(ReviewRequestInboxFailureType.PROCESSING_TIMEOUT)
+        );
     }
 
     @Test
@@ -318,100 +188,29 @@ class ReviewRequestInboxTest {
         // then
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
-                () -> assertThat(inbox.getProcessingStartedAt()).isEqualTo(
-                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
-                ),
-                () -> assertThat(inbox.getProcessedAt()).isEqualTo(FailureSnapshotDefaults.NO_PROCESSED_AT),
-                () -> assertThat(inbox.getFailedAt()).isEqualTo(failedAt),
-                () -> assertThat(inbox.getFailureReason()).isEqualTo("failure"),
-                () -> assertThat(inbox.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE),
-                () -> assertThat(history).isNotNull(),
-                () -> assertThat(history.getInboxId()).isNull(),
-                () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED)
+                () -> assertThat(inbox.hasClaimedProcessingLease()).isFalse(),
+                () -> assertThat(inbox.getProcessedTime().isPresent()).isFalse(),
+                () -> assertThat(inbox.getFailedTime().occurredAt()).isEqualTo(failedAt),
+                () -> assertThat(inbox.getFailure().reason()).isEqualTo("failure"),
+                () -> assertThat(inbox.getFailure().type()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE),
+                () -> assertThat(history.getFailure().type()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE)
         );
     }
 
     @Test
-    void markFailed는_failedAt이_null이면_예외를_던진다() {
+    void markFailed는_RETRYABLE_failureType을_허용하지_않는다() {
         // given
         ReviewRequestInbox inbox = pendingInbox();
         setProcessingState(inbox, Instant.parse("2026-02-24T00:10:00Z"), 1);
 
         // when & then
-        assertThatThrownBy(() -> inbox.markFailed(null, "failure", ReviewRequestInboxFailureType.NON_RETRYABLE))
+        assertThatThrownBy(() -> inbox.markFailed(
+                Instant.parse("2026-02-24T00:15:00Z"),
+                "failure",
+                ReviewRequestInboxFailureType.RETRYABLE
+        ))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("failedAt은 비어 있을 수 없습니다.");
-    }
-
-    @Test
-    void markFailed는_failureReason이_null이면_예외를_던진다() {
-        // given
-        ReviewRequestInbox inbox = pendingInbox();
-        setProcessingState(inbox, Instant.parse("2026-02-24T00:10:00Z"), 1);
-
-        // when & then
-        assertThatThrownBy(
-                () -> inbox.markFailed(
-                        Instant.parse("2026-02-24T00:15:00Z"),
-                        null,
-                        ReviewRequestInboxFailureType.NON_RETRYABLE
-                )
-        )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("failureReason은 비어 있을 수 없습니다.");
-    }
-
-    @Test
-    void markFailed는_failureReason이_공백이면_예외를_던진다() {
-        // given
-        ReviewRequestInbox inbox = pendingInbox();
-        setProcessingState(inbox, Instant.parse("2026-02-24T00:10:00Z"), 1);
-
-        // when & then
-        assertThatThrownBy(
-                () -> inbox.markFailed(
-                        Instant.parse("2026-02-24T00:15:00Z"),
-                        " ",
-                        ReviewRequestInboxFailureType.NON_RETRYABLE
-                )
-        )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("failureReason은 비어 있을 수 없습니다.");
-    }
-
-    @Test
-    void markFailed는_failureType이_NONE이면_예외를_던진다() {
-        // given
-        ReviewRequestInbox inbox = pendingInbox();
-        setProcessingState(inbox, Instant.parse("2026-02-24T00:10:00Z"), 1);
-
-        // when & then
-        assertThatThrownBy(
-                () -> inbox.markFailed(
-                        Instant.parse("2026-02-24T00:15:00Z"),
-                        "failure",
-                        ReviewRequestInboxFailureType.NONE
-                )
-        )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("failureType은 NONE일 수 없습니다.");
-    }
-
-    @Test
-    void markFailed는_PROCESSING_상태가_아니면_예외를_던진다() {
-        // given
-        ReviewRequestInbox inbox = pendingInbox();
-
-        // when & then
-        assertThatThrownBy(
-                () -> inbox.markFailed(
-                        Instant.parse("2026-02-24T00:15:00Z"),
-                        "failure",
-                        ReviewRequestInboxFailureType.NON_RETRYABLE
-                )
-        )
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("FAILED 전이는 PROCESSING 상태에서만 가능합니다.");
+                .hasMessage("FAILED failureType이 올바르지 않습니다.");
     }
 
     private ReviewRequestInbox pendingInbox() {
@@ -426,11 +225,10 @@ class ReviewRequestInboxTest {
 
     private void setProcessingState(ReviewRequestInbox inbox, Instant processingStartedAt, int processingAttempt) {
         ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
-        ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
-        ReflectionTestUtils.setField(inbox, "processedAt", FailureSnapshotDefaults.NO_PROCESSED_AT);
+        ReflectionTestUtils.setField(inbox, "processingLease", BoxProcessingLease.claimed(processingStartedAt));
+        ReflectionTestUtils.setField(inbox, "processedTime", BoxEventTime.absent());
+        ReflectionTestUtils.setField(inbox, "failedTime", BoxEventTime.absent());
+        ReflectionTestUtils.setField(inbox, "failure", BoxFailureSnapshot.absent());
         ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(inbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
-        ReflectionTestUtils.setField(inbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
-        ReflectionTestUtils.setField(inbox, "failureType", ReviewRequestInboxFailureType.NONE);
     }
 }

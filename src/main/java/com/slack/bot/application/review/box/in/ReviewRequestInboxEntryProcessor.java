@@ -38,7 +38,7 @@ public class ReviewRequestInboxEntryProcessor {
             Instant claimedProcessingStartedAt
     ) {
         if (!hasProcessingLease(inbox, claimedProcessingStartedAt)) {
-            logLeaseLost(inbox.getId(), claimedProcessingStartedAt, inbox.getProcessingStartedAt());
+            logLeaseLost(inbox.getId(), claimedProcessingStartedAt, actualProcessingStartedAt(inbox));
             return;
         }
 
@@ -68,7 +68,15 @@ public class ReviewRequestInboxEntryProcessor {
             ReviewRequestInbox inbox,
             Instant claimedProcessingStartedAt
     ) {
-        return claimedProcessingStartedAt.equals(inbox.getProcessingStartedAt());
+        return inbox.hasClaimedProcessingLease(claimedProcessingStartedAt);
+    }
+
+    private Instant actualProcessingStartedAt(ReviewRequestInbox inbox) {
+        if (!inbox.hasClaimedProcessingLease()) {
+            return null;
+        }
+
+        return inbox.currentProcessingLeaseStartedAt();
     }
 
     private void logLeaseLost(

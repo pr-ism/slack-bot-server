@@ -1,6 +1,8 @@
 package com.slack.bot.infrastructure.review.persistence.box.in;
 
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
+import com.slack.bot.infrastructure.common.BoxEventTime;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
+import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxHistory;
@@ -63,11 +65,11 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                 .addValue("availableAt", Timestamp.from(inbox.getAvailableAt()))
                 .addValue("pendingStatus", ReviewRequestInboxStatus.PENDING.name())
                 .addValue("retryPendingStatus", ReviewRequestInboxStatus.RETRY_PENDING.name())
-                .addValue("noProcessingStartedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT))
-                .addValue("noProcessedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSED_AT))
-                .addValue("noFailureAt", Timestamp.from(FailureSnapshotDefaults.NO_FAILURE_AT))
-                .addValue("noFailureReason", FailureSnapshotDefaults.NO_FAILURE_REASON)
-                .addValue("noneFailureType", ReviewRequestInboxFailureType.NONE.name());
+                .addValue("noProcessingStartedAt", null)
+                .addValue("noProcessedAt", null)
+                .addValue("noFailureAt", null)
+                .addValue("noFailureReason", null)
+                .addValue("noneFailureType", null);
 
         namedParameterJdbcTemplate.update(
                 buildUpsertPendingSql(),
@@ -122,12 +124,12 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                         failure_reason = :noFailureReason,
                         failure_type = :noneFailureType
                     WHERE id = :inboxId
-                    """,
+                """,
                 updateParameters
-                        .addValue("noProcessedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSED_AT))
-                        .addValue("noFailureAt", Timestamp.from(FailureSnapshotDefaults.NO_FAILURE_AT))
-                        .addValue("noFailureReason", FailureSnapshotDefaults.NO_FAILURE_REASON)
-                        .addValue("noneFailureType", ReviewRequestInboxFailureType.NONE.name())
+                        .addValue("noProcessedAt", null)
+                        .addValue("noFailureAt", null)
+                        .addValue("noFailureReason", null)
+                        .addValue("noneFailureType", null)
         );
         if (updatedCount == 0) {
             return Optional.empty();
@@ -261,7 +263,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                     failure_reason = :failureReason,
                     failure_type = CASE
                         WHEN processing_attempt >= :maxAttempts THEN :retryExhaustedFailureType
-                        ELSE :noneFailureType
+                        ELSE :processingTimeoutFailureType
                     END
                 WHERE id IN (:inboxIds)
                   AND status = :processingStatus
@@ -272,12 +274,12 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
                         .addValue("failedStatus", ReviewRequestInboxStatus.FAILED.name())
                         .addValue("retryPendingStatus", ReviewRequestInboxStatus.RETRY_PENDING.name())
                         .addValue("recoveryUpdatedAt", Timestamp.valueOf(recoveryUpdatedAt))
-                        .addValue("noProcessingStartedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT))
-                        .addValue("noProcessedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSED_AT))
+                        .addValue("noProcessingStartedAt", null)
+                        .addValue("noProcessedAt", null)
                         .addValue("failedAt", Timestamp.from(failedAt))
                         .addValue("failureReason", failureReason)
                         .addValue("retryExhaustedFailureType", ReviewRequestInboxFailureType.RETRY_EXHAUSTED.name())
-                        .addValue("noneFailureType", ReviewRequestInboxFailureType.NONE.name())
+                        .addValue("processingTimeoutFailureType", ReviewRequestInboxFailureType.PROCESSING_TIMEOUT.name())
                         .addValue("inboxIds", inboxIds)
                         .addValue("processingStatus", ReviewRequestInboxStatus.PROCESSING.name())
                         .addValue("processingStartedBefore", Timestamp.from(processingStartedBefore))
@@ -430,10 +432,10 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
 
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("status", inbox.getStatus().name())
-                .addValue("processingStartedAt", toTimestamp(inbox.getProcessingStartedAt()))
-                .addValue("processedAt", toTimestamp(inbox.getProcessedAt()))
-                .addValue("failedAt", toTimestamp(inbox.getFailedAt()))
-                .addValue("failureReason", inbox.getFailureReason())
+                .addValue("processingStartedAt", toTimestamp(inbox.getProcessingLease()))
+                .addValue("processedAt", toTimestamp(inbox.getProcessedTime()))
+                .addValue("failedAt", toTimestamp(inbox.getFailedTime()))
+                .addValue("failureReason", resolveFailureReason(inbox))
                 .addValue("failureType", resolveFailureTypeName(inbox))
                 .addValue("inboxId", inbox.getId())
                 .addValue("processingStatus", ReviewRequestInboxStatus.PROCESSING.name())
@@ -663,12 +665,38 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
         validateProcessingStartedAt(claimedProcessingStartedAt);
     }
 
-    private Timestamp toTimestamp(Instant instant) {
-        return Timestamp.from(instant);
+    private Timestamp toTimestamp(BoxProcessingLease processingLease) {
+        if (!processingLease.isClaimed()) {
+            return null;
+        }
+
+        return Timestamp.from(processingLease.startedAt());
+    }
+
+    private Timestamp toTimestamp(BoxEventTime eventTime) {
+        if (!eventTime.isPresent()) {
+            return null;
+        }
+
+        return Timestamp.from(eventTime.occurredAt());
+    }
+
+    private String resolveFailureReason(ReviewRequestInbox inbox) {
+        BoxFailureSnapshot<ReviewRequestInboxFailureType> failure = inbox.getFailure();
+        if (!failure.isPresent()) {
+            return null;
+        }
+
+        return failure.reason();
     }
 
     private String resolveFailureTypeName(ReviewRequestInbox inbox) {
-        return inbox.getFailureType().name();
+        BoxFailureSnapshot<ReviewRequestInboxFailureType> failure = inbox.getFailure();
+        if (!failure.isPresent()) {
+            return null;
+        }
+
+        return failure.type().name();
     }
 
     private Optional<ReviewRequestInboxJpaEntity> findInboxEntity(Long inboxId) {
