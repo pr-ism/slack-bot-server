@@ -22,34 +22,40 @@ public class H2SlackNotificationOutboxRepositoryAdapter extends SlackNotificatio
                         :idempotencyKey,
                         :teamId,
                         :channelId,
+                        :userIdState,
                         :userId,
+                        :textState,
                         :text,
+                        :blocksJsonState,
                         :blocksJson,
+                        :fallbackTextState,
                         :fallbackText,
                         :pendingStatus,
                         :processingAttempt,
-                        :noProcessingStartedAt,
-                        :noSentAt,
-                        :noFailureAt,
-                        :noFailureReason,
-                        :noneFailureType
+                        :processingLeaseState,
+                        :sentTimeState,
+                        :failedTimeState,
+                        :failureState
                     )
                 ) AS source (
                     message_type,
                     idempotency_key,
                     team_id,
                     channel_id,
+                    user_id_state,
                     user_id,
+                    text_state,
                     text,
+                    blocks_json_state,
                     blocks_json,
+                    fallback_text_state,
                     fallback_text,
                     status,
                     processing_attempt,
-                    processing_started_at,
-                    sent_at,
-                    failed_at,
-                    failure_reason,
-                    failure_type
+                    processing_lease_state,
+                    sent_time_state,
+                    failed_time_state,
+                    failure_state
                 )
                 ON target.idempotency_key = source.idempotency_key
                 WHEN NOT MATCHED THEN
@@ -60,17 +66,20 @@ public class H2SlackNotificationOutboxRepositoryAdapter extends SlackNotificatio
                         idempotency_key,
                         team_id,
                         channel_id,
+                        user_id_state,
                         user_id,
+                        text_state,
                         text,
+                        blocks_json_state,
                         blocks_json,
+                        fallback_text_state,
                         fallback_text,
                         status,
                         processing_attempt,
-                        processing_started_at,
-                        sent_at,
-                        failed_at,
-                        failure_reason,
-                        failure_type
+                        processing_lease_state,
+                        sent_time_state,
+                        failed_time_state,
+                        failure_state
                     )
                     VALUES (
                         CURRENT_TIMESTAMP(6),
@@ -79,17 +88,20 @@ public class H2SlackNotificationOutboxRepositoryAdapter extends SlackNotificatio
                         source.idempotency_key,
                         source.team_id,
                         source.channel_id,
+                        source.user_id_state,
                         source.user_id,
+                        source.text_state,
                         source.text,
+                        source.blocks_json_state,
                         source.blocks_json,
+                        source.fallback_text_state,
                         source.fallback_text,
                         source.status,
                         source.processing_attempt,
-                        source.processing_started_at,
-                        source.sent_at,
-                        source.failed_at,
-                        source.failure_reason,
-                        source.failure_type
+                        source.processing_lease_state,
+                        source.sent_time_state,
+                        source.failed_time_state,
+                        source.failure_state
                     )
                 """;
     }

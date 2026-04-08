@@ -240,7 +240,7 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
     }
 
     @Test
-    void PROCESSING이_아닌_상태면_markFailureStatus는_아무것도_변경하지_않는다() {
+    void PROCESSING이_아닌_상태면_handleFailure는_아무것도_변경하지_않는다() {
         // given
         ReviewRequestInbox actual = ReviewRequestInbox.pending(
                 "review-entry-no-op",
@@ -253,8 +253,9 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
         // when
         ReflectionTestUtils.invokeMethod(
                 reviewRequestInboxTransactionalProcessor,
-                "markFailureStatus",
+                "handleFailure",
                 actual,
+                CLAIMED_PROCESSING_STARTED_AT,
                 new IllegalArgumentException("invalid request")
         );
 

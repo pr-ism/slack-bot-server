@@ -15,7 +15,6 @@ import com.slack.bot.application.interaction.client.exception.SlackBotMessageDis
 import com.slack.bot.application.worker.PollingHintPublisher;
 import com.slack.bot.application.worker.PollingHintTarget;
 import com.slack.bot.domain.workspace.Workspace;
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxHistory;
@@ -183,7 +182,7 @@ class SlackNotificationOutboxProcessorTest {
                     () -> assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.SENT),
                     () -> assertThat(actual.getProcessingAttempt()).isEqualTo(2),
                     () -> assertThat(actualHistories).hasSize(2),
-                    () -> assertThat(actualHistories.getFirst().getFailureType()).isEqualTo(
+                    () -> assertThat(actualHistories.getFirst().getFailure().type()).isEqualTo(
                             SlackInteractionFailureType.PROCESSING_TIMEOUT
                     )
             );
@@ -202,23 +201,32 @@ class SlackNotificationOutboxProcessorTest {
                                                                        .text("hello-timeout-poison-pill")
                                                                        .build();
         Instant base = clock.instant();
-        setProcessingState(timeoutOutbox, base.minusSeconds(120), 1);
-        timeoutOutbox.markRetryPending(base.minusSeconds(110), "first failure");
-        setProcessingState(timeoutOutbox, base.minusSeconds(100), 2);
-        SlackNotificationOutbox saved = slackNotificationOutboxRepository.save(timeoutOutbox);
+        SlackNotificationOutbox saved = saveProcessingOutbox(timeoutOutbox, base.minusSeconds(120), 1);
+        saved.markRetryPending(base.minusSeconds(110), "first failure");
+        saved = slackNotificationOutboxRepository.save(saved);
+        setProcessingState(saved, base.minusSeconds(100), 2);
+        saved = slackNotificationOutboxRepository.save(saved);
+        Long savedOutboxId = saved.getId();
 
         // when
         slackNotificationOutboxProcessor.recoverTimeoutProcessing();
 
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
-            SlackNotificationOutbox actual = slackNotificationOutboxRepository.findById(saved.getId())
+            SlackNotificationOutbox actual = slackNotificationOutboxRepository.findById(savedOutboxId)
                                                                               .orElseThrow();
+            List<SlackNotificationOutboxHistory> histories = historiesOf(savedOutboxId);
             assertAll(
                     () -> assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED),
                     () -> assertThat(actual.getProcessingAttempt()).isEqualTo(2),
-                    () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
-                    () -> assertThat(actual.getFailureReason()).isNotBlank()
+                    () -> assertThat(actual.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
+                    () -> assertThat(actual.getFailure().reason()).isNotBlank(),
+                    () -> assertThat(histories).hasSize(1),
+                    () -> assertThat(histories.getFirst().getOutboxId()).isEqualTo(savedOutboxId),
+                    () -> assertThat(histories.getFirst().getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED),
+                    () -> assertThat(histories.getFirst().getFailure().type()).isEqualTo(
+                            SlackInteractionFailureType.RETRY_EXHAUSTED
+                    )
             );
         });
     }
@@ -237,8 +245,11 @@ class SlackNotificationOutboxProcessorTest {
                                                                            .channelId("C1")
                                                                            .text("hello-timeout-batch-" + index)
                                                                            .build();
-            setProcessingState(timeoutOutbox, base.minusSeconds(120L + index), 1);
-            SlackNotificationOutbox saved = slackNotificationOutboxRepository.save(timeoutOutbox);
+            SlackNotificationOutbox saved = saveProcessingOutbox(
+                    timeoutOutbox,
+                    base.minusSeconds(120L + index),
+                    1
+            );
             outboxIds.add(saved.getId());
         }
 
@@ -251,7 +262,7 @@ class SlackNotificationOutboxProcessorTest {
                                                                         outboxId
                                                                 ).orElseThrow())
                                                                 .toList();
-        List<SlackNotificationOutboxHistory> actualHistories = jpaSlackNotificationOutboxHistoryRepository.findAll();
+        List<SlackNotificationOutboxHistory> actualHistories = jpaSlackNotificationOutboxHistoryRepository.findAllDomains();
 
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(100),
@@ -279,8 +290,11 @@ class SlackNotificationOutboxProcessorTest {
                                                                              .channelId("C1")
                                                                              .text("hello-timeout-mixed-retry-" + index)
                                                                              .build();
-            setProcessingState(retryableOutbox, base.minusSeconds(200L + index), 1);
-            SlackNotificationOutbox saved = slackNotificationOutboxRepository.save(retryableOutbox);
+            SlackNotificationOutbox saved = saveProcessingOutbox(
+                    retryableOutbox,
+                    base.minusSeconds(200L + index),
+                    1
+            );
             outboxIds.add(saved.getId());
         }
         for (int index = 0; index < 51; index++) {
@@ -291,8 +305,11 @@ class SlackNotificationOutboxProcessorTest {
                                                                              .channelId("C1")
                                                                              .text("hello-timeout-mixed-failed-" + index)
                                                                              .build();
-            setProcessingState(exhaustedOutbox, base.minusSeconds(100L + index), 2);
-            SlackNotificationOutbox saved = slackNotificationOutboxRepository.save(exhaustedOutbox);
+            SlackNotificationOutbox saved = saveProcessingOutbox(
+                    exhaustedOutbox,
+                    base.minusSeconds(100L + index),
+                    2
+            );
             outboxIds.add(saved.getId());
         }
 
@@ -305,7 +322,7 @@ class SlackNotificationOutboxProcessorTest {
                                                                         outboxId
                                                                 ).orElseThrow())
                                                                 .toList();
-        List<SlackNotificationOutboxHistory> actualHistories = jpaSlackNotificationOutboxHistoryRepository.findAll();
+        List<SlackNotificationOutboxHistory> actualHistories = jpaSlackNotificationOutboxHistoryRepository.findAllDomains();
 
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(100),
@@ -316,10 +333,10 @@ class SlackNotificationOutboxProcessorTest {
                 () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == SlackNotificationOutboxStatus.PROCESSING)
                         .hasSize(1),
                 () -> assertThat(actualHistories).filteredOn(
-                        history -> history.getFailureType() == SlackInteractionFailureType.PROCESSING_TIMEOUT
+                        history -> history.getFailure().type() == SlackInteractionFailureType.PROCESSING_TIMEOUT
                 ).hasSize(50),
                 () -> assertThat(actualHistories).filteredOn(
-                        history -> history.getFailureType() == SlackInteractionFailureType.RETRY_EXHAUSTED
+                        history -> history.getFailure().type() == SlackInteractionFailureType.RETRY_EXHAUSTED
                 ).hasSize(50)
         );
     }
@@ -335,8 +352,11 @@ class SlackNotificationOutboxProcessorTest {
                                                                        .channelId("C1")
                                                                        .text("hello-timeout-locked")
                                                                        .build();
-        setProcessingState(timeoutOutbox, Instant.parse("2026-03-24T00:01:00Z"), 1);
-        SlackNotificationOutbox saved = slackNotificationOutboxRepository.save(timeoutOutbox);
+        SlackNotificationOutbox saved = saveProcessingOutbox(
+                timeoutOutbox,
+                Instant.parse("2026-03-24T00:01:00Z"),
+                1
+        );
         CountDownLatch lockAcquired = new CountDownLatch(1);
         CountDownLatch releaseLock = new CountDownLatch(1);
 
@@ -368,7 +388,7 @@ class SlackNotificationOutboxProcessorTest {
             assertAll(
                     () -> assertThat(skippedCount).isZero(),
                     () -> assertThat(lockedOutbox.getStatus()).isEqualTo(SlackNotificationOutboxStatus.PROCESSING),
-                    () -> assertThat(jpaSlackNotificationOutboxHistoryRepository.findAll()).isEmpty()
+                    () -> assertThat(jpaSlackNotificationOutboxHistoryRepository.findAllDomains()).isEmpty()
             );
 
             releaseLock.countDown();
@@ -430,10 +450,10 @@ class SlackNotificationOutboxProcessorTest {
                 () -> assertThat(actualFirstFailed.getProcessingAttempt()).isEqualTo(1),
                 () -> assertThat(actualSecondFailed.getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED),
                 () -> assertThat(actualSecondFailed.getProcessingAttempt()).isEqualTo(2),
-                () -> assertThat(actualSecondFailed.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
-                () -> assertThat(actualSecondFailed.getFailureReason()).isNotNull(),
-                () -> assertThat(actualSecondFailed.getFailureReason()).hasSize(500),
-                () -> assertThat(actualSecondFailed.getFailureReason()).isEqualTo("x".repeat(500)),
+                () -> assertThat(actualSecondFailed.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
+                () -> assertThat(actualSecondFailed.getFailure().reason()).isNotNull(),
+                () -> assertThat(actualSecondFailed.getFailure().reason()).hasSize(500),
+                () -> assertThat(actualSecondFailed.getFailure().reason()).isEqualTo("x".repeat(500)),
                 () -> assertThat(histories).hasSize(2),
                 () -> assertThat(histories).extracting(history -> history.getStatus())
                         .containsExactly(
@@ -444,7 +464,7 @@ class SlackNotificationOutboxProcessorTest {
     }
 
     private List<SlackNotificationOutboxHistory> historiesOf(Long outboxId) {
-        return jpaSlackNotificationOutboxHistoryRepository.findAll()
+        return jpaSlackNotificationOutboxHistoryRepository.findAllDomains()
                                                           .stream()
                                                           .filter(history -> outboxId.equals(history.getOutboxId()))
                                                           .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))
@@ -481,7 +501,7 @@ class SlackNotificationOutboxProcessorTest {
             assertAll(
                     () -> assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED),
                     () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
-                    () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT)
+                    () -> assertThat(actual.getFailure().type()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT)
             );
         });
     }
@@ -509,7 +529,7 @@ class SlackNotificationOutboxProcessorTest {
             assertAll(
                     () -> assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED),
                     () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
-                    () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT)
+                    () -> assertThat(actual.getFailure().type()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT)
             );
         });
     }
@@ -519,12 +539,17 @@ class SlackNotificationOutboxProcessorTest {
             Instant processingStartedAt,
             int processingAttempt
     ) {
-        ReflectionTestUtils.setField(outbox, "status", SlackNotificationOutboxStatus.PROCESSING);
-        ReflectionTestUtils.setField(outbox, "processingStartedAt", processingStartedAt);
-        ReflectionTestUtils.setField(outbox, "sentAt", FailureSnapshotDefaults.NO_SENT_AT);
+        outbox.claim(processingStartedAt);
         ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(outbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
-        ReflectionTestUtils.setField(outbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
-        ReflectionTestUtils.setField(outbox, "failureType", SlackInteractionFailureType.NONE);
+    }
+
+    private SlackNotificationOutbox saveProcessingOutbox(
+            SlackNotificationOutbox outbox,
+            Instant processingStartedAt,
+            int processingAttempt
+    ) {
+        SlackNotificationOutbox saved = slackNotificationOutboxRepository.save(outbox);
+        setProcessingState(saved, processingStartedAt, processingAttempt);
+        return slackNotificationOutboxRepository.save(saved);
     }
 }

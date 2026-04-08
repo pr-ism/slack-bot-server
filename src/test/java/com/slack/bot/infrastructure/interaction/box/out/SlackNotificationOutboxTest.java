@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -27,13 +26,16 @@ class SlackNotificationOutboxTest {
                 () -> assertThat(actual.getProcessingAttempt()).isZero(),
                 () -> assertThat(actual.getMessageType()).isEqualTo(SlackNotificationOutboxMessageType.EPHEMERAL_TEXT),
                 () -> assertThat(actual.getChannelId()).isEqualTo("channel1"),
-                () -> assertThat(actual.getUserId()).isEqualTo("user1"),
-                () -> assertThat(actual.getText()).isEqualTo("text"),
-                () -> assertThat(actual.getBlocksJson()).isEqualTo("[{}]"),
-                () -> assertThat(actual.getFallbackText()).isEqualTo("fallback"),
+                () -> assertThat(actual.getUserId().value()).isEqualTo("user1"),
+                () -> assertThat(actual.getText().value()).isEqualTo("text"),
+                () -> assertThat(actual.getBlocksJson().isPresent()).isFalse(),
+                () -> assertThat(actual.getFallbackText().isPresent()).isFalse(),
                 () -> assertThat(actual.getTeamId()).isEqualTo("T1"),
                 () -> assertThat(actual.getIdempotencyKey()).isEqualTo("key"),
-                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
+                () -> assertThat(actual.getProcessingLease().isClaimed()).isFalse(),
+                () -> assertThat(actual.getSentTime().isPresent()).isFalse(),
+                () -> assertThat(actual.getFailedTime().isPresent()).isFalse(),
+                () -> assertThat(actual.getFailure().isPresent()).isFalse()
         );
     }
 
@@ -317,17 +319,14 @@ class SlackNotificationOutboxTest {
         // then
         assertAll(
                 () -> assertThat(outbox.getStatus()).isEqualTo(SlackNotificationOutboxStatus.SENT),
-                () -> assertThat(outbox.getProcessingStartedAt()).isEqualTo(
-                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
-                ),
-                () -> assertThat(outbox.getSentAt()).isEqualTo(sentAt),
-                () -> assertThat(outbox.getFailedAt()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_AT),
-                () -> assertThat(outbox.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
-                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE),
+                () -> assertThat(outbox.getProcessingLease().isClaimed()).isFalse(),
+                () -> assertThat(outbox.getSentTime().occurredAt()).isEqualTo(sentAt),
+                () -> assertThat(outbox.getFailedTime().isPresent()).isFalse(),
+                () -> assertThat(outbox.getFailure().isPresent()).isFalse(),
                 () -> assertThat(history).isNotNull(),
-                () -> assertThat(history.getOutboxId()).isNull(),
+                () -> assertThat(history.getOutboxId()).isEqualTo(10L),
                 () -> assertThat(history.getStatus()).isEqualTo(SlackNotificationOutboxStatus.SENT),
-                () -> assertThat(history.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
+                () -> assertThat(history.getFailure().isPresent()).isFalse()
         );
     }
 
@@ -360,16 +359,15 @@ class SlackNotificationOutboxTest {
         // then
         assertAll(
                 () -> assertThat(outbox.getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED),
-                () -> assertThat(outbox.getProcessingStartedAt()).isEqualTo(
-                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
-                ),
-                () -> assertThat(outbox.getSentAt()).isEqualTo(FailureSnapshotDefaults.NO_SENT_AT),
-                () -> assertThat(outbox.getFailedAt()).isEqualTo(failedAt),
-                () -> assertThat(outbox.getFailureReason()).isEqualTo("failure"),
-                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
+                () -> assertThat(outbox.getProcessingLease().isClaimed()).isFalse(),
+                () -> assertThat(outbox.getSentTime().isPresent()).isFalse(),
+                () -> assertThat(outbox.getFailedTime().occurredAt()).isEqualTo(failedAt),
+                () -> assertThat(outbox.getFailure().reason()).isEqualTo("failure"),
+                () -> assertThat(outbox.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
                 () -> assertThat(history).isNotNull(),
-                () -> assertThat(history.getOutboxId()).isNull(),
-                () -> assertThat(history.getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED)
+                () -> assertThat(history.getOutboxId()).isEqualTo(10L),
+                () -> assertThat(history.getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED),
+                () -> assertThat(history.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED)
         );
     }
 
@@ -386,17 +384,15 @@ class SlackNotificationOutboxTest {
         // then
         assertAll(
                 () -> assertThat(outbox.getStatus()).isEqualTo(SlackNotificationOutboxStatus.RETRY_PENDING),
-                () -> assertThat(outbox.getProcessingStartedAt()).isEqualTo(
-                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
-                ),
-                () -> assertThat(outbox.getSentAt()).isEqualTo(FailureSnapshotDefaults.NO_SENT_AT),
-                () -> assertThat(outbox.getFailedAt()).isEqualTo(failedAt),
-                () -> assertThat(outbox.getFailureReason()).isEqualTo("retry"),
-                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE),
+                () -> assertThat(outbox.getProcessingLease().isClaimed()).isFalse(),
+                () -> assertThat(outbox.getSentTime().isPresent()).isFalse(),
+                () -> assertThat(outbox.getFailedTime().occurredAt()).isEqualTo(failedAt),
+                () -> assertThat(outbox.getFailure().reason()).isEqualTo("retry"),
+                () -> assertThat(outbox.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRYABLE),
                 () -> assertThat(history).isNotNull(),
-                () -> assertThat(history.getOutboxId()).isNull(),
+                () -> assertThat(history.getOutboxId()).isEqualTo(10L),
                 () -> assertThat(history.getStatus()).isEqualTo(SlackNotificationOutboxStatus.RETRY_PENDING),
-                () -> assertThat(history.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
+                () -> assertThat(history.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRYABLE)
         );
     }
 
@@ -489,7 +485,7 @@ class SlackNotificationOutboxTest {
     }
 
     @Test
-    void markFailed는_failureType이_NONE이면_예외를_던진다() {
+    void markFailed는_failureType이_ABSENT이면_예외를_던진다() {
         // given
         SlackNotificationOutbox outbox = pendingOutbox();
         setProcessingState(outbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
@@ -499,10 +495,10 @@ class SlackNotificationOutboxTest {
         assertThatThrownBy(() -> outbox.markFailed(
                 failedAt,
                 "failure",
-                SlackInteractionFailureType.NONE
+                SlackInteractionFailureType.ABSENT
         ))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("failureType은 NONE일 수 없습니다.");
+                .hasMessage("failureType은 ABSENT일 수 없습니다.");
     }
 
     @Test
@@ -584,8 +580,6 @@ class SlackNotificationOutboxTest {
                                       .channelId("channel1")
                                       .userId("user1")
                                       .text("text")
-                                      .blocksJson("[{}]")
-                                      .fallbackText("fallback")
                                       .build();
     }
 
@@ -594,12 +588,8 @@ class SlackNotificationOutboxTest {
             Instant processingStartedAt,
             int processingAttempt
     ) {
-        ReflectionTestUtils.setField(outbox, "status", SlackNotificationOutboxStatus.PROCESSING);
-        ReflectionTestUtils.setField(outbox, "processingStartedAt", processingStartedAt);
-        ReflectionTestUtils.setField(outbox, "sentAt", FailureSnapshotDefaults.NO_SENT_AT);
+        ReflectionTestUtils.setField(outbox, "identity", SlackNotificationOutboxId.assigned(10L));
+        outbox.claim(processingStartedAt);
         ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(outbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
-        ReflectionTestUtils.setField(outbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
-        ReflectionTestUtils.setField(outbox, "failureType", SlackInteractionFailureType.NONE);
     }
 }

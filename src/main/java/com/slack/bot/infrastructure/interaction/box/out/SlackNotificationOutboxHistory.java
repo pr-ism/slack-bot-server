@@ -1,94 +1,81 @@
 package com.slack.bot.infrastructure.interaction.box.out;
 
-import com.slack.bot.domain.common.BaseTimeEntity;
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Table;
 import java.time.Instant;
-import lombok.AccessLevel;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 
 @Getter
-@Entity
-@Table(name = "slack_notification_outbox_history")
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class SlackNotificationOutboxHistory extends BaseTimeEntity {
+public class SlackNotificationOutboxHistory {
 
-    private Long outboxId;
-
-    private int processingAttempt;
-
-    @Enumerated(EnumType.STRING)
-    private SlackNotificationOutboxStatus status;
-
-    private Instant completedAt;
-
-    private String failureReason;
-
-    @Enumerated(EnumType.STRING)
-    private SlackInteractionFailureType failureType;
+    private final SlackNotificationOutboxHistoryId historyId;
+    private final SlackNotificationOutboxId outboxId;
+    private final int processingAttempt;
+    private final SlackNotificationOutboxStatus status;
+    private final Instant completedAt;
+    private final BoxFailureSnapshot<SlackInteractionFailureType> failure;
 
     public static SlackNotificationOutboxHistory completed(
             Long outboxId,
             int processingAttempt,
             SlackNotificationOutboxStatus status,
             Instant completedAt,
-            String failureReason,
-            SlackInteractionFailureType failureType
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
     ) {
-        validateOutboxIdIfPresent(outboxId);
+        validateOutboxId(outboxId);
         validateProcessingAttempt(processingAttempt);
         validateStatus(status);
         validateCompletedAt(completedAt);
-        validateFailure(status, failureReason, failureType);
+        validateFailure(status, failure);
 
         return new SlackNotificationOutboxHistory(
-                outboxId,
+                SlackNotificationOutboxHistoryId.unassigned(),
+                SlackNotificationOutboxId.assigned(outboxId),
                 processingAttempt,
                 status,
                 completedAt,
-                failureReason,
-                failureType
+                failure
         );
     }
 
-    public SlackNotificationOutboxHistory bindOutboxId(Long outboxId) {
-        validateOutboxId(outboxId);
-        if (this.outboxId != null && !this.outboxId.equals(outboxId)) {
-            throw new IllegalStateException("history outboxId를 다른 값으로 변경할 수 없습니다.");
-        }
-        if (this.outboxId != null) {
-            return this;
-        }
-
-        return new SlackNotificationOutboxHistory(
-                outboxId,
-                processingAttempt,
-                status,
-                completedAt,
-                failureReason,
-                failureType
-        );
-    }
-
-    private SlackNotificationOutboxHistory(
+    public static SlackNotificationOutboxHistory rehydrate(
+            Long id,
             Long outboxId,
             int processingAttempt,
             SlackNotificationOutboxStatus status,
             Instant completedAt,
-            String failureReason,
-            SlackInteractionFailureType failureType
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
     ) {
+        validateOutboxId(outboxId);
+        validateProcessingAttempt(processingAttempt);
+        validateStatus(status);
+        validateCompletedAt(completedAt);
+        validateFailure(status, failure);
+
+        return new SlackNotificationOutboxHistory(
+                SlackNotificationOutboxHistoryId.assigned(id),
+                SlackNotificationOutboxId.assigned(outboxId),
+                processingAttempt,
+                status,
+                completedAt,
+                failure
+        );
+    }
+
+    private SlackNotificationOutboxHistory(
+            SlackNotificationOutboxHistoryId historyId,
+            SlackNotificationOutboxId outboxId,
+            int processingAttempt,
+            SlackNotificationOutboxStatus status,
+            Instant completedAt,
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
+    ) {
+        this.historyId = historyId;
         this.outboxId = outboxId;
         this.processingAttempt = processingAttempt;
         this.status = status;
         this.completedAt = completedAt;
-        this.failureReason = failureReason;
-        this.failureType = failureType;
+        this.failure = failure;
     }
 
     private static void validateOutboxId(Long outboxId) {
@@ -97,12 +84,12 @@ public class SlackNotificationOutboxHistory extends BaseTimeEntity {
         }
     }
 
-    private static void validateOutboxIdIfPresent(Long outboxId) {
-        if (outboxId == null) {
-            return;
-        }
+    public Long getId() {
+        return historyId.value();
+    }
 
-        validateOutboxId(outboxId);
+    public Long getOutboxId() {
+        return outboxId.value();
     }
 
     private static void validateProcessingAttempt(int processingAttempt) {
@@ -115,9 +102,7 @@ public class SlackNotificationOutboxHistory extends BaseTimeEntity {
         if (status == null) {
             throw new IllegalArgumentException("status는 비어 있을 수 없습니다.");
         }
-        if (status == SlackNotificationOutboxStatus.PENDING || status == SlackNotificationOutboxStatus.PROCESSING) {
-            throw new IllegalArgumentException("history status는 완료된 상태여야 합니다.");
-        }
+        status.validateHistoryStatus();
     }
 
     private static void validateCompletedAt(Instant completedAt) {
@@ -128,29 +113,8 @@ public class SlackNotificationOutboxHistory extends BaseTimeEntity {
 
     private static void validateFailure(
             SlackNotificationOutboxStatus status,
-            String failureReason,
-            SlackInteractionFailureType failureType
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
     ) {
-        if (status == SlackNotificationOutboxStatus.SENT) {
-            if (!FailureSnapshotDefaults.NO_FAILURE_REASON.equals(failureReason)
-                    || failureType != SlackInteractionFailureType.NONE) {
-                throw new IllegalArgumentException("SENT history에는 실패 정보가 없어야 합니다.");
-            }
-            return;
-        }
-
-        if (failureReason == null || failureReason.isBlank()) {
-            throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
-        }
-        if (status == SlackNotificationOutboxStatus.FAILED) {
-            if (failureType == null || failureType == SlackInteractionFailureType.NONE) {
-                throw new IllegalArgumentException("FAILED history에는 failureType이 필요합니다.");
-            }
-        }
-        if (status == SlackNotificationOutboxStatus.RETRY_PENDING
-                && failureType != SlackInteractionFailureType.NONE
-                && failureType != SlackInteractionFailureType.PROCESSING_TIMEOUT) {
-            throw new IllegalArgumentException("RETRY_PENDING history의 failureType이 올바르지 않습니다.");
-        }
+        status.validateHistoryFailure(failure);
     }
 }

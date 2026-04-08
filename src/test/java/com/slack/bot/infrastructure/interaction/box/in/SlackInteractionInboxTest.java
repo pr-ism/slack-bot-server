@@ -34,7 +34,7 @@ class SlackInteractionInboxTest {
                 () -> assertThat(actual.getPayloadJson()).isEqualTo("{\"type\":\"block_actions\"}"),
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackInteractionInboxStatus.PENDING),
                 () -> assertThat(actual.getProcessingAttempt()).isZero(),
-                () -> assertThat(actual.getProcessingLease().isClaimed()).isFalse(),
+                () -> assertThat(actual.hasClaimedProcessingLease()).isFalse(),
                 () -> assertThat(actual.getProcessedTime().isPresent()).isFalse(),
                 () -> assertThat(actual.getFailedTime().isPresent()).isFalse(),
                 () -> assertThat(actual.getFailure().isPresent()).isFalse()
@@ -225,7 +225,7 @@ class SlackInteractionInboxTest {
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
                 () -> assertThat(inbox.getProcessedTime().occurredAt()).isEqualTo(processedAt),
-                () -> assertThat(inbox.getProcessingLease().isClaimed()).isFalse(),
+                () -> assertThat(inbox.hasClaimedProcessingLease()).isFalse(),
                 () -> assertThat(inbox.getFailedTime().isPresent()).isFalse(),
                 () -> assertThat(history).isNotNull(),
                 () -> assertThat(history.getInboxId()).isNull(),
@@ -233,6 +233,41 @@ class SlackInteractionInboxTest {
                 () -> assertThat(history.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
                 () -> assertThat(history.getFailure().isPresent()).isFalse()
         );
+    }
+
+    @Test
+    void hasClaimedProcessingLease는_현재_lease_보유_여부와_시작시각_일치_여부를_제공한다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+        Instant processingStartedAt = Instant.parse("2026-02-15T00:00:00Z");
+        setProcessingState(inbox, processingStartedAt, 1);
+
+        // when & then
+        assertAll(
+                () -> assertThat(inbox.hasClaimedProcessingLease()).isTrue(),
+                () -> assertThat(inbox.hasClaimedProcessingLease(processingStartedAt)).isTrue(),
+                () -> assertThat(inbox.hasClaimedProcessingLease(processingStartedAt.plusSeconds(1))).isFalse(),
+                () -> assertThat(inbox.currentProcessingLeaseStartedAt()).isEqualTo(processingStartedAt)
+        );
+    }
+
+    @Test
+    void currentProcessingLeaseStartedAt는_lease가_없으면_예외를_던진다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+
+        // when & then
+        assertThatThrownBy(() -> inbox.currentProcessingLeaseStartedAt())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("processingLease를 보유하고 있지 않습니다.");
     }
 
     @Test
@@ -256,7 +291,7 @@ class SlackInteractionInboxTest {
         // then
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
-                () -> assertThat(inbox.getProcessingLease().isClaimed()).isFalse(),
+                () -> assertThat(inbox.hasClaimedProcessingLease()).isFalse(),
                 () -> assertThat(inbox.getProcessedTime().isPresent()).isFalse(),
                 () -> assertThat(inbox.getFailedTime().occurredAt()).isEqualTo(failedAt),
                 () -> assertThat(inbox.getFailure().reason()).isEqualTo("failure"),
@@ -285,7 +320,7 @@ class SlackInteractionInboxTest {
         // then
         assertAll(
                 () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
-                () -> assertThat(inbox.getProcessingLease().isClaimed()).isFalse(),
+                () -> assertThat(inbox.hasClaimedProcessingLease()).isFalse(),
                 () -> assertThat(inbox.getProcessedTime().isPresent()).isFalse(),
                 () -> assertThat(inbox.getFailedTime().occurredAt()).isEqualTo(failedAt),
                 () -> assertThat(inbox.getFailure().reason()).isEqualTo("retry"),
@@ -295,6 +330,93 @@ class SlackInteractionInboxTest {
                 () -> assertThat(history.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
                 () -> assertThat(history.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRYABLE)
         );
+    }
+
+    @Test
+    void markFailure는_재시도_가능하고_최대시도_미만이면_RETRY_PENDING으로_마킹한다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+        setProcessingState(inbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
+        Instant failedAt = Instant.parse("2026-02-15T03:00:00Z");
+
+        // when
+        SlackInteractionInboxHistory history = inbox.markFailure(failedAt, "retry", true, 2);
+
+        // then
+        assertAll(
+                () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
+                () -> assertThat(inbox.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRYABLE),
+                () -> assertThat(history.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING)
+        );
+    }
+
+    @Test
+    void markFailure는_재시도_가능하고_최대시도에_도달하면_FAILED로_마킹한다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+        setProcessingState(inbox, Instant.parse("2026-02-15T00:00:00Z"), 2);
+        Instant failedAt = Instant.parse("2026-02-15T03:00:00Z");
+
+        // when
+        SlackInteractionInboxHistory history = inbox.markFailure(failedAt, "retry exhausted", true, 2);
+
+        // then
+        assertAll(
+                () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
+                () -> assertThat(inbox.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
+                () -> assertThat(history.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED)
+        );
+    }
+
+    @Test
+    void markFailure는_재시도_불가이면_즉시_FAILED로_마킹한다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+        setProcessingState(inbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
+        Instant failedAt = Instant.parse("2026-02-15T03:00:00Z");
+
+        // when
+        SlackInteractionInboxHistory history = inbox.markFailure(failedAt, "business invariant", false, 2);
+
+        // then
+        assertAll(
+                () -> assertThat(inbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
+                () -> assertThat(inbox.getFailure().type()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
+                () -> assertThat(history.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED)
+        );
+    }
+
+    @Test
+    void markFailure는_maxAttempts가_0이하면_예외를_던진다() {
+        // given
+        SlackInteractionInbox inbox = SlackInteractionInbox.pending(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                "key",
+                "{}"
+        );
+        setProcessingState(inbox, Instant.parse("2026-02-15T00:00:00Z"), 1);
+
+        // when & then
+        assertThatThrownBy(() -> inbox.markFailure(
+                Instant.parse("2026-02-15T03:00:00Z"),
+                "retry",
+                true,
+                0
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("maxAttempts는 0보다 커야 합니다.");
     }
 
     @Test

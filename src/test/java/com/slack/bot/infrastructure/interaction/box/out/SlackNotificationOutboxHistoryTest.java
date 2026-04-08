@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -16,79 +16,32 @@ import org.junit.jupiter.api.Test;
 class SlackNotificationOutboxHistoryTest {
 
     @Test
-    void completed는_outboxId가_null이어도_history를_생성한다() {
+    void completed는_outboxId가_필수다() {
         // when
-        SlackNotificationOutboxHistory history = SlackNotificationOutboxHistory.completed(
+        // when & then
+        assertThatThrownBy(() -> SlackNotificationOutboxHistory.completed(
                 null,
                 1,
                 SlackNotificationOutboxStatus.RETRY_PENDING,
                 Instant.parse("2026-03-27T00:00:00Z"),
-                "failure",
-                SlackInteractionFailureType.NONE
-        );
-
-        // then
-        assertAll(
-                () -> assertThat(history.getOutboxId()).isNull(),
-                () -> assertThat(history.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(history.getStatus()).isEqualTo(SlackNotificationOutboxStatus.RETRY_PENDING)
-        );
+                BoxFailureSnapshot.present("failure", SlackInteractionFailureType.RETRYABLE)
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("outboxId는 비어 있을 수 없습니다.");
     }
 
     @Test
-    void bindOutboxId는_null_outboxId를_실제_id로_바인딩한다() {
-        // given
-        SlackNotificationOutboxHistory history = SlackNotificationOutboxHistory.completed(
-                null,
-                1,
-                SlackNotificationOutboxStatus.FAILED,
-                Instant.parse("2026-03-27T00:00:00Z"),
-                "failure",
-                SlackInteractionFailureType.RETRY_EXHAUSTED
-        );
-
-        // when
-        SlackNotificationOutboxHistory actual = history.bindOutboxId(10L);
-
-        // then
-        assertAll(
-                () -> assertThat(actual.getOutboxId()).isEqualTo(10L),
-                () -> assertThat(actual.getStatus()).isEqualTo(SlackNotificationOutboxStatus.FAILED),
-                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED)
-        );
-    }
-
-    @Test
-    void bindOutboxId는_다른_id로_변경할_수_없다() {
-        // given
-        SlackNotificationOutboxHistory history = SlackNotificationOutboxHistory.completed(
-                10L,
-                1,
-                SlackNotificationOutboxStatus.SENT,
-                Instant.parse("2026-03-27T00:00:00Z"),
-                FailureSnapshotDefaults.NO_FAILURE_REASON,
-                SlackInteractionFailureType.NONE
-        );
-
-        // when & then
-        assertThatThrownBy(() -> history.bindOutboxId(11L))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("history outboxId를 다른 값으로 변경할 수 없습니다.");
-    }
-
-    @Test
-    void FAILED_history는_failureType이_null이면_생성할_수_없다() {
+    void FAILED_history는_absent_failure를_허용하지_않는다() {
         // when & then
         assertThatThrownBy(() -> SlackNotificationOutboxHistory.completed(
                 10L,
                 1,
                 SlackNotificationOutboxStatus.FAILED,
                 Instant.parse("2026-03-27T00:00:00Z"),
-                "failure",
-                null
+                BoxFailureSnapshot.absent()
         ))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("FAILED history에는 failureType이 필요합니다.");
+                .hasMessage("완료 실패 정보는 비어 있을 수 없습니다.");
     }
 
     @Test
@@ -99,14 +52,32 @@ class SlackNotificationOutboxHistoryTest {
                 1,
                 SlackNotificationOutboxStatus.RETRY_PENDING,
                 Instant.parse("2026-03-27T00:00:00Z"),
-                "timeout",
-                SlackInteractionFailureType.PROCESSING_TIMEOUT
+                BoxFailureSnapshot.present("timeout", SlackInteractionFailureType.PROCESSING_TIMEOUT)
         );
 
         // then
         assertAll(
                 () -> assertThat(history.getStatus()).isEqualTo(SlackNotificationOutboxStatus.RETRY_PENDING),
-                () -> assertThat(history.getFailureType()).isEqualTo(SlackInteractionFailureType.PROCESSING_TIMEOUT)
+                () -> assertThat(history.getFailure().type()).isEqualTo(SlackInteractionFailureType.PROCESSING_TIMEOUT)
+        );
+    }
+
+    @Test
+    void validateHistoryFailure는_완료되지_않은_outbox_status를_거부한다() {
+        // given
+        BoxFailureSnapshot<SlackInteractionFailureType> failure = BoxFailureSnapshot.present(
+                "failure",
+                SlackInteractionFailureType.RETRYABLE
+        );
+
+        // when & then
+        assertAll(
+                () -> assertThatThrownBy(() -> SlackNotificationOutboxStatus.PENDING.validateHistoryFailure(failure))
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessage("history status는 완료된 상태여야 합니다."),
+                () -> assertThatThrownBy(() -> SlackNotificationOutboxStatus.PROCESSING.validateHistoryFailure(failure))
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessage("history status는 완료된 상태여야 합니다.")
         );
     }
 }

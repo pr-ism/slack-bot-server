@@ -56,4 +56,15 @@ class OutboxIdempotencySourceContextTest {
         // then
         assertThat(actual).isEqualTo("BUSINESS:");
     }
+
+    @Test
+    void withBusinessEventSource는_blank_source를_허용하지_않는다() {
+        // when & then
+        assertThatThrownBy(() -> context.withBusinessEventSource(
+                " ",
+                () -> "ignored"
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("sourceId는 비어 있을 수 없습니다.");
+    }
 }

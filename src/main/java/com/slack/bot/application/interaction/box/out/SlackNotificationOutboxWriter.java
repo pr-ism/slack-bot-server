@@ -11,6 +11,7 @@ import com.slack.bot.application.interaction.box.aop.TriggerInteractionImmediate
 import com.slack.bot.application.interaction.box.out.exception.SlackBlocksSerializationException;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
+import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStringField;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -146,17 +147,17 @@ public class SlackNotificationOutboxWriter {
                 request.messageType(),
                 request.teamId(),
                 request.channelId(),
-                request.userId()
+                request.userId().valueOrBlank()
         );
         SlackNotificationOutbox outbox = SlackNotificationOutbox.builder()
                                                                 .messageType(request.messageType())
                                                                 .idempotencyKey(key)
                                                                 .teamId(request.teamId())
                                                                 .channelId(request.channelId())
-                                                                .userId(request.userId())
-                                                                .text(request.text())
-                                                                .blocksJson(request.blocksJson())
-                                                                .fallbackText(request.fallbackText())
+                                                                .userIdField(request.userId())
+                                                                .textField(request.text())
+                                                                .blocksJsonField(request.blocksJson())
+                                                                .fallbackTextField(request.fallbackText())
                                                                 .build();
 
         slackNotificationOutboxRepository.enqueue(outbox);
@@ -188,10 +189,10 @@ public class SlackNotificationOutboxWriter {
             SlackNotificationOutboxMessageType messageType,
             String teamId,
             String channelId,
-            String userId,
-            String text,
-            String blocksJson,
-            String fallbackText
+            SlackNotificationOutboxStringField userId,
+            SlackNotificationOutboxStringField text,
+            SlackNotificationOutboxStringField blocksJson,
+            SlackNotificationOutboxStringField fallbackText
     ) {
         private static OutboxEnqueueRequest ephemeralText(
                 String sourceKey,
@@ -205,10 +206,10 @@ public class SlackNotificationOutboxWriter {
                     SlackNotificationOutboxMessageType.EPHEMERAL_TEXT,
                     teamId,
                     channelId,
-                    userId,
-                    text,
-                    null,
-                    null
+                    SlackNotificationOutboxStringField.present(userId),
+                    SlackNotificationOutboxStringField.present(text),
+                    SlackNotificationOutboxStringField.absent(),
+                    SlackNotificationOutboxStringField.absent()
             );
         }
 
@@ -225,10 +226,10 @@ public class SlackNotificationOutboxWriter {
                     SlackNotificationOutboxMessageType.EPHEMERAL_BLOCKS,
                     teamId,
                     channelId,
-                    userId,
-                    null,
-                    blocksJson,
-                    fallbackText
+                    SlackNotificationOutboxStringField.present(userId),
+                    SlackNotificationOutboxStringField.absent(),
+                    SlackNotificationOutboxStringField.present(blocksJson),
+                    fallbackTextField(fallbackText)
             );
         }
 
@@ -243,10 +244,10 @@ public class SlackNotificationOutboxWriter {
                     SlackNotificationOutboxMessageType.CHANNEL_TEXT,
                     teamId,
                     channelId,
-                    null,
-                    text,
-                    null,
-                    null
+                    SlackNotificationOutboxStringField.absent(),
+                    SlackNotificationOutboxStringField.present(text),
+                    SlackNotificationOutboxStringField.absent(),
+                    SlackNotificationOutboxStringField.absent()
             );
         }
 
@@ -262,11 +263,19 @@ public class SlackNotificationOutboxWriter {
                     SlackNotificationOutboxMessageType.CHANNEL_BLOCKS,
                     teamId,
                     channelId,
-                    null,
-                    null,
-                    blocksJson,
-                    fallbackText
+                    SlackNotificationOutboxStringField.absent(),
+                    SlackNotificationOutboxStringField.absent(),
+                    SlackNotificationOutboxStringField.present(blocksJson),
+                    fallbackTextField(fallbackText)
             );
+        }
+
+        private static SlackNotificationOutboxStringField fallbackTextField(String fallbackText) {
+            if (fallbackText == null || fallbackText.isBlank()) {
+                return SlackNotificationOutboxStringField.absent();
+            }
+
+            return SlackNotificationOutboxStringField.present(fallbackText);
         }
     }
 }

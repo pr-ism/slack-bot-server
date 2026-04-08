@@ -150,4 +150,23 @@ class SlackInteractionInboxHistoryTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("FAILED history의 failureType이 올바르지 않습니다.");
     }
+
+    @Test
+    void validateHistoryFailure는_완료되지_않은_inbox_status를_거부한다() {
+        // given
+        BoxFailureSnapshot<SlackInteractionFailureType> failure = BoxFailureSnapshot.present(
+                "failure",
+                SlackInteractionFailureType.RETRYABLE
+        );
+
+        // when & then
+        assertAll(
+                () -> assertThatThrownBy(() -> SlackInteractionInboxStatus.PENDING.validateHistoryFailure(failure))
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessage("history status는 완료된 상태여야 합니다."),
+                () -> assertThatThrownBy(() -> SlackInteractionInboxStatus.PROCESSING.validateHistoryFailure(failure))
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessage("history status는 완료된 상태여야 합니다.")
+        );
+    }
 }
