@@ -111,7 +111,7 @@ class ReviewRequestInboxProcessorTest {
 
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
-            List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAll();
+            List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAllDomains();
             List<ReviewNotificationOutbox> outboxes = jpaReviewNotificationOutboxRepository.findAll();
             ReviewRequestInbox inbox = findOnlyInbox();
 
@@ -147,7 +147,7 @@ class ReviewRequestInboxProcessorTest {
 
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
-            List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAll();
+            List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAllDomains();
             List<ReviewNotificationOutbox> outboxes = jpaReviewNotificationOutboxRepository.findAll();
             ReviewRequestInbox inbox = findOnlyInbox();
 
@@ -207,7 +207,7 @@ class ReviewRequestInboxProcessorTest {
                 Instant.now().minusSeconds(120)
         );
         setProcessingState(inbox, Instant.now().minusSeconds(120), 1);
-        ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
+        ReviewRequestInbox saved = reviewRequestInboxRepository.save(inbox);
 
         // when
         reviewRequestInboxProcessor.recoverTimeoutProcessing(1_000);
@@ -215,7 +215,7 @@ class ReviewRequestInboxProcessorTest {
 
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
-            ReviewRequestInbox processed = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
+            ReviewRequestInbox processed = jpaReviewRequestInboxRepository.findDomainById(saved.getId()).orElseThrow();
             List<ReviewRequestInboxHistory> histories = historiesOf(saved.getId());
 
             assertAll(
@@ -248,13 +248,13 @@ class ReviewRequestInboxProcessorTest {
         setProcessingState(inbox, Instant.now().minusSeconds(120), 1);
         inbox.markRetryPending(Instant.now().minusSeconds(110), "first timeout failure");
         setProcessingState(inbox, Instant.now().minusSeconds(100), 2);
-        ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
+        ReviewRequestInbox saved = reviewRequestInboxRepository.save(inbox);
 
         // when
         reviewRequestInboxProcessor.recoverTimeoutProcessing(1_000);
 
         // then
-        ReviewRequestInbox failed = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
+        ReviewRequestInbox failed = jpaReviewRequestInboxRepository.findDomainById(saved.getId()).orElseThrow();
         assertAll(
                 () -> assertThat(spyReviewNotificationService.getSendCount()).isZero(),
                 () -> assertThat(failed.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
@@ -299,7 +299,7 @@ class ReviewRequestInboxProcessorTest {
     }
 
     private List<ReviewRequestInboxHistory> historiesOf(Long inboxId) {
-        return jpaReviewRequestInboxHistoryRepository.findAll()
+        return jpaReviewRequestInboxHistoryRepository.findAllDomains()
                                                      .stream()
                                                      .filter(history -> inboxId.equals(history.getInboxId()))
                                                      .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))
@@ -358,7 +358,7 @@ class ReviewRequestInboxProcessorTest {
         reviewRequestInboxProcessor.enqueue("test-api-key", second, 0);
 
         // then
-        List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAll();
+        List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAllDomains();
         ReviewRequestInbox inbox = findOnlyInbox();
         assertAll(
                 () -> assertThat(inboxes).hasSize(1),
@@ -475,7 +475,7 @@ class ReviewRequestInboxProcessorTest {
         );
         setProcessingState(inbox, Instant.now().minusSeconds(55), 1);
         inbox.markRetryPending(Instant.now().minusSeconds(50), "first failure");
-        ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
+        ReviewRequestInbox saved = reviewRequestInboxRepository.save(inbox);
 
         doThrow(new ResourceAccessException("temporary network issue"))
                 .when(reviewNotificationOutboxEnqueuer)
@@ -491,7 +491,7 @@ class ReviewRequestInboxProcessorTest {
         reviewRequestInboxProcessor.processPending(10);
 
         // then
-        ReviewRequestInbox failed = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
+        ReviewRequestInbox failed = jpaReviewRequestInboxRepository.findDomainById(saved.getId()).orElseThrow();
         assertAll(
                 () -> assertThat(failed.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(failed.getProcessingAttempt()).isEqualTo(2),
@@ -514,7 +514,7 @@ class ReviewRequestInboxProcessorTest {
         reviewRequestInboxProcessor.processPending(10);
 
         // then
-        ReviewRequestInbox reloaded = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
+        ReviewRequestInbox reloaded = jpaReviewRequestInboxRepository.findDomainById(saved.getId()).orElseThrow();
         assertAll(
                 () -> assertThat(spyReviewNotificationService.getSendCount()).isZero(),
                 () -> assertThat(reloaded.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
@@ -545,8 +545,8 @@ class ReviewRequestInboxProcessorTest {
         reviewRequestInboxProcessor.processPending(10);
 
         // then
-        ReviewRequestInbox reloadedFirst = jpaReviewRequestInboxRepository.findById(firstInbox.getId()).orElseThrow();
-        ReviewRequestInbox reloadedSecond = jpaReviewRequestInboxRepository.findById(secondInbox.getId()).orElseThrow();
+        ReviewRequestInbox reloadedFirst = jpaReviewRequestInboxRepository.findDomainById(firstInbox.getId()).orElseThrow();
+        ReviewRequestInbox reloadedSecond = jpaReviewRequestInboxRepository.findDomainById(secondInbox.getId()).orElseThrow();
         assertAll(
                 () -> assertThat(reloadedFirst.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(reloadedSecond.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
@@ -583,13 +583,13 @@ class ReviewRequestInboxProcessorTest {
     }
 
     private ReviewRequestInbox findOnlyInbox() {
-        List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAll();
+        List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAllDomains();
         assertThat(inboxes).hasSize(1);
         return inboxes.getFirst();
     }
 
     private ReviewRequestInbox findInboxByGithubPullRequestId(Long githubPullRequestId) {
-        return jpaReviewRequestInboxRepository.findAll()
+        return jpaReviewRequestInboxRepository.findAllDomains()
                                              .stream()
                                              .filter(inbox -> githubPullRequestId.equals(inbox.getGithubPullRequestId()))
                                              .findFirst()

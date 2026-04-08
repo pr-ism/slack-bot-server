@@ -140,7 +140,7 @@ class InMemoryReviewEventBatchTest {
 
         // then
         await().atMost(3, SECONDS).untilAsserted(() -> {
-            ReviewRequestInbox inbox = jpaReviewRequestInboxRepository.findAll().getFirst();
+            ReviewRequestInbox inbox = jpaReviewRequestInboxRepository.findAllDomains().getFirst();
 
             assertThat(inbox.getRequestJson())
                     .contains("\"reviewRoundKey\":\"1\"")

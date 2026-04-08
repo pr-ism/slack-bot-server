@@ -1,35 +1,19 @@
 package com.slack.bot.infrastructure.review.box.in;
 
-import com.slack.bot.domain.common.BaseTimeEntity;
 import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Table;
 import java.time.Instant;
-import lombok.AccessLevel;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 
 @Getter
-@Entity
-@Table(name = "review_request_inbox_history")
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ReviewRequestInboxHistory extends BaseTimeEntity {
+public class ReviewRequestInboxHistory {
 
-    private Long inboxId;
-
-    private int processingAttempt;
-
-    @Enumerated(EnumType.STRING)
-    private ReviewRequestInboxStatus status;
-
-    private Instant completedAt;
-
-    private String failureReason;
-
-    @Enumerated(EnumType.STRING)
-    private ReviewRequestInboxFailureType failureType;
+    private final Long id;
+    private final Long inboxId;
+    private final int processingAttempt;
+    private final ReviewRequestInboxStatus status;
+    private final Instant completedAt;
+    private final String failureReason;
+    private final ReviewRequestInboxFailureType failureType;
 
     public static ReviewRequestInboxHistory completed(
             Long inboxId,
@@ -46,6 +30,7 @@ public class ReviewRequestInboxHistory extends BaseTimeEntity {
         validateFailure(status, failureReason, failureType);
 
         return new ReviewRequestInboxHistory(
+                null,
                 inboxId,
                 processingAttempt,
                 status,
@@ -53,6 +38,50 @@ public class ReviewRequestInboxHistory extends BaseTimeEntity {
                 failureReason,
                 failureType
         );
+    }
+
+    public static ReviewRequestInboxHistory rehydrate(
+            Long id,
+            Long inboxId,
+            int processingAttempt,
+            ReviewRequestInboxStatus status,
+            Instant completedAt,
+            String failureReason,
+            ReviewRequestInboxFailureType failureType
+    ) {
+        validateInboxIdIfPresent(inboxId);
+        validateProcessingAttempt(processingAttempt);
+        validateStatus(status);
+        validateCompletedAt(completedAt);
+        validateFailure(status, failureReason, failureType);
+
+        return new ReviewRequestInboxHistory(
+                id,
+                inboxId,
+                processingAttempt,
+                status,
+                completedAt,
+                failureReason,
+                failureType
+        );
+    }
+
+    private ReviewRequestInboxHistory(
+            Long id,
+            Long inboxId,
+            int processingAttempt,
+            ReviewRequestInboxStatus status,
+            Instant completedAt,
+            String failureReason,
+            ReviewRequestInboxFailureType failureType
+    ) {
+        this.id = id;
+        this.inboxId = inboxId;
+        this.processingAttempt = processingAttempt;
+        this.status = status;
+        this.completedAt = completedAt;
+        this.failureReason = failureReason;
+        this.failureType = failureType;
     }
 
     public ReviewRequestInboxHistory bindInboxId(Long inboxId) {
@@ -65,6 +94,7 @@ public class ReviewRequestInboxHistory extends BaseTimeEntity {
         }
 
         return new ReviewRequestInboxHistory(
+                this.id,
                 inboxId,
                 processingAttempt,
                 status,
@@ -72,22 +102,6 @@ public class ReviewRequestInboxHistory extends BaseTimeEntity {
                 failureReason,
                 failureType
         );
-    }
-
-    private ReviewRequestInboxHistory(
-            Long inboxId,
-            int processingAttempt,
-            ReviewRequestInboxStatus status,
-            Instant completedAt,
-            String failureReason,
-            ReviewRequestInboxFailureType failureType
-    ) {
-        this.inboxId = inboxId;
-        this.processingAttempt = processingAttempt;
-        this.status = status;
-        this.completedAt = completedAt;
-        this.failureReason = failureReason;
-        this.failureType = failureType;
     }
 
     private static void validateInboxId(Long inboxId) {

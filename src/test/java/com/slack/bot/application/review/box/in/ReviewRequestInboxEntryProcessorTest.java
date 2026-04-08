@@ -82,7 +82,7 @@ class ReviewRequestInboxEntryProcessorTest {
                 .isInstanceOf(ReviewRequestInboxProcessingLeaseLostException.class)
                 .hasMessageContaining("processing lease");
 
-        ReviewRequestInbox actualInbox = jpaReviewRequestInboxRepository.findById(inbox.getId()).orElseThrow();
+        ReviewRequestInbox actualInbox = jpaReviewRequestInboxRepository.findDomainById(inbox.getId()).orElseThrow();
         List<ReviewNotificationOutbox> actualOutboxes = jpaReviewNotificationOutboxRepository.findAll();
 
         assertAll(
@@ -104,7 +104,7 @@ class ReviewRequestInboxEntryProcessorTest {
         ReflectionTestUtils.setField(inbox, "processingStartedAt", CLAIMED_PROCESSING_STARTED_AT);
         ReflectionTestUtils.setField(inbox, "processedAt", FailureSnapshotDefaults.NO_PROCESSED_AT);
         ReflectionTestUtils.setField(inbox, "processingAttempt", 1);
-        return jpaReviewRequestInboxRepository.save(inbox);
+        return reviewRequestInboxRepository.save(inbox);
     }
 
     private ReviewNotificationPayload request(Long githubPullRequestId, String pullRequestTitle) {

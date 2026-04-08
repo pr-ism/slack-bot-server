@@ -92,7 +92,7 @@ class ReviewRequestInboxRepositoryAdapterTest {
                 oldAvailableAt
         );
         setProcessingState(inbox, processingStartedAt, 1);
-        ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
+        ReviewRequestInbox saved = reviewRequestInboxRepository.save(inbox);
 
         // when
         reviewRequestInboxRepository.upsertPending(
@@ -104,7 +104,7 @@ class ReviewRequestInboxRepositoryAdapterTest {
         );
 
         // then
-        ReviewRequestInbox actual = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
+        ReviewRequestInbox actual = jpaReviewRequestInboxRepository.findDomainById(saved.getId()).orElseThrow();
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
@@ -127,7 +127,7 @@ class ReviewRequestInboxRepositoryAdapterTest {
         );
         setProcessingState(inbox, Instant.parse("2026-02-24T00:01:00Z"), 1);
         inbox.markRetryPending(Instant.parse("2026-02-24T00:02:00Z"), "temporary failure");
-        ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
+        ReviewRequestInbox saved = reviewRequestInboxRepository.save(inbox);
 
         // when
         Instant newAvailableAt = Instant.parse("2026-02-24T00:03:00Z");
@@ -140,7 +140,7 @@ class ReviewRequestInboxRepositoryAdapterTest {
         );
 
         // then
-        ReviewRequestInbox actual = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
+        ReviewRequestInbox actual = jpaReviewRequestInboxRepository.findDomainById(saved.getId()).orElseThrow();
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING),
                 () -> assertThat(actual.getProcessingAttempt()).isZero(),
@@ -167,7 +167,7 @@ class ReviewRequestInboxRepositoryAdapterTest {
                 Instant.parse("2026-02-24T00:00:00Z")
         );
         setProcessingState(inbox, Instant.parse("2026-02-24T00:01:00Z"), 1);
-        ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
+        ReviewRequestInbox saved = reviewRequestInboxRepository.save(inbox);
         Instant failedAt = Instant.parse("2026-02-24T00:05:00Z");
         LocalDateTime expectedUpdatedAt = LocalDateTime.ofInstant(failedAt, ZoneOffset.UTC);
 
@@ -181,13 +181,14 @@ class ReviewRequestInboxRepositoryAdapterTest {
         );
 
         // then
-        ReviewRequestInbox actual = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
+        ReviewRequestInboxJpaEntity actualEntity = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
+        ReviewRequestInbox actual = actualEntity.toDomain();
         ReviewRequestInboxHistory history = findLatestHistory(saved.getId());
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(1),
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
                 () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
-                () -> assertThat(actual.getUpdatedAt()).isEqualTo(expectedUpdatedAt),
+                () -> assertThat(actualEntity.getUpdatedAt()).isEqualTo(expectedUpdatedAt),
                 () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
                 () -> assertThat(history.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.PROCESSING_TIMEOUT),
                 () -> assertThat(history.getFailureReason()).isEqualTo("timeout"),
@@ -209,7 +210,7 @@ class ReviewRequestInboxRepositoryAdapterTest {
                     Instant.parse("2026-02-24T00:00:00Z")
             );
             setProcessingState(inbox, base.minusSeconds(120L + index), 1);
-            ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
+            ReviewRequestInbox saved = reviewRequestInboxRepository.save(inbox);
             inboxIds.add(saved.getId());
         }
 
@@ -224,9 +225,9 @@ class ReviewRequestInboxRepositoryAdapterTest {
 
         // then
         List<ReviewRequestInbox> actualInboxes = inboxIds.stream()
-                                                         .map(inboxId -> jpaReviewRequestInboxRepository.findById(inboxId).orElseThrow())
+                                                         .map(inboxId -> jpaReviewRequestInboxRepository.findDomainById(inboxId).orElseThrow())
                                                          .toList();
-        List<ReviewRequestInboxHistory> actualHistories = jpaReviewRequestInboxHistoryRepository.findAll();
+        List<ReviewRequestInboxHistory> actualHistories = jpaReviewRequestInboxHistoryRepository.findAllDomains();
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(100),
                 () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == ReviewRequestInboxStatus.RETRY_PENDING)
@@ -256,7 +257,7 @@ class ReviewRequestInboxRepositoryAdapterTest {
                     Instant.parse("2026-02-24T00:00:00Z")
             );
             setProcessingState(retryableInbox, base.minusSeconds(200L + index), 1);
-            ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(retryableInbox);
+            ReviewRequestInbox saved = reviewRequestInboxRepository.save(retryableInbox);
             inboxIds.add(saved.getId());
         }
 
@@ -269,7 +270,7 @@ class ReviewRequestInboxRepositoryAdapterTest {
                     Instant.parse("2026-02-24T00:00:00Z")
             );
             setProcessingState(exhaustedInbox, base.minusSeconds(100L + index), 3);
-            ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(exhaustedInbox);
+            ReviewRequestInbox saved = reviewRequestInboxRepository.save(exhaustedInbox);
             inboxIds.add(saved.getId());
         }
 
@@ -284,9 +285,9 @@ class ReviewRequestInboxRepositoryAdapterTest {
 
         // then
         List<ReviewRequestInbox> actualInboxes = inboxIds.stream()
-                                                         .map(inboxId -> jpaReviewRequestInboxRepository.findById(inboxId).orElseThrow())
+                                                         .map(inboxId -> jpaReviewRequestInboxRepository.findDomainById(inboxId).orElseThrow())
                                                          .toList();
-        List<ReviewRequestInboxHistory> actualHistories = jpaReviewRequestInboxHistoryRepository.findAll();
+        List<ReviewRequestInboxHistory> actualHistories = jpaReviewRequestInboxHistoryRepository.findAllDomains();
 
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(100),
@@ -316,7 +317,7 @@ class ReviewRequestInboxRepositoryAdapterTest {
                 Instant.parse("2026-02-24T00:00:00Z")
         );
         setProcessingState(inbox, Instant.parse("2026-02-24T00:01:00Z"), 1);
-        ReviewRequestInbox saved = jpaReviewRequestInboxRepository.save(inbox);
+        ReviewRequestInbox saved = reviewRequestInboxRepository.save(inbox);
         CountDownLatch lockAcquired = new CountDownLatch(1);
         CountDownLatch releaseLock = new CountDownLatch(1);
 
@@ -350,11 +351,11 @@ class ReviewRequestInboxRepositoryAdapterTest {
             );
 
             // then
-            ReviewRequestInbox lockedInbox = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
+            ReviewRequestInbox lockedInbox = jpaReviewRequestInboxRepository.findDomainById(saved.getId()).orElseThrow();
             assertAll(
                     () -> assertThat(skippedCount).isZero(),
                     () -> assertThat(lockedInbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
-                    () -> assertThat(jpaReviewRequestInboxHistoryRepository.findAll()).isEmpty()
+                    () -> assertThat(jpaReviewRequestInboxHistoryRepository.findAllDomains()).isEmpty()
             );
 
             releaseLock.countDown();
@@ -375,7 +376,7 @@ class ReviewRequestInboxRepositoryAdapterTest {
     }
 
     private ReviewRequestInbox findByIdempotencyKey(String idempotencyKey) {
-        for (ReviewRequestInbox inbox : jpaReviewRequestInboxRepository.findAll()) {
+        for (ReviewRequestInbox inbox : jpaReviewRequestInboxRepository.findAllDomains()) {
             if (idempotencyKey.equals(inbox.getIdempotencyKey())) {
                 return inbox;
             }
@@ -386,13 +387,15 @@ class ReviewRequestInboxRepositoryAdapterTest {
 
     private ReviewRequestInboxHistory findLatestHistory(Long inboxId) {
         ReviewRequestInboxHistory latestHistory = null;
+        LocalDateTime latestCreatedAt = null;
 
-        for (ReviewRequestInboxHistory history : jpaReviewRequestInboxHistoryRepository.findAll()) {
-            if (!inboxId.equals(history.getInboxId())) {
+        for (ReviewRequestInboxHistoryJpaEntity historyEntity : jpaReviewRequestInboxHistoryRepository.findAll()) {
+            if (!inboxId.equals(historyEntity.getInboxId())) {
                 continue;
             }
-            if (latestHistory == null || history.getCreatedAt().isAfter(latestHistory.getCreatedAt())) {
-                latestHistory = history;
+            if (latestCreatedAt == null || historyEntity.getCreatedAt().isAfter(latestCreatedAt)) {
+                latestHistory = historyEntity.toDomain();
+                latestCreatedAt = historyEntity.getCreatedAt();
             }
         }
 

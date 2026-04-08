@@ -1,7 +1,5 @@
 package com.slack.bot.infrastructure.review.persistence.box.in;
 
-import static com.slack.bot.infrastructure.review.box.in.QReviewRequestInbox.reviewRequestInbox;
-
 import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
@@ -216,7 +214,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
     @Override
     @Transactional(readOnly = true)
     public Optional<ReviewRequestInbox> findById(Long inboxId) {
-        return reviewRequestInboxJpaRepository.findById(inboxId);
+        return reviewRequestInboxJpaRepository.findDomainById(inboxId);
     }
 
     @Override
@@ -410,7 +408,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
             ReviewRequestInbox inbox,
             Instant claimedProcessingStartedAt
     ) {
-        return saveIfProcessingLeaseMatched(inbox, null, claimedProcessingStartedAt);
+        return saveIfProcessingLeaseMatched(inbox, Optional.empty(), claimedProcessingStartedAt);
     }
 
     @Override
@@ -418,6 +416,14 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
     public boolean saveIfProcessingLeaseMatched(
             ReviewRequestInbox inbox,
             ReviewRequestInboxHistory history,
+            Instant claimedProcessingStartedAt
+    ) {
+        return saveIfProcessingLeaseMatched(inbox, Optional.of(history), claimedProcessingStartedAt);
+    }
+
+    private boolean saveIfProcessingLeaseMatched(
+            ReviewRequestInbox inbox,
+            Optional<ReviewRequestInboxHistory> history,
             Instant claimedProcessingStartedAt
     ) {
         validateSaveIfProcessingLeaseMatchedArguments(inbox, claimedProcessingStartedAt);
@@ -454,9 +460,8 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
             return false;
         }
 
-        if (history != null) {
-            reviewRequestInboxHistoryJpaRepository.save(history.bindInboxId(inbox.getId()));
-        }
+        history.map(historyEntry -> historyEntry.bindInboxId(inbox.getId()))
+               .ifPresent(this::saveHistory);
 
         return true;
     }
@@ -464,7 +469,9 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
     @Override
     @Transactional
     public ReviewRequestInbox save(ReviewRequestInbox inbox) {
-        return reviewRequestInboxJpaRepository.save(inbox);
+        ReviewRequestInboxJpaEntity entity = findInboxEntity(inbox.getId()).orElseGet(ReviewRequestInboxJpaEntity::new);
+        entity.apply(inbox);
+        return reviewRequestInboxJpaRepository.save(entity).toDomain();
     }
 
     protected String buildUpsertPendingSql() {
@@ -662,5 +669,19 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
 
     private String resolveFailureTypeName(ReviewRequestInbox inbox) {
         return inbox.getFailureType().name();
+    }
+
+    private Optional<ReviewRequestInboxJpaEntity> findInboxEntity(Long inboxId) {
+        if (inboxId == null) {
+            return Optional.empty();
+        }
+
+        return reviewRequestInboxJpaRepository.findById(inboxId);
+    }
+
+    private void saveHistory(ReviewRequestInboxHistory history) {
+        ReviewRequestInboxHistoryJpaEntity entity = new ReviewRequestInboxHistoryJpaEntity();
+        entity.apply(history);
+        reviewRequestInboxHistoryJpaRepository.save(entity);
     }
 }
