@@ -33,6 +33,8 @@ import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
+import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxMessageType;
+import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxProjectId;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxStringField;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxStatus;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
@@ -555,21 +557,32 @@ class ReviewNotificationOutboxProcessorTest {
     @Test
     void semantic_payload가_있으면_renderer로_최종_payload를_조립해_전송한다() throws Exception {
         // given
-        ReviewNotificationOutbox claimed = spy(ReviewNotificationOutbox.semantic(
+        ReviewNotificationOutbox claimed = spy(ReviewNotificationOutbox.rehydrate(
+                10L,
+                ReviewNotificationOutboxMessageType.SEMANTIC,
                 "semantic-outbox",
-                1L,
+                ReviewNotificationOutboxProjectId.present(1L),
                 "T1",
                 "C1",
-                """
-                {"repositoryName":"repo","githubPullRequestId":101,
-                "pullRequestNumber":42,"pullRequestTitle":"Fix bug",
-                "pullRequestUrl":"https://github.com/pr/1",
-                "authorGithubId":"author-gh",
-                "pendingReviewers":["reviewer-gh-1"],
-                "reviewersToMention":["reviewer-gh-1"]}
-                """
+                ReviewNotificationOutboxStringField.present("""
+                        {"repositoryName":"repo","githubPullRequestId":101,
+                        "pullRequestNumber":42,"pullRequestTitle":"Fix bug",
+                        "pullRequestUrl":"https://github.com/pr/1",
+                        "authorGithubId":"author-gh",
+                        "pendingReviewers":["reviewer-gh-1"],
+                        "reviewersToMention":["reviewer-gh-1"]}
+                        """),
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStatus.PROCESSING,
+                1,
+                CLAIMED_PROCESSING_STARTED_AT,
+                FailureSnapshotDefaults.NO_SENT_AT,
+                FailureSnapshotDefaults.NO_FAILURE_AT,
+                FailureSnapshotDefaults.NO_FAILURE_REASON,
+                SlackInteractionFailureType.NONE
         ));
-        setProcessingState(claimed, CLAIMED_PROCESSING_STARTED_AT, 1);
         given(reviewNotificationOutboxRepository.claimNextId(any(), anyCollection()))
                 .willReturn(Optional.of(10L), Optional.empty());
         given(reviewNotificationOutboxRepository.findById(10L)).willReturn(Optional.of(claimed));
@@ -605,13 +618,24 @@ class ReviewNotificationOutboxProcessorTest {
             attachmentsField = ReviewNotificationOutboxStringField.present(attachmentsJson);
         }
 
-        ReviewNotificationOutbox outbox = ReviewNotificationOutbox.channelBlocks(
+        ReviewNotificationOutbox outbox = ReviewNotificationOutbox.rehydrate(
+                10L + processingAttempt,
+                ReviewNotificationOutboxMessageType.CHANNEL_BLOCKS,
                 "OUTBOX-" + channelId + "-" + processingAttempt,
+                ReviewNotificationOutboxProjectId.absent(),
                 "T1",
                 channelId,
-                "[]",
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStringField.present("[]"),
                 attachmentsField,
-                ReviewNotificationOutboxStringField.present("fallback")
+                ReviewNotificationOutboxStringField.present("fallback"),
+                ReviewNotificationOutboxStatus.PENDING,
+                0,
+                FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT,
+                FailureSnapshotDefaults.NO_SENT_AT,
+                FailureSnapshotDefaults.NO_FAILURE_AT,
+                FailureSnapshotDefaults.NO_FAILURE_REASON,
+                SlackInteractionFailureType.NONE
         );
         Instant base = CLAIMED_PROCESSING_STARTED_AT;
         setProcessingState(outbox, base, 1);

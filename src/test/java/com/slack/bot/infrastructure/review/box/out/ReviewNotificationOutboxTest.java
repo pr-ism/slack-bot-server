@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
 import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import java.time.Instant;
@@ -172,7 +173,7 @@ class ReviewNotificationOutboxTest {
     @Test
     void markSent를_호출하면_SENT_상태와_전송시각이_저장된다() {
         // given
-        ReviewNotificationOutbox outbox = pendingOutbox();
+        ReviewNotificationOutbox outbox = persistedOutbox();
         setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
 
         // when
@@ -190,9 +191,9 @@ class ReviewNotificationOutboxTest {
                 () -> assertThat(outbox.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
                 () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE),
                 () -> assertThat(history).isNotNull(),
-                () -> assertThat(history.getOutboxId()).isNull(),
+                () -> assertThat(history.getOutboxId()).isEqualTo(10L),
                 () -> assertThat(history.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.SENT),
-                () -> assertThat(history.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
+                () -> assertThat(history.getFailure().isPresent()).isFalse()
         );
     }
 
@@ -222,7 +223,7 @@ class ReviewNotificationOutboxTest {
     @Test
     void markRetryPending을_호출하면_RETRY_PENDING_상태와_실패정보가_저장된다() {
         // given
-        ReviewNotificationOutbox outbox = pendingOutbox();
+        ReviewNotificationOutbox outbox = persistedOutbox();
         setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
 
         // when
@@ -238,11 +239,31 @@ class ReviewNotificationOutboxTest {
                 () -> assertThat(outbox.getSentAt()).isEqualTo(FailureSnapshotDefaults.NO_SENT_AT),
                 () -> assertThat(outbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(outbox.getFailureReason()).isEqualTo("retry"),
-                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE),
+                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRYABLE),
                 () -> assertThat(history).isNotNull(),
-                () -> assertThat(history.getOutboxId()).isNull(),
+                () -> assertThat(history.getOutboxId()).isEqualTo(10L),
                 () -> assertThat(history.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.RETRY_PENDING),
-                () -> assertThat(history.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
+                () -> assertThat(history.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRYABLE)
+        );
+    }
+
+    @Test
+    void markRetryPending은_PROCESSING_TIMEOUT_failureType을_허용한다() {
+        // given
+        ReviewNotificationOutbox outbox = persistedOutbox();
+        setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
+
+        // when
+        ReviewNotificationOutboxHistory history = outbox.markRetryPending(
+                Instant.parse("2026-02-24T00:04:00Z"),
+                "timeout",
+                SlackInteractionFailureType.PROCESSING_TIMEOUT
+        );
+
+        // then
+        assertAll(
+                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.PROCESSING_TIMEOUT),
+                () -> assertThat(history.getFailure().type()).isEqualTo(SlackInteractionFailureType.PROCESSING_TIMEOUT)
         );
     }
 
@@ -296,7 +317,7 @@ class ReviewNotificationOutboxTest {
     @Test
     void markFailed를_호출하면_FAILED_상태와_실패정보가_저장된다() {
         // given
-        ReviewNotificationOutbox outbox = pendingOutbox();
+        ReviewNotificationOutbox outbox = persistedOutbox();
         setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
 
         // when
@@ -318,8 +339,9 @@ class ReviewNotificationOutboxTest {
                 () -> assertThat(outbox.getFailureReason()).isEqualTo("failure"),
                 () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
                 () -> assertThat(history).isNotNull(),
-                () -> assertThat(history.getOutboxId()).isNull(),
-                () -> assertThat(history.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.FAILED)
+                () -> assertThat(history.getOutboxId()).isEqualTo(10L),
+                () -> assertThat(history.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.FAILED),
+                () -> assertThat(history.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED)
         );
     }
 
@@ -414,6 +436,28 @@ class ReviewNotificationOutboxTest {
                 "[{\"type\":\"section\"}]",
                 ReviewNotificationOutboxStringField.absent(),
                 ReviewNotificationOutboxStringField.present("fallback")
+        );
+    }
+
+    private ReviewNotificationOutbox persistedOutbox() {
+        return ReviewNotificationOutbox.rehydrate(
+                10L,
+                ReviewNotificationOutboxMessageType.CHANNEL_BLOCKS,
+                "idempotency",
+                ReviewNotificationOutboxProjectId.absent(),
+                "T1",
+                "C1",
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStringField.present("[{\"type\":\"section\"}]"),
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStringField.present("fallback"),
+                ReviewNotificationOutboxStatus.PENDING,
+                0,
+                FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT,
+                FailureSnapshotDefaults.NO_SENT_AT,
+                FailureSnapshotDefaults.NO_FAILURE_AT,
+                FailureSnapshotDefaults.NO_FAILURE_REASON,
+                SlackInteractionFailureType.NONE
         );
     }
 

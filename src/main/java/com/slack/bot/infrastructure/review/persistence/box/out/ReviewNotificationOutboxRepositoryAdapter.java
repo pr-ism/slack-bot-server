@@ -108,7 +108,11 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
             ReviewNotificationOutbox outbox,
             Instant claimedProcessingStartedAt
     ) {
-        return saveIfProcessingLeaseMatched(outbox, null, claimedProcessingStartedAt);
+        return saveIfProcessingLeaseMatched(
+                outbox,
+                ReviewNotificationOutboxHistoryHolder.absent(),
+                claimedProcessingStartedAt
+        );
     }
 
     @Override
@@ -116,6 +120,18 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
     public boolean saveIfProcessingLeaseMatched(
             ReviewNotificationOutbox outbox,
             ReviewNotificationOutboxHistory history,
+            Instant claimedProcessingStartedAt
+    ) {
+        return saveIfProcessingLeaseMatched(
+                outbox,
+                ReviewNotificationOutboxHistoryHolder.of(history),
+                claimedProcessingStartedAt
+        );
+    }
+
+    private boolean saveIfProcessingLeaseMatched(
+            ReviewNotificationOutbox outbox,
+            ReviewNotificationOutboxHistoryHolder historyHolder,
             Instant claimedProcessingStartedAt
     ) {
         validateSaveIfProcessingLeaseMatchedArguments(outbox, claimedProcessingStartedAt);
@@ -152,8 +168,8 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
             return false;
         }
 
-        if (history != null) {
-            historyRepository.save(history.bindOutboxId(outbox.getId()));
+        if (historyHolder.isPresent()) {
+            saveHistory(historyHolder.value());
         }
 
         return true;
@@ -304,7 +320,7 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                     failure_reason = :failureReason,
                     failure_type = CASE
                         WHEN processing_attempt >= :maxAttempts THEN :retryExhaustedFailureType
-                        ELSE :noneFailureType
+                        ELSE :processingTimeoutFailureType
                     END
                 WHERE id IN (:outboxIds)
                   AND status = :processingStatus
@@ -320,7 +336,7 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                         .addValue("failedAt", Timestamp.from(failedAt))
                         .addValue("failureReason", failureReason)
                         .addValue("retryExhaustedFailureType", SlackInteractionFailureType.RETRY_EXHAUSTED.name())
-                        .addValue("noneFailureType", SlackInteractionFailureType.NONE.name())
+                        .addValue("processingTimeoutFailureType", SlackInteractionFailureType.PROCESSING_TIMEOUT.name())
                         .addValue("outboxIds", outboxIds)
                         .addValue("processingStatus", ReviewNotificationOutboxStatus.PROCESSING.name())
                         .addValue("processingStartedBefore", Timestamp.from(processingStartedBefore))
@@ -582,7 +598,66 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                 .orElseThrow(() -> new IllegalStateException("저장 대상 outbox를 찾을 수 없습니다. id=" + outbox.getId()));
     }
 
+    private void saveHistory(ReviewNotificationOutboxHistory history) {
+        ReviewNotificationOutboxHistoryJpaEntity entity = new ReviewNotificationOutboxHistoryJpaEntity();
+        entity.apply(history);
+        historyRepository.save(entity);
+    }
+
     private String resolveFailureTypeName(ReviewNotificationOutbox outbox) {
         return outbox.getFailureType().name();
+    }
+
+    private sealed interface ReviewNotificationOutboxHistoryHolder
+            permits AbsentReviewNotificationOutboxHistoryHolder, PresentReviewNotificationOutboxHistoryHolder {
+
+        static ReviewNotificationOutboxHistoryHolder absent() {
+            return AbsentReviewNotificationOutboxHistoryHolder.INSTANCE;
+        }
+
+        static ReviewNotificationOutboxHistoryHolder of(ReviewNotificationOutboxHistory history) {
+            if (history == null) {
+                return absent();
+            }
+
+            return new PresentReviewNotificationOutboxHistoryHolder(history);
+        }
+
+        boolean isPresent();
+
+        default ReviewNotificationOutboxHistory value() {
+            throw new IllegalStateException("history가 없는 상태입니다.");
+        }
+    }
+
+    private static final class AbsentReviewNotificationOutboxHistoryHolder
+            implements ReviewNotificationOutboxHistoryHolder {
+
+        private static final AbsentReviewNotificationOutboxHistoryHolder INSTANCE =
+                new AbsentReviewNotificationOutboxHistoryHolder();
+
+        private AbsentReviewNotificationOutboxHistoryHolder() {
+        }
+
+        @Override
+        public boolean isPresent() {
+            return false;
+        }
+    }
+
+    private record PresentReviewNotificationOutboxHistoryHolder(
+            ReviewNotificationOutboxHistory value
+    ) implements ReviewNotificationOutboxHistoryHolder {
+
+        private PresentReviewNotificationOutboxHistoryHolder {
+            if (value == null) {
+                throw new IllegalArgumentException("history는 비어 있을 수 없습니다.");
+            }
+        }
+
+        @Override
+        public boolean isPresent() {
+            return true;
+        }
     }
 }

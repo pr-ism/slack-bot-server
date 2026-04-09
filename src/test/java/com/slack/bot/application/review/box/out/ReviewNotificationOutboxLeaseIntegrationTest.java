@@ -153,7 +153,7 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
                 () -> assertThat(actual.getFailureReason()).isNotBlank(),
                 () -> assertThat(histories).hasSize(1),
                 () -> assertThat(histories.getFirst().getStatus()).isEqualTo(ReviewNotificationOutboxStatus.RETRY_PENDING),
-                () -> assertThat(histories.getFirst().getFailureType()).isEqualTo(
+                () -> assertThat(histories.getFirst().getFailure().type()).isEqualTo(
                         SlackInteractionFailureType.PROCESSING_TIMEOUT
                 )
         );
@@ -189,7 +189,8 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
                                                                          outboxId
                                                                  ).orElseThrow())
                                                                  .toList();
-        List<ReviewNotificationOutboxHistory> actualHistories = jpaReviewNotificationOutboxHistoryRepository.findAll();
+        List<ReviewNotificationOutboxHistory> actualHistories =
+                jpaReviewNotificationOutboxHistoryRepository.findAllDomains();
 
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(100),
@@ -237,7 +238,8 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
                                                                          outboxId
                                                                  ).orElseThrow())
                                                                  .toList();
-        List<ReviewNotificationOutboxHistory> actualHistories = jpaReviewNotificationOutboxHistoryRepository.findAll();
+        List<ReviewNotificationOutboxHistory> actualHistories =
+                jpaReviewNotificationOutboxHistoryRepository.findAllDomains();
 
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(100),
@@ -248,10 +250,10 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
                 () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == ReviewNotificationOutboxStatus.PROCESSING)
                         .hasSize(1),
                 () -> assertThat(actualHistories).filteredOn(
-                        history -> history.getFailureType() == SlackInteractionFailureType.PROCESSING_TIMEOUT
+                        history -> history.getFailure().type() == SlackInteractionFailureType.PROCESSING_TIMEOUT
                 ).hasSize(50),
                 () -> assertThat(actualHistories).filteredOn(
-                        history -> history.getFailureType() == SlackInteractionFailureType.RETRY_EXHAUSTED
+                        history -> history.getFailure().type() == SlackInteractionFailureType.RETRY_EXHAUSTED
                 ).hasSize(50)
         );
         verify(notificationTransportApiClient, never()).sendBlockMessage(
@@ -301,7 +303,7 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
             assertAll(
                     () -> assertThat(skippedCount).isZero(),
                     () -> assertThat(lockedOutbox.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.PROCESSING),
-                    () -> assertThat(jpaReviewNotificationOutboxHistoryRepository.findAll()).isEmpty()
+                    () -> assertThat(jpaReviewNotificationOutboxHistoryRepository.findAllDomains()).isEmpty()
             );
 
             releaseLock.countDown();
@@ -323,7 +325,7 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
     }
 
     private List<ReviewNotificationOutboxHistory> historiesOf(Long outboxId) {
-        return jpaReviewNotificationOutboxHistoryRepository.findAll()
+        return jpaReviewNotificationOutboxHistoryRepository.findAllDomains()
                                                            .stream()
                                                            .filter(history -> outboxId.equals(history.getOutboxId()))
                                                            .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))

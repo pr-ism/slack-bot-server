@@ -1,5 +1,6 @@
 package com.slack.bot.infrastructure.review.box.out;
 
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
 import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import java.time.Instant;
@@ -8,7 +9,7 @@ import lombok.Getter;
 @Getter
 public class ReviewNotificationOutbox {
 
-    private final Long id;
+    private final ReviewNotificationOutboxId identity;
     private final ReviewNotificationOutboxMessageType messageType;
     private final String idempotencyKey;
     private final ReviewNotificationOutboxProjectId projectId;
@@ -39,7 +40,7 @@ public class ReviewNotificationOutbox {
         validateChannelId(channelId);
 
         return new ReviewNotificationOutbox(
-                null,
+                ReviewNotificationOutboxId.unassigned(),
                 ReviewNotificationOutboxMessageType.SEMANTIC,
                 idempotencyKey,
                 ReviewNotificationOutboxProjectId.present(projectId),
@@ -75,7 +76,7 @@ public class ReviewNotificationOutbox {
         ReviewNotificationOutboxStringField normalizedFallbackText = normalizeField(fallbackText);
 
         return new ReviewNotificationOutbox(
-                null,
+                ReviewNotificationOutboxId.unassigned(),
                 ReviewNotificationOutboxMessageType.CHANNEL_BLOCKS,
                 idempotencyKey,
                 ReviewNotificationOutboxProjectId.absent(),
@@ -135,7 +136,7 @@ public class ReviewNotificationOutbox {
         );
 
         return new ReviewNotificationOutbox(
-                id,
+                ReviewNotificationOutboxId.assigned(id),
                 messageType,
                 idempotencyKey,
                 normalizeProjectId(projectId),
@@ -156,7 +157,7 @@ public class ReviewNotificationOutbox {
     }
 
     private ReviewNotificationOutbox(
-            Long id,
+            ReviewNotificationOutboxId identity,
             ReviewNotificationOutboxMessageType messageType,
             String idempotencyKey,
             ReviewNotificationOutboxProjectId projectId,
@@ -174,7 +175,7 @@ public class ReviewNotificationOutbox {
             String failureReason,
             SlackInteractionFailureType failureType
     ) {
-        this.id = id;
+        this.identity = identity;
         this.messageType = messageType;
         this.idempotencyKey = idempotencyKey;
         this.projectId = projectId;
@@ -194,7 +195,7 @@ public class ReviewNotificationOutbox {
     }
 
     public boolean hasId() {
-        return id != null;
+        return identity.isAssigned();
     }
 
     public boolean hasSemanticPayload() {
@@ -229,8 +230,7 @@ public class ReviewNotificationOutbox {
                 this.processingAttempt,
                 ReviewNotificationOutboxStatus.SENT,
                 sentAt,
-                FailureSnapshotDefaults.NO_FAILURE_REASON,
-                SlackInteractionFailureType.NONE
+                BoxFailureSnapshot.absent()
         );
     }
 
@@ -242,8 +242,17 @@ public class ReviewNotificationOutbox {
     }
 
     public ReviewNotificationOutboxHistory markRetryPending(Instant failedAt, String failureReason) {
+        return markRetryPending(failedAt, failureReason, SlackInteractionFailureType.RETRYABLE);
+    }
+
+    public ReviewNotificationOutboxHistory markRetryPending(
+            Instant failedAt,
+            String failureReason,
+            SlackInteractionFailureType failureType
+    ) {
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
+        validateRetryPendingFailureType(failureType);
         validateTransition(ReviewNotificationOutboxStatus.PROCESSING, "RETRY_PENDING");
 
         this.status = ReviewNotificationOutboxStatus.RETRY_PENDING;
@@ -251,15 +260,14 @@ public class ReviewNotificationOutbox {
         this.sentAt = FailureSnapshotDefaults.NO_SENT_AT;
         this.failedAt = failedAt;
         this.failureReason = failureReason;
-        this.failureType = SlackInteractionFailureType.NONE;
+        this.failureType = failureType;
 
         return ReviewNotificationOutboxHistory.completed(
                 getId(),
                 this.processingAttempt,
                 ReviewNotificationOutboxStatus.RETRY_PENDING,
                 failedAt,
-                failureReason,
-                SlackInteractionFailureType.NONE
+                BoxFailureSnapshot.present(failureReason, failureType)
         );
     }
 
@@ -285,9 +293,12 @@ public class ReviewNotificationOutbox {
                 this.processingAttempt,
                 ReviewNotificationOutboxStatus.FAILED,
                 failedAt,
-                failureReason,
-                failureType
+                BoxFailureSnapshot.present(failureReason, failureType)
         );
+    }
+
+    public Long getId() {
+        return identity.value();
     }
 
     private static ReviewNotificationOutboxProjectId normalizeProjectId(ReviewNotificationOutboxProjectId projectId) {
@@ -453,6 +464,16 @@ public class ReviewNotificationOutbox {
     private void validateFailureType(SlackInteractionFailureType failureType) {
         if (failureType == null || failureType == SlackInteractionFailureType.NONE) {
             throw new IllegalArgumentException("failureType은 NONE일 수 없습니다.");
+        }
+    }
+
+    private void validateRetryPendingFailureType(SlackInteractionFailureType failureType) {
+        if (failureType == null
+                || failureType == SlackInteractionFailureType.NONE
+                || failureType == SlackInteractionFailureType.ABSENT
+                || failureType == SlackInteractionFailureType.BUSINESS_INVARIANT
+                || failureType == SlackInteractionFailureType.RETRY_EXHAUSTED) {
+            throw new IllegalArgumentException("RETRY_PENDING failureType이 올바르지 않습니다.");
         }
     }
 }
