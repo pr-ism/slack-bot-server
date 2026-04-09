@@ -186,9 +186,6 @@ public class ReservationCommandWorkflow {
             String channelId,
             String slackUserId
     ) {
-        if (reservation == null) {
-            return false;
-        }
         if (!reservation.isActive()) {
             errorNotifier.notify(token, channelId, slackUserId, InteractionErrorType.RESERVATION_ALREADY_CANCELLED);
             return false;
@@ -207,9 +204,6 @@ public class ReservationCommandWorkflow {
             String channelId,
             String slackUserId
     ) {
-        if (reservation == null) {
-            return false;
-        }
         if (!reservation.isActive()) {
             errorNotifier.notify(
                     token,
