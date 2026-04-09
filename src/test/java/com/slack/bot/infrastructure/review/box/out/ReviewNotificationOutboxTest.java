@@ -66,6 +66,17 @@ class ReviewNotificationOutboxTest {
     }
 
     @Test
+    void absent_projectId에서_value를_조회하면_예외를_던진다() {
+        // given
+        ReviewNotificationOutboxProjectId projectId = ReviewNotificationOutboxProjectId.absent();
+
+        // when & then
+        assertThatThrownBy(() -> projectId.value())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("projectId가 없는 아웃박스입니다.");
+    }
+
+    @Test
     void idempotencyKey가_null이면_예외를_던진다() {
         // when & then
         assertThatThrownBy(() -> ReviewNotificationOutbox.channelBlocks(

@@ -1,8 +1,5 @@
 package com.slack.bot.infrastructure.review.box.out;
 
-import lombok.Getter;
-
-@Getter
 public class ReviewNotificationOutboxProjectId {
 
     private final ReviewNotificationOutboxFieldState state;
