@@ -3,6 +3,7 @@ package com.slack.bot.application.review.box.out;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.NullNode;
 import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
 import com.slack.bot.application.interaction.box.out.exception.OutboxProcessingLeaseLostException;
 import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
@@ -235,18 +236,18 @@ public class ReviewNotificationOutboxProcessor {
         }
 
         return new ReviewMessageDto(
-                readBlocks(outbox.getBlocksJson()),
-                readAttachments(outbox.getAttachmentsJson()),
-                outbox.getFallbackText()
+                readBlocks(outbox.requiredBlocksJson()),
+                readAttachments(outbox),
+                outbox.getFallbackText().valueOrBlank()
         );
     }
 
-    private JsonNode readAttachments(String attachmentsJson) throws JsonProcessingException {
-        if (attachmentsJson == null || attachmentsJson.isBlank()) {
-            return null;
+    private JsonNode readAttachments(ReviewNotificationOutbox outbox) throws JsonProcessingException {
+        if (!outbox.getAttachmentsJson().isPresent()) {
+            return NullNode.getInstance();
         }
 
-        return objectMapper.readTree(attachmentsJson);
+        return objectMapper.readTree(outbox.getAttachmentsJson().value());
     }
 
     private ReviewNotificationOutboxHistory markFailureStatus(

@@ -18,6 +18,7 @@ import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.application.worker.PollingHintPublisher;
 import com.slack.bot.application.worker.PollingHintTarget;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
+import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxStringField;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -77,11 +78,11 @@ class ReviewNotificationOutboxEnqueuerTest {
         ReviewNotificationOutbox actual = captor.getValue();
 
         assertAll(
-                () -> assertThat(actual.getProjectId()).isEqualTo(1L),
+                () -> assertThat(actual.requiredProjectId()).isEqualTo(1L),
                 () -> assertThat(actual.getTeamId()).isEqualTo("T1"),
                 () -> assertThat(actual.getChannelId()).isEqualTo("C1"),
-                () -> assertThat(actual.getPayloadJson()).contains("\"repositoryName\":\"repo\""),
-                () -> assertThat(actual.getBlocksJson()).isNull(),
+                () -> assertThat(actual.requiredPayloadJson()).contains("\"repositoryName\":\"repo\""),
+                () -> assertThat(actual.getBlocksJson().isPresent()).isFalse(),
                 () -> assertThat(actual.getIdempotencyKey()).hasSize(64)
         );
         verify(pollingHintPublisher).publish(PollingHintTarget.REVIEW_NOTIFICATION_OUTBOX);
@@ -107,9 +108,9 @@ class ReviewNotificationOutboxEnqueuerTest {
         assertAll(
                 () -> assertThat(actual.getTeamId()).isEqualTo("T1"),
                 () -> assertThat(actual.getChannelId()).isEqualTo("C1"),
-                () -> assertThat(actual.getBlocksJson()).isEqualTo("[{\"type\":\"section\"}]"),
-                () -> assertThat(actual.getAttachmentsJson()).isNull(),
-                () -> assertThat(actual.getFallbackText()).isEqualTo("fallback"),
+                () -> assertThat(actual.requiredBlocksJson()).isEqualTo("[{\"type\":\"section\"}]"),
+                () -> assertThat(actual.getAttachmentsJson().isPresent()).isFalse(),
+                () -> assertThat(actual.getFallbackText().value()).isEqualTo("fallback"),
                 () -> assertThat(actual.getIdempotencyKey()).hasSize(64)
         );
         verify(pollingHintPublisher).publish(PollingHintTarget.REVIEW_NOTIFICATION_OUTBOX);
@@ -117,6 +118,7 @@ class ReviewNotificationOutboxEnqueuerTest {
 
     @Test
     void attachments를_원형_그대로_보존해_enqueue한다() throws Exception {
+        // given
         ObjectMapper objectMapper = new ObjectMapper();
 
         // when
@@ -139,16 +141,16 @@ class ReviewNotificationOutboxEnqueuerTest {
         verify(reviewNotificationOutboxRepository).enqueue(captor.capture());
 
         assertAll(
-                () -> assertThat(captor.getValue().getBlocksJson())
+                () -> assertThat(captor.getValue().requiredBlocksJson())
                         .isEqualTo("[{\"type\":\"section\"}]"),
-                () -> assertThat(captor.getValue().getAttachmentsJson()).isEqualTo(
+                () -> assertThat(captor.getValue().getAttachmentsJson().value()).isEqualTo(
                         "[{\"blocks\":[{\"type\":\"actions\"},{\"type\":\"context\"}]},{}]"
                 )
         );
     }
 
     @Test
-    void attachments가_null이면_attachmentsJson은_null로_enqueue한다() throws Exception {
+    void attachments가_null이면_attachmentsJson은_absent로_enqueue한다() throws Exception {
         // when
         enqueuer.enqueueChannelBlocks(
                 "SOURCE-1",
@@ -163,7 +165,25 @@ class ReviewNotificationOutboxEnqueuerTest {
         ArgumentCaptor<ReviewNotificationOutbox> captor = ArgumentCaptor.forClass(ReviewNotificationOutbox.class);
         verify(reviewNotificationOutboxRepository).enqueue(captor.capture());
 
-        assertThat(captor.getValue().getAttachmentsJson()).isNull();
+        assertThat(captor.getValue().getAttachmentsJson().isPresent()).isFalse();
+    }
+
+    @Test
+    void fallbackText가_공백이면_fallbackText는_absent로_enqueue한다() throws Exception {
+        // when
+        enqueuer.enqueueChannelBlocks(
+                "SOURCE-1",
+                "T1",
+                "C1",
+                new ObjectMapper().readTree("[{\"type\":\"section\"}]"),
+                " "
+        );
+
+        // then
+        ArgumentCaptor<ReviewNotificationOutbox> captor = ArgumentCaptor.forClass(ReviewNotificationOutbox.class);
+        verify(reviewNotificationOutboxRepository).enqueue(captor.capture());
+
+        assertThat(captor.getValue().getFallbackText().isPresent()).isFalse();
     }
 
     @Test

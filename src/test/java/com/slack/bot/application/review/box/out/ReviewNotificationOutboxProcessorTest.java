@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
@@ -32,6 +33,7 @@ import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
+import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxStringField;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxStatus;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
 import java.time.Clock;
@@ -282,7 +284,7 @@ class ReviewNotificationOutboxProcessorTest {
                 eq("xoxb-test-token"),
                 eq("C1"),
                 any(JsonNode.class),
-                eq(null),
+                argThat(attachments -> attachments != null && attachments.isNull()),
                 eq("fallback")
         );
         verify(claimed).markSent(any());
@@ -314,7 +316,7 @@ class ReviewNotificationOutboxProcessorTest {
                 eq("xoxb-test-token"),
                 eq("C1"),
                 any(JsonNode.class),
-                eq(null),
+                argThat(attachments -> attachments != null && attachments.isNull()),
                 eq("fallback")
         );
         verify(claimed).markSent(any());
@@ -341,7 +343,7 @@ class ReviewNotificationOutboxProcessorTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         any(JsonNode.class),
-                        eq(null),
+                        argThat(attachments -> attachments != null && attachments.isNull()),
                         eq("fallback")
                 );
 
@@ -371,7 +373,13 @@ class ReviewNotificationOutboxProcessorTest {
 
         doThrow(new ResourceAccessException("io failure"))
                 .when(notificationTransportApiClient)
-                .sendBlockMessage(eq("xoxb-test-token"), eq("C1"), any(JsonNode.class), eq(null), eq("fallback"));
+                .sendBlockMessage(
+                        eq("xoxb-test-token"),
+                        eq("C1"),
+                        any(JsonNode.class),
+                        argThat(attachments -> attachments != null && attachments.isNull()),
+                        eq("fallback")
+                );
         doThrow(new RuntimeException("db failure"))
                 .when(reviewNotificationOutboxRepository)
                 .saveIfProcessingLeaseMatched(eq(firstClaimed), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
@@ -413,14 +421,14 @@ class ReviewNotificationOutboxProcessorTest {
                 eq("xoxb-test-token"),
                 eq("C1"),
                 any(JsonNode.class),
-                eq(null),
+                argThat(attachments -> attachments != null && attachments.isNull()),
                 eq("fallback")
         );
         verify(notificationTransportApiClient).sendBlockMessage(
                 eq("xoxb-test-token"),
                 eq("C2"),
                 any(JsonNode.class),
-                eq(null),
+                argThat(attachments -> attachments != null && attachments.isNull()),
                 eq("fallback")
         );
         verify(reviewNotificationOutboxRepository, never()).save(firstClaimed);
@@ -450,7 +458,7 @@ class ReviewNotificationOutboxProcessorTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         any(JsonNode.class),
-                        eq(null),
+                        argThat(attachments -> attachments != null && attachments.isNull()),
                         eq("fallback")
                 );
 
@@ -482,7 +490,7 @@ class ReviewNotificationOutboxProcessorTest {
                         eq("xoxb-test-token"),
                         eq("C1"),
                         any(JsonNode.class),
-                        eq(null),
+                        argThat(attachments -> attachments != null && attachments.isNull()),
                         eq("fallback")
                 );
 
@@ -547,20 +555,20 @@ class ReviewNotificationOutboxProcessorTest {
     @Test
     void semantic_payload가_있으면_renderer로_최종_payload를_조립해_전송한다() throws Exception {
         // given
-        ReviewNotificationOutbox claimed = spy(ReviewNotificationOutbox.builder()
-                                                                       .idempotencyKey("semantic-outbox")
-                                                                       .projectId(1L)
-                                                                       .teamId("T1")
-                                                                       .channelId("C1")
-                                                                       .payloadJson("""
-                                                                               {"repositoryName":"repo","githubPullRequestId":101,
-                                                                               "pullRequestNumber":42,"pullRequestTitle":"Fix bug",
-                                                                               "pullRequestUrl":"https://github.com/pr/1",
-                                                                               "authorGithubId":"author-gh",
-                                                                               "pendingReviewers":["reviewer-gh-1"],
-                                                                               "reviewersToMention":["reviewer-gh-1"]}
-                                                                               """)
-                                                                       .build());
+        ReviewNotificationOutbox claimed = spy(ReviewNotificationOutbox.semantic(
+                "semantic-outbox",
+                1L,
+                "T1",
+                "C1",
+                """
+                {"repositoryName":"repo","githubPullRequestId":101,
+                "pullRequestNumber":42,"pullRequestTitle":"Fix bug",
+                "pullRequestUrl":"https://github.com/pr/1",
+                "authorGithubId":"author-gh",
+                "pendingReviewers":["reviewer-gh-1"],
+                "reviewersToMention":["reviewer-gh-1"]}
+                """
+        ));
         setProcessingState(claimed, CLAIMED_PROCESSING_STARTED_AT, 1);
         given(reviewNotificationOutboxRepository.claimNextId(any(), anyCollection()))
                 .willReturn(Optional.of(10L), Optional.empty());
@@ -592,14 +600,19 @@ class ReviewNotificationOutboxProcessorTest {
     }
 
     private ReviewNotificationOutbox spyClaimed(String channelId, int processingAttempt, String attachmentsJson) {
-        ReviewNotificationOutbox outbox = ReviewNotificationOutbox.builder()
-                                                                  .idempotencyKey("OUTBOX-" + channelId + "-" + processingAttempt)
-                                                                  .teamId("T1")
-                                                                  .channelId(channelId)
-                                                                  .blocksJson("[]")
-                                                                  .attachmentsJson(attachmentsJson)
-                                                                  .fallbackText("fallback")
-                                                                  .build();
+        ReviewNotificationOutboxStringField attachmentsField = ReviewNotificationOutboxStringField.absent();
+        if (attachmentsJson != null) {
+            attachmentsField = ReviewNotificationOutboxStringField.present(attachmentsJson);
+        }
+
+        ReviewNotificationOutbox outbox = ReviewNotificationOutbox.channelBlocks(
+                "OUTBOX-" + channelId + "-" + processingAttempt,
+                "T1",
+                channelId,
+                "[]",
+                attachmentsField,
+                ReviewNotificationOutboxStringField.present("fallback")
+        );
         Instant base = CLAIMED_PROCESSING_STARTED_AT;
         setProcessingState(outbox, base, 1);
 

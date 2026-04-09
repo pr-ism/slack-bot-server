@@ -1,7 +1,5 @@
 package com.slack.bot.infrastructure.review.persistence.box.out;
 
-import static com.slack.bot.infrastructure.review.box.out.QReviewNotificationOutbox.reviewNotificationOutbox;
-
 import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
@@ -33,14 +31,19 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
     @Override
     public boolean enqueue(ReviewNotificationOutbox outbox) {
         MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("messageType", outbox.getMessageType().name())
                 .addValue("idempotencyKey", outbox.getIdempotencyKey())
-                .addValue("projectId", outbox.getProjectId())
+                .addValue("projectId", resolveProjectId(outbox))
                 .addValue("teamId", outbox.getTeamId())
                 .addValue("channelId", outbox.getChannelId())
-                .addValue("payloadJson", outbox.getPayloadJson())
-                .addValue("blocksJson", outbox.getBlocksJson())
-                .addValue("attachmentsJson", outbox.getAttachmentsJson())
-                .addValue("fallbackText", outbox.getFallbackText())
+                .addValue("payloadJsonState", outbox.getPayloadJson().getState().name())
+                .addValue("payloadJson", outbox.getPayloadJson().valueOrBlank())
+                .addValue("blocksJsonState", outbox.getBlocksJson().getState().name())
+                .addValue("blocksJson", outbox.getBlocksJson().valueOrBlank())
+                .addValue("attachmentsJsonState", outbox.getAttachmentsJson().getState().name())
+                .addValue("attachmentsJson", outbox.getAttachmentsJson().valueOrBlank())
+                .addValue("fallbackTextState", outbox.getFallbackText().getState().name())
+                .addValue("fallbackText", outbox.getFallbackText().valueOrBlank())
                 .addValue("pendingStatus", outbox.getStatus().name())
                 .addValue("processingAttempt", outbox.getProcessingAttempt())
                 .addValue("noProcessingStartedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT))
@@ -60,7 +63,9 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
     @Override
     @Transactional
     public ReviewNotificationOutbox save(ReviewNotificationOutbox outbox) {
-        return repository.save(outbox);
+        ReviewNotificationOutboxJpaEntity entity = findOutboxEntity(outbox);
+        entity.apply(outbox);
+        return repository.save(entity).toDomain();
     }
 
     @Override
@@ -157,7 +162,7 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
     @Override
     @Transactional(readOnly = true)
     public Optional<ReviewNotificationOutbox> findById(Long outboxId) {
-        return repository.findById(outboxId);
+        return repository.findDomainById(outboxId);
     }
 
     @Override
@@ -482,13 +487,18 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                 INSERT INTO review_notification_outbox (
                     created_at,
                     updated_at,
+                    message_type,
                     idempotency_key,
                     project_id,
                     team_id,
                     channel_id,
+                    payload_json_state,
                     payload_json,
+                    blocks_json_state,
                     blocks_json,
+                    attachments_json_state,
                     attachments_json,
+                    fallback_text_state,
                     fallback_text,
                     status,
                     processing_attempt,
@@ -501,13 +511,18 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                 VALUES (
                     CURRENT_TIMESTAMP(6),
                     CURRENT_TIMESTAMP(6),
+                    :messageType,
                     :idempotencyKey,
                     :projectId,
                     :teamId,
                     :channelId,
+                    :payloadJsonState,
                     :payloadJson,
+                    :blocksJsonState,
                     :blocksJson,
+                    :attachmentsJsonState,
                     :attachmentsJson,
+                    :fallbackTextState,
                     :fallbackText,
                     :pendingStatus,
                     :processingAttempt,
@@ -548,6 +563,23 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
 
     private Timestamp toTimestamp(Instant instant) {
         return Timestamp.from(instant);
+    }
+
+    private Long resolveProjectId(ReviewNotificationOutbox outbox) {
+        if (!outbox.getProjectId().isPresent()) {
+            return null;
+        }
+
+        return outbox.getProjectId().value();
+    }
+
+    private ReviewNotificationOutboxJpaEntity findOutboxEntity(ReviewNotificationOutbox outbox) {
+        if (!outbox.hasId()) {
+            return new ReviewNotificationOutboxJpaEntity();
+        }
+
+        return repository.findById(outbox.getId())
+                .orElseThrow(() -> new IllegalStateException("저장 대상 outbox를 찾을 수 없습니다. id=" + outbox.getId()));
     }
 
     private String resolveFailureTypeName(ReviewNotificationOutbox outbox) {

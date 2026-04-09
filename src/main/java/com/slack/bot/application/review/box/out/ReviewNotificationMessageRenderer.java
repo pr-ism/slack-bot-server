@@ -20,13 +20,13 @@ public class ReviewNotificationMessageRenderer {
 
     public ReviewMessageDto render(ReviewNotificationOutbox outbox) throws JsonProcessingException {
         ReviewNotificationPayload payload = objectMapper.readValue(
-                outbox.getPayloadJson(),
+                outbox.requiredPayloadJson(),
                 ReviewNotificationPayload.class
         );
         String actionMeta = reviewActionMetaBuilder.build(
                 outbox.getTeamId(),
                 outbox.getChannelId(),
-                outbox.getProjectId(),
+                outbox.requiredProjectId(),
                 payload
         );
 

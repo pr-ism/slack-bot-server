@@ -18,6 +18,7 @@ import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxHistory;
+import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxStringField;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxStatus;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
 import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxHistoryRepository;
@@ -311,13 +312,14 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
     }
 
     private ReviewNotificationOutbox pendingOutbox(String idempotencyKey) {
-        return ReviewNotificationOutbox.builder()
-                                       .idempotencyKey(idempotencyKey)
-                                       .teamId("T1")
-                                       .channelId("C1")
-                                       .blocksJson("[]")
-                                       .fallbackText("fallback")
-                                       .build();
+        return ReviewNotificationOutbox.channelBlocks(
+                idempotencyKey,
+                "T1",
+                "C1",
+                "[]",
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStringField.present("fallback")
+        );
     }
 
     private List<ReviewNotificationOutboxHistory> historiesOf(Long outboxId) {

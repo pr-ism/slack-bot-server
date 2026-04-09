@@ -115,7 +115,7 @@ class ReviewRequestInboxProcessorTest {
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
             List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAllDomains();
-            List<ReviewNotificationOutbox> outboxes = jpaReviewNotificationOutboxRepository.findAll();
+            List<ReviewNotificationOutbox> outboxes = jpaReviewNotificationOutboxRepository.findAllDomains();
             ReviewRequestInbox inbox = findOnlyInbox();
 
             assertAll(
@@ -151,7 +151,7 @@ class ReviewRequestInboxProcessorTest {
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
             List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAllDomains();
-            List<ReviewNotificationOutbox> outboxes = jpaReviewNotificationOutboxRepository.findAll();
+            List<ReviewNotificationOutbox> outboxes = jpaReviewNotificationOutboxRepository.findAllDomains();
             ReviewRequestInbox inbox = findOnlyInbox();
 
             assertAll(
@@ -453,7 +453,7 @@ class ReviewRequestInboxProcessorTest {
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
                 () -> assertThat(inbox.getFailure().isPresent()).isFalse(),
-                () -> assertThat(jpaReviewNotificationOutboxRepository.findAll()).isEmpty()
+                () -> assertThat(jpaReviewNotificationOutboxRepository.findAllDomains()).isEmpty()
         );
     }
 
@@ -497,7 +497,7 @@ class ReviewRequestInboxProcessorTest {
                 () -> assertThat(failed.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(failed.getProcessingAttempt()).isEqualTo(2),
                 () -> assertThat(failed.getFailure().isPresent()).isFalse(),
-                () -> assertThat(jpaReviewNotificationOutboxRepository.findAll()).isEmpty()
+                () -> assertThat(jpaReviewNotificationOutboxRepository.findAllDomains()).isEmpty()
         );
     }
 
@@ -519,7 +519,7 @@ class ReviewRequestInboxProcessorTest {
                 () -> assertThat(spyReviewNotificationService.getSendCount()).isZero(),
                 () -> assertThat(reloaded.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(reloaded.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(jpaReviewNotificationOutboxRepository.findAll()).isEmpty()
+                () -> assertThat(jpaReviewNotificationOutboxRepository.findAllDomains()).isEmpty()
         );
     }
 

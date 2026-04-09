@@ -50,13 +50,13 @@ class ReviewNotificationMessageRendererTest {
                 List.of("reviewer-gh-1"),
                 List.of("reviewer-gh-1")
         );
-        ReviewNotificationOutbox outbox = ReviewNotificationOutbox.builder()
-                                                                  .idempotencyKey("idempotency")
-                                                                  .projectId(1L)
-                                                                  .teamId("T1")
-                                                                  .channelId("C1")
-                                                                  .payloadJson(objectMapper.writeValueAsString(payload))
-                                                                  .build();
+        ReviewNotificationOutbox outbox = ReviewNotificationOutbox.semantic(
+                "idempotency",
+                1L,
+                "T1",
+                "C1",
+                objectMapper.writeValueAsString(payload)
+        );
         ArrayNode blocks = objectMapper.createArrayNode();
         ArrayNode attachments = objectMapper.createArrayNode();
         ReviewMessageDto expected = new ReviewMessageDto(blocks, attachments, "fallback");

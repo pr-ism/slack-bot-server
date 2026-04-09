@@ -96,7 +96,7 @@ class ReviewRequestInboxLeaseIntegrationTest {
 
         // then
         ReviewRequestInbox actualInbox = jpaReviewRequestInboxRepository.findDomainById(inbox.getId()).orElseThrow();
-        List<ReviewNotificationOutbox> actualOutboxes = jpaReviewNotificationOutboxRepository.findAll();
+        List<ReviewNotificationOutbox> actualOutboxes = jpaReviewNotificationOutboxRepository.findAllDomains();
 
         assertAll(
                 () -> assertThat(actualInbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
@@ -130,7 +130,7 @@ class ReviewRequestInboxLeaseIntegrationTest {
 
         // then
         ReviewRequestInbox actualInbox = jpaReviewRequestInboxRepository.findDomainById(inbox.getId()).orElseThrow();
-        List<ReviewNotificationOutbox> actualOutboxes = jpaReviewNotificationOutboxRepository.findAll();
+        List<ReviewNotificationOutbox> actualOutboxes = jpaReviewNotificationOutboxRepository.findAllDomains();
 
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(1),
