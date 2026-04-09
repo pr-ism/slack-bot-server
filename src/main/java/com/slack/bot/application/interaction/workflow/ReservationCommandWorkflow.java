@@ -37,19 +37,21 @@ public class ReservationCommandWorkflow {
             String slackUserId,
             String token
     ) {
-        Long reservationId = readReservationId(action);
-
-        if (isMissingReservationId(reservationId)) {
-            return Optional.empty();
-        }
-
-        ReviewReservation reservation = findReservationOrNotify(reservationId, token, channelId, slackUserId);
-
-        if (!isCancelableReservationOrNotify(reservation, token, channelId, slackUserId)) {
-            return Optional.empty();
-        }
-
-        return cancelReservationOrFallback(teamId, channelId, slackUserId, reservationId, reservation);
+        return readReservationId(action)
+                .flatMap(reservationId -> findReservationOrNotify(reservationId, token, channelId, slackUserId)
+                        .filter(reservation -> isCancelableReservationOrNotify(
+                                reservation,
+                                token,
+                                channelId,
+                                slackUserId
+                        ))
+                        .flatMap(reservation -> cancelReservationOrFallback(
+                                teamId,
+                                channelId,
+                                slackUserId,
+                                reservationId,
+                                reservation
+                        )));
     }
 
     public void handleChange(
@@ -60,39 +62,27 @@ public class ReservationCommandWorkflow {
             String slackUserId,
             String token
     ) {
-        Long reservationId = readReservationId(action);
-
-        if (isMissingReservationId(reservationId)) {
-            return;
-        }
-
-        ReviewReservation reservation = findReservationOrNotify(reservationId, token, channelId, slackUserId);
-
-        if (!isChangeableReservationOrNotify(reservation, token, channelId, slackUserId)) {
-            return;
-        }
-
-        publishChangeEvent(teamId, channelId, slackUserId, reservation);
-        openChangeModal(payload, channelId, slackUserId, token, reservation);
+        readReservationId(action)
+                .flatMap(reservationId -> findReservationOrNotify(reservationId, token, channelId, slackUserId))
+                .filter(reservation -> isChangeableReservationOrNotify(
+                        reservation,
+                        token,
+                        channelId,
+                        slackUserId
+                ))
+                .ifPresent(reservation -> {
+                    publishChangeEvent(teamId, channelId, slackUserId, reservation);
+                    openChangeModal(payload, channelId, slackUserId, token, reservation);
+                });
     }
 
-    private Long readReservationId(JsonNode action) {
+    private Optional<Long> readReservationId(JsonNode action) {
         String rawReservationId = action.path("value")
                                         .asText(null);
 
-        if (rawReservationId == null || rawReservationId.isBlank()) {
-            return null;
-        }
-
-        try {
-            return Long.parseLong(rawReservationId);
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    private boolean isMissingReservationId(Long reservationId) {
-        return reservationId == null;
+        return Optional.ofNullable(rawReservationId)
+                       .filter(value -> !value.isBlank())
+                       .flatMap(value -> parseReservationId(value));
     }
 
     private Optional<ReviewReservation> cancelReservationOrFallback(
@@ -110,22 +100,32 @@ public class ReservationCommandWorkflow {
                                           .or(() -> Optional.of(reservation));
     }
 
-    private ReviewReservation findReservationOrNotify(
+    private Optional<ReviewReservation> findReservationOrNotify(
             Long reservationId,
             String token,
             String channelId,
             String slackUserId
     ) {
         return reviewReservationCoordinator.findById(reservationId)
-                                           .orElseGet(() -> {
+                                           .or(() -> {
                                                errorNotifier.notify(
                                                        token,
                                                        channelId,
                                                        slackUserId,
                                                        InteractionErrorType.RESERVATION_NOT_FOUND
                                                );
-                                               return null;
+                                               return Optional.empty();
                                            });
+    }
+
+    private Optional<Long> parseReservationId(String rawReservationId) {
+        try {
+            Long reservationId = Long.parseLong(rawReservationId);
+
+            return Optional.of(reservationId);
+        } catch (NumberFormatException e) {
+            return Optional.empty();
+        }
     }
 
     private boolean isOwnerOrNotify(

@@ -67,8 +67,8 @@ class AccessLinkerTest {
 
         // then
         assertAll(
-                () -> assertThat(resolvedMember).isPresent(),
-                () -> assertThat(resolvedMember.get().getId()).isEqualTo(projectMemberId)
+                () -> assertThat(resolvedMember).hasValueSatisfying(projectMember ->
+                        assertThat(projectMember.getId()).isEqualTo(projectMemberId))
         );
     }
 
@@ -87,8 +87,8 @@ class AccessLinkerTest {
 
         // then
         assertAll(
-                () -> assertThat(resolvedMember).isPresent(),
-                () -> assertThat(resolvedMember.get().getId()).isEqualTo(1L)
+                () -> assertThat(resolvedMember).hasValueSatisfying(projectMember ->
+                        assertThat(projectMember.getId()).isEqualTo(1L))
         );
     }
 

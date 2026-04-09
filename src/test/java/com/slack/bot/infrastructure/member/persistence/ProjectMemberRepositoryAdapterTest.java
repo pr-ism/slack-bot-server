@@ -41,9 +41,10 @@ class ProjectMemberRepositoryAdapterTest {
         assertAll(
                 () -> assertThat(actualResolved.getDisplayName()).isEqualTo("기존 사용자"),
                 () -> assertThat(actualResolved.getGithubId().getValue()).isEqualTo("git-2"),
-                () -> assertThat(actualPersisted).isPresent(),
-                () -> assertThat(actualPersisted.get().getDisplayName()).isEqualTo("기존 사용자"),
-                () -> assertThat(actualPersisted.get().getGithubId().getValue()).isEqualTo("git-2")
+                () -> assertThat(actualPersisted).hasValueSatisfying(projectMember -> assertAll(
+                        () -> assertThat(projectMember.getDisplayName()).isEqualTo("기존 사용자"),
+                        () -> assertThat(projectMember.getGithubId().getValue()).isEqualTo("git-2")
+                ))
         );
     }
 }

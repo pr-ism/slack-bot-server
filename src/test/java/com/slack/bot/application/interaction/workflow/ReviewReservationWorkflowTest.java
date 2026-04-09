@@ -71,9 +71,10 @@ class ReviewReservationWorkflowTest {
 
         assertAll(
                 () -> assertThat(actual).isEqualTo(SlackActionResponse.clear()),
-                () -> assertThat(actualSaved).isPresent(),
-                () -> assertThat(actualSaved.get().getReservationPullRequest().getGithubPullRequestId()).isEqualTo(10L),
-                () -> assertThat(actualSaved.get().getReservationPullRequest().getPullRequestTitle()).isEqualTo("PR 제목"),
+                () -> assertThat(actualSaved).hasValueSatisfying(reservation -> assertAll(
+                        () -> assertThat(reservation.getReservationPullRequest().getGithubPullRequestId()).isEqualTo(10L),
+                        () -> assertThat(reservation.getReservationPullRequest().getPullRequestTitle()).isEqualTo("PR 제목")
+                )),
                 () -> assertThat(actualApplicationEvents.stream(ReviewReservationScheduledEvent.class).toList())
                         .singleElement()
                         .satisfies(actualEvent -> assertAll(
@@ -104,8 +105,8 @@ class ReviewReservationWorkflowTest {
 
         assertAll(
                 () -> assertThat(actual).isEqualTo(SlackActionResponse.empty()),
-                () -> assertThat(actualActive).isPresent(),
-                () -> assertThat(actualActive.get().getId()).isEqualTo(100L),
+                () -> assertThat(actualActive).hasValueSatisfying(activeReservation ->
+                        assertThat(activeReservation.getId()).isEqualTo(100L)),
                 () -> assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
@@ -145,8 +146,8 @@ class ReviewReservationWorkflowTest {
 
         assertAll(
                 () -> assertThat(actual).isEqualTo(SlackActionResponse.clear()),
-                () -> assertThat(actualSaved).isPresent(),
-                () -> assertThat(actualSaved.get().getId()).isNotNull(),
+                () -> assertThat(actualSaved).hasValueSatisfying(savedReservation ->
+                        assertThat(savedReservation.getId()).isNotNull()),
                 () -> assertThat(actualApplicationEvents.stream(ReviewReservationScheduledEvent.class).toList())
                         .singleElement()
                         .satisfies(actualEvent -> assertAll(
@@ -177,8 +178,8 @@ class ReviewReservationWorkflowTest {
 
         assertAll(
                 () -> assertThat(actual).isEqualTo(SlackActionResponse.clear()),
-                () -> assertThat(actualChanged).isPresent(),
-                () -> assertThat(actualChanged.get().getScheduledAt()).isEqualTo(scheduledAt)
+                () -> assertThat(actualChanged).hasValueSatisfying(changedReservation ->
+                        assertThat(changedReservation.getScheduledAt()).isEqualTo(scheduledAt))
         );
         verify(notificationApiClient, never()).sendEphemeralMessage(any(), any(), any(), any());
         verify(notificationApiClient, never()).sendEphemeralBlockMessage(any(), any(), any(), any(), any());

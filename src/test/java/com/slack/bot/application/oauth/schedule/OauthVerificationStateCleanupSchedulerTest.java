@@ -51,7 +51,8 @@ class OauthVerificationStateCleanupSchedulerTest {
         // then
         assertAll(
                 () -> assertThat(stateRepository.findByState("expired-state")).isEmpty(),
-                () -> assertThat(stateRepository.findByState("valid-state")).isPresent()
+                () -> assertThat(stateRepository.findByState("valid-state")).hasValueSatisfying(state ->
+                        assertThat(state.getState()).isEqualTo("valid-state"))
         );
     }
 }

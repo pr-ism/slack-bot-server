@@ -82,8 +82,8 @@ class AccessLinkSequenceRepositoryAdapterTest {
         // then
         assertAll(
                 () -> assertThat(allocatedValues).hasSize(100), // threadCount(10) * blockSize(10) = 100
-                () -> assertThat(sequence).isPresent(),
-                () -> assertThat(sequence.get().getNextValue()).isEqualTo(100L) // initialValue(0) + ( threadCount(10) * blockSize(10) ) = 100
+                () -> assertThat(sequence).hasValueSatisfying(actualSequence ->
+                        assertThat(actualSequence.getNextValue()).isEqualTo(100L)) // initialValue(0) + ( threadCount(10) * blockSize(10) ) = 100
         );
     }
 }

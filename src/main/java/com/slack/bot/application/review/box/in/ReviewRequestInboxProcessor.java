@@ -36,6 +36,7 @@ public class ReviewRequestInboxProcessor {
     private final ReviewNotificationIdempotencyKeyGenerator idempotencyKeyGenerator;
     private final ReviewRequestInboxIdempotencyPayloadEncoder idempotencyPayloadEncoder;
     private final PollingHintPublisher pollingHintPublisher;
+
     public void enqueue(String apiKey, ReviewNotificationPayload request, long batchWindowMillis) {
         validateBatchWindowMillis(batchWindowMillis);
         if (request == null) {
@@ -54,19 +55,11 @@ public class ReviewRequestInboxProcessor {
         int claimedCount = 0;
         for (int count = 0; count < limit; count++) {
             Instant claimNow = currentLeaseStartedAt();
-            Long claimedInboxId = reviewRequestInboxRepository.claimNextId(
-                    claimNow,
-                    claimNow,
-                    claimedInboxIds
-            ).orElse(null);
-
-            if (claimedInboxId == null) {
+            if (!claimAndProcessNext(claimedInboxIds, claimNow)) {
                 return claimedCount;
             }
 
-            claimedInboxIds.add(claimedInboxId);
             claimedCount++;
-            processSafely(claimedInboxId, claimNow);
         }
 
         return claimedCount;
@@ -98,6 +91,18 @@ public class ReviewRequestInboxProcessor {
         } catch (Exception e) {
             log.error("review_request inbox 엔트리 처리 중 예상치 못한 오류가 발생했습니다. inboxId={}", inboxId, e);
         }
+    }
+
+    private boolean claimAndProcessNext(Set<Long> claimedInboxIds, Instant claimNow) {
+        return reviewRequestInboxRepository.claimNextId(
+                claimNow,
+                claimNow,
+                claimedInboxIds
+        ).map(claimedInboxId -> {
+            claimedInboxIds.add(claimedInboxId);
+            processSafely(claimedInboxId, claimNow);
+            return true;
+        }).orElse(false);
     }
 
     private Instant currentLeaseStartedAt() {

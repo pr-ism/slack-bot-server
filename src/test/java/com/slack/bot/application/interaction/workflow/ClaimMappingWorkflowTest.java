@@ -49,8 +49,8 @@ class ClaimMappingWorkflowTest {
         Optional<ProjectMember> actual = projectMemberRepository.findBySlackUser("T1", "U1");
 
         assertAll(
-                () -> assertThat(actual).isPresent(),
-                () -> assertThat(actual.get().getGithubId().getValue()).isEqualTo("new-github-id")
+                () -> assertThat(actual).hasValueSatisfying(projectMember ->
+                        assertThat(projectMember.getGithubId().getValue()).isEqualTo("new-github-id"))
         );
         verify(notificationApiClient).sendEphemeralMessage(
                         eq("xoxb-test-token"),

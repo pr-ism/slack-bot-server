@@ -8,6 +8,14 @@ public record BlockActionOutcomeDto(ReviewReservation duplicateReservation, Revi
         return new BlockActionOutcomeDto(null, null);
     }
 
+    public static BlockActionOutcomeDto duplicate(ReviewReservation reservation) {
+        return new BlockActionOutcomeDto(reservation, null);
+    }
+
+    public static BlockActionOutcomeDto cancelled(ReviewReservation reservation) {
+        return new BlockActionOutcomeDto(null, reservation);
+    }
+
     public boolean hasDuplicateReservation() {
         return duplicateReservation != null;
     }

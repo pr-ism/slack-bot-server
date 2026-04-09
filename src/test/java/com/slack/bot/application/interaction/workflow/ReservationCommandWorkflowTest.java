@@ -140,10 +140,10 @@ class ReservationCommandWorkflowTest {
                         ));
         verify(notificationApiClient, never()).sendEphemeralMessage(any(), any(), any(), any());
         assertAll(
-                () -> assertThat(actual).isPresent(),
-                () -> assertThat(actual.get().getId()).isEqualTo(100L),
-                () -> assertThat(actualCancelled).isPresent(),
-                () -> assertThat(actualCancelled.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED)
+                () -> assertThat(actual).hasValueSatisfying(cancelledReservation ->
+                        assertThat(cancelledReservation.getId()).isEqualTo(100L)),
+                () -> assertThat(actualCancelled).hasValueSatisfying(cancelledReservation ->
+                        assertThat(cancelledReservation.getStatus()).isEqualTo(ReservationStatus.CANCELLED))
         );
     }
 

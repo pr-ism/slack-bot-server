@@ -77,10 +77,11 @@ class RegisterWorkspaceServiceTest {
         Optional<Workspace> actual = jpaWorkspaceRepository.findByTeamId("T123");
 
         assertAll(
-                () -> assertThat(actual).isPresent(),
-                () -> assertThat(actual.get().getAccessToken()).isEqualTo("xoxb-test-token"),
-                () -> assertThat(actual.get().getUserId()).isEqualTo(installerId),
-                () -> assertThat(actual.get().getBotUserId()).isEqualTo("B003")
+                () -> assertThat(actual).hasValueSatisfying(workspace -> assertAll(
+                        () -> assertThat(workspace.getAccessToken()).isEqualTo("xoxb-test-token"),
+                        () -> assertThat(workspace.getUserId()).isEqualTo(installerId),
+                        () -> assertThat(workspace.getBotUserId()).isEqualTo("B003")
+                ))
         );
     }
 }

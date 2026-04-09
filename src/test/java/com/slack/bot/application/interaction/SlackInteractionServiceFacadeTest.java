@@ -72,12 +72,10 @@ class SlackInteractionServiceFacadeTest {
                         eq("D-REVIEWER"),
                         any(),
                         any()
-                );
+        );
         assertThat(actualReviewReservationRepository.findById(100L))
-                        .isPresent()
-                        .get()
-                        .extracting(reservation -> reservation.getStatus())
-                        .isEqualTo(ReservationStatus.CANCELLED);
+                .hasValueSatisfying(reservation ->
+                        assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.CANCELLED));
     }
 
     @Test
@@ -96,10 +94,8 @@ class SlackInteractionServiceFacadeTest {
         assertThat(actual).isEqualTo(SlackActionResponse.empty());
         verify(notificationApiClient, never()).openDirectMessageChannel(any(), any());
         assertThat(actualReviewReservationRepository.findById(100L))
-                        .isPresent()
-                        .get()
-                        .extracting(reservation -> reservation.getStatus())
-                        .isEqualTo(ReservationStatus.ACTIVE);
+                .hasValueSatisfying(reservation ->
+                        assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.ACTIVE));
     }
 
     @Test

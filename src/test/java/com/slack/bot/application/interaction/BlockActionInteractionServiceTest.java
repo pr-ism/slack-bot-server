@@ -66,13 +66,11 @@ class BlockActionInteractionServiceTest {
                         eq("D-REVIEWER"),
                         any(),
                         any()
-                );
+        );
         Optional<ReviewReservation> actual = actualReviewReservationRepository.findById(100L);
         assertThat(actual)
-                        .isPresent()
-                        .get()
-                        .extracting(reservation -> reservation.getStatus())
-                        .isEqualTo(ReservationStatus.ACTIVE);
+                .hasValueSatisfying(reservation ->
+                        assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.ACTIVE));
     }
 
     @Test
@@ -96,13 +94,11 @@ class BlockActionInteractionServiceTest {
                         eq("D-REVIEWER"),
                         any(),
                         any()
-                );
+        );
         Optional<ReviewReservation> actual = actualReviewReservationRepository.findById(100L);
         assertThat(actual)
-                        .isPresent()
-                        .get()
-                        .extracting(reservation -> reservation.getStatus())
-                        .isEqualTo(ReservationStatus.CANCELLED);
+                .hasValueSatisfying(reservation ->
+                        assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.CANCELLED));
     }
 
     private JsonNode openReviewSchedulerPayload(String metaJson) {

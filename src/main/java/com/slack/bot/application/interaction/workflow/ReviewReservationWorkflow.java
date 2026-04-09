@@ -190,39 +190,51 @@ public class ReviewReservationWorkflow {
             String token,
             Instant scheduledAt
     ) {
-        Long reservationId = parseReservationId(meta.reservationId());
-        boolean isReschedule = reservationId != null;
         ReservationPullRequest reservationPullRequest = ReservationPullRequest.builder()
                                                                           .githubPullRequestId(meta.githubPullRequestId())
                                                                           .pullRequestNumber(meta.pullRequestNumber())
                                                                           .pullRequestTitle(meta.pullRequestTitle())
                                                                           .pullRequestUrl(meta.pullRequestUrl())
                                                                           .build();
+        return parseReservationId(meta.reservationId())
+                .map(reservationId -> baseContextBuilder(meta, reviewerId, token, scheduledAt, reservationPullRequest)
+                        .isReschedule(true)
+                        .reservationId(reservationId)
+                        .build())
+                .orElseGet(() -> baseContextBuilder(meta, reviewerId, token, scheduledAt, reservationPullRequest)
+                        .isReschedule(false)
+                        .build());
+    }
 
+    private ReservationContextDto.ReservationContextDtoBuilder baseContextBuilder(
+            ReviewScheduleMetaDto meta,
+            String reviewerId,
+            String token,
+            Instant scheduledAt,
+            ReservationPullRequest reservationPullRequest
+    ) {
         return ReservationContextDto.builder()
                                     .meta(meta)
                                     .reviewerId(reviewerId)
                                     .token(token)
                                     .scheduledAt(scheduledAt)
                                     .authorSlackId(authorResolver.resolveAuthorSlackId(meta))
-                                    .isReschedule(isReschedule)
                                     .projectId(projectIdResolver.resolve(meta.projectId(), meta.teamId()))
-                                    .reservationPullRequest(reservationPullRequest)
-                                    .reservationId(reservationId)
-                                    .build();
+                                    .reservationPullRequest(reservationPullRequest);
     }
 
-    private Long parseReservationId(String rawId) {
+    private Optional<Long> parseReservationId(String rawId) {
         return Optional.ofNullable(rawId)
                        .filter(value -> !value.isBlank())
-                       .map(value -> {
-                           try {
-                               return Long.parseLong(value);
-                           } catch (NumberFormatException e) {
-                               log.warn("유효하지 않은 reservationId: {}", value);
-                               return null;
-                           }
-                       })
-                       .orElse(null);
+                       .flatMap(value -> parseReservationIdSafely(value));
+    }
+
+    private Optional<Long> parseReservationIdSafely(String value) {
+        try {
+            return Optional.of(Long.parseLong(value));
+        } catch (NumberFormatException e) {
+            log.warn("유효하지 않은 reservationId: {}", value);
+            return Optional.empty();
+        }
     }
 }

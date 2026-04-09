@@ -40,8 +40,8 @@ class MemberConnectorTest {
 
         assertAll(
                 () -> assertThat(actualConnectedName).isEqualTo("홍길동"),
-                () -> assertThat(actualUpdatedMember).isPresent(),
-                () -> assertThat(actualUpdatedMember.get().getGithubId().getValue()).isEqualTo("gildong")
+                () -> assertThat(actualUpdatedMember).hasValueSatisfying(projectMember ->
+                        assertThat(projectMember.getGithubId().getValue()).isEqualTo("gildong"))
         );
     }
 
@@ -56,9 +56,10 @@ class MemberConnectorTest {
 
         assertAll(
                 () -> assertThat(actualConnectedName).isEqualTo("신규 사용자"),
-                () -> assertThat(actualSavedMember).isPresent(),
-                () -> assertThat(actualSavedMember.get().getDisplayName()).isEqualTo("신규 사용자"),
-                () -> assertThat(actualSavedMember.get().getGithubId().getValue()).isEqualTo("gildong")
+                () -> assertThat(actualSavedMember).hasValueSatisfying(projectMember -> assertAll(
+                        () -> assertThat(projectMember.getDisplayName()).isEqualTo("신규 사용자"),
+                        () -> assertThat(projectMember.getGithubId().getValue()).isEqualTo("gildong")
+                ))
         );
     }
 

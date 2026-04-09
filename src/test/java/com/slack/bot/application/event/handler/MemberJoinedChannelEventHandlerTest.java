@@ -86,8 +86,8 @@ class MemberJoinedChannelEventHandlerTest {
         Optional<Channel> actualChannel = channelRepository.findByTeamId("workspace-id");
 
         assertAll(
-                () -> assertThat(actualChannel).isPresent(),
-                () -> assertThat(actualChannel.get().getChannelName()).isEqualTo(expectedChannelName)
+                () -> assertThat(actualChannel).hasValueSatisfying(channel ->
+                        assertThat(channel.getChannelName()).isEqualTo(expectedChannelName))
         );
     }
 
@@ -112,8 +112,8 @@ class MemberJoinedChannelEventHandlerTest {
         Optional<Channel> actual = channelRepository.findByTeamId("workspace-id");
 
         assertAll(
-                () -> assertThat(actual).isPresent(),
-                () -> assertThat(actual.get().getChannelName()).isEqualTo(expectedUpdatedName)
+                () -> assertThat(actual).hasValueSatisfying(channel ->
+                        assertThat(channel.getChannelName()).isEqualTo(expectedUpdatedName))
         );
     }
 
@@ -135,8 +135,8 @@ class MemberJoinedChannelEventHandlerTest {
         Optional<Channel> actualChannel = channelRepository.findByTeamId("workspace-id");
 
         assertAll(
-                () -> assertThat(actualChannel).isPresent(),
-                () -> assertThat(actualChannel.get().getChannelName()).isEqualTo("channel-" + errorChannelId)
+                () -> assertThat(actualChannel).hasValueSatisfying(channel ->
+                        assertThat(channel.getChannelName()).isEqualTo("channel-" + errorChannelId))
         );
     }
 

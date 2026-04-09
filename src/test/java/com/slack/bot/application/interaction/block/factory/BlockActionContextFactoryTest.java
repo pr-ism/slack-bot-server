@@ -40,12 +40,13 @@ class BlockActionContextFactoryTest {
 
         // then
         assertAll(
-                () -> assertThat(actual).isPresent(),
-                () -> assertThat(actual.get().teamId()).isEqualTo("T1"),
-                () -> assertThat(actual.get().channelId()).isEqualTo("C1"),
-                () -> assertThat(actual.get().slackUserId()).isEqualTo("U1"),
-                () -> assertThat(actual.get().actionId()).isEqualTo("cancel_review_reservation"),
-                () -> assertThat(actual.get().botToken()).isEqualTo("xoxb-test-token")
+                () -> assertThat(actual).hasValueSatisfying(context -> assertAll(
+                        () -> assertThat(context.teamId()).isEqualTo("T1"),
+                        () -> assertThat(context.channelId()).isEqualTo("C1"),
+                        () -> assertThat(context.slackUserId()).isEqualTo("U1"),
+                        () -> assertThat(context.actionId()).isEqualTo("cancel_review_reservation"),
+                        () -> assertThat(context.botToken()).isEqualTo("xoxb-test-token")
+                ))
         );
     }
 

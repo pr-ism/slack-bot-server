@@ -6,6 +6,7 @@ import com.slack.bot.application.interaction.box.out.OutboxIdempotencySourceCont
 import com.slack.bot.application.interaction.box.out.OutboxWorkspaceResolver;
 import com.slack.bot.application.interaction.box.out.SlackNotificationOutboxWriter;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
@@ -132,12 +133,7 @@ public class NotificationApiClient {
             return sourceKey;
         }
 
-        String contextSourceKey = outboxIdempotencySourceContext.currentSourceKey()
-                                                                .orElse(null);
-        if (contextSourceKey != null) {
-            return contextSourceKey;
-        }
-
-        return AD_HOC_SOURCE_PREFIX + UUID.randomUUID();
+        return outboxIdempotencySourceContext.currentSourceKey()
+                                             .orElseGet(() -> AD_HOC_SOURCE_PREFIX + UUID.randomUUID());
     }
 }

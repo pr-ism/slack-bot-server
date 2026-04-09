@@ -79,8 +79,8 @@ class ViewSubmissionInteractionCoordinatorTest {
         Optional<ReviewReservation> actual = reviewReservationRepository.findActive("T1", 123L, "U1");
 
         assertAll(
-                () -> assertThat(actual).isPresent(),
-                () -> assertThat(actual.get().getReservationPullRequest().getGithubPullRequestId()).isEqualTo(10L)
+                () -> assertThat(actual).hasValueSatisfying(reservation ->
+                        assertThat(reservation.getReservationPullRequest().getGithubPullRequestId()).isEqualTo(10L))
         );
     }
 

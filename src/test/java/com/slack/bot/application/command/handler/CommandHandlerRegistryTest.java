@@ -67,8 +67,8 @@ class CommandHandlerRegistryTest {
         assertAll(
                 () -> assertThat(actual).contains("✅"),
                 () -> assertThat(actual).contains(githubId),
-                () -> assertThat(actualProjectMember).isPresent(),
-                () -> assertThat(actualProjectMember.get().getGithubId().getValue()).isEqualTo(githubId)
+                () -> assertThat(actualProjectMember).hasValueSatisfying(projectMember ->
+                        assertThat(projectMember.getGithubId().getValue()).isEqualTo(githubId))
         );
     }
 
