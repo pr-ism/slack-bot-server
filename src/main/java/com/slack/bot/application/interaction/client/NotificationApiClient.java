@@ -6,7 +6,6 @@ import com.slack.bot.application.interaction.box.out.OutboxIdempotencySourceCont
 import com.slack.bot.application.interaction.box.out.OutboxWorkspaceResolver;
 import com.slack.bot.application.interaction.box.out.SlackNotificationOutboxWriter;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
