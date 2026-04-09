@@ -18,7 +18,9 @@ import com.slack.bot.application.review.box.ReviewNotificationSourceContext;
 import com.slack.bot.application.review.box.in.exception.ReviewRequestInboxProcessingLeaseLostException;
 import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
+import com.slack.bot.infrastructure.common.BoxEventTime;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
+import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
@@ -132,7 +134,7 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE)
+                () -> assertThat(actual.getFailure().isPresent()).isFalse()
         );
         verify(reviewRequestInboxRepository, never()).save(actual);
         verify(reviewRequestInboxRepository, never()).saveIfProcessingLeaseMatched(any(), any(), any());
@@ -169,9 +171,9 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
         // then
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
-                () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE),
-                () -> assertThat(actual.getFailureReason()).isNotBlank(),
-                () -> assertThat(actual.getFailureReason().length()).isLessThanOrEqualTo(500)
+                () -> assertThat(actual.getFailure().type()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE),
+                () -> assertThat(actual.getFailure().reason()).isNotBlank(),
+                () -> assertThat(actual.getFailure().reason().length()).isLessThanOrEqualTo(500)
         );
         verify(reviewRequestInboxRepository).saveIfProcessingLeaseMatched(eq(actual), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
     }
@@ -191,8 +193,8 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
         // then
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
-                () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE),
-                () -> assertThat(actual.getFailureReason()).isNotBlank()
+                () -> assertThat(actual.getFailure().type()).isEqualTo(ReviewRequestInboxFailureType.NON_RETRYABLE),
+                () -> assertThat(actual.getFailure().reason()).isNotBlank()
         );
         verify(reviewRequestInboxRepository).saveIfProcessingLeaseMatched(eq(actual), any(), eq(CLAIMED_PROCESSING_STARTED_AT));
     }
@@ -213,8 +215,8 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
         // then
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
-                () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
-                () -> assertThat(actual.getFailureReason()).isNotBlank()
+                () -> assertThat(actual.getFailure().type()).isEqualTo(ReviewRequestInboxFailureType.RETRYABLE),
+                () -> assertThat(actual.getFailure().reason()).isNotBlank()
         );
     }
 
@@ -234,8 +236,8 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
         // then
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
-                () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.RETRY_EXHAUSTED),
-                () -> assertThat(actual.getFailureReason()).isNotBlank()
+                () -> assertThat(actual.getFailure().type()).isEqualTo(ReviewRequestInboxFailureType.RETRY_EXHAUSTED),
+                () -> assertThat(actual.getFailure().reason()).isNotBlank()
         );
     }
 
@@ -262,8 +264,7 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
         // then
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING),
-                () -> assertThat(actual.getFailureType()).isEqualTo(ReviewRequestInboxFailureType.NONE),
-                () -> assertThat(actual.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON)
+                () -> assertThat(actual.getFailure().isPresent()).isFalse()
         );
     }
 
@@ -322,8 +323,10 @@ class ReviewRequestInboxTransactionalProcessorUnitTest {
 
     private void setProcessingState(ReviewRequestInbox inbox, Instant processingStartedAt, int processingAttempt) {
         ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
-        ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
-        ReflectionTestUtils.setField(inbox, "processedAt", FailureSnapshotDefaults.NO_PROCESSED_AT);
+        ReflectionTestUtils.setField(inbox, "processingLease", BoxProcessingLease.claimed(processingStartedAt));
+        ReflectionTestUtils.setField(inbox, "processedTime", BoxEventTime.absent());
+        ReflectionTestUtils.setField(inbox, "failedTime", BoxEventTime.absent());
+        ReflectionTestUtils.setField(inbox, "failure", BoxFailureSnapshot.absent());
         ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
     }
 }

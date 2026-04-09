@@ -11,7 +11,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.review.box.in.exception.ReviewRequestInboxProcessingLeaseLostException;
 import com.slack.bot.application.review.dto.ReviewNotificationPayload;
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
+import com.slack.bot.infrastructure.common.BoxEventTime;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
+import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
@@ -82,7 +84,7 @@ class ReviewRequestInboxEntryProcessorTest {
                 .isInstanceOf(ReviewRequestInboxProcessingLeaseLostException.class)
                 .hasMessageContaining("processing lease");
 
-        ReviewRequestInbox actualInbox = jpaReviewRequestInboxRepository.findById(inbox.getId()).orElseThrow();
+        ReviewRequestInbox actualInbox = jpaReviewRequestInboxRepository.findDomainById(inbox.getId()).orElseThrow();
         List<ReviewNotificationOutbox> actualOutboxes = jpaReviewNotificationOutboxRepository.findAll();
 
         assertAll(
@@ -101,10 +103,12 @@ class ReviewRequestInboxEntryProcessorTest {
                 Instant.parse("2026-02-15T00:00:00Z")
         );
         ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
-        ReflectionTestUtils.setField(inbox, "processingStartedAt", CLAIMED_PROCESSING_STARTED_AT);
-        ReflectionTestUtils.setField(inbox, "processedAt", FailureSnapshotDefaults.NO_PROCESSED_AT);
+        ReflectionTestUtils.setField(inbox, "processingLease", BoxProcessingLease.claimed(CLAIMED_PROCESSING_STARTED_AT));
+        ReflectionTestUtils.setField(inbox, "processedTime", BoxEventTime.absent());
+        ReflectionTestUtils.setField(inbox, "failedTime", BoxEventTime.absent());
+        ReflectionTestUtils.setField(inbox, "failure", BoxFailureSnapshot.absent());
         ReflectionTestUtils.setField(inbox, "processingAttempt", 1);
-        return jpaReviewRequestInboxRepository.save(inbox);
+        return reviewRequestInboxRepository.save(inbox);
     }
 
     private ReviewNotificationPayload request(Long githubPullRequestId, String pullRequestTitle) {

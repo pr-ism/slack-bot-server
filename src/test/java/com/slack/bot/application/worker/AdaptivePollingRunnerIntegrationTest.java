@@ -116,21 +116,7 @@ class AdaptivePollingRunnerIntegrationTest {
         AtomicInteger pollCount = new AtomicInteger();
         CountDownLatch enteredSleep = new CountDownLatch(1);
         Duration pollInterval = Duration.ofSeconds(5L);
-        AdaptivePollingRunner.PollingSleeper pollingSleeper = new AdaptivePollingRunner.PollingSleeper() {
-            private final AdaptivePollingRunner.MonitorPollingSleeper delegate =
-                    new AdaptivePollingRunner.MonitorPollingSleeper();
-
-            @Override
-            public AdaptivePollingRunner.PollingSleepResult sleep(Duration delay) throws InterruptedException {
-                enteredSleep.countDown();
-                return delegate.sleep(delay);
-            }
-
-            @Override
-            public void wakeUp() {
-                delegate.wakeUp();
-            }
-        };
+        AdaptivePollingRunner.PollingSleeper pollingSleeper = new CountingPollingSleeper(enteredSleep);
         AdaptivePollingRunner adaptivePollingRunner = new AdaptivePollingRunner(
                 "db-polling-wakeup",
                 () -> {
@@ -200,5 +186,27 @@ class AdaptivePollingRunnerIntegrationTest {
                                 .put("action_id", actionId)
                                 .put("value", value));
         return actions;
+    }
+
+    private static final class CountingPollingSleeper implements AdaptivePollingRunner.PollingSleeper {
+
+        private final CountDownLatch enteredSleep;
+        private final AdaptivePollingRunner.MonitorPollingSleeper delegate;
+
+        private CountingPollingSleeper(CountDownLatch enteredSleep) {
+            this.enteredSleep = enteredSleep;
+            this.delegate = new AdaptivePollingRunner.MonitorPollingSleeper();
+        }
+
+        @Override
+        public AdaptivePollingRunner.PollingSleepResult sleep(Duration delay) throws InterruptedException {
+            enteredSleep.countDown();
+            return delegate.sleep(delay);
+        }
+
+        @Override
+        public void wakeUp() {
+            delegate.wakeUp();
+        }
     }
 }

@@ -48,13 +48,7 @@ public class IntegrationTestConfig {
                                            .baseUrl(baseUrl)
                                            .build();
 
-        return new MemberConnectionSlackApiClient(slackClient) {
-
-            @Override
-            public String resolveUserName(String token, String slackUserId) {
-                return "신규 사용자";
-            }
-        };
+        return new StubMemberConnectionSlackApiClient(slackClient);
     }
 
     @Bean
@@ -65,25 +59,7 @@ public class IntegrationTestConfig {
                                            .baseUrl(baseUrl)
                                            .build();
 
-        return new SlackEventApiClient(slackClient) {
-
-            @Override
-            public ChannelNameWrapper fetchChannelInfo(String token, String channelId) {
-                if ("error-channel-id".equals(channelId)) {
-                    throw new RuntimeException("테스트를 위한 실패");
-                }
-
-                return new ChannelNameWrapper("integration-test-channel");
-            }
-
-            @Override
-            public void sendMessage(String token, String channelId, String text) {
-            }
-
-            @Override
-            public void sendEphemeralMessage(String token, String channelId, String targetUserId, String text) {
-            }
-        };
+        return new StubSlackEventApiClient(slackClient);
     }
 
     @Bean
@@ -94,18 +70,7 @@ public class IntegrationTestConfig {
                                            .build();
         ObjectMapper objectMapper = new ObjectMapper();
 
-        return new ReviewSlackApiClient(slackClient, objectMapper) {
-
-            @Override
-            public void sendBlockMessage(
-                    String token,
-                    String channelId,
-                    JsonNode blocks,
-                    JsonNode attachments,
-                    String fallbackText
-            ) {
-            }
-        };
+        return new StubReviewSlackApiClient(slackClient, objectMapper);
     }
 
     @Bean
@@ -125,41 +90,7 @@ public class IntegrationTestConfig {
     @Bean
     @Primary
     public MysqlDuplicateKeyDetector mysqlDuplicateKeyDetector() {
-        return new MysqlDuplicateKeyDetector() {
-
-            @Override
-            public boolean isDuplicateKey(Throwable throwable) {
-                if (isH2DuplicateKey(throwable)) {
-                    return true;
-                }
-                return super.isDuplicateKey(throwable);
-            }
-
-            private boolean isH2DuplicateKey(Throwable throwable) {
-                Throwable current = throwable;
-
-                while (current != null) {
-                    if (current instanceof ConstraintViolationException cve && isH2SqlState(cve.getSQLException())) {
-                        return true;
-                    }
-
-                    if (current instanceof SQLException sqlException && isH2SqlState(sqlException)) {
-                        return true;
-                    }
-
-                    current = current.getCause();
-                }
-
-                return false;
-            }
-
-            private boolean isH2SqlState(SQLException sqlException) {
-                if (sqlException == null) {
-                    return false;
-                }
-                return "23505".equals(sqlException.getSQLState());
-            }
-        };
+        return new H2AwareMysqlDuplicateKeyDetector();
     }
 
     @Bean
@@ -216,5 +147,96 @@ public class IntegrationTestConfig {
                 repository,
                 historyRepository
         );
+    }
+
+    private static final class StubMemberConnectionSlackApiClient extends MemberConnectionSlackApiClient {
+
+        private StubMemberConnectionSlackApiClient(RestClient slackClient) {
+            super(slackClient);
+        }
+
+        @Override
+        public String resolveUserName(String token, String slackUserId) {
+            return "신규 사용자";
+        }
+    }
+
+    private static final class StubSlackEventApiClient extends SlackEventApiClient {
+
+        private StubSlackEventApiClient(RestClient slackClient) {
+            super(slackClient);
+        }
+
+        @Override
+        public ChannelNameWrapper fetchChannelInfo(String token, String channelId) {
+            if (ERROR_CHANNEL_NAME.equals(channelId)) {
+                throw new RuntimeException("테스트를 위한 실패");
+            }
+
+            return new ChannelNameWrapper("integration-test-channel");
+        }
+
+        @Override
+        public void sendMessage(String token, String channelId, String text) {
+        }
+
+        @Override
+        public void sendEphemeralMessage(String token, String channelId, String targetUserId, String text) {
+        }
+    }
+
+    private static final class StubReviewSlackApiClient extends ReviewSlackApiClient {
+
+        private StubReviewSlackApiClient(RestClient slackClient, ObjectMapper objectMapper) {
+            super(slackClient, objectMapper);
+        }
+
+        @Override
+        public void sendBlockMessage(
+                String token,
+                String channelId,
+                JsonNode blocks,
+                JsonNode attachments,
+                String fallbackText
+        ) {
+        }
+    }
+
+    private static final class H2AwareMysqlDuplicateKeyDetector extends MysqlDuplicateKeyDetector {
+
+        @Override
+        public boolean isDuplicateKey(Throwable throwable) {
+            if (isH2DuplicateKey(throwable)) {
+                return true;
+            }
+
+            return super.isDuplicateKey(throwable);
+        }
+
+        private boolean isH2DuplicateKey(Throwable throwable) {
+            Throwable current = throwable;
+
+            while (current != null) {
+                if (current instanceof ConstraintViolationException cve && isH2SqlState(cve.getSQLException())) {
+                    return true;
+                }
+
+                if (current instanceof SQLException sqlException && isH2SqlState(sqlException)) {
+                    return true;
+                }
+
+                current = current.getCause();
+            }
+
+            return false;
+        }
+
+        private boolean isH2SqlState(SQLException sqlException) {
+            if (sqlException == null) {
+                return false;
+            }
+
+            return "23505".equals(sqlException.getSQLState());
+        }
     }
 }

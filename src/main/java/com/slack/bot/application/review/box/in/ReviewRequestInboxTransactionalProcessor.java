@@ -9,8 +9,8 @@ import com.slack.bot.application.review.box.in.exception.ReviewRequestInboxProce
 import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
-import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxHistory;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
+import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxHistory;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import java.time.Clock;

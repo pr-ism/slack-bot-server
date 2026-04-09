@@ -11,6 +11,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.review.box.ReviewNotificationIdempotencyKeyGenerator;
 import com.slack.bot.application.review.dto.ReviewNotificationPayload;
@@ -249,8 +250,7 @@ class ReviewNotificationOutboxEnqueuerTest {
                 List.of("reviewer-gh-1"),
                 List.of("reviewer-gh-1")
         );
-        doThrow(new JsonProcessingException("serialize fail") {
-        }).when(objectMapper).writeValueAsString(payload);
+        doThrow(new JsonMappingException(null, "serialize fail")).when(objectMapper).writeValueAsString(payload);
 
         // when & then
         assertThatThrownBy(() -> failingEnqueuer.enqueueReviewNotification("SOURCE", 1L, "T1", "C1", payload))

@@ -5,7 +5,9 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
+import com.slack.bot.infrastructure.common.BoxEventTime;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
+import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
@@ -77,6 +79,20 @@ class ReviewRequestInboxEntryProcessorUnitTest {
     }
 
     @Test
+    void processingLease가_없으면_트랜잭션_처리를_건너뛴다() {
+        // given
+        ReviewRequestInbox inbox = processingInboxWithoutLease(111L);
+        given(reviewRequestInboxRepository.findById(111L)).willReturn(Optional.of(inbox));
+
+        // when
+        reviewRequestInboxEntryProcessor.processClaimedInbox(111L, CLAIMED_PROCESSING_STARTED_AT);
+
+        // then
+        verify(reviewRequestInboxRepository, never()).renewProcessingLease(any(), any(), any());
+        verify(reviewRequestInboxTransactionalProcessor, never()).processInTransaction(any(), any());
+    }
+
+    @Test
     void lease_연장에_실패하면_트랜잭션_처리를_건너뛴다() {
         // given
         ReviewRequestInbox inbox = processingInbox(12L, CLAIMED_PROCESSING_STARTED_AT);
@@ -116,8 +132,28 @@ class ReviewRequestInboxEntryProcessorUnitTest {
         );
         ReflectionTestUtils.setField(inbox, "id", inboxId);
         ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
-        ReflectionTestUtils.setField(inbox, "processingStartedAt", processingStartedAt);
-        ReflectionTestUtils.setField(inbox, "processedAt", FailureSnapshotDefaults.NO_PROCESSED_AT);
+        ReflectionTestUtils.setField(inbox, "processingLease", BoxProcessingLease.claimed(processingStartedAt));
+        ReflectionTestUtils.setField(inbox, "processedTime", BoxEventTime.absent());
+        ReflectionTestUtils.setField(inbox, "failedTime", BoxEventTime.absent());
+        ReflectionTestUtils.setField(inbox, "failure", BoxFailureSnapshot.absent());
+        ReflectionTestUtils.setField(inbox, "processingAttempt", 1);
+        return inbox;
+    }
+
+    private ReviewRequestInbox processingInboxWithoutLease(Long inboxId) {
+        ReviewRequestInbox inbox = ReviewRequestInbox.pending(
+                "review-entry-" + inboxId + "-no-lease",
+                "test-api-key",
+                100L + inboxId,
+                "{}",
+                CLAIMED_PROCESSING_STARTED_AT
+        );
+        ReflectionTestUtils.setField(inbox, "id", inboxId);
+        ReflectionTestUtils.setField(inbox, "status", ReviewRequestInboxStatus.PROCESSING);
+        ReflectionTestUtils.setField(inbox, "processingLease", BoxProcessingLease.idle());
+        ReflectionTestUtils.setField(inbox, "processedTime", BoxEventTime.absent());
+        ReflectionTestUtils.setField(inbox, "failedTime", BoxEventTime.absent());
+        ReflectionTestUtils.setField(inbox, "failure", BoxFailureSnapshot.absent());
         ReflectionTestUtils.setField(inbox, "processingAttempt", 1);
         return inbox;
     }

@@ -43,12 +43,9 @@ public class InteractionImmediateProcessor {
             return;
         }
 
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                runAsync(taskName, runnable);
-            }
-        });
+        TransactionSynchronizationManager.registerSynchronization(
+                new AfterCommitSynchronization(taskName, runnable)
+        );
     }
 
     private boolean isTransactionActive() {
@@ -72,6 +69,22 @@ public class InteractionImmediateProcessor {
             runnable.run();
         } catch (Exception e) {
             log.error("{}에 실패했습니다. 스케줄러 복구에 위임합니다.", taskName, e);
+        }
+    }
+
+    private final class AfterCommitSynchronization implements TransactionSynchronization {
+
+        private final String taskName;
+        private final Runnable runnable;
+
+        private AfterCommitSynchronization(String taskName, Runnable runnable) {
+            this.taskName = taskName;
+            this.runnable = runnable;
+        }
+
+        @Override
+        public void afterCommit() {
+            runAsync(taskName, runnable);
         }
     }
 }

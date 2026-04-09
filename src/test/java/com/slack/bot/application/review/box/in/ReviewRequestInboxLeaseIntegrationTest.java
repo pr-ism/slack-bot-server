@@ -95,7 +95,7 @@ class ReviewRequestInboxLeaseIntegrationTest {
         reviewRequestInboxProcessor.processPending(1);
 
         // then
-        ReviewRequestInbox actualInbox = jpaReviewRequestInboxRepository.findById(inbox.getId()).orElseThrow();
+        ReviewRequestInbox actualInbox = jpaReviewRequestInboxRepository.findDomainById(inbox.getId()).orElseThrow();
         List<ReviewNotificationOutbox> actualOutboxes = jpaReviewNotificationOutboxRepository.findAll();
 
         assertAll(
@@ -129,7 +129,7 @@ class ReviewRequestInboxLeaseIntegrationTest {
         int recoveredCount = reviewRequestInboxProcessor.recoverTimeoutProcessing(60_000L);
 
         // then
-        ReviewRequestInbox actualInbox = jpaReviewRequestInboxRepository.findById(inbox.getId()).orElseThrow();
+        ReviewRequestInbox actualInbox = jpaReviewRequestInboxRepository.findDomainById(inbox.getId()).orElseThrow();
         List<ReviewNotificationOutbox> actualOutboxes = jpaReviewNotificationOutboxRepository.findAll();
 
         assertAll(
@@ -155,7 +155,7 @@ class ReviewRequestInboxLeaseIntegrationTest {
                 requestJson,
                 Instant.parse("2026-03-23T23:59:00Z")
         );
-        return jpaReviewRequestInboxRepository.save(inbox);
+        return reviewRequestInboxRepository.save(inbox);
     }
 
     private ReviewNotificationPayload request(Long githubPullRequestId) {

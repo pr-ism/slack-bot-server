@@ -356,7 +356,9 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
     @Override
     @Transactional
     public SlackInteractionInbox save(SlackInteractionInbox inbox) {
-        SlackInteractionInboxJpaEntity entity = findInboxEntity(inbox.getId()).orElseGet(SlackInteractionInboxJpaEntity::new);
+        SlackInteractionInboxJpaEntity entity = findInboxEntity(inbox.getId()).orElseGet(
+                () -> new SlackInteractionInboxJpaEntity()
+        );
         entity.apply(inbox);
         return repository.save(entity).toDomain();
     }

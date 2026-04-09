@@ -1,58 +1,80 @@
 package com.slack.bot.infrastructure.review.box.in;
 
-import com.slack.bot.domain.common.BaseTimeEntity;
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Table;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
 import java.time.Instant;
-import lombok.AccessLevel;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 
 @Getter
-@Entity
-@Table(name = "review_request_inbox_history")
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ReviewRequestInboxHistory extends BaseTimeEntity {
+public class ReviewRequestInboxHistory {
 
-    private Long inboxId;
-
-    private int processingAttempt;
-
-    @Enumerated(EnumType.STRING)
-    private ReviewRequestInboxStatus status;
-
-    private Instant completedAt;
-
-    private String failureReason;
-
-    @Enumerated(EnumType.STRING)
-    private ReviewRequestInboxFailureType failureType;
+    private final Long id;
+    private final Long inboxId;
+    private final int processingAttempt;
+    private final ReviewRequestInboxStatus status;
+    private final Instant completedAt;
+    private final BoxFailureSnapshot<ReviewRequestInboxFailureType> failure;
 
     public static ReviewRequestInboxHistory completed(
             Long inboxId,
             int processingAttempt,
             ReviewRequestInboxStatus status,
             Instant completedAt,
-            String failureReason,
-            ReviewRequestInboxFailureType failureType
+            BoxFailureSnapshot<ReviewRequestInboxFailureType> failure
     ) {
         validateInboxIdIfPresent(inboxId);
         validateProcessingAttempt(processingAttempt);
         validateStatus(status);
         validateCompletedAt(completedAt);
-        validateFailure(status, failureReason, failureType);
+        validateFailure(status, failure);
 
         return new ReviewRequestInboxHistory(
+                null,
                 inboxId,
                 processingAttempt,
                 status,
                 completedAt,
-                failureReason,
-                failureType
+                failure
         );
+    }
+
+    public static ReviewRequestInboxHistory rehydrate(
+            Long id,
+            Long inboxId,
+            int processingAttempt,
+            ReviewRequestInboxStatus status,
+            Instant completedAt,
+            BoxFailureSnapshot<ReviewRequestInboxFailureType> failure
+    ) {
+        validateInboxIdIfPresent(inboxId);
+        validateProcessingAttempt(processingAttempt);
+        validateStatus(status);
+        validateCompletedAt(completedAt);
+        validateFailure(status, failure);
+
+        return new ReviewRequestInboxHistory(
+                id,
+                inboxId,
+                processingAttempt,
+                status,
+                completedAt,
+                failure
+        );
+    }
+
+    private ReviewRequestInboxHistory(
+            Long id,
+            Long inboxId,
+            int processingAttempt,
+            ReviewRequestInboxStatus status,
+            Instant completedAt,
+            BoxFailureSnapshot<ReviewRequestInboxFailureType> failure
+    ) {
+        this.id = id;
+        this.inboxId = inboxId;
+        this.processingAttempt = processingAttempt;
+        this.status = status;
+        this.completedAt = completedAt;
+        this.failure = failure;
     }
 
     public ReviewRequestInboxHistory bindInboxId(Long inboxId) {
@@ -65,29 +87,13 @@ public class ReviewRequestInboxHistory extends BaseTimeEntity {
         }
 
         return new ReviewRequestInboxHistory(
+                this.id,
                 inboxId,
                 processingAttempt,
                 status,
                 completedAt,
-                failureReason,
-                failureType
+                failure
         );
-    }
-
-    private ReviewRequestInboxHistory(
-            Long inboxId,
-            int processingAttempt,
-            ReviewRequestInboxStatus status,
-            Instant completedAt,
-            String failureReason,
-            ReviewRequestInboxFailureType failureType
-    ) {
-        this.inboxId = inboxId;
-        this.processingAttempt = processingAttempt;
-        this.status = status;
-        this.completedAt = completedAt;
-        this.failureReason = failureReason;
-        this.failureType = failureType;
     }
 
     private static void validateInboxId(Long inboxId) {
@@ -114,9 +120,7 @@ public class ReviewRequestInboxHistory extends BaseTimeEntity {
         if (status == null) {
             throw new IllegalArgumentException("status는 비어 있을 수 없습니다.");
         }
-        if (status == ReviewRequestInboxStatus.PENDING || status == ReviewRequestInboxStatus.PROCESSING) {
-            throw new IllegalArgumentException("history status는 완료된 상태여야 합니다.");
-        }
+        status.validateHistoryStatus();
     }
 
     private static void validateCompletedAt(Instant completedAt) {
@@ -127,33 +131,8 @@ public class ReviewRequestInboxHistory extends BaseTimeEntity {
 
     private static void validateFailure(
             ReviewRequestInboxStatus status,
-            String failureReason,
-            ReviewRequestInboxFailureType failureType
+            BoxFailureSnapshot<ReviewRequestInboxFailureType> failure
     ) {
-        if (status == ReviewRequestInboxStatus.PROCESSED) {
-            if (!FailureSnapshotDefaults.NO_FAILURE_REASON.equals(failureReason)
-                    || failureType != ReviewRequestInboxFailureType.NONE) {
-                throw new IllegalArgumentException("PROCESSED history에는 실패 정보가 없어야 합니다.");
-            }
-            return;
-        }
-
-        if (failureReason == null || failureReason.isBlank()) {
-            throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
-        }
-        if (status == ReviewRequestInboxStatus.FAILED) {
-            if (failureType == null || failureType == ReviewRequestInboxFailureType.NONE) {
-                throw new IllegalArgumentException("FAILED history에는 failureType이 필요합니다.");
-            }
-        }
-        if (status == ReviewRequestInboxStatus.RETRY_PENDING) {
-            if (failureType == null) {
-                throw new IllegalArgumentException("RETRY_PENDING history에는 failureType이 필요합니다.");
-            }
-            if (failureType != ReviewRequestInboxFailureType.NONE
-                    && failureType != ReviewRequestInboxFailureType.PROCESSING_TIMEOUT) {
-                throw new IllegalArgumentException("RETRY_PENDING history의 failureType이 올바르지 않습니다.");
-            }
-        }
+        status.validateHistoryFailure(failure);
     }
 }
