@@ -16,8 +16,10 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ReservationCommandWorkflow {
@@ -37,21 +39,32 @@ public class ReservationCommandWorkflow {
             String slackUserId,
             String token
     ) {
-        return readReservationId(action)
-                .flatMap(reservationId -> findReservationOrNotify(reservationId, token, channelId, slackUserId)
-                        .filter(reservation -> isCancelableReservationOrNotify(
-                                reservation,
-                                token,
-                                channelId,
-                                slackUserId
-                        ))
-                        .flatMap(reservation -> cancelReservationOrFallback(
-                                teamId,
-                                channelId,
-                                slackUserId,
-                                reservationId,
-                                reservation
-                        )));
+        ReservationIdResolution reservationIdResolution = resolveReservationId(action);
+
+        if (reservationIdResolution instanceof MissingReservationId) {
+            return Optional.empty();
+        }
+        if (reservationIdResolution instanceof InvalidReservationId invalidReservationId) {
+            notifyInvalidReservationId(token, channelId, slackUserId, invalidReservationId.rawValue());
+            return Optional.empty();
+        }
+
+        ValidReservationId validReservationId = (ValidReservationId) reservationIdResolution;
+
+        return findReservationOrNotify(validReservationId.reservationId(), token, channelId, slackUserId)
+                .filter(reservation -> isCancelableReservationOrNotify(
+                        reservation,
+                        token,
+                        channelId,
+                        slackUserId
+                ))
+                .flatMap(reservation -> cancelReservationOrFallback(
+                        teamId,
+                        channelId,
+                        slackUserId,
+                        validReservationId.reservationId(),
+                        reservation
+                ));
     }
 
     public void handleChange(
@@ -62,8 +75,19 @@ public class ReservationCommandWorkflow {
             String slackUserId,
             String token
     ) {
-        readReservationId(action)
-                .flatMap(reservationId -> findReservationOrNotify(reservationId, token, channelId, slackUserId))
+        ReservationIdResolution reservationIdResolution = resolveReservationId(action);
+
+        if (reservationIdResolution instanceof MissingReservationId) {
+            return;
+        }
+        if (reservationIdResolution instanceof InvalidReservationId invalidReservationId) {
+            notifyInvalidReservationId(token, channelId, slackUserId, invalidReservationId.rawValue());
+            return;
+        }
+
+        ValidReservationId validReservationId = (ValidReservationId) reservationIdResolution;
+
+        findReservationOrNotify(validReservationId.reservationId(), token, channelId, slackUserId)
                 .filter(reservation -> isChangeableReservationOrNotify(
                         reservation,
                         token,
@@ -76,13 +100,16 @@ public class ReservationCommandWorkflow {
                 });
     }
 
-    private Optional<Long> readReservationId(JsonNode action) {
+    private ReservationIdResolution resolveReservationId(JsonNode action) {
         String rawReservationId = action.path("value")
                                         .asText(null);
 
         return Optional.ofNullable(rawReservationId)
                        .filter(value -> !value.isBlank())
-                       .flatMap(value -> parseReservationId(value));
+                       .<ReservationIdResolution>map(value -> parseReservationId(value)
+                               .<ReservationIdResolution>map(reservationId -> new ValidReservationId(reservationId))
+                               .orElseGet(() -> new InvalidReservationId(value)))
+                       .orElseGet(() -> new MissingReservationId());
     }
 
     private Optional<ReviewReservation> cancelReservationOrFallback(
@@ -126,6 +153,16 @@ public class ReservationCommandWorkflow {
         } catch (NumberFormatException e) {
             return Optional.empty();
         }
+    }
+
+    private void notifyInvalidReservationId(
+            String token,
+            String channelId,
+            String slackUserId,
+            String rawReservationId
+    ) {
+        log.warn("유효하지 않은 reservationId action value입니다. rawReservationId={}", rawReservationId);
+        errorNotifier.notify(token, channelId, slackUserId, InteractionErrorType.RESERVATION_LOAD_FAILURE);
     }
 
     private boolean isOwnerOrNotify(
@@ -247,5 +284,17 @@ public class ReservationCommandWorkflow {
         );
 
         reviewInteractionEventPublisher.publish(event);
+    }
+
+    private sealed interface ReservationIdResolution permits MissingReservationId, InvalidReservationId, ValidReservationId {
+    }
+
+    private record MissingReservationId() implements ReservationIdResolution {
+    }
+
+    private record InvalidReservationId(String rawValue) implements ReservationIdResolution {
+    }
+
+    private record ValidReservationId(Long reservationId) implements ReservationIdResolution {
     }
 }

@@ -2,6 +2,7 @@ package com.slack.bot.application.interaction.workflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -11,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.interaction.client.NotificationApiClient;
 import com.slack.bot.application.interaction.publisher.ReviewInteractionEventPublisher;
 import com.slack.bot.application.interaction.publisher.ReviewReservationCancelEvent;
+import com.slack.bot.application.interaction.reply.InteractionErrorType;
 import com.slack.bot.application.interaction.reply.SlackActionErrorNotifier;
 import com.slack.bot.application.interaction.reservation.ReviewReservationCoordinator;
 import com.slack.bot.application.interaction.reservation.ReviewScheduleMetaBuilder;
@@ -118,6 +120,42 @@ class ReservationCommandWorkflowUnitTest {
         assertThat(actual).contains(reservation);
         verify(reviewInteractionEventPublisher, never()).publish(any(ReviewReservationCancelEvent.class));
         verify(errorNotifier, never()).notify(any(), any(), any(), any());
+    }
+
+    @Test
+    void 잘못된_예약_ID면_예약_로드_실패_알림을_보내고_취소를_중단한다() {
+        // given
+        Clock clock = Clock.fixed(Instant.parse("2026-02-15T00:00:00Z"), ZoneOffset.UTC);
+        ReservationCommandWorkflow workflow = new ReservationCommandWorkflow(
+                clock,
+                slackApiClient,
+                errorNotifier,
+                slackViews,
+                reviewScheduleMetaBuilder,
+                reviewReservationCoordinator,
+                reviewInteractionEventPublisher
+        );
+        JsonNode action = actionWithReservationId("invalid");
+
+        // when
+        Optional<ReviewReservation> actual = workflow.handleCancel(
+                action,
+                "T1",
+                "C1",
+                "U1",
+                "xoxb-test-token"
+        );
+
+        // then
+        assertThat(actual).isEmpty();
+        verify(errorNotifier).notify(
+                eq("xoxb-test-token"),
+                eq("C1"),
+                eq("U1"),
+                eq(InteractionErrorType.RESERVATION_LOAD_FAILURE)
+        );
+        verify(reviewReservationCoordinator, never()).findById(any());
+        verify(reviewInteractionEventPublisher, never()).publish(any(ReviewReservationCancelEvent.class));
     }
 
     private JsonNode actionWithReservationId(String reservationId) {
