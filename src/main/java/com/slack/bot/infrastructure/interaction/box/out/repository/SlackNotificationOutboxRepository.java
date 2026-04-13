@@ -40,4 +40,6 @@ public interface SlackNotificationOutboxRepository {
             int maxAttempts,
             int recoveryBatchSize
     );
+
+    int deleteCompletedBefore(Instant completedBefore, int deleteBatchSize);
 }

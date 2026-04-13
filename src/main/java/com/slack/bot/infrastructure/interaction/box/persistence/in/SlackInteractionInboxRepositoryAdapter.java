@@ -183,6 +183,21 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
         return recoveredCount.get();
     }
 
+    @Override
+    @Transactional
+    public int deleteCompletedBefore(Instant completedBefore, int deleteBatchSize) {
+        validateCompletedBefore(completedBefore);
+        validateDeleteBatchSize(deleteBatchSize);
+
+        List<Long> deletableInboxIds = selectCompletedDeletionTargetIds(completedBefore, deleteBatchSize);
+        if (deletableInboxIds.isEmpty()) {
+            return 0;
+        }
+
+        deleteHistories(deletableInboxIds);
+        return deleteInboxes(deletableInboxIds);
+    }
+
     private List<Long> selectTimeoutRecoveryTargetIds(
             SlackInteractionInboxType interactionType,
             Instant processingStartedBefore,
@@ -213,6 +228,57 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
         sql.append(recoveryBatchSize);
         sql.append("\nFOR UPDATE SKIP LOCKED");
         return sql.toString();
+    }
+
+    private List<Long> selectCompletedDeletionTargetIds(
+            Instant completedBefore,
+            int deleteBatchSize
+    ) {
+        return namedParameterJdbcTemplate.query(
+                buildCompletedDeletionTargetSelectSql(deleteBatchSize),
+                new MapSqlParameterSource()
+                        .addValue("processedStatus", SlackInteractionInboxStatus.PROCESSED.name())
+                        .addValue("failedStatus", SlackInteractionInboxStatus.FAILED.name())
+                        .addValue("completedBefore", Timestamp.from(completedBefore)),
+                (resultSet, rowNum) -> resultSet.getLong("id")
+        );
+    }
+
+    private String buildCompletedDeletionTargetSelectSql(int deleteBatchSize) {
+        StringBuilder sql = new StringBuilder(
+                """
+                SELECT id
+                FROM slack_interaction_inbox
+                WHERE (status = :processedStatus AND processed_at < :completedBefore)
+                   OR (status = :failedStatus AND failed_at < :completedBefore)
+                ORDER BY COALESCE(processed_at, failed_at) ASC, id ASC
+                LIMIT
+                """
+        );
+        sql.append(deleteBatchSize);
+        return sql.toString();
+    }
+
+    private void deleteHistories(List<Long> deletableInboxIds) {
+        namedParameterJdbcTemplate.update(
+                """
+                DELETE FROM slack_interaction_inbox_history
+                WHERE inbox_id IN (:inboxIds)
+                """,
+                new MapSqlParameterSource()
+                        .addValue("inboxIds", deletableInboxIds)
+        );
+    }
+
+    private int deleteInboxes(List<Long> deletableInboxIds) {
+        return namedParameterJdbcTemplate.update(
+                """
+                DELETE FROM slack_interaction_inbox
+                WHERE id IN (:inboxIds)
+                """,
+                new MapSqlParameterSource()
+                        .addValue("inboxIds", deletableInboxIds)
+        );
     }
 
     private boolean isTimeoutRecoverable(
@@ -329,6 +395,12 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
         }
     }
 
+    private void validateCompletedBefore(Instant completedBefore) {
+        if (completedBefore == null) {
+            throw new IllegalArgumentException("completedBefore는 비어 있을 수 없습니다.");
+        }
+    }
+
     private void validateFailedAt(Instant failedAt) {
         if (failedAt == null) {
             throw new IllegalArgumentException("failedAt은 비어 있을 수 없습니다.");
@@ -350,6 +422,12 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
     private void validateRecoveryBatchSize(int recoveryBatchSize) {
         if (recoveryBatchSize <= 0) {
             throw new IllegalArgumentException("recoveryBatchSize는 0보다 커야 합니다.");
+        }
+    }
+
+    private void validateDeleteBatchSize(int deleteBatchSize) {
+        if (deleteBatchSize <= 0) {
+            throw new IllegalArgumentException("deleteBatchSize는 0보다 커야 합니다.");
         }
     }
 

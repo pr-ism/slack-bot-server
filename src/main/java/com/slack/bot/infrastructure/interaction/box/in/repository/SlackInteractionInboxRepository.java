@@ -28,6 +28,8 @@ public interface SlackInteractionInboxRepository {
             int recoveryBatchSize
     );
 
+    int deleteCompletedBefore(Instant completedBefore, int deleteBatchSize);
+
     boolean saveIfProcessingLeaseMatched(
             SlackInteractionInbox inbox,
             Instant claimedProcessingStartedAt
