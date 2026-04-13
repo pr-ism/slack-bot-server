@@ -403,7 +403,7 @@ class ReviewNotificationOutboxTest {
     }
 
     @Test
-    void markFailed는_failureType이_NONE이면_예외를_던진다() {
+    void markFailed는_failureType이_FAILED_허용값이_아니면_예외를_던진다() {
         // given
         ReviewNotificationOutbox outbox = pendingOutbox();
         setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
@@ -413,11 +413,11 @@ class ReviewNotificationOutboxTest {
                 () -> outbox.markFailed(
                         Instant.parse("2026-02-24T00:05:00Z"),
                         "failure",
-                        SlackInteractionFailureType.NONE
+                        SlackInteractionFailureType.RETRYABLE
                 )
         )
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("failureType은 NONE일 수 없습니다.");
+                .hasMessage("FAILED failureType이 올바르지 않습니다.");
     }
 
     @Test

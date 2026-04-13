@@ -290,7 +290,7 @@ public class ReviewNotificationOutbox {
     ) {
         validateFailedAt(failedAt);
         validateFailureReason(failureReason);
-        validateFailureType(failureType);
+        validateFailedFailureType(failureType);
         validateTransition(ReviewNotificationOutboxStatus.PROCESSING, "FAILED");
 
         this.status = ReviewNotificationOutboxStatus.FAILED;
@@ -517,8 +517,7 @@ public class ReviewNotificationOutbox {
         validateFailedCompletionState("RETRY_PENDING", processingAttempt, processingLease, sentTime, failedTime, failure);
 
         SlackInteractionFailureType failureType = failure.type();
-        if (failureType == SlackInteractionFailureType.RETRYABLE
-                || failureType == SlackInteractionFailureType.PROCESSING_TIMEOUT) {
+        if (failureType.isRetryPendingOutboxFailureType()) {
             return;
         }
 
@@ -535,8 +534,7 @@ public class ReviewNotificationOutbox {
         validateFailedCompletionState("FAILED", processingAttempt, processingLease, sentTime, failedTime, failure);
 
         SlackInteractionFailureType failureType = failure.type();
-        if (failureType == SlackInteractionFailureType.BUSINESS_INVARIANT
-                || failureType == SlackInteractionFailureType.RETRY_EXHAUSTED) {
+        if (failureType.isFailedOutboxFailureType()) {
             return;
         }
 
@@ -617,21 +615,15 @@ public class ReviewNotificationOutbox {
         }
     }
 
-    private void validateFailureType(SlackInteractionFailureType failureType) {
-        if (failureType == null
-                || failureType == SlackInteractionFailureType.ABSENT
-                || failureType == SlackInteractionFailureType.NONE) {
-            throw new IllegalArgumentException("failureType은 NONE일 수 없습니다.");
+    private void validateRetryPendingFailureType(SlackInteractionFailureType failureType) {
+        if (failureType == null || !failureType.isRetryPendingOutboxFailureType()) {
+            throw new IllegalArgumentException("RETRY_PENDING failureType이 올바르지 않습니다.");
         }
     }
 
-    private void validateRetryPendingFailureType(SlackInteractionFailureType failureType) {
-        if (failureType == null
-                || failureType == SlackInteractionFailureType.NONE
-                || failureType == SlackInteractionFailureType.ABSENT
-                || failureType == SlackInteractionFailureType.BUSINESS_INVARIANT
-                || failureType == SlackInteractionFailureType.RETRY_EXHAUSTED) {
-            throw new IllegalArgumentException("RETRY_PENDING failureType이 올바르지 않습니다.");
+    private void validateFailedFailureType(SlackInteractionFailureType failureType) {
+        if (failureType == null || !failureType.isFailedOutboxFailureType()) {
+            throw new IllegalArgumentException("FAILED failureType이 올바르지 않습니다.");
         }
     }
 }

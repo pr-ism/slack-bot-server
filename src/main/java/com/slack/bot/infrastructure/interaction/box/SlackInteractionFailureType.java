@@ -6,5 +6,13 @@ public enum SlackInteractionFailureType {
     RETRYABLE,
     PROCESSING_TIMEOUT,
     BUSINESS_INVARIANT,
-    RETRY_EXHAUSTED
+    RETRY_EXHAUSTED;
+
+    public boolean isRetryPendingOutboxFailureType() {
+        return this == RETRYABLE || this == PROCESSING_TIMEOUT;
+    }
+
+    public boolean isFailedOutboxFailureType() {
+        return this == BUSINESS_INVARIANT || this == RETRY_EXHAUSTED;
+    }
 }
