@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 
 import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
 import com.slack.bot.infrastructure.common.BoxFailureState;
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxHistory;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
@@ -20,7 +19,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class SlackNotificationOutboxHistoryJpaEntityTest {
 
     @Test
-    void apply는_PRESENT_failure_후_ABSENT_failure를_재적용하면_센티널로_초기화한다() {
+    void apply는_PRESENT_failure_후_ABSENT_failure를_재적용하면_failure_필드를_비운다() {
         // given
         SlackNotificationOutboxHistoryJpaEntity entity = new SlackNotificationOutboxHistoryJpaEntity();
         SlackNotificationOutboxHistory failedHistory = SlackNotificationOutboxHistory.completed(
@@ -46,12 +45,8 @@ class SlackNotificationOutboxHistoryJpaEntityTest {
         // then
         assertAll(
                 () -> assertThat(ReflectionTestUtils.getField(entity, "failureState")).isEqualTo(BoxFailureState.ABSENT),
-                () -> assertThat(ReflectionTestUtils.getField(entity, "failureReason")).isEqualTo(
-                        FailureSnapshotDefaults.NO_FAILURE_REASON
-                ),
-                () -> assertThat(ReflectionTestUtils.getField(entity, "failureType")).isEqualTo(
-                        SlackInteractionFailureType.NONE
-                ),
+                () -> assertThat(ReflectionTestUtils.getField(entity, "failureReason")).isNull(),
+                () -> assertThat(ReflectionTestUtils.getField(entity, "failureType")).isNull(),
                 () -> assertThat(entity.toDomain().getFailure().isPresent()).isFalse()
         );
     }
