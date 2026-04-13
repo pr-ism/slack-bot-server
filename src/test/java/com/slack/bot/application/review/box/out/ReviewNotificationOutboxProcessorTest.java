@@ -19,6 +19,9 @@ import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.slack.bot.infrastructure.common.BoxEventTime;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
+import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.application.interaction.box.BoxFailureReasonTruncator;
 import com.slack.bot.application.interaction.box.retry.EqualJitterExponentialBackOffPolicy;
 import com.slack.bot.application.interaction.box.retry.InteractionRetryExceptionClassifier;
@@ -29,7 +32,6 @@ import com.slack.bot.domain.workspace.Workspace;
 import com.slack.bot.domain.workspace.repository.WorkspaceRepository;
 import com.slack.bot.global.config.properties.InteractionRetryProperties;
 import com.slack.bot.global.config.properties.ReviewWorkerProperties;
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
@@ -230,8 +232,8 @@ class ReviewNotificationOutboxProcessorTest {
         ReviewNotificationOutbox claimed = spyClaimed("C1", 1, null);
         ReflectionTestUtils.setField(
                 claimed,
-                "processingStartedAt",
-                Instant.parse("2026-02-24T00:00:01Z")
+                "processingLease",
+                BoxProcessingLease.claimed(Instant.parse("2026-02-24T00:00:01Z"))
         );
         given(reviewNotificationOutboxRepository.claimNextId(any(), anyCollection()))
                 .willReturn(Optional.of(10L), Optional.empty());
@@ -577,11 +579,10 @@ class ReviewNotificationOutboxProcessorTest {
                 ReviewNotificationOutboxStringField.absent(),
                 ReviewNotificationOutboxStatus.PROCESSING,
                 1,
-                CLAIMED_PROCESSING_STARTED_AT,
-                FailureSnapshotDefaults.NO_SENT_AT,
-                FailureSnapshotDefaults.NO_FAILURE_AT,
-                FailureSnapshotDefaults.NO_FAILURE_REASON,
-                SlackInteractionFailureType.NONE
+                BoxProcessingLease.claimed(CLAIMED_PROCESSING_STARTED_AT),
+                BoxEventTime.absent(),
+                BoxEventTime.absent(),
+                BoxFailureSnapshot.absent()
         ));
         given(reviewNotificationOutboxRepository.claimNextId(any(), anyCollection()))
                 .willReturn(Optional.of(10L), Optional.empty());
@@ -631,11 +632,10 @@ class ReviewNotificationOutboxProcessorTest {
                 ReviewNotificationOutboxStringField.present("fallback"),
                 ReviewNotificationOutboxStatus.PENDING,
                 0,
-                FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT,
-                FailureSnapshotDefaults.NO_SENT_AT,
-                FailureSnapshotDefaults.NO_FAILURE_AT,
-                FailureSnapshotDefaults.NO_FAILURE_REASON,
-                SlackInteractionFailureType.NONE
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.absent(),
+                BoxFailureSnapshot.absent()
         );
         Instant base = CLAIMED_PROCESSING_STARTED_AT;
         setProcessingState(outbox, base, 1);
@@ -654,11 +654,10 @@ class ReviewNotificationOutboxProcessorTest {
             int processingAttempt
     ) {
         ReflectionTestUtils.setField(outbox, "status", ReviewNotificationOutboxStatus.PROCESSING);
-        ReflectionTestUtils.setField(outbox, "processingStartedAt", processingStartedAt);
-        ReflectionTestUtils.setField(outbox, "sentAt", FailureSnapshotDefaults.NO_SENT_AT);
+        ReflectionTestUtils.setField(outbox, "processingLease", BoxProcessingLease.claimed(processingStartedAt));
+        ReflectionTestUtils.setField(outbox, "sentTime", BoxEventTime.absent());
         ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(outbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
-        ReflectionTestUtils.setField(outbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
-        ReflectionTestUtils.setField(outbox, "failureType", SlackInteractionFailureType.NONE);
+        ReflectionTestUtils.setField(outbox, "failedTime", BoxEventTime.absent());
+        ReflectionTestUtils.setField(outbox, "failure", BoxFailureSnapshot.absent());
     }
 }

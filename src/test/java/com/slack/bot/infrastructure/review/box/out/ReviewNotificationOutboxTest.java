@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
+import com.slack.bot.infrastructure.common.BoxEventTime;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
+import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -31,7 +33,11 @@ class ReviewNotificationOutboxTest {
                 () -> assertThat(outbox.getChannelId()).isEqualTo("C1"),
                 () -> assertThat(outbox.getBlocksJson().value()).isEqualTo("[{\"type\":\"section\"}]"),
                 () -> assertThat(outbox.getFallbackText().value()).isEqualTo("fallback"),
-                () -> assertThat(outbox.getAttachmentsJson().isPresent()).isFalse()
+                () -> assertThat(outbox.getAttachmentsJson().isPresent()).isFalse(),
+                () -> assertThat(outbox.getProcessingLease().isClaimed()).isFalse(),
+                () -> assertThat(outbox.getSentTime().isPresent()).isFalse(),
+                () -> assertThat(outbox.getFailedTime().isPresent()).isFalse(),
+                () -> assertThat(outbox.getFailure().isPresent()).isFalse()
         );
     }
 
@@ -193,13 +199,10 @@ class ReviewNotificationOutboxTest {
         // then
         assertAll(
                 () -> assertThat(outbox.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.SENT),
-                () -> assertThat(outbox.getProcessingStartedAt()).isEqualTo(
-                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
-                ),
-                () -> assertThat(outbox.getSentAt()).isEqualTo(sentAt),
-                () -> assertThat(outbox.getFailedAt()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_AT),
-                () -> assertThat(outbox.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
-                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE),
+                () -> assertThat(outbox.getProcessingLease().isClaimed()).isFalse(),
+                () -> assertThat(outbox.getSentTime().occurredAt()).isEqualTo(sentAt),
+                () -> assertThat(outbox.getFailedTime().isPresent()).isFalse(),
+                () -> assertThat(outbox.getFailure().isPresent()).isFalse(),
                 () -> assertThat(history).isNotNull(),
                 () -> assertThat(history.getOutboxId()).isEqualTo(10L),
                 () -> assertThat(history.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.SENT),
@@ -243,13 +246,11 @@ class ReviewNotificationOutboxTest {
         // then
         assertAll(
                 () -> assertThat(outbox.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.RETRY_PENDING),
-                () -> assertThat(outbox.getProcessingStartedAt()).isEqualTo(
-                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
-                ),
-                () -> assertThat(outbox.getSentAt()).isEqualTo(FailureSnapshotDefaults.NO_SENT_AT),
-                () -> assertThat(outbox.getFailedAt()).isEqualTo(failedAt),
-                () -> assertThat(outbox.getFailureReason()).isEqualTo("retry"),
-                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRYABLE),
+                () -> assertThat(outbox.getProcessingLease().isClaimed()).isFalse(),
+                () -> assertThat(outbox.getSentTime().isPresent()).isFalse(),
+                () -> assertThat(outbox.getFailedTime().occurredAt()).isEqualTo(failedAt),
+                () -> assertThat(outbox.getFailure().reason()).isEqualTo("retry"),
+                () -> assertThat(outbox.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRYABLE),
                 () -> assertThat(history).isNotNull(),
                 () -> assertThat(history.getOutboxId()).isEqualTo(10L),
                 () -> assertThat(history.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.RETRY_PENDING),
@@ -272,7 +273,7 @@ class ReviewNotificationOutboxTest {
 
         // then
         assertAll(
-                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.PROCESSING_TIMEOUT),
+                () -> assertThat(outbox.getFailure().type()).isEqualTo(SlackInteractionFailureType.PROCESSING_TIMEOUT),
                 () -> assertThat(history.getFailure().type()).isEqualTo(SlackInteractionFailureType.PROCESSING_TIMEOUT)
         );
     }
@@ -341,13 +342,11 @@ class ReviewNotificationOutboxTest {
         // then
         assertAll(
                 () -> assertThat(outbox.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.FAILED),
-                () -> assertThat(outbox.getProcessingStartedAt()).isEqualTo(
-                        FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT
-                ),
-                () -> assertThat(outbox.getSentAt()).isEqualTo(FailureSnapshotDefaults.NO_SENT_AT),
-                () -> assertThat(outbox.getFailedAt()).isEqualTo(failedAt),
-                () -> assertThat(outbox.getFailureReason()).isEqualTo("failure"),
-                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
+                () -> assertThat(outbox.getProcessingLease().isClaimed()).isFalse(),
+                () -> assertThat(outbox.getSentTime().isPresent()).isFalse(),
+                () -> assertThat(outbox.getFailedTime().occurredAt()).isEqualTo(failedAt),
+                () -> assertThat(outbox.getFailure().reason()).isEqualTo("failure"),
+                () -> assertThat(outbox.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
                 () -> assertThat(history).isNotNull(),
                 () -> assertThat(history.getOutboxId()).isEqualTo(10L),
                 () -> assertThat(history.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.FAILED),
@@ -463,11 +462,10 @@ class ReviewNotificationOutboxTest {
                 ReviewNotificationOutboxStringField.present("fallback"),
                 ReviewNotificationOutboxStatus.PENDING,
                 0,
-                FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT,
-                FailureSnapshotDefaults.NO_SENT_AT,
-                FailureSnapshotDefaults.NO_FAILURE_AT,
-                FailureSnapshotDefaults.NO_FAILURE_REASON,
-                SlackInteractionFailureType.NONE
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.absent(),
+                BoxFailureSnapshot.absent()
         );
     }
 
@@ -477,11 +475,10 @@ class ReviewNotificationOutboxTest {
             int processingAttempt
     ) {
         ReflectionTestUtils.setField(outbox, "status", ReviewNotificationOutboxStatus.PROCESSING);
-        ReflectionTestUtils.setField(outbox, "processingStartedAt", processingStartedAt);
-        ReflectionTestUtils.setField(outbox, "sentAt", FailureSnapshotDefaults.NO_SENT_AT);
+        ReflectionTestUtils.setField(outbox, "processingLease", BoxProcessingLease.claimed(processingStartedAt));
+        ReflectionTestUtils.setField(outbox, "sentTime", BoxEventTime.absent());
         ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(outbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
-        ReflectionTestUtils.setField(outbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
-        ReflectionTestUtils.setField(outbox, "failureType", SlackInteractionFailureType.NONE);
+        ReflectionTestUtils.setField(outbox, "failedTime", BoxEventTime.absent());
+        ReflectionTestUtils.setField(outbox, "failure", BoxFailureSnapshot.absent());
     }
 }

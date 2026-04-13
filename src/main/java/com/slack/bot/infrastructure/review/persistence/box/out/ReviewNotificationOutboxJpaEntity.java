@@ -1,6 +1,9 @@
 package com.slack.bot.infrastructure.review.persistence.box.out;
 
 import com.slack.bot.domain.common.BaseTimeEntity;
+import com.slack.bot.infrastructure.common.BoxEventTime;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
+import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxFieldState;
@@ -84,11 +87,10 @@ public class ReviewNotificationOutboxJpaEntity extends BaseTimeEntity {
                 toStringField(fallbackTextState, fallbackText),
                 status,
                 processingAttempt,
-                processingStartedAt,
-                sentAt,
-                failedAt,
-                failureReason,
-                failureType
+                toProcessingLease(),
+                toEventTime(sentAt),
+                toEventTime(failedAt),
+                toFailure()
         );
     }
 
@@ -104,11 +106,10 @@ public class ReviewNotificationOutboxJpaEntity extends BaseTimeEntity {
         applyStringField(outbox.getFallbackText(), FieldType.FALLBACK_TEXT);
         this.status = outbox.getStatus();
         this.processingAttempt = outbox.getProcessingAttempt();
-        this.processingStartedAt = outbox.getProcessingStartedAt();
-        this.sentAt = outbox.getSentAt();
-        this.failedAt = outbox.getFailedAt();
-        this.failureReason = outbox.getFailureReason();
-        this.failureType = outbox.getFailureType();
+        applyProcessingLease(outbox.getProcessingLease());
+        applyEventTime(outbox.getSentTime(), FieldType.SENT_TIME);
+        applyEventTime(outbox.getFailedTime(), FieldType.FAILED_TIME);
+        applyFailure(outbox.getFailure());
     }
 
     private void applyProjectId(ReviewNotificationOutbox outbox) {
@@ -150,6 +151,48 @@ public class ReviewNotificationOutboxJpaEntity extends BaseTimeEntity {
         this.fallbackText = field.valueOrBlank();
     }
 
+    private void applyProcessingLease(BoxProcessingLease processingLease) {
+        this.processingStartedAt = null;
+        if (!processingLease.isClaimed()) {
+            return;
+        }
+
+        this.processingStartedAt = processingLease.startedAt();
+    }
+
+    private void applyEventTime(
+            BoxEventTime eventTime,
+            FieldType fieldType
+    ) {
+        if (fieldType == FieldType.SENT_TIME) {
+            this.sentAt = null;
+            if (!eventTime.isPresent()) {
+                return;
+            }
+
+            this.sentAt = eventTime.occurredAt();
+            return;
+        }
+
+        this.failedAt = null;
+        if (!eventTime.isPresent()) {
+            return;
+        }
+
+        this.failedAt = eventTime.occurredAt();
+    }
+
+    private void applyFailure(BoxFailureSnapshot<SlackInteractionFailureType> failure) {
+        this.failureReason = null;
+        this.failureType = null;
+        if (!failure.isPresent()) {
+            return;
+        }
+
+        this.failureReason = failure.reason();
+        this.failureType = failure.type();
+    }
+
     private ReviewNotificationOutboxStringField toStringField(
             ReviewNotificationOutboxFieldState state,
             String value
@@ -160,6 +203,33 @@ public class ReviewNotificationOutboxJpaEntity extends BaseTimeEntity {
         }
 
         return ReviewNotificationOutboxStringField.present(value);
+    }
+
+    private BoxProcessingLease toProcessingLease() {
+        if (processingStartedAt == null) {
+            return BoxProcessingLease.idle();
+        }
+
+        return BoxProcessingLease.claimed(processingStartedAt);
+    }
+
+    private BoxEventTime toEventTime(Instant occurredAt) {
+        if (occurredAt == null) {
+            return BoxEventTime.absent();
+        }
+
+        return BoxEventTime.present(occurredAt);
+    }
+
+    private BoxFailureSnapshot<SlackInteractionFailureType> toFailure() {
+        if (failureReason == null && failureType == null) {
+            return BoxFailureSnapshot.absent();
+        }
+        if (failureReason == null || failureType == null) {
+            throw new IllegalStateException("outbox failure 상태가 올바르지 않습니다.");
+        }
+
+        return BoxFailureSnapshot.present(failureReason, failureType);
     }
 
     private void validateStringField(
@@ -178,6 +248,8 @@ public class ReviewNotificationOutboxJpaEntity extends BaseTimeEntity {
         PAYLOAD_JSON,
         BLOCKS_JSON,
         ATTACHMENTS_JSON,
-        FALLBACK_TEXT
+        FALLBACK_TEXT,
+        SENT_TIME,
+        FAILED_TIME
     }
 }

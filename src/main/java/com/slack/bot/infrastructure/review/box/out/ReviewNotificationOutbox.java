@@ -1,7 +1,8 @@
 package com.slack.bot.infrastructure.review.box.out;
 
+import com.slack.bot.infrastructure.common.BoxEventTime;
 import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
+import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import java.time.Instant;
 import lombok.Getter;
@@ -22,11 +23,10 @@ public class ReviewNotificationOutbox {
 
     private ReviewNotificationOutboxStatus status;
     private int processingAttempt;
-    private Instant processingStartedAt;
-    private Instant sentAt;
-    private Instant failedAt;
-    private String failureReason;
-    private SlackInteractionFailureType failureType;
+    private BoxProcessingLease processingLease;
+    private BoxEventTime sentTime;
+    private BoxEventTime failedTime;
+    private BoxFailureSnapshot<SlackInteractionFailureType> failure;
 
     public static ReviewNotificationOutbox semantic(
             String idempotencyKey,
@@ -52,11 +52,10 @@ public class ReviewNotificationOutbox {
                 ReviewNotificationOutboxStringField.absent(),
                 ReviewNotificationOutboxStatus.PENDING,
                 0,
-                FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT,
-                FailureSnapshotDefaults.NO_SENT_AT,
-                FailureSnapshotDefaults.NO_FAILURE_AT,
-                FailureSnapshotDefaults.NO_FAILURE_REASON,
-                SlackInteractionFailureType.NONE
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.absent(),
+                BoxFailureSnapshot.absent()
         );
     }
 
@@ -88,11 +87,10 @@ public class ReviewNotificationOutbox {
                 normalizedFallbackText,
                 ReviewNotificationOutboxStatus.PENDING,
                 0,
-                FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT,
-                FailureSnapshotDefaults.NO_SENT_AT,
-                FailureSnapshotDefaults.NO_FAILURE_AT,
-                FailureSnapshotDefaults.NO_FAILURE_REASON,
-                SlackInteractionFailureType.NONE
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.absent(),
+                BoxFailureSnapshot.absent()
         );
     }
 
@@ -109,11 +107,10 @@ public class ReviewNotificationOutbox {
             ReviewNotificationOutboxStringField fallbackText,
             ReviewNotificationOutboxStatus status,
             int processingAttempt,
-            Instant processingStartedAt,
-            Instant sentAt,
-            Instant failedAt,
-            String failureReason,
-            SlackInteractionFailureType failureType
+            BoxProcessingLease processingLease,
+            BoxEventTime sentTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
     ) {
         validateIdempotencyKey(idempotencyKey);
         validateTeamId(teamId);
@@ -121,11 +118,10 @@ public class ReviewNotificationOutbox {
         validateMessageType(messageType);
         validateStatus(status);
         validateProcessingAttempt(processingAttempt);
-        validateProcessingStartedAt(processingStartedAt);
-        validateSentAtState(sentAt);
-        validateFailedAtState(failedAt);
-        validateFailureReasonState(failureReason);
-        validateFailureTypeState(failureType);
+        validateProcessingLease(processingLease);
+        validateSentTime(sentTime);
+        validateFailedTime(failedTime);
+        validateFailure(failure);
         validateMessageFields(
                 messageType,
                 normalizeProjectId(projectId),
@@ -134,6 +130,7 @@ public class ReviewNotificationOutbox {
                 normalizeField(attachmentsJson),
                 normalizeField(fallbackText)
         );
+        validateState(status, processingAttempt, processingLease, sentTime, failedTime, failure);
 
         return new ReviewNotificationOutbox(
                 ReviewNotificationOutboxId.assigned(id),
@@ -148,11 +145,10 @@ public class ReviewNotificationOutbox {
                 normalizeField(fallbackText),
                 status,
                 processingAttempt,
-                processingStartedAt,
-                sentAt,
-                failedAt,
-                failureReason,
-                failureType
+                processingLease,
+                sentTime,
+                failedTime,
+                failure
         );
     }
 
@@ -169,11 +165,10 @@ public class ReviewNotificationOutbox {
             ReviewNotificationOutboxStringField fallbackText,
             ReviewNotificationOutboxStatus status,
             int processingAttempt,
-            Instant processingStartedAt,
-            Instant sentAt,
-            Instant failedAt,
-            String failureReason,
-            SlackInteractionFailureType failureType
+            BoxProcessingLease processingLease,
+            BoxEventTime sentTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
     ) {
         this.identity = identity;
         this.messageType = messageType;
@@ -187,11 +182,10 @@ public class ReviewNotificationOutbox {
         this.fallbackText = fallbackText;
         this.status = status;
         this.processingAttempt = processingAttempt;
-        this.processingStartedAt = processingStartedAt;
-        this.sentAt = sentAt;
-        this.failedAt = failedAt;
-        this.failureReason = failureReason;
-        this.failureType = failureType;
+        this.processingLease = processingLease;
+        this.sentTime = sentTime;
+        this.failedTime = failedTime;
+        this.failure = failure;
     }
 
     public boolean hasId() {
@@ -200,6 +194,26 @@ public class ReviewNotificationOutbox {
 
     public boolean hasSemanticPayload() {
         return messageType == ReviewNotificationOutboxMessageType.SEMANTIC;
+    }
+
+    public boolean hasClaimedProcessingLease() {
+        return processingLease.isClaimed();
+    }
+
+    public boolean hasClaimedProcessingLease(Instant processingStartedAt) {
+        if (!processingLease.isClaimed()) {
+            return false;
+        }
+
+        return processingLease.startedAt().equals(processingStartedAt);
+    }
+
+    public Instant currentProcessingLeaseStartedAt() {
+        if (!processingLease.isClaimed()) {
+            throw new IllegalStateException("processingLease를 보유하고 있지 않습니다.");
+        }
+
+        return processingLease.startedAt();
     }
 
     public long requiredProjectId() {
@@ -219,11 +233,10 @@ public class ReviewNotificationOutbox {
         validateTransition(ReviewNotificationOutboxStatus.PROCESSING, "SENT");
 
         this.status = ReviewNotificationOutboxStatus.SENT;
-        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
-        this.sentAt = sentAt;
-        this.failedAt = FailureSnapshotDefaults.NO_FAILURE_AT;
-        this.failureReason = FailureSnapshotDefaults.NO_FAILURE_REASON;
-        this.failureType = SlackInteractionFailureType.NONE;
+        this.processingLease = BoxProcessingLease.idle();
+        this.sentTime = BoxEventTime.present(sentAt);
+        this.failedTime = BoxEventTime.absent();
+        this.failure = BoxFailureSnapshot.absent();
 
         return ReviewNotificationOutboxHistory.completed(
                 getId(),
@@ -238,7 +251,7 @@ public class ReviewNotificationOutbox {
         validateProcessingStartedAt(processingStartedAt);
         validateTransition(ReviewNotificationOutboxStatus.PROCESSING, "PROCESSING");
 
-        this.processingStartedAt = processingStartedAt;
+        this.processingLease = BoxProcessingLease.claimed(processingStartedAt);
     }
 
     public ReviewNotificationOutboxHistory markRetryPending(Instant failedAt, String failureReason) {
@@ -256,11 +269,10 @@ public class ReviewNotificationOutbox {
         validateTransition(ReviewNotificationOutboxStatus.PROCESSING, "RETRY_PENDING");
 
         this.status = ReviewNotificationOutboxStatus.RETRY_PENDING;
-        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
-        this.sentAt = FailureSnapshotDefaults.NO_SENT_AT;
-        this.failedAt = failedAt;
-        this.failureReason = failureReason;
-        this.failureType = failureType;
+        this.processingLease = BoxProcessingLease.idle();
+        this.sentTime = BoxEventTime.absent();
+        this.failedTime = BoxEventTime.present(failedAt);
+        this.failure = BoxFailureSnapshot.present(failureReason, failureType);
 
         return ReviewNotificationOutboxHistory.completed(
                 getId(),
@@ -282,11 +294,10 @@ public class ReviewNotificationOutbox {
         validateTransition(ReviewNotificationOutboxStatus.PROCESSING, "FAILED");
 
         this.status = ReviewNotificationOutboxStatus.FAILED;
-        this.processingStartedAt = FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT;
-        this.sentAt = FailureSnapshotDefaults.NO_SENT_AT;
-        this.failedAt = failedAt;
-        this.failureReason = failureReason;
-        this.failureType = failureType;
+        this.processingLease = BoxProcessingLease.idle();
+        this.sentTime = BoxEventTime.absent();
+        this.failedTime = BoxEventTime.present(failedAt);
+        this.failure = BoxFailureSnapshot.present(failureReason, failureType);
 
         return ReviewNotificationOutboxHistory.completed(
                 getId(),
@@ -373,6 +384,187 @@ public class ReviewNotificationOutbox {
         }
     }
 
+    private static void validateStatus(ReviewNotificationOutboxStatus status) {
+        if (status == null) {
+            throw new IllegalArgumentException("status는 비어 있을 수 없습니다.");
+        }
+    }
+
+    private static void validateProcessingAttempt(int processingAttempt) {
+        if (processingAttempt < 0) {
+            throw new IllegalArgumentException("processingAttempt는 0 이상이어야 합니다.");
+        }
+    }
+
+    private static void validateProcessingLease(BoxProcessingLease processingLease) {
+        if (processingLease == null) {
+            throw new IllegalArgumentException("processingLease는 비어 있을 수 없습니다.");
+        }
+    }
+
+    private static void validateSentTime(BoxEventTime sentTime) {
+        if (sentTime == null) {
+            throw new IllegalArgumentException("sentTime은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private static void validateFailedTime(BoxEventTime failedTime) {
+        if (failedTime == null) {
+            throw new IllegalArgumentException("failedTime은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private static void validateFailure(BoxFailureSnapshot<SlackInteractionFailureType> failure) {
+        if (failure == null) {
+            throw new IllegalArgumentException("failure는 비어 있을 수 없습니다.");
+        }
+    }
+
+    private static void validateState(
+            ReviewNotificationOutboxStatus status,
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime sentTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
+    ) {
+        if (status == ReviewNotificationOutboxStatus.PENDING) {
+            validateInitialState("PENDING", processingAttempt, processingLease, sentTime, failedTime, failure);
+            return;
+        }
+        if (status == ReviewNotificationOutboxStatus.PROCESSING) {
+            validateProcessingState(processingAttempt, processingLease, sentTime, failedTime, failure);
+            return;
+        }
+        if (status == ReviewNotificationOutboxStatus.SENT) {
+            validateSentState(processingAttempt, processingLease, sentTime, failedTime, failure);
+            return;
+        }
+        if (status == ReviewNotificationOutboxStatus.RETRY_PENDING) {
+            validateRetryPendingState(processingAttempt, processingLease, sentTime, failedTime, failure);
+            return;
+        }
+        if (status == ReviewNotificationOutboxStatus.FAILED) {
+            validateFailedState(processingAttempt, processingLease, sentTime, failedTime, failure);
+        }
+    }
+
+    private static void validateInitialState(
+            String statusName,
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime sentTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
+    ) {
+        if (processingAttempt != 0) {
+            throw new IllegalArgumentException(statusName + " 상태의 processingAttempt는 0이어야 합니다.");
+        }
+        if (processingLease.isClaimed()) {
+            throw new IllegalArgumentException(statusName + " 상태의 processingLease는 idle이어야 합니다.");
+        }
+        if (sentTime.isPresent() || failedTime.isPresent() || failure.isPresent()) {
+            throw new IllegalArgumentException(statusName + " 상태에는 완료 정보가 없어야 합니다.");
+        }
+    }
+
+    private static void validateProcessingState(
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime sentTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
+    ) {
+        if (processingAttempt <= 0) {
+            throw new IllegalArgumentException("PROCESSING 상태의 processingAttempt는 1 이상이어야 합니다.");
+        }
+        if (!processingLease.isClaimed()) {
+            throw new IllegalArgumentException("PROCESSING 상태의 processingLease는 claimed여야 합니다.");
+        }
+        if (sentTime.isPresent() || failedTime.isPresent() || failure.isPresent()) {
+            throw new IllegalArgumentException("PROCESSING 상태에는 완료 정보가 없어야 합니다.");
+        }
+    }
+
+    private static void validateSentState(
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime sentTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
+    ) {
+        if (processingAttempt <= 0) {
+            throw new IllegalArgumentException("SENT 상태의 processingAttempt는 1 이상이어야 합니다.");
+        }
+        if (processingLease.isClaimed()) {
+            throw new IllegalArgumentException("SENT 상태의 processingLease는 idle이어야 합니다.");
+        }
+        if (!sentTime.isPresent()) {
+            throw new IllegalArgumentException("SENT 상태에는 sentTime이 필요합니다.");
+        }
+        if (failedTime.isPresent() || failure.isPresent()) {
+            throw new IllegalArgumentException("SENT 상태에는 실패 정보가 없어야 합니다.");
+        }
+    }
+
+    private static void validateRetryPendingState(
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime sentTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
+    ) {
+        validateFailedCompletionState("RETRY_PENDING", processingAttempt, processingLease, sentTime, failedTime, failure);
+
+        SlackInteractionFailureType failureType = failure.type();
+        if (failureType == SlackInteractionFailureType.RETRYABLE
+                || failureType == SlackInteractionFailureType.PROCESSING_TIMEOUT) {
+            return;
+        }
+
+        throw new IllegalArgumentException("RETRY_PENDING 상태의 failureType이 올바르지 않습니다.");
+    }
+
+    private static void validateFailedState(
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime sentTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
+    ) {
+        validateFailedCompletionState("FAILED", processingAttempt, processingLease, sentTime, failedTime, failure);
+
+        SlackInteractionFailureType failureType = failure.type();
+        if (failureType == SlackInteractionFailureType.BUSINESS_INVARIANT
+                || failureType == SlackInteractionFailureType.RETRY_EXHAUSTED) {
+            return;
+        }
+
+        throw new IllegalArgumentException("FAILED 상태의 failureType이 올바르지 않습니다.");
+    }
+
+    private static void validateFailedCompletionState(
+            String statusName,
+            int processingAttempt,
+            BoxProcessingLease processingLease,
+            BoxEventTime sentTime,
+            BoxEventTime failedTime,
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
+    ) {
+        if (processingAttempt <= 0) {
+            throw new IllegalArgumentException(statusName + " 상태의 processingAttempt는 1 이상이어야 합니다.");
+        }
+        if (processingLease.isClaimed()) {
+            throw new IllegalArgumentException(statusName + " 상태의 processingLease는 idle이어야 합니다.");
+        }
+        if (sentTime.isPresent()) {
+            throw new IllegalArgumentException(statusName + " 상태에는 sentTime이 없어야 합니다.");
+        }
+        if (!failedTime.isPresent() || !failure.isPresent()) {
+            throw new IllegalArgumentException(statusName + " 상태에는 실패 정보가 필요합니다.");
+        }
+    }
+
     private void validateTransition(ReviewNotificationOutboxStatus expectedStatus, String targetStatus) {
         if (status == expectedStatus) {
             return;
@@ -401,51 +593,15 @@ public class ReviewNotificationOutbox {
         }
     }
 
-    private static void validateStatus(ReviewNotificationOutboxStatus status) {
-        if (status == null) {
-            throw new IllegalArgumentException("status는 비어 있을 수 없습니다.");
-        }
-    }
-
-    private static void validateProcessingAttempt(int processingAttempt) {
-        if (processingAttempt < 0) {
-            throw new IllegalArgumentException("processingAttempt는 0 이상이어야 합니다.");
-        }
-    }
-
-    private static void validateProcessingStartedAt(Instant processingStartedAt) {
-        if (processingStartedAt == null) {
-            throw new IllegalArgumentException("processingStartedAt은 비어 있을 수 없습니다.");
-        }
-    }
-
-    private static void validateSentAtState(Instant sentAt) {
-        if (sentAt == null) {
-            throw new IllegalArgumentException("sentAt은 비어 있을 수 없습니다.");
-        }
-    }
-
-    private static void validateFailedAtState(Instant failedAt) {
-        if (failedAt == null) {
-            throw new IllegalArgumentException("failedAt은 비어 있을 수 없습니다.");
-        }
-    }
-
-    private static void validateFailureReasonState(String failureReason) {
-        if (failureReason == null) {
-            throw new IllegalArgumentException("failureReason은 비어 있을 수 없습니다.");
-        }
-    }
-
-    private static void validateFailureTypeState(SlackInteractionFailureType failureType) {
-        if (failureType == null) {
-            throw new IllegalArgumentException("failureType은 비어 있을 수 없습니다.");
-        }
-    }
-
     private void validateSentAt(Instant sentAt) {
         if (sentAt == null) {
             throw new IllegalArgumentException("sentAt은 비어 있을 수 없습니다.");
+        }
+    }
+
+    private void validateProcessingStartedAt(Instant processingStartedAt) {
+        if (processingStartedAt == null) {
+            throw new IllegalArgumentException("processingStartedAt은 비어 있을 수 없습니다.");
         }
     }
 
@@ -462,7 +618,9 @@ public class ReviewNotificationOutbox {
     }
 
     private void validateFailureType(SlackInteractionFailureType failureType) {
-        if (failureType == null || failureType == SlackInteractionFailureType.NONE) {
+        if (failureType == null
+                || failureType == SlackInteractionFailureType.ABSENT
+                || failureType == SlackInteractionFailureType.NONE) {
             throw new IllegalArgumentException("failureType은 NONE일 수 없습니다.");
         }
     }

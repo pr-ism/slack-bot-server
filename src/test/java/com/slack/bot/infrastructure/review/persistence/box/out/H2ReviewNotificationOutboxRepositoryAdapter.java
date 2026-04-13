@@ -33,11 +33,11 @@ public class H2ReviewNotificationOutboxRepositoryAdapter extends ReviewNotificat
                         :fallbackText,
                         :pendingStatus,
                         :processingAttempt,
-                        :noProcessingStartedAt,
-                        :noSentAt,
-                        :noFailureAt,
-                        :noFailureReason,
-                        :noneFailureType
+                        :processingStartedAt,
+                        :sentAt,
+                        :failedAt,
+                        :failureReason,
+                        :failureType
                     )
                 ) AS source (
                     message_type,
