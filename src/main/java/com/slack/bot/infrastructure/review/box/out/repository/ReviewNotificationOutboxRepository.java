@@ -40,4 +40,6 @@ public interface ReviewNotificationOutboxRepository {
             int maxAttempts,
             int recoveryBatchSize
     );
+
+    int deleteCompletedBefore(Instant completedBefore, int deleteBatchSize);
 }
