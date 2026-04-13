@@ -1,6 +1,6 @@
 package com.slack.bot.infrastructure.review.persistence.box.out;
 
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
+import com.slack.bot.infrastructure.common.BoxEventTime;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxHistory;
@@ -33,7 +33,6 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("messageType", outbox.getMessageType().name())
                 .addValue("idempotencyKey", outbox.getIdempotencyKey())
-                .addValue("projectId", resolveProjectId(outbox))
                 .addValue("teamId", outbox.getTeamId())
                 .addValue("channelId", outbox.getChannelId())
                 .addValue("payloadJsonState", outbox.getPayloadJson().getState().name())
@@ -45,12 +44,9 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                 .addValue("fallbackTextState", outbox.getFallbackText().getState().name())
                 .addValue("fallbackText", outbox.getFallbackText().valueOrBlank())
                 .addValue("pendingStatus", outbox.getStatus().name())
-                .addValue("processingAttempt", outbox.getProcessingAttempt())
-                .addValue("noProcessingStartedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT))
-                .addValue("noSentAt", Timestamp.from(FailureSnapshotDefaults.NO_SENT_AT))
-                .addValue("noFailureAt", Timestamp.from(FailureSnapshotDefaults.NO_FAILURE_AT))
-                .addValue("noFailureReason", FailureSnapshotDefaults.NO_FAILURE_REASON)
-                .addValue("noneFailureType", SlackInteractionFailureType.NONE.name());
+                .addValue("processingAttempt", outbox.getProcessingAttempt());
+        addProjectId(parameters, outbox);
+        addAbsentCompletionState(parameters);
 
         int updatedCount = namedParameterJdbcTemplate.update(
                 buildEnqueueSql(),
@@ -138,14 +134,14 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
 
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("status", outbox.getStatus().name())
-                .addValue("processingStartedAt", toTimestamp(outbox.getProcessingStartedAt()))
-                .addValue("sentAt", toTimestamp(outbox.getSentAt()))
-                .addValue("failedAt", toTimestamp(outbox.getFailedAt()))
-                .addValue("failureReason", outbox.getFailureReason())
-                .addValue("failureType", resolveFailureTypeName(outbox))
                 .addValue("outboxId", outbox.getId())
                 .addValue("processingStatus", ReviewNotificationOutboxStatus.PROCESSING.name())
                 .addValue("claimedProcessingStartedAt", Timestamp.from(claimedProcessingStartedAt));
+        addProcessingLease(parameters, outbox);
+        addEventTime(parameters, "sentAt", outbox.getSentTime());
+        addEventTime(parameters, "failedAt", outbox.getFailedTime());
+        addFailureReason(parameters, outbox);
+        addFailureType(parameters, outbox);
 
         int updatedCount = namedParameterJdbcTemplate.update(
                 """
@@ -217,17 +213,17 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                 SET status = :processingStatus,
                     processing_started_at = :processingStartedAt,
                     processing_attempt = processing_attempt + 1,
-                    sent_at = :noSentAt,
-                    failed_at = :noFailureAt,
-                    failure_reason = :noFailureReason,
-                    failure_type = :noneFailureType
+                    sent_at = :sentAt,
+                    failed_at = :failedAt,
+                    failure_reason = :failureReason,
+                    failure_type = :failureType
                 WHERE id = :outboxId
                 """,
                 updateParameters
-                        .addValue("noSentAt", Timestamp.from(FailureSnapshotDefaults.NO_SENT_AT))
-                        .addValue("noFailureAt", Timestamp.from(FailureSnapshotDefaults.NO_FAILURE_AT))
-                        .addValue("noFailureReason", FailureSnapshotDefaults.NO_FAILURE_REASON)
-                        .addValue("noneFailureType", SlackInteractionFailureType.NONE.name())
+                        .addValue("sentAt", null)
+                        .addValue("failedAt", null)
+                        .addValue("failureReason", null)
+                        .addValue("failureType", null)
         );
         if (updatedCount == 0) {
             return Optional.empty();
@@ -314,8 +310,8 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                         ELSE :retryPendingStatus
                     END,
                     updated_at = :recoveryUpdatedAt,
-                    processing_started_at = :noProcessingStartedAt,
-                    sent_at = :noSentAt,
+                    processing_started_at = :processingStartedAt,
+                    sent_at = :sentAt,
                     failed_at = :failedAt,
                     failure_reason = :failureReason,
                     failure_type = CASE
@@ -331,8 +327,8 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                         .addValue("failedStatus", ReviewNotificationOutboxStatus.FAILED.name())
                         .addValue("retryPendingStatus", ReviewNotificationOutboxStatus.RETRY_PENDING.name())
                         .addValue("recoveryUpdatedAt", Timestamp.valueOf(recoveryUpdatedAt))
-                        .addValue("noProcessingStartedAt", Timestamp.from(FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT))
-                        .addValue("noSentAt", Timestamp.from(FailureSnapshotDefaults.NO_SENT_AT))
+                        .addValue("processingStartedAt", null)
+                        .addValue("sentAt", null)
                         .addValue("failedAt", Timestamp.from(failedAt))
                         .addValue("failureReason", failureReason)
                         .addValue("retryExhaustedFailureType", SlackInteractionFailureType.RETRY_EXHAUSTED.name())
@@ -542,11 +538,11 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                     :fallbackText,
                     :pendingStatus,
                     :processingAttempt,
-                    :noProcessingStartedAt,
-                    :noSentAt,
-                    :noFailureAt,
-                    :noFailureReason,
-                    :noneFailureType
+                    :processingStartedAt,
+                    :sentAt,
+                    :failedAt,
+                    :failureReason,
+                    :failureType
                 )
                 ON DUPLICATE KEY UPDATE
                     idempotency_key = idempotency_key
@@ -577,18 +573,6 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
         }
     }
 
-    private Timestamp toTimestamp(Instant instant) {
-        return Timestamp.from(instant);
-    }
-
-    private Long resolveProjectId(ReviewNotificationOutbox outbox) {
-        if (!outbox.getProjectId().isPresent()) {
-            return null;
-        }
-
-        return outbox.getProjectId().value();
-    }
-
     private ReviewNotificationOutboxJpaEntity findOutboxEntity(ReviewNotificationOutbox outbox) {
         if (!outbox.hasId()) {
             return new ReviewNotificationOutboxJpaEntity();
@@ -604,8 +588,70 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
         historyRepository.save(entity);
     }
 
-    private String resolveFailureTypeName(ReviewNotificationOutbox outbox) {
-        return outbox.getFailureType().name();
+    private void addProjectId(MapSqlParameterSource parameters, ReviewNotificationOutbox outbox) {
+        if (!outbox.getProjectId().isPresent()) {
+            parameters.addValue("projectId", null);
+            return;
+        }
+
+        parameters.addValue("projectId", outbox.getProjectId().value());
+    }
+
+    private void addAbsentCompletionState(MapSqlParameterSource parameters) {
+        parameters.addValue("processingStartedAt", null);
+        parameters.addValue("sentAt", null);
+        parameters.addValue("failedAt", null);
+        parameters.addValue("failureReason", null);
+        parameters.addValue("failureType", null);
+    }
+
+    private void addProcessingLease(
+            MapSqlParameterSource parameters,
+            ReviewNotificationOutbox outbox
+    ) {
+        if (!outbox.getProcessingLease().isClaimed()) {
+            parameters.addValue("processingStartedAt", null);
+            return;
+        }
+
+        parameters.addValue("processingStartedAt", Timestamp.from(outbox.getProcessingLease().startedAt()));
+    }
+
+    private void addEventTime(
+            MapSqlParameterSource parameters,
+            String parameterName,
+            BoxEventTime eventTime
+    ) {
+        if (!eventTime.isPresent()) {
+            parameters.addValue(parameterName, null);
+            return;
+        }
+
+        parameters.addValue(parameterName, Timestamp.from(eventTime.occurredAt()));
+    }
+
+    private void addFailureReason(
+            MapSqlParameterSource parameters,
+            ReviewNotificationOutbox outbox
+    ) {
+        if (!outbox.getFailure().isPresent()) {
+            parameters.addValue("failureReason", null);
+            return;
+        }
+
+        parameters.addValue("failureReason", outbox.getFailure().reason());
+    }
+
+    private void addFailureType(
+            MapSqlParameterSource parameters,
+            ReviewNotificationOutbox outbox
+    ) {
+        if (!outbox.getFailure().isPresent()) {
+            parameters.addValue("failureType", null);
+            return;
+        }
+
+        parameters.addValue("failureType", outbox.getFailure().type().name());
     }
 
     private sealed interface ReviewNotificationOutboxHistoryHolder

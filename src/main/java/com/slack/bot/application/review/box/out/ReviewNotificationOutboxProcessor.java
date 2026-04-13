@@ -145,7 +145,7 @@ public class ReviewNotificationOutboxProcessor {
             Instant claimedProcessingStartedAt
     ) {
         if (!hasProcessingLease(outbox, claimedProcessingStartedAt)) {
-            logLeaseLost(outbox.getId(), claimedProcessingStartedAt, outbox.getProcessingStartedAt());
+            logLeaseLost(outbox.getId(), claimedProcessingStartedAt, describeProcessingLease(outbox));
             return;
         }
 
@@ -172,7 +172,7 @@ public class ReviewNotificationOutboxProcessor {
                     return;
                 }
 
-                logLeaseLost(outbox.getId(), currentProcessingStartedAt.get(), outbox.getProcessingStartedAt());
+                logLeaseLost(outbox.getId(), currentProcessingStartedAt.get(), describeProcessingLease(outbox));
             } catch (Exception e) {
                 log.error(
                         "review_notification outbox 실패 상태 저장에 실패했습니다. outboxId={}",
@@ -194,10 +194,10 @@ public class ReviewNotificationOutboxProcessor {
                 return;
             }
 
-            logLeaseLost(outbox.getId(), currentProcessingStartedAt.get(), outbox.getProcessingStartedAt());
+            logLeaseLost(outbox.getId(), currentProcessingStartedAt.get(), describeProcessingLease(outbox));
         } catch (Exception e) {
             log.error(
-                    "review_notification outbox 전송은 성공했지만 SENT 상태 저장에 실패했습니다. outboxId={}",
+                "review_notification outbox 전송은 성공했지만 SENT 상태 저장에 실패했습니다. outboxId={}",
                     outbox.getId(),
                     e
             );
@@ -298,7 +298,7 @@ public class ReviewNotificationOutboxProcessor {
                 renewedProcessingStartedAt
         );
         if (!renewed) {
-            logLeaseLost(outbox.getId(), currentProcessingStartedAt.get(), renewedProcessingStartedAt);
+            logLeaseLost(outbox.getId(), currentProcessingStartedAt.get(), renewedProcessingStartedAt.toString());
             throw new OutboxProcessingLeaseLostException("review_notification outbox processing lease를 상실했습니다.");
         }
 
@@ -310,21 +310,27 @@ public class ReviewNotificationOutboxProcessor {
             ReviewNotificationOutbox outbox,
             Instant claimedProcessingStartedAt
     ) {
-        Instant actualProcessingStartedAt = outbox.getProcessingStartedAt();
+        return outbox.hasClaimedProcessingLease(claimedProcessingStartedAt);
+    }
 
-        return claimedProcessingStartedAt.equals(actualProcessingStartedAt);
+    private String describeProcessingLease(ReviewNotificationOutbox outbox) {
+        if (!outbox.hasClaimedProcessingLease()) {
+            return "idle";
+        }
+
+        return outbox.currentProcessingLeaseStartedAt().toString();
     }
 
     private void logLeaseLost(
             Long outboxId,
             Instant claimedProcessingStartedAt,
-            Instant actualProcessingStartedAt
+            String actualProcessingLease
     ) {
         log.warn(
-                "review_notification outbox 처리 lease를 상실해 최종 상태 저장을 건너뜁니다. outboxId={}, claimedProcessingStartedAt={}, actualProcessingStartedAt={}",
+                "review_notification outbox 처리 lease를 상실해 최종 상태 저장을 건너뜁니다. outboxId={}, claimedProcessingStartedAt={}, actualProcessingLease={}",
                 outboxId,
                 claimedProcessingStartedAt,
-                actualProcessingStartedAt
+                actualProcessingLease
         );
     }
 }

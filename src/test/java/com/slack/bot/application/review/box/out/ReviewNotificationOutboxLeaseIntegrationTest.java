@@ -13,7 +13,9 @@ import static org.mockito.Mockito.verify;
 import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.worker.PollingHintPublisher;
 import com.slack.bot.application.worker.PollingHintTarget;
-import com.slack.bot.infrastructure.common.FailureSnapshotDefaults;
+import com.slack.bot.infrastructure.common.BoxEventTime;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
+import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
@@ -96,7 +98,7 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
         doAnswer(invocation -> {
             int recoveredCount = reviewNotificationOutboxProcessor.recoverTimeoutProcessing(60_000L);
             assertThat(recoveredCount).isZero();
-            return null;
+            return 0;
         }).when(notificationTransportApiClient).sendBlockMessage(
                 anyString(),
                 anyString(),
@@ -114,7 +116,7 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.SENT),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actual.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
+                () -> assertThat(actual.getFailure().isPresent()).isFalse()
         );
         verify(notificationTransportApiClient).sendBlockMessage(
                 anyString(),
@@ -150,7 +152,7 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
                 () -> assertThat(recoveredCount).isEqualTo(1),
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.RETRY_PENDING),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actual.getFailureReason()).isNotBlank(),
+                () -> assertThat(actual.getFailure().reason()).isNotBlank(),
                 () -> assertThat(histories).hasSize(1),
                 () -> assertThat(histories.getFirst().getStatus()).isEqualTo(ReviewNotificationOutboxStatus.RETRY_PENDING),
                 () -> assertThat(histories.getFirst().getFailure().type()).isEqualTo(
@@ -338,12 +340,11 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
             int processingAttempt
     ) {
         ReflectionTestUtils.setField(outbox, "status", ReviewNotificationOutboxStatus.PROCESSING);
-        ReflectionTestUtils.setField(outbox, "processingStartedAt", processingStartedAt);
-        ReflectionTestUtils.setField(outbox, "sentAt", FailureSnapshotDefaults.NO_SENT_AT);
+        ReflectionTestUtils.setField(outbox, "processingLease", BoxProcessingLease.claimed(processingStartedAt));
+        ReflectionTestUtils.setField(outbox, "sentTime", BoxEventTime.absent());
         ReflectionTestUtils.setField(outbox, "processingAttempt", processingAttempt);
-        ReflectionTestUtils.setField(outbox, "failedAt", FailureSnapshotDefaults.NO_FAILURE_AT);
-        ReflectionTestUtils.setField(outbox, "failureReason", FailureSnapshotDefaults.NO_FAILURE_REASON);
-        ReflectionTestUtils.setField(outbox, "failureType", SlackInteractionFailureType.NONE);
+        ReflectionTestUtils.setField(outbox, "failedTime", BoxEventTime.absent());
+        ReflectionTestUtils.setField(outbox, "failure", BoxFailureSnapshot.absent());
     }
 
     private void awaitLatch(CountDownLatch latch) {
