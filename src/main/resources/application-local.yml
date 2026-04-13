@@ -98,6 +98,12 @@ app:
       max-pool-size: 4
       thread-name-prefix: review-interaction-
       queue-capacity: 500
+  cleanup:
+    box:
+      enabled: false
+      fixed-delay-ms: 1800000
+      retention-days: 30
+      delete-batch-size: 500
   interaction:
     inbox:
       block-actions:

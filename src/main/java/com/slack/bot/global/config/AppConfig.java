@@ -19,6 +19,7 @@ import com.slack.bot.application.interaction.block.handler.StartReviewActionHand
 import com.slack.bot.application.setting.strategy.NotificationSettingsUpdater;
 import com.slack.bot.global.config.properties.AccessLinkKeyProperties;
 import com.slack.bot.global.config.properties.AppProperties;
+import com.slack.bot.global.config.properties.BoxCleanupProperties;
 import com.slack.bot.global.config.properties.ClaimMappingMessageProperties;
 import com.slack.bot.global.config.properties.CommandMessageProperties;
 import com.slack.bot.global.config.properties.EventMessageProperties;
@@ -47,6 +48,7 @@ import org.springframework.web.client.RestClient;
 @EnableScheduling
 @EnableConfigurationProperties({
         SlackProperties.class, AccessLinkKeyProperties.class, CommandMessageProperties.class, AppProperties.class,
+        BoxCleanupProperties.class,
         SlackEventAsyncProperties.class, EventMessageProperties.class, ReviewReminderMessageProperties.class,
         ReviewReservationTimeOptionsProperties.class, ClaimMappingMessageProperties.class, ReviewWorkerProperties.class
 })
