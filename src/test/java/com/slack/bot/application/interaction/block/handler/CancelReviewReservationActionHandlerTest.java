@@ -62,8 +62,8 @@ class CancelReviewReservationActionHandlerTest {
                 () -> assertThat(actual.duplicateReservation()).isNull(),
                 () -> assertThat(actual.cancelledReservation()).isNotNull(),
                 () -> assertThat(actual.cancelledReservation().getId()).isEqualTo(100L),
-                () -> assertThat(actualCancelled).isPresent(),
-                () -> assertThat(actualCancelled.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED),
+                () -> assertThat(actualCancelled).hasValueSatisfying(cancelledReservation ->
+                        assertThat(cancelledReservation.getStatus()).isEqualTo(ReservationStatus.CANCELLED)),
                 () -> assertThat(actualApplicationEvents.stream(ReviewReservationCancelEvent.class).toList())
                                         .singleElement()
                                         .satisfies(actualEvent -> assertAll(

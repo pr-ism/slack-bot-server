@@ -29,9 +29,10 @@ class ProjectMemberReaderTest {
 
         // then
         assertAll(
-                () -> assertThat(actualMember).isPresent(),
-                () -> assertThat(actualMember.get().getSlackUserId()).isEqualTo("U1"),
-                () -> assertThat(actualMember.get().getTeamId()).isEqualTo("T1")
+                () -> assertThat(actualMember).hasValueSatisfying(projectMember -> assertAll(
+                        () -> assertThat(projectMember.getSlackUserId()).isEqualTo("U1"),
+                        () -> assertThat(projectMember.getTeamId()).isEqualTo("T1")
+                ))
         );
     }
 }

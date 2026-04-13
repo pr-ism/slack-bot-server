@@ -109,14 +109,16 @@ class ReviewInteractionEventHandlerTest {
             );
 
             assertAll(
-                    () -> assertThat(actual).isPresent(),
-                    () -> assertThat(actual.get().getInteractionTimeline().getReviewTimeSelectedAt()).isNotNull(),
-                    () -> assertThat(actual.get().getInteractionTimeline().getReviewScheduledAt()).isEqualTo(reviewScheduledAt),
-                    () -> assertThat(actual.get().getInteractionTimeline().getPullRequestNotifiedAt())
-                            .isIn(firstNotifiedAt, fulfilledNotifiedAt),
-                    () -> assertThat(actual.get().getInteractionCount().getScheduleChangeCount()).isEqualTo(1),
-                    () -> assertThat(actual.get().getInteractionCount().getScheduleCancelCount()).isEqualTo(1),
-                    () -> assertThat(actual.get().isReviewFulfilled()).isTrue()
+                    () -> assertThat(actual).hasValueSatisfying(interaction -> assertAll(
+                            () -> assertThat(interaction.getInteractionTimeline().getReviewTimeSelectedAt()).isNotNull(),
+                            () -> assertThat(interaction.getInteractionTimeline().getReviewScheduledAt())
+                                    .isEqualTo(reviewScheduledAt),
+                            () -> assertThat(interaction.getInteractionTimeline().getPullRequestNotifiedAt())
+                                    .isIn(firstNotifiedAt, fulfilledNotifiedAt),
+                            () -> assertThat(interaction.getInteractionCount().getScheduleChangeCount()).isEqualTo(1),
+                            () -> assertThat(interaction.getInteractionCount().getScheduleCancelCount()).isEqualTo(1),
+                            () -> assertThat(interaction.isReviewFulfilled()).isTrue()
+                    ))
             );
         });
     }
@@ -161,9 +163,9 @@ class ReviewInteractionEventHandlerTest {
             long savedCount = jpaReviewReservationInteractionRepository.count();
 
             assertAll(
-                    () -> assertThat(actual).isPresent(),
                     () -> assertThat(savedCount).isEqualTo(1L),
-                    () -> assertThat(actual.get().getInteractionCount().getScheduleChangeCount()).isEqualTo(1)
+                    () -> assertThat(actual).hasValueSatisfying(interaction ->
+                            assertThat(interaction.getInteractionCount().getScheduleChangeCount()).isEqualTo(1))
             );
         });
     }
@@ -248,8 +250,8 @@ class ReviewInteractionEventHandlerTest {
             );
 
             assertAll(
-                    () -> assertThat(actual).isPresent(),
-                    () -> assertThat(actual.get().getInteractionTimeline().getPullRequestNotifiedAt()).isNotNull()
+                    () -> assertThat(actual).hasValueSatisfying(interaction ->
+                            assertThat(interaction.getInteractionTimeline().getPullRequestNotifiedAt()).isNotNull())
             );
         });
     }
@@ -301,8 +303,8 @@ class ReviewInteractionEventHandlerTest {
 
             assertAll(
                     () -> assertThat(savedCount).isEqualTo(1L),
-                    () -> assertThat(actual).isPresent(),
-                    () -> assertThat(actual.get().getInteractionCount().getScheduleChangeCount()).isEqualTo(2)
+                    () -> assertThat(actual).hasValueSatisfying(interaction ->
+                            assertThat(interaction.getInteractionCount().getScheduleChangeCount()).isEqualTo(2))
             );
         });
     }

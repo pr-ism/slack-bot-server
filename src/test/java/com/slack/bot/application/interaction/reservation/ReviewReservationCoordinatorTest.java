@@ -70,8 +70,8 @@ class ReviewReservationCoordinatorTest {
 
         // then
         assertAll(
-                () -> assertThat(actual).isPresent(),
-                () -> assertThat(actual.get().getId()).isEqualTo(created.getId())
+                () -> assertThat(actual).hasValueSatisfying(reservation ->
+                        assertThat(reservation.getId()).isEqualTo(created.getId()))
         );
     }
 
@@ -112,8 +112,8 @@ class ReviewReservationCoordinatorTest {
 
         // then
         assertAll(
-                () -> assertThat(actual).isPresent(),
-                () -> assertThat(actual.get().getId()).isEqualTo(created.getId())
+                () -> assertThat(actual).hasValueSatisfying(reservation ->
+                        assertThat(reservation.getId()).isEqualTo(created.getId()))
         );
     }
 
@@ -289,8 +289,8 @@ class ReviewReservationCoordinatorTest {
         // 원래 예약은 취소됨
         Optional<ReviewReservation> actualOriginalReservation = reservationRepository.findById(original.getId());
         assertAll(
-                () -> assertThat(actualOriginalReservation).isPresent(),
-                () -> assertThat(actualOriginalReservation.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED)
+                () -> assertThat(actualOriginalReservation).hasValueSatisfying(reservation ->
+                        assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.CANCELLED))
         );
     }
 
@@ -338,8 +338,8 @@ class ReviewReservationCoordinatorTest {
                 () -> assertThat(actual.getId()).isEqualTo(original.getId()),
                 () -> assertThat(actual.getScheduledAt()).isEqualTo(rescheduledAt),
                 () -> assertThat(actual.getStatus()).isEqualTo(ReservationStatus.ACTIVE),
-                () -> assertThat(actualReminder).isPresent(),
-                () -> assertThat(actualReminder.get().getScheduledAt()).isEqualTo(rescheduledAt)
+                () -> assertThat(actualReminder).hasValueSatisfying(reminder ->
+                        assertThat(reminder.getScheduledAt()).isEqualTo(rescheduledAt))
         );
     }
 
@@ -400,8 +400,8 @@ class ReviewReservationCoordinatorTest {
         Optional<ReviewReservation> actual = reservationRepository.findById(second.getId());
 
         assertAll(
-                () -> assertThat(actual).isPresent(),
-                () -> assertThat(actual.get().getStatus()).isEqualTo(ReservationStatus.ACTIVE)
+                () -> assertThat(actual).hasValueSatisfying(reservation ->
+                        assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.ACTIVE))
         );
     }
 
@@ -539,8 +539,8 @@ class ReviewReservationCoordinatorTest {
 
         // then
         assertAll(
-                () -> assertThat(actual).isPresent(),
-                () -> assertThat(actual.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED)
+                () -> assertThat(actual).hasValueSatisfying(reservation ->
+                        assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.CANCELLED))
         );
     }
 
@@ -581,8 +581,8 @@ class ReviewReservationCoordinatorTest {
 
         // then
         assertAll(
-                () -> assertThat(actual).isPresent(),
-                () -> assertThat(actual.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED)
+                () -> assertThat(actual).hasValueSatisfying(reservation ->
+                        assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.CANCELLED))
         );
     }
 

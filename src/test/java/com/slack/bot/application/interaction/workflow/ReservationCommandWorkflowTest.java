@@ -68,7 +68,7 @@ class ReservationCommandWorkflowTest {
     }
 
     @Test
-    void 예약_ID가_숫자가_아니면_아무_동작도_하지_않는다(ApplicationEvents actualApplicationEvents) {
+    void 예약_ID가_숫자가_아니면_예약_로드_실패_알림을_보내고_취소를_중단한다(ApplicationEvents actualApplicationEvents) {
         // given
         JsonNode action = actionWithReservationId("invalid");
 
@@ -83,7 +83,12 @@ class ReservationCommandWorkflowTest {
 
         // then
         assertThat(actual).isEmpty();
-        verify(notificationApiClient, never()).sendEphemeralMessage(any(), any(), any(), any());
+        verify(notificationApiClient).sendEphemeralMessage(
+                        "xoxb-test-token",
+                        "C1",
+                        "U1",
+                        InteractionErrorType.RESERVATION_LOAD_FAILURE.message()
+                );
         assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty();
     }
 
@@ -140,10 +145,10 @@ class ReservationCommandWorkflowTest {
                         ));
         verify(notificationApiClient, never()).sendEphemeralMessage(any(), any(), any(), any());
         assertAll(
-                () -> assertThat(actual).isPresent(),
-                () -> assertThat(actual.get().getId()).isEqualTo(100L),
-                () -> assertThat(actualCancelled).isPresent(),
-                () -> assertThat(actualCancelled.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED)
+                () -> assertThat(actual).hasValueSatisfying(cancelledReservation ->
+                        assertThat(cancelledReservation.getId()).isEqualTo(100L)),
+                () -> assertThat(actualCancelled).hasValueSatisfying(cancelledReservation ->
+                        assertThat(cancelledReservation.getStatus()).isEqualTo(ReservationStatus.CANCELLED))
         );
     }
 
@@ -380,6 +385,34 @@ class ReservationCommandWorkflowTest {
                         "C1",
                         "U1",
                         InteractionErrorType.RESERVATION_NOT_FOUND.message()
+                );
+        assertThat(actual.stream(ReviewInteractionEvent.class).toList()).isEmpty();
+        verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
+    }
+
+    @Test
+    void 리뷰_예약_변경_요청에서_예약_ID가_숫자가_아니면_예약_로드_실패_알림을_보내고_모달을_열지_않는다(ApplicationEvents actual) {
+        // given
+        JsonNode payload = objectMapper.createObjectNode()
+                                       .put("trigger_id", "TRIGGER_1");
+        JsonNode action = actionWithReservationId("invalid");
+
+        // when
+        reservationCommandWorkflow.handleChange(
+                payload,
+                action,
+                "T1",
+                "C1",
+                "U1",
+                "xoxb-test-token"
+        );
+
+        // then
+        verify(notificationApiClient).sendEphemeralMessage(
+                        "xoxb-test-token",
+                        "C1",
+                        "U1",
+                        InteractionErrorType.RESERVATION_LOAD_FAILURE.message()
                 );
         assertThat(actual.stream(ReviewInteractionEvent.class).toList()).isEmpty();
         verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));

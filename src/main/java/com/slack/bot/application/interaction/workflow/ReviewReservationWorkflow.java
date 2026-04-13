@@ -148,6 +148,15 @@ public class ReviewReservationWorkflow {
     ) {
         try {
             return action.get();
+        } catch (InvalidReservationIdException e) {
+            log.info("리뷰 예약 메타 reservationId 유효성 실패: {}", e.getMessage());
+
+            return errorNotifier.respond(
+                    token,
+                    meta.channelId(),
+                    reviewerId,
+                    InteractionErrorType.INVALID_META
+            );
         } catch (ReservationScheduleInPastException e) {
             log.info("리뷰 예약 시간 유효성 실패: {}", e.getMessage());
 
@@ -190,39 +199,82 @@ public class ReviewReservationWorkflow {
             String token,
             Instant scheduledAt
     ) {
-        Long reservationId = parseReservationId(meta.reservationId());
-        boolean isReschedule = reservationId != null;
         ReservationPullRequest reservationPullRequest = ReservationPullRequest.builder()
                                                                           .githubPullRequestId(meta.githubPullRequestId())
                                                                           .pullRequestNumber(meta.pullRequestNumber())
                                                                           .pullRequestTitle(meta.pullRequestTitle())
                                                                           .pullRequestUrl(meta.pullRequestUrl())
                                                                           .build();
+        ReservationIdResolution reservationIdResolution = resolveReservationId(meta.reservationId());
 
+        if (reservationIdResolution instanceof MissingReservationId) {
+            return baseContextBuilder(meta, reviewerId, token, scheduledAt, reservationPullRequest)
+                    .isReschedule(false)
+                    .build();
+        }
+        if (reservationIdResolution instanceof InvalidReservationId invalidReservationId) {
+            throw new InvalidReservationIdException(invalidReservationId.rawValue());
+        }
+
+        ValidReservationId validReservationId = (ValidReservationId) reservationIdResolution;
+
+        return baseContextBuilder(meta, reviewerId, token, scheduledAt, reservationPullRequest)
+                .isReschedule(true)
+                .reservationId(validReservationId.reservationId())
+                .build();
+    }
+
+    private ReservationContextDto.ReservationContextDtoBuilder baseContextBuilder(
+            ReviewScheduleMetaDto meta,
+            String reviewerId,
+            String token,
+            Instant scheduledAt,
+            ReservationPullRequest reservationPullRequest
+    ) {
         return ReservationContextDto.builder()
                                     .meta(meta)
                                     .reviewerId(reviewerId)
                                     .token(token)
                                     .scheduledAt(scheduledAt)
                                     .authorSlackId(authorResolver.resolveAuthorSlackId(meta))
-                                    .isReschedule(isReschedule)
                                     .projectId(projectIdResolver.resolve(meta.projectId(), meta.teamId()))
-                                    .reservationPullRequest(reservationPullRequest)
-                                    .reservationId(reservationId)
-                                    .build();
+                                    .reservationPullRequest(reservationPullRequest);
     }
 
-    private Long parseReservationId(String rawId) {
+    private ReservationIdResolution resolveReservationId(String rawId) {
         return Optional.ofNullable(rawId)
                        .filter(value -> !value.isBlank())
-                       .map(value -> {
-                           try {
-                               return Long.parseLong(value);
-                           } catch (NumberFormatException e) {
-                               log.warn("유효하지 않은 reservationId: {}", value);
-                               return null;
-                           }
-                       })
-                       .orElse(null);
+                       .<ReservationIdResolution>map(value -> parseReservationIdSafely(value)
+                               .<ReservationIdResolution>map(reservationId -> new ValidReservationId(reservationId))
+                               .orElseGet(() -> new InvalidReservationId(value)))
+                       .orElseGet(() -> new MissingReservationId());
+    }
+
+    private Optional<Long> parseReservationIdSafely(String value) {
+        try {
+            return Optional.of(Long.parseLong(value));
+        } catch (NumberFormatException e) {
+            log.warn("유효하지 않은 reservationId: {}", value);
+            return Optional.empty();
+        }
+    }
+
+    private sealed interface ReservationIdResolution permits MissingReservationId, InvalidReservationId, ValidReservationId {
+    }
+
+    private record MissingReservationId() implements ReservationIdResolution {
+    }
+
+    private record InvalidReservationId(String rawValue) implements ReservationIdResolution {
+    }
+
+    private record ValidReservationId(Long reservationId) implements ReservationIdResolution {
+    }
+
+    private static class InvalidReservationIdException extends RuntimeException {
+
+        private InvalidReservationIdException(String rawValue) {
+            super("유효하지 않은 reservationId입니다: " + rawValue);
+        }
     }
 }

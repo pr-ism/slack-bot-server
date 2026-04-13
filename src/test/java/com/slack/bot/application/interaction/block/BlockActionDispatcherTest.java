@@ -79,8 +79,8 @@ class BlockActionDispatcherTest {
 
         assertAll(
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
-                () -> assertThat(actualMapped).isPresent(),
-                () -> assertThat(actualMapped.get().getGithubId().getValue()).isEqualTo("new-github-id")
+                () -> assertThat(actualMapped).hasValueSatisfying(projectMember ->
+                        assertThat(projectMember.getGithubId().getValue()).isEqualTo("new-github-id"))
         );
         verify(notificationApiClient).sendEphemeralMessage(
                         eq("xoxb-test-token"),
@@ -184,8 +184,8 @@ class BlockActionDispatcherTest {
                 () -> assertThat(actual.duplicateReservation()).isNull(),
                 () -> assertThat(actual.cancelledReservation()).isNotNull(),
                 () -> assertThat(actual.cancelledReservation().getId()).isEqualTo(100L),
-                () -> assertThat(actualCancelled).isPresent(),
-                () -> assertThat(actualCancelled.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED)
+                () -> assertThat(actualCancelled).hasValueSatisfying(reservation ->
+                        assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.CANCELLED))
         );
     }
 

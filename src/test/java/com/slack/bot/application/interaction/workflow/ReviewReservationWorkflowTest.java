@@ -71,9 +71,10 @@ class ReviewReservationWorkflowTest {
 
         assertAll(
                 () -> assertThat(actual).isEqualTo(SlackActionResponse.clear()),
-                () -> assertThat(actualSaved).isPresent(),
-                () -> assertThat(actualSaved.get().getReservationPullRequest().getGithubPullRequestId()).isEqualTo(10L),
-                () -> assertThat(actualSaved.get().getReservationPullRequest().getPullRequestTitle()).isEqualTo("PR 제목"),
+                () -> assertThat(actualSaved).hasValueSatisfying(reservation -> assertAll(
+                        () -> assertThat(reservation.getReservationPullRequest().getGithubPullRequestId()).isEqualTo(10L),
+                        () -> assertThat(reservation.getReservationPullRequest().getPullRequestTitle()).isEqualTo("PR 제목")
+                )),
                 () -> assertThat(actualApplicationEvents.stream(ReviewReservationScheduledEvent.class).toList())
                         .singleElement()
                         .satisfies(actualEvent -> assertAll(
@@ -104,8 +105,8 @@ class ReviewReservationWorkflowTest {
 
         assertAll(
                 () -> assertThat(actual).isEqualTo(SlackActionResponse.empty()),
-                () -> assertThat(actualActive).isPresent(),
-                () -> assertThat(actualActive.get().getId()).isEqualTo(100L),
+                () -> assertThat(actualActive).hasValueSatisfying(activeReservation ->
+                        assertThat(activeReservation.getId()).isEqualTo(100L)),
                 () -> assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
     }
@@ -132,7 +133,7 @@ class ReviewReservationWorkflowTest {
 
     @Test
     @Sql("classpath:sql/fixtures/interaction/project_123.sql")
-    void reservation_ID가_숫자가_아니면_신규_예약으로_처리한다(ApplicationEvents actualApplicationEvents) {
+    void reservation_ID가_숫자가_아니면_INVALID_META_알림을_보내고_예약을_중단한다(ApplicationEvents actualApplicationEvents) {
         // given
         ReviewScheduleMetaDto meta = meta("123", "abc");
         Instant scheduledAt = Instant.now().plusSeconds(3600);
@@ -144,19 +145,16 @@ class ReviewReservationWorkflowTest {
         Optional<ReviewReservation> actualSaved = reviewReservationRepository.findActive("T1", 123L, "U1");
 
         assertAll(
-                () -> assertThat(actual).isEqualTo(SlackActionResponse.clear()),
-                () -> assertThat(actualSaved).isPresent(),
-                () -> assertThat(actualSaved.get().getId()).isNotNull(),
-                () -> assertThat(actualApplicationEvents.stream(ReviewReservationScheduledEvent.class).toList())
-                        .singleElement()
-                        .satisfies(actualEvent -> assertAll(
-                                () -> assertThat(actualEvent.teamId()).isEqualTo("T1"),
-                                () -> assertThat(actualEvent.channelId()).isEqualTo("C1"),
-                                () -> assertThat(actualEvent.slackUserId()).isEqualTo("U1"),
-                                () -> assertThat(actualEvent.projectId()).isEqualTo(123L),
-                                () -> assertThat(actualEvent.githubPullRequestId()).isEqualTo(10L)
-                        ))
+                () -> assertThat(actual).isEqualTo(SlackActionResponse.empty()),
+                () -> assertThat(actualSaved).isEmpty(),
+                () -> assertThat(actualApplicationEvents.stream(ReviewInteractionEvent.class).toList()).isEmpty()
         );
+        verify(notificationApiClient).sendEphemeralMessage(
+                        "xoxb-test-token",
+                        "C1",
+                        "U1",
+                        InteractionErrorType.INVALID_META.message()
+                );
     }
 
     @Test
@@ -177,8 +175,8 @@ class ReviewReservationWorkflowTest {
 
         assertAll(
                 () -> assertThat(actual).isEqualTo(SlackActionResponse.clear()),
-                () -> assertThat(actualChanged).isPresent(),
-                () -> assertThat(actualChanged.get().getScheduledAt()).isEqualTo(scheduledAt)
+                () -> assertThat(actualChanged).hasValueSatisfying(changedReservation ->
+                        assertThat(changedReservation.getScheduledAt()).isEqualTo(scheduledAt))
         );
         verify(notificationApiClient, never()).sendEphemeralMessage(any(), any(), any(), any());
         verify(notificationApiClient, never()).sendEphemeralBlockMessage(any(), any(), any(), any(), any());

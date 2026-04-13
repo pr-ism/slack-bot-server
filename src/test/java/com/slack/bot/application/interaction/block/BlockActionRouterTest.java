@@ -54,10 +54,13 @@ class BlockActionRouterTest {
 
         // then
         assertAll(
-                () -> assertThat(actual).isPresent(),
-                () -> assertThat(actual.get().context().actionId()).isEqualTo(BlockActionType.CANCEL_REVIEW_RESERVATION.value()),
-                () -> assertThat(actual.get().outcome().cancelledReservation()).isNotNull(),
-                () -> assertThat(actual.get().outcome().cancelledReservation().getId()).isEqualTo(100L)
+                () -> assertThat(actual).hasValueSatisfying(result -> assertAll(
+                        () -> assertThat(result.context().actionId()).isEqualTo(
+                                BlockActionType.CANCEL_REVIEW_RESERVATION.value()
+                        ),
+                        () -> assertThat(result.outcome().cancelledReservation()).isNotNull(),
+                        () -> assertThat(result.outcome().cancelledReservation().getId()).isEqualTo(100L)
+                ))
         );
     }
 

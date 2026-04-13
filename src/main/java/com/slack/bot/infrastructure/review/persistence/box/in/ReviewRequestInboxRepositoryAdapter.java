@@ -26,10 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRepository {
 
-    private static final List<ReviewRequestInboxStatus> CLAIMABLE_STATUSES = List.of(
-            ReviewRequestInboxStatus.PENDING,
-            ReviewRequestInboxStatus.RETRY_PENDING
-    );
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
     private final JpaReviewRequestInboxRepository reviewRequestInboxJpaRepository;
     private final JpaReviewRequestInboxHistoryRepository reviewRequestInboxHistoryJpaRepository;

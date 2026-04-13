@@ -18,6 +18,7 @@ import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxHistory;
+import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxStringField;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxStatus;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
 import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxHistoryRepository;
@@ -152,7 +153,7 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
                 () -> assertThat(actual.getFailureReason()).isNotBlank(),
                 () -> assertThat(histories).hasSize(1),
                 () -> assertThat(histories.getFirst().getStatus()).isEqualTo(ReviewNotificationOutboxStatus.RETRY_PENDING),
-                () -> assertThat(histories.getFirst().getFailureType()).isEqualTo(
+                () -> assertThat(histories.getFirst().getFailure().type()).isEqualTo(
                         SlackInteractionFailureType.PROCESSING_TIMEOUT
                 )
         );
@@ -188,7 +189,8 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
                                                                          outboxId
                                                                  ).orElseThrow())
                                                                  .toList();
-        List<ReviewNotificationOutboxHistory> actualHistories = jpaReviewNotificationOutboxHistoryRepository.findAll();
+        List<ReviewNotificationOutboxHistory> actualHistories =
+                jpaReviewNotificationOutboxHistoryRepository.findAllDomains();
 
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(100),
@@ -236,7 +238,8 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
                                                                          outboxId
                                                                  ).orElseThrow())
                                                                  .toList();
-        List<ReviewNotificationOutboxHistory> actualHistories = jpaReviewNotificationOutboxHistoryRepository.findAll();
+        List<ReviewNotificationOutboxHistory> actualHistories =
+                jpaReviewNotificationOutboxHistoryRepository.findAllDomains();
 
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(100),
@@ -247,10 +250,10 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
                 () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == ReviewNotificationOutboxStatus.PROCESSING)
                         .hasSize(1),
                 () -> assertThat(actualHistories).filteredOn(
-                        history -> history.getFailureType() == SlackInteractionFailureType.PROCESSING_TIMEOUT
+                        history -> history.getFailure().type() == SlackInteractionFailureType.PROCESSING_TIMEOUT
                 ).hasSize(50),
                 () -> assertThat(actualHistories).filteredOn(
-                        history -> history.getFailureType() == SlackInteractionFailureType.RETRY_EXHAUSTED
+                        history -> history.getFailure().type() == SlackInteractionFailureType.RETRY_EXHAUSTED
                 ).hasSize(50)
         );
         verify(notificationTransportApiClient, never()).sendBlockMessage(
@@ -300,7 +303,7 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
             assertAll(
                     () -> assertThat(skippedCount).isZero(),
                     () -> assertThat(lockedOutbox.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.PROCESSING),
-                    () -> assertThat(jpaReviewNotificationOutboxHistoryRepository.findAll()).isEmpty()
+                    () -> assertThat(jpaReviewNotificationOutboxHistoryRepository.findAllDomains()).isEmpty()
             );
 
             releaseLock.countDown();
@@ -311,17 +314,18 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
     }
 
     private ReviewNotificationOutbox pendingOutbox(String idempotencyKey) {
-        return ReviewNotificationOutbox.builder()
-                                       .idempotencyKey(idempotencyKey)
-                                       .teamId("T1")
-                                       .channelId("C1")
-                                       .blocksJson("[]")
-                                       .fallbackText("fallback")
-                                       .build();
+        return ReviewNotificationOutbox.channelBlocks(
+                idempotencyKey,
+                "T1",
+                "C1",
+                "[]",
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStringField.present("fallback")
+        );
     }
 
     private List<ReviewNotificationOutboxHistory> historiesOf(Long outboxId) {
-        return jpaReviewNotificationOutboxHistoryRepository.findAll()
+        return jpaReviewNotificationOutboxHistoryRepository.findAllDomains()
                                                            .stream()
                                                            .filter(history -> outboxId.equals(history.getOutboxId()))
                                                            .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))

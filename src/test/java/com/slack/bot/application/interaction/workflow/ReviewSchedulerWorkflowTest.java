@@ -167,8 +167,8 @@ class ReviewSchedulerWorkflowTest {
                         ));
         verify(notificationApiClient, never()).openModal(any(), any(), any(View.class));
         assertAll(
-                () -> assertThat(actual).isPresent(),
-                () -> assertThat(actual.get().getId()).isEqualTo(100L)
+                () -> assertThat(actual).hasValueSatisfying(reservation ->
+                        assertThat(reservation.getId()).isEqualTo(100L))
         );
     }
 

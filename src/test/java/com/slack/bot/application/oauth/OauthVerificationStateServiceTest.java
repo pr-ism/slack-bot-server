@@ -40,10 +40,11 @@ class OauthVerificationStateServiceTest {
         Optional<OauthVerificationState> actual = stateRepository.findByState(stateToken);
 
         assertAll(
-                () -> assertThat(actual).isPresent(),
-                () -> assertThat(actual.get().getUserId()).isEqualTo(42L),
-                () -> assertThat(actual.get().getState()).isEqualTo(stateToken),
-                () -> assertThat(actual.get().isExpired(LocalDateTime.now(clock))).isFalse()
+                () -> assertThat(actual).hasValueSatisfying(state -> assertAll(
+                        () -> assertThat(state.getUserId()).isEqualTo(42L),
+                        () -> assertThat(state.getState()).isEqualTo(stateToken),
+                        () -> assertThat(state.isExpired(LocalDateTime.now(clock))).isFalse()
+                ))
         );
     }
 

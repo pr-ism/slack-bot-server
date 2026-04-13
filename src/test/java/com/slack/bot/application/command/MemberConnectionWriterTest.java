@@ -44,9 +44,10 @@ class MemberConnectionWriterTest {
 
         assertAll(
                 () -> assertThat(actualConnectedName).isEqualTo("홍길동"),
-                () -> assertThat(actualUpdatedMember).isPresent(),
-                () -> assertThat(actualUpdatedMember.get().getDisplayName()).isEqualTo("홍길동"),
-                () -> assertThat(actualUpdatedMember.get().getGithubId().getValue()).isEqualTo("gildong")
+                () -> assertThat(actualUpdatedMember).hasValueSatisfying(projectMember -> assertAll(
+                        () -> assertThat(projectMember.getDisplayName()).isEqualTo("홍길동"),
+                        () -> assertThat(projectMember.getGithubId().getValue()).isEqualTo("gildong")
+                ))
         );
     }
 
@@ -65,9 +66,10 @@ class MemberConnectionWriterTest {
 
         assertAll(
                 () -> assertThat(actualConnectedName).isEqualTo("신규 사용자"),
-                () -> assertThat(actualSavedMember).isPresent(),
-                () -> assertThat(actualSavedMember.get().getDisplayName()).isEqualTo("신규 사용자"),
-                () -> assertThat(actualSavedMember.get().getGithubId().getValue()).isEqualTo("gildong")
+                () -> assertThat(actualSavedMember).hasValueSatisfying(projectMember -> assertAll(
+                        () -> assertThat(projectMember.getDisplayName()).isEqualTo("신규 사용자"),
+                        () -> assertThat(projectMember.getGithubId().getValue()).isEqualTo("gildong")
+                ))
         );
     }
 
@@ -115,9 +117,10 @@ class MemberConnectionWriterTest {
 
         // then
         assertAll(
-                () -> assertThat(actualSavedMember).isPresent(),
-                () -> assertThat(actualSavedMember.get().getDisplayName()).isEqualTo(displayName),
-                () -> assertThat(actualSavedMember.get().getGithubId().getValue()).isEqualTo(githubId)
+                () -> assertThat(actualSavedMember).hasValueSatisfying(projectMember -> assertAll(
+                        () -> assertThat(projectMember.getDisplayName()).isEqualTo(displayName),
+                        () -> assertThat(projectMember.getGithubId().getValue()).isEqualTo(githubId)
+                ))
         );
     }
 }

@@ -132,12 +132,7 @@ public class NotificationApiClient {
             return sourceKey;
         }
 
-        String contextSourceKey = outboxIdempotencySourceContext.currentSourceKey()
-                                                                .orElse(null);
-        if (contextSourceKey != null) {
-            return contextSourceKey;
-        }
-
-        return AD_HOC_SOURCE_PREFIX + UUID.randomUUID();
+        return outboxIdempotencySourceContext.currentSourceKey()
+                                             .orElseGet(() -> AD_HOC_SOURCE_PREFIX + UUID.randomUUID());
     }
 }

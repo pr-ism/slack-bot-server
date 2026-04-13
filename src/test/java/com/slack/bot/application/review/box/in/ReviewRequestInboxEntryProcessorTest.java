@@ -85,7 +85,7 @@ class ReviewRequestInboxEntryProcessorTest {
                 .hasMessageContaining("processing lease");
 
         ReviewRequestInbox actualInbox = jpaReviewRequestInboxRepository.findDomainById(inbox.getId()).orElseThrow();
-        List<ReviewNotificationOutbox> actualOutboxes = jpaReviewNotificationOutboxRepository.findAll();
+        List<ReviewNotificationOutbox> actualOutboxes = jpaReviewNotificationOutboxRepository.findAllDomains();
 
         assertAll(
                 () -> assertThat(actualInbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),

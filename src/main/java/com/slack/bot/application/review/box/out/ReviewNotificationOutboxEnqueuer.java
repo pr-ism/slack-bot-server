@@ -9,6 +9,7 @@ import com.slack.bot.application.review.dto.ReviewNotificationPayload;
 import com.slack.bot.application.worker.PollingHintPublisher;
 import com.slack.bot.application.worker.PollingHintTarget;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
+import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxStringField;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -38,13 +39,13 @@ public class ReviewNotificationOutboxEnqueuer {
                 idempotencyPayload
         );
 
-        ReviewNotificationOutbox outbox = ReviewNotificationOutbox.builder()
-                                                                  .idempotencyKey(idempotencyKey)
-                                                                  .projectId(projectId)
-                                                                  .teamId(teamId)
-                                                                  .channelId(channelId)
-                                                                  .payloadJson(payloadJson)
-                                                                  .build();
+        ReviewNotificationOutbox outbox = ReviewNotificationOutbox.semantic(
+                idempotencyKey,
+                projectId,
+                teamId,
+                channelId,
+                payloadJson
+        );
 
         reviewNotificationOutboxRepository.enqueue(outbox);
         pollingHintPublisher.publish(PollingHintTarget.REVIEW_NOTIFICATION_OUTBOX);
@@ -59,21 +60,22 @@ public class ReviewNotificationOutboxEnqueuer {
             String fallbackText
     ) {
         String normalizedBlocksJson = normalizeBlocks(blocks);
-        String normalizedAttachmentsJson = normalizeAttachments(attachments);
+        ReviewNotificationOutboxStringField normalizedAttachmentsJson = normalizeAttachments(attachments);
+        ReviewNotificationOutboxStringField normalizedFallbackText = normalizeFallbackText(fallbackText);
         String idempotencyPayload = idempotencyPayloadEncoder.encode(sourceKey, teamId, channelId);
         String idempotencyKey = idempotencyKeyGenerator.generate(
                 ReviewNotificationIdempotencyScope.REVIEW_NOTIFICATION_OUTBOX,
                 idempotencyPayload
         );
 
-        ReviewNotificationOutbox outbox = ReviewNotificationOutbox.builder()
-                                                                  .idempotencyKey(idempotencyKey)
-                                                                  .teamId(teamId)
-                                                                  .channelId(channelId)
-                                                                  .blocksJson(normalizedBlocksJson)
-                                                                  .attachmentsJson(normalizedAttachmentsJson)
-                                                                  .fallbackText(fallbackText)
-                                                                  .build();
+        ReviewNotificationOutbox outbox = ReviewNotificationOutbox.channelBlocks(
+                idempotencyKey,
+                teamId,
+                channelId,
+                normalizedBlocksJson,
+                normalizedAttachmentsJson,
+                normalizedFallbackText
+        );
 
         reviewNotificationOutboxRepository.enqueue(outbox);
         pollingHintPublisher.publish(PollingHintTarget.REVIEW_NOTIFICATION_OUTBOX);
@@ -87,20 +89,21 @@ public class ReviewNotificationOutboxEnqueuer {
             String fallbackText
     ) {
         String normalizedBlocksJson = normalizeBlocks(blocks);
+        ReviewNotificationOutboxStringField normalizedFallbackText = normalizeFallbackText(fallbackText);
         String idempotencyPayload = idempotencyPayloadEncoder.encode(sourceKey, teamId, channelId);
         String idempotencyKey = idempotencyKeyGenerator.generate(
                 ReviewNotificationIdempotencyScope.REVIEW_NOTIFICATION_OUTBOX,
                 idempotencyPayload
         );
 
-        ReviewNotificationOutbox outbox = ReviewNotificationOutbox.builder()
-                                                                  .idempotencyKey(idempotencyKey)
-                                                                  .teamId(teamId)
-                                                                  .channelId(channelId)
-                                                                  .blocksJson(normalizedBlocksJson)
-                                                                  .attachmentsJson(null)
-                                                                  .fallbackText(fallbackText)
-                                                                  .build();
+        ReviewNotificationOutbox outbox = ReviewNotificationOutbox.channelBlocks(
+                idempotencyKey,
+                teamId,
+                channelId,
+                normalizedBlocksJson,
+                ReviewNotificationOutboxStringField.absent(),
+                normalizedFallbackText
+        );
 
         reviewNotificationOutboxRepository.enqueue(outbox);
         pollingHintPublisher.publish(PollingHintTarget.REVIEW_NOTIFICATION_OUTBOX);
@@ -114,12 +117,20 @@ public class ReviewNotificationOutboxEnqueuer {
         return blocks.toString();
     }
 
-    private String normalizeAttachments(JsonNode attachments) {
+    private ReviewNotificationOutboxStringField normalizeAttachments(JsonNode attachments) {
         if (attachments == null) {
-            return null;
+            return ReviewNotificationOutboxStringField.absent();
         }
 
-        return attachments.toString();
+        return ReviewNotificationOutboxStringField.present(attachments.toString());
+    }
+
+    private ReviewNotificationOutboxStringField normalizeFallbackText(String fallbackText) {
+        if (fallbackText == null || fallbackText.isBlank()) {
+            return ReviewNotificationOutboxStringField.absent();
+        }
+
+        return ReviewNotificationOutboxStringField.present(fallbackText);
     }
 
     private String serializePayload(ReviewNotificationPayload payload) {
@@ -135,5 +146,4 @@ public class ReviewNotificationOutboxEnqueuer {
             throw new IllegalArgumentException("payload는 null일 수 없습니다.");
         }
     }
-
 }

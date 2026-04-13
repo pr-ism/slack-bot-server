@@ -16,8 +16,10 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ReservationCommandWorkflow {
@@ -37,19 +39,32 @@ public class ReservationCommandWorkflow {
             String slackUserId,
             String token
     ) {
-        Long reservationId = readReservationId(action);
+        ReservationIdResolution reservationIdResolution = resolveReservationId(action);
 
-        if (isMissingReservationId(reservationId)) {
+        if (reservationIdResolution instanceof MissingReservationId) {
+            return Optional.empty();
+        }
+        if (reservationIdResolution instanceof InvalidReservationId invalidReservationId) {
+            notifyInvalidReservationId(token, channelId, slackUserId, invalidReservationId.rawValue());
             return Optional.empty();
         }
 
-        ReviewReservation reservation = findReservationOrNotify(reservationId, token, channelId, slackUserId);
+        ValidReservationId validReservationId = (ValidReservationId) reservationIdResolution;
 
-        if (!isCancelableReservationOrNotify(reservation, token, channelId, slackUserId)) {
-            return Optional.empty();
-        }
-
-        return cancelReservationOrFallback(teamId, channelId, slackUserId, reservationId, reservation);
+        return findReservationOrNotify(validReservationId.reservationId(), token, channelId, slackUserId)
+                .filter(reservation -> isCancelableReservationOrNotify(
+                        reservation,
+                        token,
+                        channelId,
+                        slackUserId
+                ))
+                .flatMap(reservation -> cancelReservationOrFallback(
+                        teamId,
+                        channelId,
+                        slackUserId,
+                        validReservationId.reservationId(),
+                        reservation
+                ));
     }
 
     public void handleChange(
@@ -60,39 +75,41 @@ public class ReservationCommandWorkflow {
             String slackUserId,
             String token
     ) {
-        Long reservationId = readReservationId(action);
+        ReservationIdResolution reservationIdResolution = resolveReservationId(action);
 
-        if (isMissingReservationId(reservationId)) {
+        if (reservationIdResolution instanceof MissingReservationId) {
+            return;
+        }
+        if (reservationIdResolution instanceof InvalidReservationId invalidReservationId) {
+            notifyInvalidReservationId(token, channelId, slackUserId, invalidReservationId.rawValue());
             return;
         }
 
-        ReviewReservation reservation = findReservationOrNotify(reservationId, token, channelId, slackUserId);
+        ValidReservationId validReservationId = (ValidReservationId) reservationIdResolution;
 
-        if (!isChangeableReservationOrNotify(reservation, token, channelId, slackUserId)) {
-            return;
-        }
-
-        publishChangeEvent(teamId, channelId, slackUserId, reservation);
-        openChangeModal(payload, channelId, slackUserId, token, reservation);
+        findReservationOrNotify(validReservationId.reservationId(), token, channelId, slackUserId)
+                .filter(reservation -> isChangeableReservationOrNotify(
+                        reservation,
+                        token,
+                        channelId,
+                        slackUserId
+                ))
+                .ifPresent(reservation -> {
+                    publishChangeEvent(teamId, channelId, slackUserId, reservation);
+                    openChangeModal(payload, channelId, slackUserId, token, reservation);
+                });
     }
 
-    private Long readReservationId(JsonNode action) {
+    private ReservationIdResolution resolveReservationId(JsonNode action) {
         String rawReservationId = action.path("value")
                                         .asText(null);
 
-        if (rawReservationId == null || rawReservationId.isBlank()) {
-            return null;
-        }
-
-        try {
-            return Long.parseLong(rawReservationId);
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    private boolean isMissingReservationId(Long reservationId) {
-        return reservationId == null;
+        return Optional.ofNullable(rawReservationId)
+                       .filter(value -> !value.isBlank())
+                       .<ReservationIdResolution>map(value -> parseReservationId(value)
+                               .<ReservationIdResolution>map(reservationId -> new ValidReservationId(reservationId))
+                               .orElseGet(() -> new InvalidReservationId(value)))
+                       .orElseGet(() -> new MissingReservationId());
     }
 
     private Optional<ReviewReservation> cancelReservationOrFallback(
@@ -110,22 +127,42 @@ public class ReservationCommandWorkflow {
                                           .or(() -> Optional.of(reservation));
     }
 
-    private ReviewReservation findReservationOrNotify(
+    private Optional<ReviewReservation> findReservationOrNotify(
             Long reservationId,
             String token,
             String channelId,
             String slackUserId
     ) {
         return reviewReservationCoordinator.findById(reservationId)
-                                           .orElseGet(() -> {
+                                           .or(() -> {
                                                errorNotifier.notify(
                                                        token,
                                                        channelId,
                                                        slackUserId,
                                                        InteractionErrorType.RESERVATION_NOT_FOUND
                                                );
-                                               return null;
+                                               return Optional.empty();
                                            });
+    }
+
+    private Optional<Long> parseReservationId(String rawReservationId) {
+        try {
+            Long reservationId = Long.parseLong(rawReservationId);
+
+            return Optional.of(reservationId);
+        } catch (NumberFormatException e) {
+            return Optional.empty();
+        }
+    }
+
+    private void notifyInvalidReservationId(
+            String token,
+            String channelId,
+            String slackUserId,
+            String rawReservationId
+    ) {
+        log.warn("유효하지 않은 reservationId action value입니다. rawReservationId={}", rawReservationId);
+        errorNotifier.notify(token, channelId, slackUserId, InteractionErrorType.RESERVATION_LOAD_FAILURE);
     }
 
     private boolean isOwnerOrNotify(
@@ -149,9 +186,6 @@ public class ReservationCommandWorkflow {
             String channelId,
             String slackUserId
     ) {
-        if (reservation == null) {
-            return false;
-        }
         if (!reservation.isActive()) {
             errorNotifier.notify(token, channelId, slackUserId, InteractionErrorType.RESERVATION_ALREADY_CANCELLED);
             return false;
@@ -170,9 +204,6 @@ public class ReservationCommandWorkflow {
             String channelId,
             String slackUserId
     ) {
-        if (reservation == null) {
-            return false;
-        }
         if (!reservation.isActive()) {
             errorNotifier.notify(
                     token,
@@ -247,5 +278,17 @@ public class ReservationCommandWorkflow {
         );
 
         reviewInteractionEventPublisher.publish(event);
+    }
+
+    private sealed interface ReservationIdResolution permits MissingReservationId, InvalidReservationId, ValidReservationId {
+    }
+
+    private record MissingReservationId() implements ReservationIdResolution {
+    }
+
+    private record InvalidReservationId(String rawValue) implements ReservationIdResolution {
+    }
+
+    private record ValidReservationId(Long reservationId) implements ReservationIdResolution {
     }
 }

@@ -88,8 +88,8 @@ class CommandServiceTest {
 
         assertAll(
                 () -> assertThat(actual).contains("✅"),
-                () -> assertThat(actualSavedMember).isPresent(),
-                () -> assertThat(actualSavedMember.get().getGithubId().getValue()).isEqualTo("gildong")
+                () -> assertThat(actualSavedMember).hasValueSatisfying(projectMember ->
+                        assertThat(projectMember.getGithubId().getValue()).isEqualTo("gildong"))
         );
     }
 }

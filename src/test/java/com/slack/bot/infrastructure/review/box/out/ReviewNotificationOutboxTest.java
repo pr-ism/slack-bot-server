@@ -17,51 +17,75 @@ import org.springframework.test.util.ReflectionTestUtils;
 class ReviewNotificationOutboxTest {
 
     @Test
-    void builder로_생성하면_기본_상태는_PENDING이고_시도횟수는_0이다() {
+    void channel_blocks로_생성하면_기본_상태는_PENDING이고_시도횟수는_0이다() {
         // when
         ReviewNotificationOutbox outbox = pendingOutbox();
 
         // then
         assertAll(
+                () -> assertThat(outbox.getMessageType()).isEqualTo(ReviewNotificationOutboxMessageType.CHANNEL_BLOCKS),
                 () -> assertThat(outbox.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.PENDING),
                 () -> assertThat(outbox.getProcessingAttempt()).isZero(),
                 () -> assertThat(outbox.getIdempotencyKey()).isEqualTo("idempotency"),
                 () -> assertThat(outbox.getTeamId()).isEqualTo("T1"),
                 () -> assertThat(outbox.getChannelId()).isEqualTo("C1"),
-                () -> assertThat(outbox.getBlocksJson()).isEqualTo("[{\"type\":\"section\"}]"),
-                () -> assertThat(outbox.getFallbackText()).isEqualTo("fallback")
+                () -> assertThat(outbox.getBlocksJson().value()).isEqualTo("[{\"type\":\"section\"}]"),
+                () -> assertThat(outbox.getFallbackText().value()).isEqualTo("fallback"),
+                () -> assertThat(outbox.getAttachmentsJson().isPresent()).isFalse()
         );
     }
 
     @Test
     void semantic_payload만으로도_outbox를_생성할_수_있다() {
         // when
-        ReviewNotificationOutbox outbox = ReviewNotificationOutbox.builder()
-                                                                  .idempotencyKey("idempotency")
-                                                                  .projectId(1L)
-                                                                  .teamId("T1")
-                                                                  .channelId("C1")
-                                                                  .payloadJson("{\"repositoryName\":\"repo\"}")
-                                                                  .build();
+        ReviewNotificationOutbox outbox = ReviewNotificationOutbox.semantic(
+                "idempotency",
+                1L,
+                "T1",
+                "C1",
+                "{\"repositoryName\":\"repo\"}"
+        );
 
         // then
         assertAll(
-                () -> assertThat(outbox.getProjectId()).isEqualTo(1L),
-                () -> assertThat(outbox.getPayloadJson()).isEqualTo("{\"repositoryName\":\"repo\"}"),
-                () -> assertThat(outbox.getBlocksJson()).isNull(),
+                () -> assertThat(outbox.getMessageType()).isEqualTo(ReviewNotificationOutboxMessageType.SEMANTIC),
+                () -> assertThat(outbox.requiredProjectId()).isEqualTo(1L),
+                () -> assertThat(outbox.requiredPayloadJson()).isEqualTo("{\"repositoryName\":\"repo\"}"),
+                () -> assertThat(outbox.getBlocksJson().isPresent()).isFalse(),
                 () -> assertThat(outbox.hasSemanticPayload()).isTrue()
         );
     }
 
     @Test
+    void semantic_outbox는_projectId가_null이면_예외를_던진다() {
+        // when & then
+        assertThatThrownBy(() -> ReviewNotificationOutbox.semantic("idempotency", null, "T1", "C1", "{\"k\":1}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("projectId는 1 이상의 값이어야 합니다.");
+    }
+
+    @Test
+    void absent_projectId에서_value를_조회하면_예외를_던진다() {
+        // given
+        ReviewNotificationOutboxProjectId projectId = ReviewNotificationOutboxProjectId.absent();
+
+        // when & then
+        assertThatThrownBy(() -> projectId.value())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("projectId가 없는 아웃박스입니다.");
+    }
+
+    @Test
     void idempotencyKey가_null이면_예외를_던진다() {
         // when & then
-        assertThatThrownBy(() -> ReviewNotificationOutbox.builder()
-                                                         .idempotencyKey(null)
-                                                         .teamId("T1")
-                                                         .channelId("C1")
-                                                         .blocksJson("[{}]")
-                                                         .build())
+        assertThatThrownBy(() -> ReviewNotificationOutbox.channelBlocks(
+                null,
+                "T1",
+                "C1",
+                "[{}]",
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStringField.absent()
+        ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("idempotencyKey는 비어 있을 수 없습니다.");
     }
@@ -69,12 +93,14 @@ class ReviewNotificationOutboxTest {
     @Test
     void idempotencyKey가_공백이면_예외를_던진다() {
         // when & then
-        assertThatThrownBy(() -> ReviewNotificationOutbox.builder()
-                                                         .idempotencyKey(" ")
-                                                         .teamId("T1")
-                                                         .channelId("C1")
-                                                         .blocksJson("[{}]")
-                                                         .build())
+        assertThatThrownBy(() -> ReviewNotificationOutbox.channelBlocks(
+                " ",
+                "T1",
+                "C1",
+                "[{}]",
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStringField.absent()
+        ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("idempotencyKey는 비어 있을 수 없습니다.");
     }
@@ -82,12 +108,14 @@ class ReviewNotificationOutboxTest {
     @Test
     void teamId가_null이면_예외를_던진다() {
         // when & then
-        assertThatThrownBy(() -> ReviewNotificationOutbox.builder()
-                                                         .idempotencyKey("idempotency")
-                                                         .teamId(null)
-                                                         .channelId("C1")
-                                                         .blocksJson("[{}]")
-                                                         .build())
+        assertThatThrownBy(() -> ReviewNotificationOutbox.channelBlocks(
+                "idempotency",
+                null,
+                "C1",
+                "[{}]",
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStringField.absent()
+        ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("teamId는 비어 있을 수 없습니다.");
     }
@@ -95,12 +123,14 @@ class ReviewNotificationOutboxTest {
     @Test
     void teamId가_공백이면_예외를_던진다() {
         // when & then
-        assertThatThrownBy(() -> ReviewNotificationOutbox.builder()
-                                                         .idempotencyKey("idempotency")
-                                                         .teamId(" ")
-                                                         .channelId("C1")
-                                                         .blocksJson("[{}]")
-                                                         .build())
+        assertThatThrownBy(() -> ReviewNotificationOutbox.channelBlocks(
+                "idempotency",
+                " ",
+                "C1",
+                "[{}]",
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStringField.absent()
+        ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("teamId는 비어 있을 수 없습니다.");
     }
@@ -108,12 +138,14 @@ class ReviewNotificationOutboxTest {
     @Test
     void channelId가_null이면_예외를_던진다() {
         // when & then
-        assertThatThrownBy(() -> ReviewNotificationOutbox.builder()
-                                                         .idempotencyKey("idempotency")
-                                                         .teamId("T1")
-                                                         .channelId(null)
-                                                         .blocksJson("[{}]")
-                                                         .build())
+        assertThatThrownBy(() -> ReviewNotificationOutbox.channelBlocks(
+                "idempotency",
+                "T1",
+                null,
+                "[{}]",
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStringField.absent()
+        ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("channelId는 비어 있을 수 없습니다.");
     }
@@ -121,12 +153,14 @@ class ReviewNotificationOutboxTest {
     @Test
     void channelId가_공백이면_예외를_던진다() {
         // when & then
-        assertThatThrownBy(() -> ReviewNotificationOutbox.builder()
-                                                         .idempotencyKey("idempotency")
-                                                         .teamId("T1")
-                                                         .channelId(" ")
-                                                         .blocksJson("[{}]")
-                                                         .build())
+        assertThatThrownBy(() -> ReviewNotificationOutbox.channelBlocks(
+                "idempotency",
+                "T1",
+                " ",
+                "[{}]",
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStringField.absent()
+        ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("channelId는 비어 있을 수 없습니다.");
     }
@@ -134,33 +168,22 @@ class ReviewNotificationOutboxTest {
     @Test
     void blocksJson이_null이면_예외를_던진다() {
         // when & then
-        assertThatThrownBy(() -> ReviewNotificationOutbox.builder()
-                                                         .idempotencyKey("idempotency")
-                                                         .teamId("T1")
-                                                         .channelId("C1")
-                                                         .blocksJson(null)
-                                                         .build())
+        assertThatThrownBy(() -> ReviewNotificationOutbox.channelBlocks(
+                "idempotency",
+                "T1",
+                "C1",
+                null,
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStringField.absent()
+        ))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("payloadJson 또는 blocksJson 중 하나는 비어 있을 수 없습니다.");
-    }
-
-    @Test
-    void blocksJson이_공백이면_예외를_던진다() {
-        // when & then
-        assertThatThrownBy(() -> ReviewNotificationOutbox.builder()
-                                                         .idempotencyKey("idempotency")
-                                                         .teamId("T1")
-                                                         .channelId("C1")
-                                                         .blocksJson(" ")
-                                                         .build())
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("payloadJson 또는 blocksJson 중 하나는 비어 있을 수 없습니다.");
+                .hasMessage("필드 값은 비어 있을 수 없습니다.");
     }
 
     @Test
     void markSent를_호출하면_SENT_상태와_전송시각이_저장된다() {
         // given
-        ReviewNotificationOutbox outbox = pendingOutbox();
+        ReviewNotificationOutbox outbox = persistedOutbox();
         setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
 
         // when
@@ -178,9 +201,9 @@ class ReviewNotificationOutboxTest {
                 () -> assertThat(outbox.getFailureReason()).isEqualTo(FailureSnapshotDefaults.NO_FAILURE_REASON),
                 () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE),
                 () -> assertThat(history).isNotNull(),
-                () -> assertThat(history.getOutboxId()).isNull(),
+                () -> assertThat(history.getOutboxId()).isEqualTo(10L),
                 () -> assertThat(history.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.SENT),
-                () -> assertThat(history.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
+                () -> assertThat(history.getFailure().isPresent()).isFalse()
         );
     }
 
@@ -210,7 +233,7 @@ class ReviewNotificationOutboxTest {
     @Test
     void markRetryPending을_호출하면_RETRY_PENDING_상태와_실패정보가_저장된다() {
         // given
-        ReviewNotificationOutbox outbox = pendingOutbox();
+        ReviewNotificationOutbox outbox = persistedOutbox();
         setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
 
         // when
@@ -226,11 +249,31 @@ class ReviewNotificationOutboxTest {
                 () -> assertThat(outbox.getSentAt()).isEqualTo(FailureSnapshotDefaults.NO_SENT_AT),
                 () -> assertThat(outbox.getFailedAt()).isEqualTo(failedAt),
                 () -> assertThat(outbox.getFailureReason()).isEqualTo("retry"),
-                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE),
+                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRYABLE),
                 () -> assertThat(history).isNotNull(),
-                () -> assertThat(history.getOutboxId()).isNull(),
+                () -> assertThat(history.getOutboxId()).isEqualTo(10L),
                 () -> assertThat(history.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.RETRY_PENDING),
-                () -> assertThat(history.getFailureType()).isEqualTo(SlackInteractionFailureType.NONE)
+                () -> assertThat(history.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRYABLE)
+        );
+    }
+
+    @Test
+    void markRetryPending은_PROCESSING_TIMEOUT_failureType을_허용한다() {
+        // given
+        ReviewNotificationOutbox outbox = persistedOutbox();
+        setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
+
+        // when
+        ReviewNotificationOutboxHistory history = outbox.markRetryPending(
+                Instant.parse("2026-02-24T00:04:00Z"),
+                "timeout",
+                SlackInteractionFailureType.PROCESSING_TIMEOUT
+        );
+
+        // then
+        assertAll(
+                () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.PROCESSING_TIMEOUT),
+                () -> assertThat(history.getFailure().type()).isEqualTo(SlackInteractionFailureType.PROCESSING_TIMEOUT)
         );
     }
 
@@ -284,7 +327,7 @@ class ReviewNotificationOutboxTest {
     @Test
     void markFailed를_호출하면_FAILED_상태와_실패정보가_저장된다() {
         // given
-        ReviewNotificationOutbox outbox = pendingOutbox();
+        ReviewNotificationOutbox outbox = persistedOutbox();
         setProcessingState(outbox, Instant.parse("2026-02-24T00:00:00Z"), 1);
 
         // when
@@ -306,8 +349,9 @@ class ReviewNotificationOutboxTest {
                 () -> assertThat(outbox.getFailureReason()).isEqualTo("failure"),
                 () -> assertThat(outbox.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
                 () -> assertThat(history).isNotNull(),
-                () -> assertThat(history.getOutboxId()).isNull(),
-                () -> assertThat(history.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.FAILED)
+                () -> assertThat(history.getOutboxId()).isEqualTo(10L),
+                () -> assertThat(history.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.FAILED),
+                () -> assertThat(history.getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED)
         );
     }
 
@@ -395,13 +439,36 @@ class ReviewNotificationOutboxTest {
     }
 
     private ReviewNotificationOutbox pendingOutbox() {
-        return ReviewNotificationOutbox.builder()
-                                       .idempotencyKey("idempotency")
-                                       .teamId("T1")
-                                       .channelId("C1")
-                                       .blocksJson("[{\"type\":\"section\"}]")
-                                       .fallbackText("fallback")
-                                       .build();
+        return ReviewNotificationOutbox.channelBlocks(
+                "idempotency",
+                "T1",
+                "C1",
+                "[{\"type\":\"section\"}]",
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStringField.present("fallback")
+        );
+    }
+
+    private ReviewNotificationOutbox persistedOutbox() {
+        return ReviewNotificationOutbox.rehydrate(
+                10L,
+                ReviewNotificationOutboxMessageType.CHANNEL_BLOCKS,
+                "idempotency",
+                ReviewNotificationOutboxProjectId.absent(),
+                "T1",
+                "C1",
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStringField.present("[{\"type\":\"section\"}]"),
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStringField.present("fallback"),
+                ReviewNotificationOutboxStatus.PENDING,
+                0,
+                FailureSnapshotDefaults.NO_PROCESSING_STARTED_AT,
+                FailureSnapshotDefaults.NO_SENT_AT,
+                FailureSnapshotDefaults.NO_FAILURE_AT,
+                FailureSnapshotDefaults.NO_FAILURE_REASON,
+                SlackInteractionFailureType.NONE
+        );
     }
 
     private void setProcessingState(

@@ -62,8 +62,8 @@ class ClaimMappingActionHandlerTest {
         assertAll(
                 () -> assertThat(actual.duplicateReservation()).isNull(),
                 () -> assertThat(actual.cancelledReservation()).isNull(),
-                () -> assertThat(actualMapped).isPresent(),
-                () -> assertThat(actualMapped.get().getGithubId().getValue()).isEqualTo("new-github-id")
+                () -> assertThat(actualMapped).hasValueSatisfying(projectMember ->
+                        assertThat(projectMember.getGithubId().getValue()).isEqualTo("new-github-id"))
         );
         verify(notificationApiClient).sendEphemeralMessage(
                         eq("xoxb-test-token"),
@@ -97,8 +97,8 @@ class ClaimMappingActionHandlerTest {
 
         assertAll(
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
-                () -> assertThat(actualMapped).isPresent(),
-                () -> assertThat(actualMapped.get().getGithubId().getValue()).isEqualTo("updated-u2-github")
+                () -> assertThat(actualMapped).hasValueSatisfying(projectMember ->
+                        assertThat(projectMember.getGithubId().getValue()).isEqualTo("updated-u2-github"))
         );
         verify(notificationApiClient).sendEphemeralMessage(
                         eq("xoxb-test-token"),
@@ -124,8 +124,8 @@ class ClaimMappingActionHandlerTest {
 
         assertAll(
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
-                () -> assertThat(actualMapped).isPresent(),
-                () -> assertThat(actualMapped.get().getGithubId().getValue()).isEqualTo("new-user-github")
+                () -> assertThat(actualMapped).hasValueSatisfying(projectMember ->
+                        assertThat(projectMember.getGithubId().getValue()).isEqualTo("new-user-github"))
         );
         verify(notificationApiClient).sendEphemeralMessage(
                         eq("xoxb-test-token"),

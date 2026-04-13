@@ -383,8 +383,8 @@ class StartReviewActionHandlerTest {
 
         assertAll(
                 () -> assertThat(actual).isEqualTo(BlockActionOutcomeDto.empty()),
-                () -> assertThat(actualReservation).isPresent(),
-                () -> assertThat(actualReservation.get().getStatus()).isEqualTo(ReservationStatus.CANCELLED),
+                () -> assertThat(actualReservation).hasValueSatisfying(reservation ->
+                        assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.CANCELLED)),
                 () -> assertThat(actualApplicationEvents.stream(ReviewReservationFulfilledEvent.class).toList())
                         .singleElement()
                         .satisfies(actualEvent -> assertAll(
