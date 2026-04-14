@@ -1,4 +1,4 @@
-package com.slack.bot.application.cleanup;
+package com.slack.bot.application.box.cleanup;
 
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;

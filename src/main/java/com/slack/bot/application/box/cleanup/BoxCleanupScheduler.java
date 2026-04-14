@@ -1,4 +1,4 @@
-package com.slack.bot.application.cleanup;
+package com.slack.bot.application.box.cleanup;
 
 import com.slack.bot.global.config.properties.BoxCleanupProperties;
 import java.time.Clock;

@@ -1,4 +1,4 @@
-package com.slack.bot.application.cleanup;
+package com.slack.bot.application.box.cleanup;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
