@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
@@ -58,6 +59,34 @@ class BoxCleanupServiceTest {
                 () -> assertThat(result.reviewInboxDeleted()).isEqualTo(3),
                 () -> assertThat(result.reviewOutboxDeleted()).isEqualTo(4),
                 () -> assertThat(result.totalDeleted()).isEqualTo(10)
+        );
+        verify(slackInteractionInboxRepository).deleteCompletedBefore(completedBefore, 100);
+        verify(slackNotificationOutboxRepository).deleteCompletedBefore(completedBefore, 100);
+        verify(reviewRequestInboxRepository).deleteCompletedBefore(completedBefore, 100);
+        verify(reviewNotificationOutboxRepository).deleteCompletedBefore(completedBefore, 100);
+    }
+
+    @Test
+    void 한_도메인_정리에_실패해도_나머지_도메인_정리는_계속한다() {
+        // given
+        Instant completedBefore = Instant.parse("2026-04-13T00:00:00Z");
+        given(slackInteractionInboxRepository.deleteCompletedBefore(completedBefore, 100)).willReturn(1);
+        willThrow(new RuntimeException("interaction outbox failure"))
+                .given(slackNotificationOutboxRepository)
+                .deleteCompletedBefore(completedBefore, 100);
+        given(reviewRequestInboxRepository.deleteCompletedBefore(completedBefore, 100)).willReturn(3);
+        given(reviewNotificationOutboxRepository.deleteCompletedBefore(completedBefore, 100)).willReturn(4);
+
+        // when
+        BoxCleanupService.CleanupResult result = boxCleanupService.cleanCompletedBoxes(completedBefore, 100);
+
+        // then
+        assertAll(
+                () -> assertThat(result.interactionInboxDeleted()).isEqualTo(1),
+                () -> assertThat(result.interactionOutboxDeleted()).isZero(),
+                () -> assertThat(result.reviewInboxDeleted()).isEqualTo(3),
+                () -> assertThat(result.reviewOutboxDeleted()).isEqualTo(4),
+                () -> assertThat(result.totalDeleted()).isEqualTo(8)
         );
         verify(slackInteractionInboxRepository).deleteCompletedBefore(completedBefore, 100);
         verify(slackNotificationOutboxRepository).deleteCompletedBefore(completedBefore, 100);

@@ -6,8 +6,10 @@ import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxR
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class BoxCleanupService {
@@ -21,21 +23,21 @@ public class BoxCleanupService {
         validateCompletedBefore(completedBefore);
         validateDeleteBatchSize(deleteBatchSize);
 
-        int interactionInboxDeleted = slackInteractionInboxRepository.deleteCompletedBefore(
-                completedBefore,
-                deleteBatchSize
+        int interactionInboxDeleted = cleanDomain(
+                "interaction inbox",
+                () -> slackInteractionInboxRepository.deleteCompletedBefore(completedBefore, deleteBatchSize)
         );
-        int interactionOutboxDeleted = slackNotificationOutboxRepository.deleteCompletedBefore(
-                completedBefore,
-                deleteBatchSize
+        int interactionOutboxDeleted = cleanDomain(
+                "interaction outbox",
+                () -> slackNotificationOutboxRepository.deleteCompletedBefore(completedBefore, deleteBatchSize)
         );
-        int reviewInboxDeleted = reviewRequestInboxRepository.deleteCompletedBefore(
-                completedBefore,
-                deleteBatchSize
+        int reviewInboxDeleted = cleanDomain(
+                "review inbox",
+                () -> reviewRequestInboxRepository.deleteCompletedBefore(completedBefore, deleteBatchSize)
         );
-        int reviewOutboxDeleted = reviewNotificationOutboxRepository.deleteCompletedBefore(
-                completedBefore,
-                deleteBatchSize
+        int reviewOutboxDeleted = cleanDomain(
+                "review outbox",
+                () -> reviewNotificationOutboxRepository.deleteCompletedBefore(completedBefore, deleteBatchSize)
         );
 
         return new CleanupResult(
@@ -56,6 +58,21 @@ public class BoxCleanupService {
         if (deleteBatchSize <= 0) {
             throw new IllegalArgumentException("deleteBatchSize는 0보다 커야 합니다.");
         }
+    }
+
+    private int cleanDomain(String domainName, CleanupAction cleanupAction) {
+        try {
+            return cleanupAction.clean();
+        } catch (Exception exception) {
+            log.error("{} cleanup 실행에 실패했습니다.", domainName, exception);
+            return 0;
+        }
+    }
+
+    @FunctionalInterface
+    private interface CleanupAction {
+
+        int clean();
     }
 
     public record CleanupResult(
