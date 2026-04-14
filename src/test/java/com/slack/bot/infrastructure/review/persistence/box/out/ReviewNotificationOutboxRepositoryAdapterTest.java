@@ -17,10 +17,19 @@ import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxStrin
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @IntegrationTest
 @SuppressWarnings("NonAsciiCharacters")
@@ -35,6 +44,12 @@ class ReviewNotificationOutboxRepositoryAdapterTest {
 
     @Autowired
     JpaReviewNotificationOutboxHistoryRepository jpaReviewNotificationOutboxHistoryRepository;
+
+    @Autowired
+    NamedParameterJdbcTemplate namedParameterJdbcTemplate;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
     @Test
     void 완료된_review_outbox와_history를_같이_삭제한다() {
@@ -93,6 +108,61 @@ class ReviewNotificationOutboxRepositoryAdapterTest {
                 () -> assertThat(jpaReviewNotificationOutboxRepository.findDomainById(firstOutbox.getId())).isEmpty(),
                 () -> assertThat(jpaReviewNotificationOutboxRepository.findDomainById(secondOutbox.getId())).isPresent()
         );
+    }
+
+    @Test
+    void 잠겨있는_완료된_review_outbox는_cleanup에서_건너뛴다() throws Exception {
+        // given
+        ReviewNotificationOutbox lockedOutbox = createSentOutbox(
+                "cleanup-review-locked",
+                Instant.parse("2026-02-24T00:01:00Z")
+        );
+        CountDownLatch lockAcquired = new CountDownLatch(1);
+        CountDownLatch releaseLock = new CountDownLatch(1);
+
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> lockFuture = executorService.submit(() -> {
+                new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                    namedParameterJdbcTemplate.query(
+                            """
+                            SELECT id
+                            FROM review_notification_outbox
+                            WHERE id = :outboxId
+                            FOR UPDATE
+                            """,
+                            new MapSqlParameterSource().addValue("outboxId", lockedOutbox.getId()),
+                            (resultSet, rowNum) -> resultSet.getLong(1)
+                    );
+                    lockAcquired.countDown();
+                    awaitLatch(releaseLock);
+                });
+            });
+            awaitLatch(lockAcquired);
+
+            // when
+            Future<Integer> cleanupFuture = executorService.submit(() -> reviewNotificationOutboxRepository.deleteCompletedBefore(
+                    Instant.parse("2026-02-24T00:05:00Z"),
+                    100
+            ));
+            int deletedCount = cleanupFuture.get(1, TimeUnit.SECONDS);
+
+            // then
+            List<ReviewNotificationOutboxHistory> histories = jpaReviewNotificationOutboxHistoryRepository.findAllDomains();
+            assertAll(
+                    () -> assertThat(deletedCount).isZero(),
+                    () -> assertThat(jpaReviewNotificationOutboxRepository.findDomainById(lockedOutbox.getId())).isPresent(),
+                    () -> assertThat(histories)
+                            .filteredOn(history -> history.getOutboxId().equals(lockedOutbox.getId()))
+                            .hasSize(1)
+            );
+
+            releaseLock.countDown();
+            lockFuture.get(5, TimeUnit.SECONDS);
+        } finally {
+            releaseLock.countDown();
+            executorService.shutdownNow();
+        }
     }
 
     private ReviewNotificationOutbox createSentOutbox(String idempotencyKey, Instant sentAt) {
@@ -178,5 +248,17 @@ class ReviewNotificationOutboxRepositoryAdapterTest {
         entity.apply(history);
         jpaReviewNotificationOutboxHistoryRepository.save(entity);
         return savedOutbox;
+    }
+
+    private void awaitLatch(CountDownLatch latch) {
+        try {
+            boolean completed = latch.await(5, TimeUnit.SECONDS);
+            if (!completed) {
+                throw new IllegalStateException("락 대기 중 시간이 초과되었습니다.");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("락 대기 중 인터럽트가 발생했습니다.", exception);
+        }
     }
 }

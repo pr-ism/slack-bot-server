@@ -447,6 +447,7 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                 """
         );
         sql.append(deleteBatchSize);
+        sql.append("\nFOR UPDATE SKIP LOCKED");
         return sql.toString();
     }
 
