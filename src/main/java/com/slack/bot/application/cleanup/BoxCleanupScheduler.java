@@ -6,11 +6,13 @@ import java.time.Duration;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(prefix = "app.cleanup.box", name = "enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class BoxCleanupScheduler {
 
@@ -20,10 +22,6 @@ public class BoxCleanupScheduler {
 
     @Scheduled(fixedDelayString = "${app.cleanup.box.fixed-delay-ms:1800000}")
     public void cleanCompletedBoxes() {
-        if (!boxCleanupProperties.enabled()) {
-            return;
-        }
-
         try {
             Instant completedBefore = clock.instant()
                                            .minus(Duration.ofDays(boxCleanupProperties.retentionDays()));
