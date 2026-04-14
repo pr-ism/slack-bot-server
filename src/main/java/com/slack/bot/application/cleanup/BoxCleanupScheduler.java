@@ -31,6 +31,21 @@ public class BoxCleanupScheduler {
                     completedBefore,
                     boxCleanupProperties.deleteBatchSize()
             );
+            if (result.hasFailure()) {
+                log.warn(
+                        "box cleanup이 부분 실패로 종료됐습니다. interactionInboxDeleted={}, interactionInboxFailed={}, interactionOutboxDeleted={}, interactionOutboxFailed={}, reviewInboxDeleted={}, reviewInboxFailed={}, reviewOutboxDeleted={}, reviewOutboxFailed={}, totalDeleted={}",
+                        result.interactionInboxDeleted(),
+                        result.interactionInbox().failed(),
+                        result.interactionOutboxDeleted(),
+                        result.interactionOutbox().failed(),
+                        result.reviewInboxDeleted(),
+                        result.reviewInbox().failed(),
+                        result.reviewOutboxDeleted(),
+                        result.reviewOutbox().failed(),
+                        result.totalDeleted()
+                );
+                return;
+            }
             log.info(
                     "box cleanup을 완료했습니다. interactionInboxDeleted={}, interactionOutboxDeleted={}, reviewInboxDeleted={}, reviewOutboxDeleted={}, totalDeleted={}",
                     result.interactionInboxDeleted(),

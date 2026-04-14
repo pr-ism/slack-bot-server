@@ -23,28 +23,28 @@ public class BoxCleanupService {
         validateCompletedBefore(completedBefore);
         validateDeleteBatchSize(deleteBatchSize);
 
-        int interactionInboxDeleted = cleanDomain(
+        DomainCleanupResult interactionInboxResult = cleanDomain(
                 "interaction inbox",
                 () -> slackInteractionInboxRepository.deleteCompletedBefore(completedBefore, deleteBatchSize)
         );
-        int interactionOutboxDeleted = cleanDomain(
+        DomainCleanupResult interactionOutboxResult = cleanDomain(
                 "interaction outbox",
                 () -> slackNotificationOutboxRepository.deleteCompletedBefore(completedBefore, deleteBatchSize)
         );
-        int reviewInboxDeleted = cleanDomain(
+        DomainCleanupResult reviewInboxResult = cleanDomain(
                 "review inbox",
                 () -> reviewRequestInboxRepository.deleteCompletedBefore(completedBefore, deleteBatchSize)
         );
-        int reviewOutboxDeleted = cleanDomain(
+        DomainCleanupResult reviewOutboxResult = cleanDomain(
                 "review outbox",
                 () -> reviewNotificationOutboxRepository.deleteCompletedBefore(completedBefore, deleteBatchSize)
         );
 
         return new CleanupResult(
-                interactionInboxDeleted,
-                interactionOutboxDeleted,
-                reviewInboxDeleted,
-                reviewOutboxDeleted
+                interactionInboxResult,
+                interactionOutboxResult,
+                reviewInboxResult,
+                reviewOutboxResult
         );
     }
 
@@ -60,12 +60,12 @@ public class BoxCleanupService {
         }
     }
 
-    private int cleanDomain(String domainName, CleanupAction cleanupAction) {
+    private DomainCleanupResult cleanDomain(String domainName, CleanupAction cleanupAction) {
         try {
-            return cleanupAction.clean();
+            return DomainCleanupResult.succeeded(cleanupAction.clean());
         } catch (Exception exception) {
             log.error("{} cleanup 실행에 실패했습니다.", domainName, exception);
-            return 0;
+            return DomainCleanupResult.failedResult();
         }
     }
 
@@ -76,17 +76,58 @@ public class BoxCleanupService {
     }
 
     public record CleanupResult(
-            int interactionInboxDeleted,
-            int interactionOutboxDeleted,
-            int reviewInboxDeleted,
-            int reviewOutboxDeleted
+            DomainCleanupResult interactionInbox,
+            DomainCleanupResult interactionOutbox,
+            DomainCleanupResult reviewInbox,
+            DomainCleanupResult reviewOutbox
     ) {
 
+        public int interactionInboxDeleted() {
+            return interactionInbox.deletedCount();
+        }
+
+        public int interactionOutboxDeleted() {
+            return interactionOutbox.deletedCount();
+        }
+
+        public int reviewInboxDeleted() {
+            return reviewInbox.deletedCount();
+        }
+
+        public int reviewOutboxDeleted() {
+            return reviewOutbox.deletedCount();
+        }
+
         public int totalDeleted() {
-            return interactionInboxDeleted
-                    + interactionOutboxDeleted
-                    + reviewInboxDeleted
-                    + reviewOutboxDeleted;
+            return interactionInbox.deletedCount()
+                    + interactionOutbox.deletedCount()
+                    + reviewInbox.deletedCount()
+                    + reviewOutbox.deletedCount();
+        }
+
+        public boolean hasFailure() {
+            if (interactionInbox.failed()) {
+                return true;
+            }
+            if (interactionOutbox.failed()) {
+                return true;
+            }
+            if (reviewInbox.failed()) {
+                return true;
+            }
+
+            return reviewOutbox.failed();
+        }
+    }
+
+    public record DomainCleanupResult(int deletedCount, boolean failed) {
+
+        public static DomainCleanupResult succeeded(int deletedCount) {
+            return new DomainCleanupResult(deletedCount, false);
+        }
+
+        public static DomainCleanupResult failedResult() {
+            return new DomainCleanupResult(0, true);
         }
     }
 }

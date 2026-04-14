@@ -32,7 +32,12 @@ class BoxCleanupSchedulerTest {
         BoxCleanupProperties properties = new BoxCleanupProperties(true, 1_800_000L, 30L, 500);
         BoxCleanupScheduler scheduler = new BoxCleanupScheduler(clock, properties, boxCleanupService);
         given(boxCleanupService.cleanCompletedBoxes(Instant.parse("2026-03-14T00:00:00Z"), 500))
-                .willReturn(new BoxCleanupService.CleanupResult(1, 2, 3, 4));
+                .willReturn(new BoxCleanupService.CleanupResult(
+                        BoxCleanupService.DomainCleanupResult.succeeded(1),
+                        BoxCleanupService.DomainCleanupResult.succeeded(2),
+                        BoxCleanupService.DomainCleanupResult.succeeded(3),
+                        BoxCleanupService.DomainCleanupResult.succeeded(4)
+                ));
 
         // when
         scheduler.cleanCompletedBoxes();
@@ -64,6 +69,24 @@ class BoxCleanupSchedulerTest {
         willThrow(new RuntimeException("cleanup failure"))
                 .given(boxCleanupService)
                 .cleanCompletedBoxes(Instant.parse("2026-03-14T00:00:00Z"), 500);
+
+        // when & then
+        assertThatCode(() -> scheduler.cleanCompletedBoxes()).doesNotThrowAnyException();
+    }
+
+    @Test
+    void 부분_실패결과가_와도_예외없이_종료한다() {
+        // given
+        Clock clock = Clock.fixed(Instant.parse("2026-04-13T00:00:00Z"), ZoneId.of("Asia/Seoul"));
+        BoxCleanupProperties properties = new BoxCleanupProperties(true, 1_800_000L, 30L, 500);
+        BoxCleanupScheduler scheduler = new BoxCleanupScheduler(clock, properties, boxCleanupService);
+        given(boxCleanupService.cleanCompletedBoxes(Instant.parse("2026-03-14T00:00:00Z"), 500))
+                .willReturn(new BoxCleanupService.CleanupResult(
+                        BoxCleanupService.DomainCleanupResult.succeeded(1),
+                        BoxCleanupService.DomainCleanupResult.failedResult(),
+                        BoxCleanupService.DomainCleanupResult.succeeded(3),
+                        BoxCleanupService.DomainCleanupResult.succeeded(4)
+                ));
 
         // when & then
         assertThatCode(() -> scheduler.cleanCompletedBoxes()).doesNotThrowAnyException();

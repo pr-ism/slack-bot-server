@@ -58,7 +58,12 @@ class BoxCleanupServiceTest {
                 () -> assertThat(result.interactionOutboxDeleted()).isEqualTo(2),
                 () -> assertThat(result.reviewInboxDeleted()).isEqualTo(3),
                 () -> assertThat(result.reviewOutboxDeleted()).isEqualTo(4),
-                () -> assertThat(result.totalDeleted()).isEqualTo(10)
+                () -> assertThat(result.totalDeleted()).isEqualTo(10),
+                () -> assertThat(result.hasFailure()).isFalse(),
+                () -> assertThat(result.interactionInbox().failed()).isFalse(),
+                () -> assertThat(result.interactionOutbox().failed()).isFalse(),
+                () -> assertThat(result.reviewInbox().failed()).isFalse(),
+                () -> assertThat(result.reviewOutbox().failed()).isFalse()
         );
         verify(slackInteractionInboxRepository).deleteCompletedBefore(completedBefore, 100);
         verify(slackNotificationOutboxRepository).deleteCompletedBefore(completedBefore, 100);
@@ -86,7 +91,12 @@ class BoxCleanupServiceTest {
                 () -> assertThat(result.interactionOutboxDeleted()).isZero(),
                 () -> assertThat(result.reviewInboxDeleted()).isEqualTo(3),
                 () -> assertThat(result.reviewOutboxDeleted()).isEqualTo(4),
-                () -> assertThat(result.totalDeleted()).isEqualTo(8)
+                () -> assertThat(result.totalDeleted()).isEqualTo(8),
+                () -> assertThat(result.hasFailure()).isTrue(),
+                () -> assertThat(result.interactionInbox().failed()).isFalse(),
+                () -> assertThat(result.interactionOutbox().failed()).isTrue(),
+                () -> assertThat(result.reviewInbox().failed()).isFalse(),
+                () -> assertThat(result.reviewOutbox().failed()).isFalse()
         );
         verify(slackInteractionInboxRepository).deleteCompletedBefore(completedBefore, 100);
         verify(slackNotificationOutboxRepository).deleteCompletedBefore(completedBefore, 100);
