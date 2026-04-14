@@ -7,11 +7,17 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -19,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("NonAsciiCharacters")
 @ExtendWith(MockitoExtension.class)
@@ -102,6 +109,66 @@ class BoxCleanupServiceTest {
         verify(slackNotificationOutboxRepository).deleteCompletedBefore(completedBefore, 100);
         verify(reviewRequestInboxRepository).deleteCompletedBefore(completedBefore, 100);
         verify(reviewNotificationOutboxRepository).deleteCompletedBefore(completedBefore, 100);
+    }
+
+    @Test
+    void 한_도메인_정리에_실패하면_에러_로그를_남긴다() {
+        // given
+        Instant completedBefore = Instant.parse("2026-04-13T00:00:00Z");
+        ListAppender<ILoggingEvent> listAppender = attachListAppender();
+        given(slackInteractionInboxRepository.deleteCompletedBefore(completedBefore, 100)).willReturn(1);
+        willThrow(new RuntimeException("interaction outbox failure"))
+                .given(slackNotificationOutboxRepository)
+                .deleteCompletedBefore(completedBefore, 100);
+        given(reviewRequestInboxRepository.deleteCompletedBefore(completedBefore, 100)).willReturn(3);
+        given(reviewNotificationOutboxRepository.deleteCompletedBefore(completedBefore, 100)).willReturn(4);
+
+        // when
+        try {
+            boxCleanupService.cleanCompletedBoxes(completedBefore, 100);
+
+            // then
+            assertAll(
+                    () -> assertThat(logLevels(listAppender)).contains(Level.ERROR),
+                    () -> assertThat(logMessages(listAppender)).contains("interaction outbox cleanup 실행에 실패했습니다.")
+            );
+        } finally {
+            detachListAppender(listAppender);
+        }
+    }
+
+    private ListAppender<ILoggingEvent> attachListAppender() {
+        Logger logger = (Logger) LoggerFactory.getLogger(BoxCleanupService.class);
+        ListAppender<ILoggingEvent> listAppender = new ListAppender<>();
+        listAppender.start();
+        logger.addAppender(listAppender);
+        return listAppender;
+    }
+
+    private void detachListAppender(ListAppender<ILoggingEvent> listAppender) {
+        Logger logger = (Logger) LoggerFactory.getLogger(BoxCleanupService.class);
+        logger.detachAppender(listAppender);
+        listAppender.stop();
+    }
+
+    private List<String> logMessages(ListAppender<ILoggingEvent> listAppender) {
+        List<String> messages = new ArrayList<>();
+
+        for (ILoggingEvent event : listAppender.list) {
+            messages.add(event.getFormattedMessage());
+        }
+
+        return messages;
+    }
+
+    private List<Level> logLevels(ListAppender<ILoggingEvent> listAppender) {
+        List<Level> levels = new ArrayList<>();
+
+        for (ILoggingEvent event : listAppender.list) {
+            levels.add(event.getLevel());
+        }
+
+        return levels;
     }
 
     @Test
