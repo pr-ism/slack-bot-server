@@ -38,6 +38,8 @@ public interface ReviewRequestInboxRepository {
             int recoveryBatchSize
     );
 
+    int deleteCompletedBefore(Instant completedBefore, int deleteBatchSize);
+
     boolean saveIfProcessingLeaseMatched(
             ReviewRequestInbox inbox,
             Instant claimedProcessingStartedAt

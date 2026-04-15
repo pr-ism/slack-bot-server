@@ -15,6 +15,7 @@ import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxR
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -196,7 +197,7 @@ class ReviewRequestInboxRepositoryAdapterTest {
     void PROCESSING_타임아웃_복구는_배치_크기만큼만_처리한다() {
         // given
         Instant base = Instant.parse("2026-02-24T00:10:00Z");
-        List<Long> inboxIds = new java.util.ArrayList<>();
+        List<Long> inboxIds = new ArrayList<>();
         for (int index = 0; index < 101; index++) {
             ReviewRequestInbox inbox = ReviewRequestInbox.pending(
                     "api-key:batch:" + index,
@@ -239,10 +240,90 @@ class ReviewRequestInboxRepositoryAdapterTest {
     }
 
     @Test
+    void 완료된_review_inbox와_history를_같이_삭제한다() {
+        // given
+        ReviewRequestInbox oldProcessedInbox = ReviewRequestInbox.pending(
+                "cleanup-review-processed",
+                "api-key",
+                3001L,
+                "{\"pullRequestTitle\":\"old\"}",
+                Instant.parse("2026-02-24T00:00:00Z")
+        );
+        setProcessingState(oldProcessedInbox, Instant.parse("2026-02-24T00:01:00Z"), 1);
+        ReviewRequestInboxHistory oldProcessedHistory = oldProcessedInbox.markProcessed(
+                Instant.parse("2026-02-24T00:02:00Z")
+        );
+        ReviewRequestInbox savedProcessedInbox = saveInboxWithHistory(oldProcessedInbox, oldProcessedHistory);
+
+        ReviewRequestInbox recentFailedInbox = ReviewRequestInbox.pending(
+                "cleanup-review-failed",
+                "api-key",
+                3002L,
+                "{\"pullRequestTitle\":\"recent\"}",
+                Instant.parse("2026-02-24T00:00:00Z")
+        );
+        setProcessingState(recentFailedInbox, Instant.parse("2026-02-24T00:03:00Z"), 1);
+        ReviewRequestInboxHistory recentFailedHistory = recentFailedInbox.markFailed(
+                Instant.parse("2026-02-24T00:09:00Z"),
+                "failure",
+                ReviewRequestInboxFailureType.NON_RETRYABLE
+        );
+        ReviewRequestInbox savedFailedInbox = saveInboxWithHistory(recentFailedInbox, recentFailedHistory);
+
+        // when
+        int deletedCount = reviewRequestInboxRepository.deleteCompletedBefore(
+                Instant.parse("2026-02-24T00:05:00Z"),
+                100
+        );
+
+        // then
+        List<ReviewRequestInboxHistory> histories = jpaReviewRequestInboxHistoryRepository.findAllDomains();
+        assertAll(
+                () -> assertThat(deletedCount).isEqualTo(1),
+                () -> assertThat(jpaReviewRequestInboxRepository.findDomainById(savedProcessedInbox.getId())).isEmpty(),
+                () -> assertThat(jpaReviewRequestInboxRepository.findDomainById(savedFailedInbox.getId())).isPresent(),
+                () -> assertThat(histories)
+                        .filteredOn(history -> history.getInboxId().equals(savedProcessedInbox.getId()))
+                        .isEmpty(),
+                () -> assertThat(histories)
+                        .filteredOn(history -> history.getInboxId().equals(savedFailedInbox.getId()))
+                        .hasSize(1)
+        );
+    }
+
+    @Test
+    void deleteCompletedBefore는_batch_크기만큼만_삭제한다() {
+        // given
+        ReviewRequestInbox firstInbox = createProcessedInbox(
+                "cleanup-review-batch-1",
+                3101L,
+                Instant.parse("2026-02-24T00:01:00Z")
+        );
+        ReviewRequestInbox secondInbox = createProcessedInbox(
+                "cleanup-review-batch-2",
+                3102L,
+                Instant.parse("2026-02-24T00:02:00Z")
+        );
+
+        // when
+        int deletedCount = reviewRequestInboxRepository.deleteCompletedBefore(
+                Instant.parse("2026-02-24T00:05:00Z"),
+                1
+        );
+
+        // then
+        assertAll(
+                () -> assertThat(deletedCount).isEqualTo(1),
+                () -> assertThat(jpaReviewRequestInboxRepository.findDomainById(firstInbox.getId())).isEmpty(),
+                () -> assertThat(jpaReviewRequestInboxRepository.findDomainById(secondInbox.getId())).isPresent()
+        );
+    }
+
+    @Test
     void PROCESSING_타임아웃_복구는_재시도_가능과_소진건을_합쳐_배치_크기만큼만_처리한다() {
         // given
         Instant base = Instant.parse("2026-02-24T00:20:00Z");
-        List<Long> inboxIds = new java.util.ArrayList<>();
+        List<Long> inboxIds = new ArrayList<>();
 
         for (int index = 0; index < 50; index++) {
             ReviewRequestInbox retryableInbox = ReviewRequestInbox.pending(
@@ -368,6 +449,34 @@ class ReviewRequestInboxRepositoryAdapterTest {
         ReflectionTestUtils.setField(inbox, "processingAttempt", processingAttempt);
         ReflectionTestUtils.setField(inbox, "failedTime", BoxEventTime.absent());
         ReflectionTestUtils.setField(inbox, "failure", BoxFailureSnapshot.absent());
+    }
+
+    private ReviewRequestInbox createProcessedInbox(
+            String idempotencyKey,
+            Long githubPullRequestId,
+            Instant processedAt
+    ) {
+        ReviewRequestInbox inbox = ReviewRequestInbox.pending(
+                idempotencyKey,
+                "api-key",
+                githubPullRequestId,
+                "{\"pullRequestTitle\":\"processed\"}",
+                Instant.parse("2026-02-24T00:00:00Z")
+        );
+        setProcessingState(inbox, processedAt.minusSeconds(30L), 1);
+        ReviewRequestInboxHistory history = inbox.markProcessed(processedAt);
+        return saveInboxWithHistory(inbox, history);
+    }
+
+    private ReviewRequestInbox saveInboxWithHistory(
+            ReviewRequestInbox inbox,
+            ReviewRequestInboxHistory history
+    ) {
+        ReviewRequestInbox savedInbox = reviewRequestInboxRepository.save(inbox);
+        ReviewRequestInboxHistoryJpaEntity entity = new ReviewRequestInboxHistoryJpaEntity();
+        entity.apply(history.bindInboxId(savedInbox.getId()));
+        jpaReviewRequestInboxHistoryRepository.save(entity);
+        return savedInbox;
     }
 
     private ReviewRequestInbox findByIdempotencyKey(String idempotencyKey) {

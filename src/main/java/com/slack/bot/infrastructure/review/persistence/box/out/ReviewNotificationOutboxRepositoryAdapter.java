@@ -351,6 +351,21 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
         return Math.toIntExact(updatedCount);
     }
 
+    @Override
+    @Transactional
+    public int deleteCompletedBefore(Instant completedBefore, int deleteBatchSize) {
+        validateCompletedBefore(completedBefore);
+        validateDeleteBatchSize(deleteBatchSize);
+
+        List<Long> deletableOutboxIds = selectCompletedDeletionTargetIds(completedBefore, deleteBatchSize);
+        if (deletableOutboxIds.isEmpty()) {
+            return 0;
+        }
+
+        deleteHistories(deletableOutboxIds);
+        return deleteOutboxes(deletableOutboxIds);
+    }
+
     private void batchInsertTimeoutRecoveryHistory(
             List<TimeoutRecoveryTarget> timedOutRows,
             Instant failedAt,
@@ -403,6 +418,58 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
                 )
                 """,
                 batchParameters.toArray(new MapSqlParameterSource[0])
+        );
+    }
+
+    private List<Long> selectCompletedDeletionTargetIds(
+            Instant completedBefore,
+            int deleteBatchSize
+    ) {
+        return namedParameterJdbcTemplate.query(
+                buildCompletedDeletionTargetSelectSql(deleteBatchSize),
+                new MapSqlParameterSource()
+                        .addValue("sentStatus", ReviewNotificationOutboxStatus.SENT.name())
+                        .addValue("failedStatus", ReviewNotificationOutboxStatus.FAILED.name())
+                        .addValue("completedBefore", Timestamp.from(completedBefore)),
+                (resultSet, rowNum) -> resultSet.getLong("id")
+        );
+    }
+
+    private String buildCompletedDeletionTargetSelectSql(int deleteBatchSize) {
+        StringBuilder sql = new StringBuilder(
+                """
+                SELECT id
+                FROM review_notification_outbox
+                WHERE (status = :sentStatus AND sent_at < :completedBefore)
+                   OR (status = :failedStatus AND failed_at < :completedBefore)
+                ORDER BY COALESCE(sent_at, failed_at) ASC, id ASC
+                LIMIT
+                """
+        );
+        sql.append(deleteBatchSize);
+        sql.append("\nFOR UPDATE SKIP LOCKED");
+        return sql.toString();
+    }
+
+    private void deleteHistories(List<Long> deletableOutboxIds) {
+        namedParameterJdbcTemplate.update(
+                """
+                DELETE FROM review_notification_outbox_history
+                WHERE outbox_id IN (:outboxIds)
+                """,
+                new MapSqlParameterSource()
+                        .addValue("outboxIds", deletableOutboxIds)
+        );
+    }
+
+    private int deleteOutboxes(List<Long> deletableOutboxIds) {
+        return namedParameterJdbcTemplate.update(
+                """
+                DELETE FROM review_notification_outbox
+                WHERE id IN (:outboxIds)
+                """,
+                new MapSqlParameterSource()
+                        .addValue("outboxIds", deletableOutboxIds)
         );
     }
 
@@ -494,6 +561,12 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
         }
     }
 
+    private void validateCompletedBefore(Instant completedBefore) {
+        if (completedBefore == null) {
+            throw new IllegalArgumentException("completedBefore는 비어 있을 수 없습니다.");
+        }
+    }
+
     protected String buildEnqueueSql() {
         return """
                 INSERT INTO review_notification_outbox (
@@ -570,6 +643,12 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
     private void validateRecoveryBatchSize(int recoveryBatchSize) {
         if (recoveryBatchSize <= 0) {
             throw new IllegalArgumentException("recoveryBatchSize는 0보다 커야 합니다.");
+        }
+    }
+
+    private void validateDeleteBatchSize(int deleteBatchSize) {
+        if (deleteBatchSize <= 0) {
+            throw new IllegalArgumentException("deleteBatchSize는 0보다 커야 합니다.");
         }
     }
 
