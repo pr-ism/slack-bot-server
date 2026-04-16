@@ -18,7 +18,7 @@ import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStatus;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
-import com.slack.bot.infrastructure.interaction.box.persistence.in.JpaSlackInteractionInboxRepository;
+import com.slack.bot.infrastructure.interaction.box.persistence.in.SlackInteractionInboxMybatisMapper;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.CountDownLatch;
@@ -45,7 +45,7 @@ class AdaptivePollingRunnerIntegrationTest {
     ReviewReservationRepository reviewReservationRepository;
 
     @Autowired
-    JpaSlackInteractionInboxRepository jpaSlackInteractionInboxRepository;
+    SlackInteractionInboxMybatisMapper slackInteractionInboxMybatisMapper;
 
     @Autowired
     SlackInteractionInboxRepository slackInteractionInboxRepository;
@@ -87,7 +87,8 @@ class AdaptivePollingRunnerIntegrationTest {
 
             // when
             await().atMost(Duration.ofSeconds(3L)).untilAsserted(() -> {
-                SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
+                SlackInteractionInbox actualInbox = slackInteractionInboxMybatisMapper.findDomainById(inbox.getId())
+                                                                                      .orElseThrow();
 
                 // then
                 assertAll(
@@ -143,7 +144,8 @@ class AdaptivePollingRunnerIntegrationTest {
 
             // then
             await().atMost(Duration.ofSeconds(4L)).untilAsserted(() -> {
-                SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
+                SlackInteractionInbox actualInbox = slackInteractionInboxMybatisMapper.findDomainById(inbox.getId())
+                                                                                      .orElseThrow();
 
                 assertAll(
                         () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),

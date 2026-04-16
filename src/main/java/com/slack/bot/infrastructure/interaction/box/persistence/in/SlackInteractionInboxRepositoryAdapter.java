@@ -24,8 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionInboxRepository {
 
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
-    private final JpaSlackInteractionInboxRepository repository;
-    private final JpaSlackInteractionInboxHistoryRepository historyRepository;
+    private final SlackInteractionInboxMybatisMapper slackInteractionInboxMybatisMapper;
+    private final SlackInteractionInboxHistoryMybatisMapper slackInteractionInboxHistoryMybatisMapper;
 
     @Override
     public boolean enqueue(SlackInteractionInboxType interactionType, String idempotencyKey, String payloadJson) {
@@ -78,13 +78,11 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
         }
 
         Long inboxId = claimedIds.getFirst();
-        return repository.findLockedById(inboxId)
-                .flatMap(entity -> {
-                    SlackInteractionInbox inbox = entity.toDomain();
+        return slackInteractionInboxMybatisMapper.findLockedDomainById(inboxId)
+                .map(inbox -> {
                     inbox.claim(processingStartedAt);
-                    entity.apply(inbox);
-                    SlackInteractionInboxJpaEntity saved = repository.save(entity);
-                    return Optional.of(saved.getId());
+                    slackInteractionInboxMybatisMapper.update(SlackInteractionInboxRow.from(inbox));
+                    return inbox.getId();
                 });
     }
 
@@ -132,7 +130,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
     @Override
     @Transactional(readOnly = true)
     public Optional<SlackInteractionInbox> findById(Long inboxId) {
-        return repository.findDomainById(inboxId);
+        return slackInteractionInboxMybatisMapper.findDomainById(inboxId);
     }
 
     @Override
@@ -162,20 +160,18 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
 
         AtomicInteger recoveredCount = new AtomicInteger();
         for (Long inboxId : timedOutInboxIds) {
-            repository.findLockedById(inboxId)
-                    .map(entity -> TimeoutRecoveryCandidate.of(entity, entity.toDomain()))
-                    .filter(candidate -> isTimeoutRecoverable(candidate.inbox(), interactionType, processingStartedBefore))
-                    .ifPresent(candidate -> {
+            slackInteractionInboxMybatisMapper.findLockedDomainById(inboxId)
+                    .filter(inbox -> isTimeoutRecoverable(inbox, interactionType, processingStartedBefore))
+                    .ifPresent(inbox -> {
                         SlackInteractionInboxHistory history = recoverTimeoutProcessing(
-                                candidate.inbox(),
+                                inbox,
                                 failedAt,
                                 failureReason,
                                 maxAttempts
                         );
 
-                        candidate.entity().apply(candidate.inbox());
-                        repository.save(candidate.entity());
-                        saveHistory(history.bindInboxId(candidate.inbox().getId()));
+                        slackInteractionInboxMybatisMapper.update(SlackInteractionInboxRow.from(inbox));
+                        saveHistory(history.bindInboxId(inbox.getId()));
                         recoveredCount.incrementAndGet();
                     });
         }
@@ -434,11 +430,13 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
     @Override
     @Transactional
     public SlackInteractionInbox save(SlackInteractionInbox inbox) {
-        SlackInteractionInboxJpaEntity entity = findInboxEntity(inbox.getId()).orElseGet(
-                () -> new SlackInteractionInboxJpaEntity()
-        );
-        entity.apply(inbox);
-        return repository.save(entity).toDomain();
+        if (inbox.getId() == null) {
+            return insertInbox(inbox);
+        }
+
+        return slackInteractionInboxMybatisMapper.findDomainById(inbox.getId())
+                .map(savedInbox -> updateInbox(inbox))
+                .orElseGet(() -> insertInbox(inbox));
     }
 
     @Override
@@ -530,18 +528,21 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
         return saved;
     }
 
-    private Optional<SlackInteractionInboxJpaEntity> findInboxEntity(Long inboxId) {
-        if (inboxId == null) {
-            return Optional.empty();
-        }
+    private SlackInteractionInbox insertInbox(SlackInteractionInbox inbox) {
+        SlackInteractionInboxRow row = SlackInteractionInboxRow.from(inbox);
+        row.setId(null);
+        slackInteractionInboxMybatisMapper.insert(row);
+        return row.toDomain();
+    }
 
-        return repository.findById(inboxId);
+    private SlackInteractionInbox updateInbox(SlackInteractionInbox inbox) {
+        SlackInteractionInboxRow row = SlackInteractionInboxRow.from(inbox);
+        slackInteractionInboxMybatisMapper.update(row);
+        return row.toDomain();
     }
 
     private void saveHistory(SlackInteractionInboxHistory history) {
-        SlackInteractionInboxHistoryJpaEntity entity = new SlackInteractionInboxHistoryJpaEntity();
-        entity.apply(history);
-        historyRepository.save(entity);
+        slackInteractionInboxHistoryMybatisMapper.insert(SlackInteractionInboxHistoryRow.from(history));
     }
 
     private void validateSaveIfProcessingLeaseMatchedArguments(
@@ -556,17 +557,5 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
         }
 
         validateProcessingStartedAt(claimedProcessingStartedAt);
-    }
-
-    private record TimeoutRecoveryCandidate(
-            SlackInteractionInboxJpaEntity entity,
-            SlackInteractionInbox inbox
-    ) {
-        private static TimeoutRecoveryCandidate of(
-                SlackInteractionInboxJpaEntity entity,
-                SlackInteractionInbox inbox
-        ) {
-            return new TimeoutRecoveryCandidate(entity, inbox);
-        }
     }
 }
