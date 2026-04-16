@@ -434,9 +434,7 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
             return insertInbox(inbox);
         }
 
-        return slackInteractionInboxMybatisMapper.findDomainById(inbox.getId())
-                .map(savedInbox -> updateInbox(inbox))
-                .orElseGet(() -> insertInbox(inbox));
+        return updateInbox(inbox);
     }
 
     @Override
@@ -537,7 +535,11 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
 
     private SlackInteractionInbox updateInbox(SlackInteractionInbox inbox) {
         SlackInteractionInboxRow row = SlackInteractionInboxRow.from(inbox);
-        slackInteractionInboxMybatisMapper.update(row);
+        int updatedCount = slackInteractionInboxMybatisMapper.update(row);
+        if (updatedCount == 0) {
+            throw new IllegalStateException("저장 대상 inbox를 찾을 수 없습니다. id=" + inbox.getId());
+        }
+
         return row.toDomain();
     }
 

@@ -22,6 +22,7 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
@@ -180,6 +181,27 @@ class SlackInteractionInboxRepositoryAdapterTest {
     }
 
     @Test
+    void save는_업데이트_대상이_사라지면_예외를_던진다() {
+        // given
+        SlackInteractionInbox savedInbox = slackInteractionInboxRepository.save(
+                SlackInteractionInbox.pending(
+                        SlackInteractionInboxType.BLOCK_ACTIONS,
+                        "interaction-inbox-save-missing-target",
+                        "{\"value\":1}"
+                )
+        );
+        savedInbox.claim(Instant.parse("2026-04-16T04:00:00Z"));
+        deleteInboxById(savedInbox.getId());
+
+        // when & then
+        assertThatThrownBy(() -> slackInteractionInboxRepository.save(savedInbox))
+                .isInstanceOf(InvalidDataAccessApiUsageException.class)
+                .hasMessageContaining("저장 대상 inbox를 찾을 수 없습니다. id=" + savedInbox.getId())
+                .hasRootCauseInstanceOf(IllegalStateException.class);
+        assertThat(slackInteractionInboxRepository.findById(savedInbox.getId())).isEmpty();
+    }
+
+    @Test
     void 완료된_inbox와_history를_같이_삭제한다() {
         // given
         SlackInteractionInbox oldProcessedInbox = SlackInteractionInbox.pending(
@@ -335,6 +357,16 @@ class SlackInteractionInboxRepositoryAdapterTest {
                 """,
                 new MapSqlParameterSource().addValue("inboxId", inboxId),
                 Integer.class
+        );
+    }
+
+    private void deleteInboxById(Long inboxId) {
+        namedParameterJdbcTemplate.update(
+                """
+                DELETE FROM slack_interaction_inbox
+                WHERE id = :inboxId
+                """,
+                new MapSqlParameterSource().addValue("inboxId", inboxId)
         );
     }
 
