@@ -97,23 +97,6 @@ public interface SlackInteractionInboxMybatisMapper {
             @Param("recoveryBatchSize") int recoveryBatchSize
     );
 
-    @Select("""
-            SELECT id,
-                   interaction_type AS interactionType,
-                   idempotency_key AS idempotencyKey,
-                   payload_json AS payloadJson,
-                   status,
-                   processing_attempt AS processingAttempt,
-                   processing_started_at AS processingStartedAt,
-                   processed_at AS processedAt,
-                   failed_at AS failedAt,
-                   failure_reason AS failureReason,
-                   failure_type AS failureType
-            FROM slack_interaction_inbox
-            ORDER BY id ASC
-            """)
-    List<SlackInteractionInboxRow> findAllRows();
-
     @Insert("""
             INSERT INTO slack_interaction_inbox (
                 created_at,
@@ -167,11 +150,5 @@ public interface SlackInteractionInboxMybatisMapper {
     default Optional<SlackInteractionInbox> findDomainById(Long id) {
         return Optional.ofNullable(findRowById(id))
                        .map(row -> row.toDomain());
-    }
-
-    default List<SlackInteractionInbox> findAllDomains() {
-        return findAllRows().stream()
-                            .map(row -> row.toDomain())
-                            .toList();
     }
 }

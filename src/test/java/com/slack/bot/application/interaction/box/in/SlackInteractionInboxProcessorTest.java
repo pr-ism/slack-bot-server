@@ -20,19 +20,21 @@ import com.slack.bot.application.worker.PollingHintTarget;
 import com.slack.bot.domain.reservation.ReservationStatus;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.repository.ReviewReservationRepository;
+import com.slack.bot.infrastructure.common.BoxEventTime;
+import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
+import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxHistory;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStatus;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
-import com.slack.bot.infrastructure.interaction.box.persistence.in.SlackInteractionInboxHistoryMybatisMapper;
-import com.slack.bot.infrastructure.interaction.box.persistence.in.SlackInteractionInboxMybatisMapper;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -70,12 +72,6 @@ class SlackInteractionInboxProcessorTest {
     ObjectMapper objectMapper;
 
     @Autowired
-    SlackInteractionInboxMybatisMapper slackInteractionInboxMybatisMapper;
-
-    @Autowired
-    SlackInteractionInboxHistoryMybatisMapper slackInteractionInboxHistoryMybatisMapper;
-
-    @Autowired
     SlackInteractionInboxRepository actualSlackInteractionInboxRepository;
 
     @Autowired
@@ -110,7 +106,7 @@ class SlackInteractionInboxProcessorTest {
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
             assertAll(
                     () -> assertThat(actual).isTrue(),
-                    () -> assertThat(slackInteractionInboxMybatisMapper.findAllDomains())
+                    () -> assertThat(findAllInboxes())
                             .hasSize(1)
                             .first()
                             .extracting(inbox -> inbox.getStatus())
@@ -146,8 +142,8 @@ class SlackInteractionInboxProcessorTest {
 
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
-            SlackInteractionInbox actualProcessedInbox = slackInteractionInboxMybatisMapper.findDomainById(200L)
-                                                                                           .orElseThrow();
+            SlackInteractionInbox actualProcessedInbox = actualSlackInteractionInboxRepository.findById(200L)
+                                                                                              .orElseThrow();
             List<SlackInteractionInboxHistory> actualHistories = historiesOf(200L);
 
             assertAll(
@@ -221,14 +217,8 @@ class SlackInteractionInboxProcessorTest {
 
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
-            List<SlackInteractionInbox> actualInboxes = slackInteractionInboxMybatisMapper.findAllDomains()
-                                                                                           .stream()
-                                                                                           .filter(inbox -> savedInboxIds.contains(inbox.getId()))
-                                                                                           .toList();
-            List<SlackInteractionInboxHistory> actualHistories = slackInteractionInboxHistoryMybatisMapper.findAllDomains()
-                                                                                                           .stream()
-                                                                                                           .filter(history -> savedInboxIds.contains(history.getInboxId()))
-                                                                                                           .toList();
+            List<SlackInteractionInbox> actualInboxes = findInboxesByIds(savedInboxIds);
+            List<SlackInteractionInboxHistory> actualHistories = findHistoriesByInboxIds(savedInboxIds);
 
             assertAll(
                     () -> assertThat(recoveredCount).isEqualTo(100),
@@ -274,14 +264,8 @@ class SlackInteractionInboxProcessorTest {
 
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
-            List<SlackInteractionInbox> actualInboxes = slackInteractionInboxMybatisMapper.findAllDomains()
-                                                                                           .stream()
-                                                                                           .filter(inbox -> savedInboxIds.contains(inbox.getId()))
-                                                                                           .toList();
-            List<SlackInteractionInboxHistory> actualHistories = slackInteractionInboxHistoryMybatisMapper.findAllDomains()
-                                                                                                           .stream()
-                                                                                                           .filter(history -> savedInboxIds.contains(history.getInboxId()))
-                                                                                                           .toList();
+            List<SlackInteractionInbox> actualInboxes = findInboxesByIds(savedInboxIds);
+            List<SlackInteractionInboxHistory> actualHistories = findHistoriesByInboxIds(savedInboxIds);
 
             assertAll(
                     () -> assertThat(recoveredCount).isEqualTo(100),
@@ -411,7 +395,7 @@ class SlackInteractionInboxProcessorTest {
         // when
         boolean actual = slackInteractionInboxProcessor.enqueueBlockAction(invalidPayload);
         slackInteractionInboxProcessor.processPendingBlockActions(10);
-        SlackInteractionInbox inbox = slackInteractionInboxMybatisMapper.findAllDomains().getFirst();
+        SlackInteractionInbox inbox = findAllInboxes().getFirst();
         SlackInteractionInbox actualAfterFirst = actualSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
         List<SlackInteractionInboxHistory> histories = historiesOf(inbox.getId());
 
@@ -428,11 +412,149 @@ class SlackInteractionInboxProcessorTest {
     }
 
     private List<SlackInteractionInboxHistory> historiesOf(Long inboxId) {
-        return slackInteractionInboxHistoryMybatisMapper.findAllDomains()
-                                                        .stream()
-                                                        .filter(history -> inboxId.equals(history.getInboxId()))
-                                                        .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))
-                                                        .toList();
+        return namedParameterJdbcTemplate.query(
+                """
+                SELECT id,
+                       inbox_id,
+                       processing_attempt,
+                       status,
+                       completed_at,
+                       failure_reason,
+                       failure_type
+                FROM slack_interaction_inbox_history
+                WHERE inbox_id = :inboxId
+                ORDER BY processing_attempt ASC
+                """,
+                new MapSqlParameterSource().addValue("inboxId", inboxId),
+                (resultSet, rowNum) -> mapHistory(resultSet)
+        );
+    }
+
+    private List<SlackInteractionInbox> findAllInboxes() {
+        return namedParameterJdbcTemplate.query(
+                """
+                SELECT id,
+                       interaction_type,
+                       idempotency_key,
+                       payload_json,
+                       status,
+                       processing_attempt,
+                       processing_started_at,
+                       processed_at,
+                       failed_at,
+                       failure_reason,
+                       failure_type
+                FROM slack_interaction_inbox
+                ORDER BY id ASC
+                """,
+                (resultSet, rowNum) -> mapInbox(resultSet)
+        );
+    }
+
+    private List<SlackInteractionInbox> findInboxesByIds(List<Long> inboxIds) {
+        return namedParameterJdbcTemplate.query(
+                """
+                SELECT id,
+                       interaction_type,
+                       idempotency_key,
+                       payload_json,
+                       status,
+                       processing_attempt,
+                       processing_started_at,
+                       processed_at,
+                       failed_at,
+                       failure_reason,
+                       failure_type
+                FROM slack_interaction_inbox
+                WHERE id IN (:inboxIds)
+                ORDER BY id ASC
+                """,
+                new MapSqlParameterSource().addValue("inboxIds", inboxIds),
+                (resultSet, rowNum) -> mapInbox(resultSet)
+        );
+    }
+
+    private List<SlackInteractionInboxHistory> findHistoriesByInboxIds(List<Long> inboxIds) {
+        return namedParameterJdbcTemplate.query(
+                """
+                SELECT id,
+                       inbox_id,
+                       processing_attempt,
+                       status,
+                       completed_at,
+                       failure_reason,
+                       failure_type
+                FROM slack_interaction_inbox_history
+                WHERE inbox_id IN (:inboxIds)
+                ORDER BY inbox_id ASC, processing_attempt ASC
+                """,
+                new MapSqlParameterSource().addValue("inboxIds", inboxIds),
+                (resultSet, rowNum) -> mapHistory(resultSet)
+        );
+    }
+
+    private SlackInteractionInbox mapInbox(ResultSet resultSet) throws SQLException {
+        return SlackInteractionInbox.rehydrate(
+                resultSet.getLong("id"),
+                SlackInteractionInboxType.valueOf(resultSet.getString("interaction_type")),
+                resultSet.getString("idempotency_key"),
+                resultSet.getString("payload_json"),
+                SlackInteractionInboxStatus.valueOf(resultSet.getString("status")),
+                resultSet.getInt("processing_attempt"),
+                toProcessingLease(resultSet),
+                toProcessedTime(resultSet),
+                toFailedTime(resultSet),
+                toFailure(resultSet)
+        );
+    }
+
+    private SlackInteractionInboxHistory mapHistory(ResultSet resultSet) throws SQLException {
+        return SlackInteractionInboxHistory.rehydrate(
+                resultSet.getLong("id"),
+                resultSet.getLong("inbox_id"),
+                resultSet.getInt("processing_attempt"),
+                SlackInteractionInboxStatus.valueOf(resultSet.getString("status")),
+                resultSet.getTimestamp("completed_at").toInstant(),
+                toFailure(resultSet)
+        );
+    }
+
+    private BoxProcessingLease toProcessingLease(ResultSet resultSet) throws SQLException {
+        if (resultSet.getTimestamp("processing_started_at") == null) {
+            return BoxProcessingLease.idle();
+        }
+
+        return BoxProcessingLease.claimed(resultSet.getTimestamp("processing_started_at").toInstant());
+    }
+
+    private BoxEventTime toProcessedTime(ResultSet resultSet) throws SQLException {
+        if (resultSet.getTimestamp("processed_at") == null) {
+            return BoxEventTime.absent();
+        }
+
+        return BoxEventTime.present(resultSet.getTimestamp("processed_at").toInstant());
+    }
+
+    private BoxEventTime toFailedTime(ResultSet resultSet) throws SQLException {
+        if (resultSet.getTimestamp("failed_at") == null) {
+            return BoxEventTime.absent();
+        }
+
+        return BoxEventTime.present(resultSet.getTimestamp("failed_at").toInstant());
+    }
+
+    private BoxFailureSnapshot<SlackInteractionFailureType> toFailure(ResultSet resultSet) throws SQLException {
+        String failureReason = resultSet.getString("failure_reason");
+        String failureType = resultSet.getString("failure_type");
+
+        if (failureReason == null && failureType == null) {
+            return BoxFailureSnapshot.absent();
+        }
+
+        return BoxFailureSnapshot.present(
+                failureReason,
+                SlackInteractionFailureType.valueOf(failureType)
+        );
     }
 
     private void awaitLatch(CountDownLatch latch) {

@@ -1,27 +1,11 @@
 package com.slack.bot.infrastructure.interaction.box.persistence.in;
 
-import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxHistory;
-import java.util.List;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
-import org.apache.ibatis.annotations.Select;
 
 @Mapper
 public interface SlackInteractionInboxHistoryMybatisMapper {
-
-    @Select("""
-            SELECT id,
-                   inbox_id AS inboxId,
-                   processing_attempt AS processingAttempt,
-                   status,
-                   completed_at AS completedAt,
-                   failure_reason AS failureReason,
-                   failure_type AS failureType
-            FROM slack_interaction_inbox_history
-            ORDER BY id ASC
-            """)
-    List<SlackInteractionInboxHistoryRow> findAllRows();
 
     @Insert("""
             INSERT INTO slack_interaction_inbox_history (
@@ -47,10 +31,4 @@ public interface SlackInteractionInboxHistoryMybatisMapper {
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(SlackInteractionInboxHistoryRow row);
-
-    default List<SlackInteractionInboxHistory> findAllDomains() {
-        return findAllRows().stream()
-                            .map(row -> row.toDomain())
-                            .toList();
-    }
 }
