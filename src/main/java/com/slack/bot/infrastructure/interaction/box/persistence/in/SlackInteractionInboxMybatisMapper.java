@@ -1,6 +1,8 @@
 package com.slack.bot.infrastructure.interaction.box.persistence.in;
 
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.apache.ibatis.annotations.Insert;
@@ -30,23 +32,70 @@ public interface SlackInteractionInboxMybatisMapper {
             """)
     SlackInteractionInboxRow findRowById(@Param("id") Long id);
 
-    @Select("""
-            SELECT id,
-                   interaction_type AS interactionType,
-                   idempotency_key AS idempotencyKey,
-                   payload_json AS payloadJson,
-                   status,
-                   processing_attempt AS processingAttempt,
-                   processing_started_at AS processingStartedAt,
-                   processed_at AS processedAt,
-                   failed_at AS failedAt,
-                   failure_reason AS failureReason,
-                   failure_type AS failureType
-            FROM slack_interaction_inbox
-            WHERE id = #{id}
-            FOR UPDATE
-            """)
-    SlackInteractionInboxRow findRowByIdForUpdate(@Param("id") Long id);
+    @Select({
+            "<script>",
+            "SELECT id,",
+            "       interaction_type AS interactionType,",
+            "       idempotency_key AS idempotencyKey,",
+            "       payload_json AS payloadJson,",
+            "       status,",
+            "       processing_attempt AS processingAttempt,",
+            "       processing_started_at AS processingStartedAt,",
+            "       processed_at AS processedAt,",
+            "       failed_at AS failedAt,",
+            "       failure_reason AS failureReason,",
+            "       failure_type AS failureType",
+            "FROM slack_interaction_inbox",
+            "WHERE interaction_type = #{interactionType}",
+            "  AND status IN",
+            "  <foreach collection='claimableStatuses' item='claimableStatus' open='(' separator=',' close=')'>",
+            "    #{claimableStatus}",
+            "  </foreach>",
+            "  <if test='excludedInboxIds != null and excludedInboxIds.size &gt; 0'>",
+            "    AND id NOT IN",
+            "    <foreach collection='excludedInboxIds' item='excludedInboxId' open='(' separator=',' close=')'>",
+            "      #{excludedInboxId}",
+            "    </foreach>",
+            "  </if>",
+            "ORDER BY id ASC",
+            "LIMIT 1",
+            "FOR UPDATE SKIP LOCKED",
+            "</script>"
+    })
+    List<SlackInteractionInboxRow> findClaimableRowsForUpdate(
+            @Param("interactionType") String interactionType,
+            @Param("claimableStatuses") List<String> claimableStatuses,
+            @Param("excludedInboxIds") Collection<Long> excludedInboxIds
+    );
+
+    @Select({
+            "<script>",
+            "SELECT id,",
+            "       interaction_type AS interactionType,",
+            "       idempotency_key AS idempotencyKey,",
+            "       payload_json AS payloadJson,",
+            "       status,",
+            "       processing_attempt AS processingAttempt,",
+            "       processing_started_at AS processingStartedAt,",
+            "       processed_at AS processedAt,",
+            "       failed_at AS failedAt,",
+            "       failure_reason AS failureReason,",
+            "       failure_type AS failureType",
+            "FROM slack_interaction_inbox",
+            "WHERE interaction_type = #{interactionType}",
+            "  AND status = #{processingStatus}",
+            "  AND processing_started_at &lt; #{processingStartedBefore}",
+            "ORDER BY processing_started_at ASC, id ASC",
+            "LIMIT #{recoveryBatchSize}",
+            "FOR UPDATE SKIP LOCKED",
+            "</script>"
+    })
+    List<SlackInteractionInboxRow> findTimeoutRecoveryRowsForUpdate(
+            @Param("interactionType") String interactionType,
+            @Param("processingStatus") String processingStatus,
+            @Param("processingStartedBefore") Instant processingStartedBefore,
+            @Param("recoveryBatchSize") int recoveryBatchSize
+    );
 
     @Select("""
             SELECT id,
@@ -117,11 +166,6 @@ public interface SlackInteractionInboxMybatisMapper {
 
     default Optional<SlackInteractionInbox> findDomainById(Long id) {
         return Optional.ofNullable(findRowById(id))
-                       .map(row -> row.toDomain());
-    }
-
-    default Optional<SlackInteractionInbox> findLockedDomainById(Long id) {
-        return Optional.ofNullable(findRowByIdForUpdate(id))
                        .map(row -> row.toDomain());
     }
 

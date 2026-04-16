@@ -117,6 +117,44 @@ class SlackInteractionInboxRepositoryAdapterTest {
     }
 
     @Test
+    void recoverTimeoutProcessing은_timeout_inbox를_retry_pending과_history로_복구한다() {
+        // given
+        Instant processingStartedAt = Instant.parse("2026-04-16T01:59:00Z");
+        Instant processingStartedBefore = Instant.parse("2026-04-16T02:00:00Z");
+        Instant failedAt = Instant.parse("2026-04-16T02:01:00Z");
+        SlackInteractionInbox processingInbox = createProcessingInbox(
+                "interaction-inbox-timeout-recovery",
+                processingStartedAt
+        );
+
+        // when
+        int recoveredCount = slackInteractionInboxRepository.recoverTimeoutProcessing(
+                SlackInteractionInboxType.BLOCK_ACTIONS,
+                processingStartedBefore,
+                failedAt,
+                "processing timeout",
+                3,
+                10
+        );
+
+        // then
+        SlackInteractionInbox recoveredInbox = slackInteractionInboxRepository.findById(processingInbox.getId()).orElseThrow();
+        List<SlackInteractionInboxHistory> histories = historiesOf(processingInbox.getId());
+        assertAll(
+                () -> assertThat(recoveredCount).isEqualTo(1),
+                () -> assertThat(recoveredInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
+                () -> assertThat(recoveredInbox.getFailedTime().occurredAt()).isEqualTo(failedAt),
+                () -> assertThat(recoveredInbox.getFailure().type()).isEqualTo(SlackInteractionFailureType.PROCESSING_TIMEOUT),
+                () -> assertThat(histories).hasSize(1),
+                () -> assertThat(histories.getFirst().getStatus()).isEqualTo(SlackInteractionInboxStatus.RETRY_PENDING),
+                () -> assertThat(histories.getFirst().getCompletedAt()).isEqualTo(failedAt),
+                () -> assertThat(histories.getFirst().getFailure().type()).isEqualTo(
+                        SlackInteractionFailureType.PROCESSING_TIMEOUT
+                )
+        );
+    }
+
+    @Test
     void saveIfProcessingLeaseMatched는_lease가_일치하면_상태와_history를_같이_저장한다() {
         // given
         Instant claimedProcessingStartedAt = Instant.parse("2026-04-16T02:00:00Z");

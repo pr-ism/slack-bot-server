@@ -12,7 +12,6 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -57,74 +56,22 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
         validateInteractionType(interactionType);
         validateProcessingStartedAt(processingStartedAt);
 
-        MapSqlParameterSource selectParameters = new MapSqlParameterSource()
-                .addValue("interactionType", interactionType.name())
-                .addValue(
-                        "claimableStatuses",
-                        List.of(
-                                SlackInteractionInboxStatus.PENDING.name(),
-                                SlackInteractionInboxStatus.RETRY_PENDING.name()
-                        )
-                );
-        addExcludedInboxIds(selectParameters, excludedInboxIds);
-
-        List<Long> claimedIds = namedParameterJdbcTemplate.query(
-                buildClaimNextIdSelectSql(excludedInboxIds),
-                selectParameters,
-                (resultSet, rowNum) -> resultSet.getLong(1)
+        List<SlackInteractionInboxRow> claimableRows = slackInteractionInboxMybatisMapper.findClaimableRowsForUpdate(
+                interactionType.name(),
+                List.of(
+                        SlackInteractionInboxStatus.PENDING.name(),
+                        SlackInteractionInboxStatus.RETRY_PENDING.name()
+                ),
+                excludedInboxIds
         );
-        if (claimedIds.isEmpty()) {
+        if (claimableRows.isEmpty()) {
             return Optional.empty();
         }
 
-        Long inboxId = claimedIds.getFirst();
-        return slackInteractionInboxMybatisMapper.findLockedDomainById(inboxId)
-                .map(inbox -> {
-                    inbox.claim(processingStartedAt);
-                    slackInteractionInboxMybatisMapper.update(SlackInteractionInboxRow.from(inbox));
-                    return inbox.getId();
-                });
-    }
-
-    private String buildClaimNextIdSelectSql(Collection<Long> excludedInboxIds) {
-        StringBuilder sql = new StringBuilder(
-                """
-                SELECT id
-                FROM slack_interaction_inbox
-                WHERE interaction_type = :interactionType
-                  AND status IN (:claimableStatuses)
-                """
-        );
-
-        appendExcludedInboxIdsClause(sql, excludedInboxIds);
-        sql.append(
-                """
-                ORDER BY id ASC
-                LIMIT 1
-                FOR UPDATE SKIP LOCKED
-                """
-        );
-
-        return sql.toString();
-    }
-
-    private void appendExcludedInboxIdsClause(StringBuilder sql, Collection<Long> excludedInboxIds) {
-        if (excludedInboxIds == null || excludedInboxIds.isEmpty()) {
-            return;
-        }
-
-        sql.append("\n  AND id NOT IN (:excludedInboxIds)");
-    }
-
-    private void addExcludedInboxIds(
-            MapSqlParameterSource parameters,
-            Collection<Long> excludedInboxIds
-    ) {
-        if (excludedInboxIds == null || excludedInboxIds.isEmpty()) {
-            return;
-        }
-
-        parameters.addValue("excludedInboxIds", excludedInboxIds);
+        SlackInteractionInbox inbox = claimableRows.getFirst().toDomain();
+        inbox.claim(processingStartedAt);
+        updateInbox(inbox);
+        return Optional.of(inbox.getId());
     }
 
     @Override
@@ -152,31 +99,33 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
                 recoveryBatchSize
         );
 
-        List<Long> timedOutInboxIds = selectTimeoutRecoveryTargetIds(
-                interactionType,
+        List<SlackInteractionInboxRow> timedOutInboxRows = slackInteractionInboxMybatisMapper.findTimeoutRecoveryRowsForUpdate(
+                interactionType.name(),
+                SlackInteractionInboxStatus.PROCESSING.name(),
                 processingStartedBefore,
                 recoveryBatchSize
         );
 
-        AtomicInteger recoveredCount = new AtomicInteger();
-        for (Long inboxId : timedOutInboxIds) {
-            slackInteractionInboxMybatisMapper.findLockedDomainById(inboxId)
-                    .filter(inbox -> isTimeoutRecoverable(inbox, interactionType, processingStartedBefore))
-                    .ifPresent(inbox -> {
-                        SlackInteractionInboxHistory history = recoverTimeoutProcessing(
-                                inbox,
-                                failedAt,
-                                failureReason,
-                                maxAttempts
-                        );
+        int recoveredCount = 0;
+        for (SlackInteractionInboxRow timedOutInboxRow : timedOutInboxRows) {
+            SlackInteractionInbox inbox = timedOutInboxRow.toDomain();
+            if (!isTimeoutRecoverable(inbox, interactionType, processingStartedBefore)) {
+                continue;
+            }
 
-                        slackInteractionInboxMybatisMapper.update(SlackInteractionInboxRow.from(inbox));
-                        saveHistory(history.bindInboxId(inbox.getId()));
-                        recoveredCount.incrementAndGet();
-                    });
+            SlackInteractionInboxHistory history = recoverTimeoutProcessing(
+                    inbox,
+                    failedAt,
+                    failureReason,
+                    maxAttempts
+            );
+
+            updateInbox(inbox);
+            saveHistory(history.bindInboxId(inbox.getId()));
+            recoveredCount++;
         }
 
-        return recoveredCount.get();
+        return recoveredCount;
     }
 
     @Override
@@ -192,38 +141,6 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
 
         deleteHistories(deletableInboxIds);
         return deleteInboxes(deletableInboxIds);
-    }
-
-    private List<Long> selectTimeoutRecoveryTargetIds(
-            SlackInteractionInboxType interactionType,
-            Instant processingStartedBefore,
-            int recoveryBatchSize
-    ) {
-        return namedParameterJdbcTemplate.query(
-                buildTimeoutRecoverySelectSql(recoveryBatchSize),
-                new MapSqlParameterSource()
-                        .addValue("interactionType", interactionType.name())
-                        .addValue("processingStatus", SlackInteractionInboxStatus.PROCESSING.name())
-                        .addValue("processingStartedBefore", Timestamp.from(processingStartedBefore)),
-                (resultSet, rowNum) -> resultSet.getLong("id")
-        );
-    }
-
-    private String buildTimeoutRecoverySelectSql(int recoveryBatchSize) {
-        StringBuilder sql = new StringBuilder(
-                """
-                SELECT id
-                FROM slack_interaction_inbox
-                WHERE interaction_type = :interactionType
-                  AND status = :processingStatus
-                  AND processing_started_at < :processingStartedBefore
-                ORDER BY processing_started_at ASC, id ASC
-                LIMIT
-                """
-        );
-        sql.append(recoveryBatchSize);
-        sql.append("\nFOR UPDATE SKIP LOCKED");
-        return sql.toString();
     }
 
     private List<Long> selectCompletedDeletionTargetIds(
