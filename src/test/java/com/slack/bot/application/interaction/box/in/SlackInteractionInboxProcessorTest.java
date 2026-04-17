@@ -399,7 +399,7 @@ class SlackInteractionInboxProcessorTest {
         // when
         boolean actual = slackInteractionInboxProcessor.enqueueBlockAction(invalidPayload);
         slackInteractionInboxProcessor.processPendingBlockActions(10);
-        SlackInteractionInbox inbox = findAllInboxes().getFirst();
+        SlackInteractionInbox inbox = slackInteractionInboxJdbcFixture.findInboxByPayloadJson(invalidPayload);
         SlackInteractionInbox actualAfterFirst = actualSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
         List<SlackInteractionInboxHistory> histories = historiesOf(inbox.getId());
 

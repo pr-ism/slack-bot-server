@@ -126,6 +126,28 @@ public final class SlackInteractionInboxJdbcFixture {
         );
     }
 
+    public SlackInteractionInbox findInboxByPayloadJson(String payloadJson) {
+        return namedParameterJdbcTemplate.queryForObject(
+                """
+                SELECT id,
+                       interaction_type,
+                       idempotency_key,
+                       payload_json,
+                       status,
+                       processing_attempt,
+                       processing_started_at,
+                       processed_at,
+                       failed_at,
+                       failure_reason,
+                       failure_type
+                FROM slack_interaction_inbox
+                WHERE payload_json = :payloadJson
+                """,
+                new MapSqlParameterSource().addValue("payloadJson", payloadJson),
+                (resultSet, rowNum) -> mapInbox(resultSet)
+        );
+    }
+
     private SlackInteractionInbox mapInbox(ResultSet resultSet) throws SQLException {
         return SlackInteractionInbox.rehydrate(
                 resultSet.getLong("id"),
