@@ -22,18 +22,17 @@ import com.slack.bot.application.interaction.client.NotificationApiClient;
 import com.slack.bot.domain.reservation.ReservationStatus;
 import com.slack.bot.domain.reservation.ReviewReservation;
 import com.slack.bot.domain.reservation.repository.ReviewReservationRepository;
-import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxHistory;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStatus;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import com.slack.bot.support.SlackInteractionInboxJdbcFixture;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -76,6 +75,13 @@ class SlackInteractionInboxEntryProcessorTest {
 
     @Autowired
     PlatformTransactionManager transactionManager;
+
+    SlackInteractionInboxJdbcFixture slackInteractionInboxJdbcFixture;
+
+    @BeforeEach
+    void setUp() {
+        slackInteractionInboxJdbcFixture = new SlackInteractionInboxJdbcFixture(namedParameterJdbcTemplate);
+    }
 
     @Test
     @Sql(scripts = {
@@ -426,49 +432,6 @@ class SlackInteractionInboxEntryProcessorTest {
     }
 
     private List<SlackInteractionInboxHistory> historiesOf(Long inboxId) {
-        return namedParameterJdbcTemplate.query(
-                """
-                SELECT id,
-                       inbox_id,
-                       processing_attempt,
-                       status,
-                       completed_at,
-                       failure_reason,
-                       failure_type
-                FROM slack_interaction_inbox_history
-                WHERE inbox_id = :inboxId
-                ORDER BY processing_attempt ASC
-                """,
-                new MapSqlParameterSource().addValue("inboxId", inboxId),
-                (resultSet, rowNum) -> mapHistory(resultSet)
-        );
-    }
-
-    private SlackInteractionInboxHistory mapHistory(ResultSet resultSet) throws SQLException {
-        return SlackInteractionInboxHistory.rehydrate(
-                resultSet.getLong("id"),
-                resultSet.getLong("inbox_id"),
-                resultSet.getInt("processing_attempt"),
-                SlackInteractionInboxStatus.valueOf(resultSet.getString("status")),
-                resultSet.getTimestamp("completed_at").toInstant(),
-                toFailure(resultSet)
-        );
-    }
-
-    private BoxFailureSnapshot<SlackInteractionFailureType> toFailure(ResultSet resultSet) throws SQLException {
-        String failureReason = resultSet.getString("failure_reason");
-        String failureType = resultSet.getString("failure_type");
-
-        if (failureReason == null && failureType == null) {
-            return BoxFailureSnapshot.absent();
-        }
-        if (failureReason == null || failureType == null) {
-            throw new IllegalStateException("failure_reason과 failure_type은 항상 함께 세팅되어야 합니다.");
-        }
-
-        return BoxFailureSnapshot.present(
-                failureReason,
-                SlackInteractionFailureType.valueOf(failureType)
-        );
+        return slackInteractionInboxJdbcFixture.historiesOf(inboxId);
     }
 }
