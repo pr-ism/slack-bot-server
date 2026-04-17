@@ -21,12 +21,13 @@ import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxH
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxMessageType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
-import com.slack.bot.infrastructure.interaction.box.persistence.out.JpaSlackNotificationOutboxHistoryRepository;
+import com.slack.bot.support.SlackNotificationOutboxJdbcFixture;
 import com.slack.bot.infrastructure.interaction.client.NotificationTransportApiClient;
 import com.slack.bot.infrastructure.workspace.persistence.JpaWorkspaceRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -34,6 +35,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -65,9 +67,6 @@ class SlackNotificationOutboxProcessorTest {
     JpaWorkspaceRepository jpaWorkspaceRepository;
 
     @Autowired
-    JpaSlackNotificationOutboxHistoryRepository jpaSlackNotificationOutboxHistoryRepository;
-
-    @Autowired
     Clock clock;
 
     @Autowired
@@ -78,6 +77,13 @@ class SlackNotificationOutboxProcessorTest {
 
     @Autowired
     PlatformTransactionManager transactionManager;
+
+    SlackNotificationOutboxJdbcFixture slackNotificationOutboxJdbcFixture;
+
+    @BeforeEach
+    void setUp() {
+        slackNotificationOutboxJdbcFixture = new SlackNotificationOutboxJdbcFixture(namedParameterJdbcTemplate);
+    }
 
     @Test
     @Sql(scripts = "/sql/fixtures/box/out/pending_outbox.sql")
@@ -236,7 +242,7 @@ class SlackNotificationOutboxProcessorTest {
     void PROCESSING_타임아웃_outbox_복구는_배치_크기만큼만_처리한다() {
         // given
         Instant base = clock.instant();
-        List<Long> outboxIds = new java.util.ArrayList<>();
+        List<Long> outboxIds = new ArrayList<>();
         for (int index = 0; index < 101; index++) {
             SlackNotificationOutbox timeoutOutbox = SlackNotificationOutbox.builder()
                                                                            .messageType(SlackNotificationOutboxMessageType.CHANNEL_TEXT)
@@ -257,23 +263,21 @@ class SlackNotificationOutboxProcessorTest {
         int recoveredCount = slackNotificationOutboxProcessor.recoverTimeoutProcessing();
 
         // then
-        List<SlackNotificationOutbox> actualOutboxes = outboxIds.stream()
-                                                                .map(outboxId -> slackNotificationOutboxRepository.findById(
-                                                                        outboxId
-                                                                ).orElseThrow())
-                                                                .toList();
-        List<SlackNotificationOutboxHistory> actualHistories = jpaSlackNotificationOutboxHistoryRepository.findAllDomains();
+        await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
+            List<SlackNotificationOutbox> actualOutboxes = findOutboxesByIds(outboxIds);
+            List<SlackNotificationOutboxHistory> actualHistories = findHistoriesByOutboxIds(outboxIds);
 
-        assertAll(
-                () -> assertThat(recoveredCount).isEqualTo(100),
-                () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == SlackNotificationOutboxStatus.RETRY_PENDING)
-                        .hasSize(100),
-                () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == SlackNotificationOutboxStatus.PROCESSING)
-                        .hasSize(1),
-                () -> assertThat(actualHistories).hasSize(100),
-                () -> assertThat(actualHistories).extracting(history -> history.getStatus())
-                        .containsOnly(SlackNotificationOutboxStatus.RETRY_PENDING)
-        );
+            assertAll(
+                    () -> assertThat(recoveredCount).isEqualTo(100),
+                    () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == SlackNotificationOutboxStatus.RETRY_PENDING)
+                            .hasSize(100),
+                    () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == SlackNotificationOutboxStatus.PROCESSING)
+                            .hasSize(1),
+                    () -> assertThat(actualHistories).hasSize(100),
+                    () -> assertThat(actualHistories).extracting(history -> history.getStatus())
+                            .containsOnly(SlackNotificationOutboxStatus.RETRY_PENDING)
+            );
+        });
     }
 
     @Test
@@ -281,7 +285,7 @@ class SlackNotificationOutboxProcessorTest {
     void PROCESSING_타임아웃_outbox_복구는_재시도_가능과_소진건을_합쳐_배치_크기만큼만_처리한다() {
         // given
         Instant base = clock.instant();
-        List<Long> outboxIds = new java.util.ArrayList<>();
+        List<Long> outboxIds = new ArrayList<>();
         for (int index = 0; index < 50; index++) {
             SlackNotificationOutbox retryableOutbox = SlackNotificationOutbox.builder()
                                                                              .messageType(SlackNotificationOutboxMessageType.CHANNEL_TEXT)
@@ -317,28 +321,28 @@ class SlackNotificationOutboxProcessorTest {
         int recoveredCount = slackNotificationOutboxProcessor.recoverTimeoutProcessing();
 
         // then
-        List<SlackNotificationOutbox> actualOutboxes = outboxIds.stream()
-                                                                .map(outboxId -> slackNotificationOutboxRepository.findById(
-                                                                        outboxId
-                                                                ).orElseThrow())
-                                                                .toList();
-        List<SlackNotificationOutboxHistory> actualHistories = jpaSlackNotificationOutboxHistoryRepository.findAllDomains();
+        await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
+            List<SlackNotificationOutbox> actualOutboxes = findOutboxesByIds(outboxIds);
+            List<SlackNotificationOutboxHistory> actualHistories = findHistoriesByOutboxIds(outboxIds);
 
-        assertAll(
-                () -> assertThat(recoveredCount).isEqualTo(100),
-                () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == SlackNotificationOutboxStatus.RETRY_PENDING)
-                        .hasSize(50),
-                () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == SlackNotificationOutboxStatus.FAILED)
-                        .hasSize(50),
-                () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == SlackNotificationOutboxStatus.PROCESSING)
-                        .hasSize(1),
-                () -> assertThat(actualHistories).filteredOn(
-                        history -> history.getFailure().type() == SlackInteractionFailureType.PROCESSING_TIMEOUT
-                ).hasSize(50),
-                () -> assertThat(actualHistories).filteredOn(
-                        history -> history.getFailure().type() == SlackInteractionFailureType.RETRY_EXHAUSTED
-                ).hasSize(50)
-        );
+            assertAll(
+                    () -> assertThat(recoveredCount).isEqualTo(100),
+                    () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == SlackNotificationOutboxStatus.RETRY_PENDING)
+                            .hasSize(50),
+                    () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == SlackNotificationOutboxStatus.FAILED)
+                            .hasSize(50),
+                    () -> assertThat(actualOutboxes).filteredOn(outbox -> outbox.getStatus() == SlackNotificationOutboxStatus.PROCESSING)
+                            .hasSize(1),
+                    () -> assertThat(actualHistories).filteredOn(
+                            history -> history.getFailure().isPresent()
+                                    && history.getFailure().type() == SlackInteractionFailureType.PROCESSING_TIMEOUT
+                    ).hasSize(50),
+                    () -> assertThat(actualHistories).filteredOn(
+                            history -> history.getFailure().isPresent()
+                                    && history.getFailure().type() == SlackInteractionFailureType.RETRY_EXHAUSTED
+                    ).hasSize(50)
+            );
+        });
     }
 
     @Test
@@ -388,7 +392,7 @@ class SlackNotificationOutboxProcessorTest {
             assertAll(
                     () -> assertThat(skippedCount).isZero(),
                     () -> assertThat(lockedOutbox.getStatus()).isEqualTo(SlackNotificationOutboxStatus.PROCESSING),
-                    () -> assertThat(jpaSlackNotificationOutboxHistoryRepository.findAllDomains()).isEmpty()
+                    () -> assertThat(historiesOf(saved.getId())).isEmpty()
             );
 
             releaseLock.countDown();
@@ -464,11 +468,20 @@ class SlackNotificationOutboxProcessorTest {
     }
 
     private List<SlackNotificationOutboxHistory> historiesOf(Long outboxId) {
-        return jpaSlackNotificationOutboxHistoryRepository.findAllDomains()
-                                                          .stream()
-                                                          .filter(history -> outboxId.equals(history.getOutboxId()))
-                                                          .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))
-                                                          .toList();
+        return slackNotificationOutboxJdbcFixture.historiesOf(outboxId);
+    }
+
+    private List<SlackNotificationOutbox> findOutboxesByIds(List<Long> outboxIds) {
+        return slackNotificationOutboxJdbcFixture.findOutboxesByIds(outboxIds);
+    }
+
+    private List<SlackNotificationOutboxHistory> findHistoriesByOutboxIds(List<Long> outboxIds) {
+        return slackNotificationOutboxJdbcFixture.findHistoriesByOutboxIds(outboxIds)
+                                                 .stream()
+                                                 .sorted(Comparator.<SlackNotificationOutboxHistory>comparingLong(
+                                                         history -> history.getOutboxId()
+                                                 ).thenComparingInt(history -> history.getProcessingAttempt()))
+                                                 .toList();
     }
 
     private void awaitLatch(CountDownLatch latch) {

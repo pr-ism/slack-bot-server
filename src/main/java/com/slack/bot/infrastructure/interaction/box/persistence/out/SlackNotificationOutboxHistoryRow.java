@@ -24,7 +24,9 @@ public class SlackNotificationOutboxHistoryRow {
 
     public static SlackNotificationOutboxHistoryRow from(SlackNotificationOutboxHistory history) {
         SlackNotificationOutboxHistoryRow row = new SlackNotificationOutboxHistoryRow();
-        row.setId(resolveId(history));
+        if (history.getHistoryId().isAssigned()) {
+            row.setId(history.getId());
+        }
         row.setOutboxId(history.getOutboxId());
         row.setProcessingAttempt(history.getProcessingAttempt());
         row.setStatus(history.getStatus());
@@ -75,13 +77,5 @@ public class SlackNotificationOutboxHistoryRow {
         if (failureState == null) {
             throw new IllegalStateException("history failureState는 비어 있을 수 없습니다.");
         }
-    }
-
-    private static Long resolveId(SlackNotificationOutboxHistory history) {
-        if (!history.getHistoryId().isAssigned()) {
-            return null;
-        }
-
-        return history.getId();
     }
 }

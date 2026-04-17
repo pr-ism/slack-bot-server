@@ -121,32 +121,35 @@ public class SlackNotificationOutboxRow {
             failureType = failure.type();
         }
 
-        return SlackNotificationOutboxRow.builder()
-                                         .id(resolveId(outbox))
-                                         .messageType(outbox.getMessageType())
-                                         .idempotencyKey(outbox.getIdempotencyKey())
-                                         .teamId(outbox.getTeamId())
-                                         .channelId(outbox.getChannelId())
-                                         .userIdState(outbox.getUserId().getState())
-                                         .userId(outbox.getUserId().valueOrBlank())
-                                         .textState(outbox.getText().getState())
-                                         .text(outbox.getText().valueOrBlank())
-                                         .blocksJsonState(outbox.getBlocksJson().getState())
-                                         .blocksJson(outbox.getBlocksJson().valueOrBlank())
-                                         .fallbackTextState(outbox.getFallbackText().getState())
-                                         .fallbackText(outbox.getFallbackText().valueOrBlank())
-                                         .status(outbox.getStatus())
-                                         .processingAttempt(outbox.getProcessingAttempt())
-                                         .processingLeaseState(resolveProcessingLeaseState(outbox))
-                                         .processingStartedAt(processingStartedAt)
-                                         .sentTimeState(resolveSentTimeState(outbox))
-                                         .sentAt(sentAt)
-                                         .failedTimeState(resolveFailedTimeState(outbox))
-                                         .failedAt(failedAt)
-                                         .failureState(resolveFailureState(failure))
-                                         .failureReason(failureReason)
-                                         .failureType(failureType)
-                                         .build();
+        SlackNotificationOutboxRowBuilder rowBuilder = SlackNotificationOutboxRow.builder()
+                                                                                 .messageType(outbox.getMessageType())
+                                                                                 .idempotencyKey(outbox.getIdempotencyKey())
+                                                                                 .teamId(outbox.getTeamId())
+                                                                                 .channelId(outbox.getChannelId())
+                                                                                 .userIdState(outbox.getUserId().getState())
+                                                                                 .userId(outbox.getUserId().valueOrBlank())
+                                                                                 .textState(outbox.getText().getState())
+                                                                                 .text(outbox.getText().valueOrBlank())
+                                                                                 .blocksJsonState(outbox.getBlocksJson().getState())
+                                                                                 .blocksJson(outbox.getBlocksJson().valueOrBlank())
+                                                                                 .fallbackTextState(outbox.getFallbackText().getState())
+                                                                                 .fallbackText(outbox.getFallbackText().valueOrBlank())
+                                                                                 .status(outbox.getStatus())
+                                                                                 .processingAttempt(outbox.getProcessingAttempt())
+                                                                                 .processingLeaseState(resolveProcessingLeaseState(outbox))
+                                                                                 .processingStartedAt(processingStartedAt)
+                                                                                 .sentTimeState(resolveSentTimeState(outbox))
+                                                                                 .sentAt(sentAt)
+                                                                                 .failedTimeState(resolveFailedTimeState(outbox))
+                                                                                 .failedAt(failedAt)
+                                                                                 .failureState(resolveFailureState(failure))
+                                                                                 .failureReason(failureReason)
+                                                                                 .failureType(failureType);
+        if (outbox.hasId()) {
+            rowBuilder.id(outbox.getId());
+        }
+
+        return rowBuilder.build();
     }
 
     public SlackNotificationOutbox toDomain() {
@@ -167,14 +170,6 @@ public class SlackNotificationOutboxRow {
                 toFailedTime(),
                 toFailure()
         );
-    }
-
-    private static Long resolveId(SlackNotificationOutbox outbox) {
-        if (!outbox.hasId()) {
-            return null;
-        }
-
-        return outbox.getId();
     }
 
     private static BoxProcessingLeaseState resolveProcessingLeaseState(SlackNotificationOutbox outbox) {
