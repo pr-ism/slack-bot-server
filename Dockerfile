@@ -10,7 +10,7 @@ RUN chmod +x gradlew && ./gradlew dependencies --no-daemon || true
 COPY src ./src
 RUN ./gradlew clean bootJar -x test -x copyApiDocument --no-daemon
 
-FROM amazoncorretto:21-headless
+FROM amazoncorretto:21-al2023-headless
 WORKDIR /app
 
 RUN (command -v dnf && dnf install -y shadow-utils && dnf clean all) || \
