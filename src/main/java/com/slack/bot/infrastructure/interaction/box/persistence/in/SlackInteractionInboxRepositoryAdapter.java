@@ -369,35 +369,15 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
     ) {
         validateSaveIfProcessingLeaseMatchedArguments(inbox, claimedProcessingStartedAt);
 
-        Timestamp processingStartedAt = null;
-        if (inbox.getProcessingLease().isClaimed()) {
-            processingStartedAt = Timestamp.from(inbox.getProcessingLease().startedAt());
-        }
-
-        Timestamp processedAt = null;
-        if (inbox.getProcessedTime().isPresent()) {
-            processedAt = Timestamp.from(inbox.getProcessedTime().occurredAt());
-        }
-
-        Timestamp failedAt = null;
-        if (inbox.getFailedTime().isPresent()) {
-            failedAt = Timestamp.from(inbox.getFailedTime().occurredAt());
-        }
-
-        String failureReason = null;
-        String failureType = null;
-        if (inbox.getFailure().isPresent()) {
-            failureReason = inbox.getFailure().reason();
-            failureType = inbox.getFailure().type().name();
-        }
+        SlackInteractionInboxRow row = SlackInteractionInboxRow.from(inbox);
 
         MapSqlParameterSource parameters = new MapSqlParameterSource()
-                .addValue("status", inbox.getStatus().name())
-                .addValue("processingStartedAt", processingStartedAt)
-                .addValue("processedAt", processedAt)
-                .addValue("failedAt", failedAt)
-                .addValue("failureReason", failureReason)
-                .addValue("failureType", failureType)
+                .addValue("status", row.getStatus().name())
+                .addValue("processingStartedAt", toNullableTimestamp(row.getProcessingStartedAt()))
+                .addValue("processedAt", toNullableTimestamp(row.getProcessedAt()))
+                .addValue("failedAt", toNullableTimestamp(row.getFailedAt()))
+                .addValue("failureReason", row.getFailureReason())
+                .addValue("failureType", toNullableFailureTypeName(row))
                 .addValue("inboxId", inbox.getId())
                 .addValue("processingStatus", SlackInteractionInboxStatus.PROCESSING.name())
                 .addValue("claimedProcessingStartedAt", Timestamp.from(claimedProcessingStartedAt));
@@ -453,11 +433,27 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
             throw new IllegalStateException("저장 대상 inbox를 찾을 수 없습니다. id=" + inbox.getId());
         }
 
-        return row.toDomain();
+        return inbox;
     }
 
     private void saveHistory(SlackInteractionInboxHistory history) {
         slackInteractionInboxHistoryMybatisMapper.insert(SlackInteractionInboxHistoryRow.from(history));
+    }
+
+    private Timestamp toNullableTimestamp(Instant value) {
+        if (value == null) {
+            return null;
+        }
+
+        return Timestamp.from(value);
+    }
+
+    private String toNullableFailureTypeName(SlackInteractionInboxRow row) {
+        if (row.getFailureType() == null) {
+            return null;
+        }
+
+        return row.getFailureType().name();
     }
 
     private void validateSaveIfProcessingLeaseMatchedArguments(
