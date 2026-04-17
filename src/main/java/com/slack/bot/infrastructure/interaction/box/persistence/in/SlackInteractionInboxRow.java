@@ -10,12 +10,8 @@ import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType
 import java.time.Instant;
 import lombok.Builder;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 @Getter
-@Setter
-@NoArgsConstructor
 public class SlackInteractionInboxRow {
 
     private Long id;
@@ -31,7 +27,7 @@ public class SlackInteractionInboxRow {
     private SlackInteractionFailureType failureType;
 
     @Builder
-    private SlackInteractionInboxRow(
+    public SlackInteractionInboxRow(
             Long id,
             SlackInteractionInboxType interactionType,
             String idempotencyKey,

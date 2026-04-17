@@ -1,10 +1,15 @@
 package com.slack.bot.infrastructure.interaction.box.persistence.in;
 
+import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
+import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStatus;
+import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.apache.ibatis.annotations.Arg;
+import org.apache.ibatis.annotations.ConstructorArgs;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
@@ -15,6 +20,19 @@ import org.apache.ibatis.annotations.Update;
 @Mapper
 public interface SlackInteractionInboxMybatisMapper {
 
+    @ConstructorArgs({
+            @Arg(column = "id", javaType = Long.class, id = true),
+            @Arg(column = "interactionType", javaType = SlackInteractionInboxType.class),
+            @Arg(column = "idempotencyKey", javaType = String.class),
+            @Arg(column = "payloadJson", javaType = String.class),
+            @Arg(column = "status", javaType = SlackInteractionInboxStatus.class),
+            @Arg(column = "processingAttempt", javaType = int.class),
+            @Arg(column = "processingStartedAt", javaType = Instant.class),
+            @Arg(column = "processedAt", javaType = Instant.class),
+            @Arg(column = "failedAt", javaType = Instant.class),
+            @Arg(column = "failureReason", javaType = String.class),
+            @Arg(column = "failureType", javaType = SlackInteractionFailureType.class)
+    })
     @Select("""
             SELECT id,
                    interaction_type AS interactionType,
@@ -32,6 +50,19 @@ public interface SlackInteractionInboxMybatisMapper {
             """)
     SlackInteractionInboxRow findRowById(@Param("id") Long id);
 
+    @ConstructorArgs({
+            @Arg(column = "id", javaType = Long.class, id = true),
+            @Arg(column = "interactionType", javaType = SlackInteractionInboxType.class),
+            @Arg(column = "idempotencyKey", javaType = String.class),
+            @Arg(column = "payloadJson", javaType = String.class),
+            @Arg(column = "status", javaType = SlackInteractionInboxStatus.class),
+            @Arg(column = "processingAttempt", javaType = int.class),
+            @Arg(column = "processingStartedAt", javaType = Instant.class),
+            @Arg(column = "processedAt", javaType = Instant.class),
+            @Arg(column = "failedAt", javaType = Instant.class),
+            @Arg(column = "failureReason", javaType = String.class),
+            @Arg(column = "failureType", javaType = SlackInteractionFailureType.class)
+    })
     @Select({
             "<script>",
             "SELECT id,",
@@ -68,6 +99,19 @@ public interface SlackInteractionInboxMybatisMapper {
             @Param("excludedInboxIds") Collection<Long> excludedInboxIds
     );
 
+    @ConstructorArgs({
+            @Arg(column = "id", javaType = Long.class, id = true),
+            @Arg(column = "interactionType", javaType = SlackInteractionInboxType.class),
+            @Arg(column = "idempotencyKey", javaType = String.class),
+            @Arg(column = "payloadJson", javaType = String.class),
+            @Arg(column = "status", javaType = SlackInteractionInboxStatus.class),
+            @Arg(column = "processingAttempt", javaType = int.class),
+            @Arg(column = "processingStartedAt", javaType = Instant.class),
+            @Arg(column = "processedAt", javaType = Instant.class),
+            @Arg(column = "failedAt", javaType = Instant.class),
+            @Arg(column = "failureReason", javaType = String.class),
+            @Arg(column = "failureType", javaType = SlackInteractionFailureType.class)
+    })
     @Select({
             "<script>",
             "SELECT id,",
