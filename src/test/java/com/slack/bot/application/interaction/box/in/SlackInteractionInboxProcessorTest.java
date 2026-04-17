@@ -550,6 +550,9 @@ class SlackInteractionInboxProcessorTest {
         if (failureReason == null && failureType == null) {
             return BoxFailureSnapshot.absent();
         }
+        if (failureReason == null || failureType == null) {
+            throw new IllegalStateException("failure_reason과 failure_type은 항상 함께 세팅되어야 합니다.");
+        }
 
         return BoxFailureSnapshot.present(
                 failureReason,
