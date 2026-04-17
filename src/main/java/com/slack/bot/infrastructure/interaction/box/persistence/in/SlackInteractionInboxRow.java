@@ -8,11 +8,14 @@ import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStatus;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import java.time.Instant;
+import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Getter
 @Setter
+@NoArgsConstructor
 public class SlackInteractionInboxRow {
 
     private Long id;
@@ -27,19 +30,70 @@ public class SlackInteractionInboxRow {
     private String failureReason;
     private SlackInteractionFailureType failureType;
 
+    @Builder
+    private SlackInteractionInboxRow(
+            Long id,
+            SlackInteractionInboxType interactionType,
+            String idempotencyKey,
+            String payloadJson,
+            SlackInteractionInboxStatus status,
+            int processingAttempt,
+            Instant processingStartedAt,
+            Instant processedAt,
+            Instant failedAt,
+            String failureReason,
+            SlackInteractionFailureType failureType
+    ) {
+        this.id = id;
+        this.interactionType = interactionType;
+        this.idempotencyKey = idempotencyKey;
+        this.payloadJson = payloadJson;
+        this.status = status;
+        this.processingAttempt = processingAttempt;
+        this.processingStartedAt = processingStartedAt;
+        this.processedAt = processedAt;
+        this.failedAt = failedAt;
+        this.failureReason = failureReason;
+        this.failureType = failureType;
+    }
+
     public static SlackInteractionInboxRow from(SlackInteractionInbox inbox) {
-        SlackInteractionInboxRow row = new SlackInteractionInboxRow();
-        row.setId(inbox.getId());
-        row.setInteractionType(inbox.getInteractionType());
-        row.setIdempotencyKey(inbox.getIdempotencyKey());
-        row.setPayloadJson(inbox.getPayloadJson());
-        row.setStatus(inbox.getStatus());
-        row.setProcessingAttempt(inbox.getProcessingAttempt());
-        row.applyProcessingLease(inbox);
-        row.applyProcessedTime(inbox);
-        row.applyFailedTime(inbox);
-        row.applyFailure(inbox);
-        return row;
+        Instant processingStartedAt = null;
+        if (inbox.getProcessingLease().isClaimed()) {
+            processingStartedAt = inbox.getProcessingLease().startedAt();
+        }
+
+        Instant processedAt = null;
+        if (inbox.getProcessedTime().isPresent()) {
+            processedAt = inbox.getProcessedTime().occurredAt();
+        }
+
+        Instant failedAt = null;
+        if (inbox.getFailedTime().isPresent()) {
+            failedAt = inbox.getFailedTime().occurredAt();
+        }
+
+        BoxFailureSnapshot<SlackInteractionFailureType> failure = inbox.getFailure();
+        String failureReason = null;
+        SlackInteractionFailureType failureType = null;
+        if (failure.isPresent()) {
+            failureReason = failure.reason();
+            failureType = failure.type();
+        }
+
+        return SlackInteractionInboxRow.builder()
+                                       .id(inbox.getId())
+                                       .interactionType(inbox.getInteractionType())
+                                       .idempotencyKey(inbox.getIdempotencyKey())
+                                       .payloadJson(inbox.getPayloadJson())
+                                       .status(inbox.getStatus())
+                                       .processingAttempt(inbox.getProcessingAttempt())
+                                       .processingStartedAt(processingStartedAt)
+                                       .processedAt(processedAt)
+                                       .failedAt(failedAt)
+                                       .failureReason(failureReason)
+                                       .failureType(failureType)
+                                       .build();
     }
 
     public SlackInteractionInbox toDomain() {
@@ -55,40 +109,6 @@ public class SlackInteractionInboxRow {
                 toFailedTime(),
                 toFailure()
         );
-    }
-
-    private void applyProcessingLease(SlackInteractionInbox inbox) {
-        this.processingStartedAt = null;
-        if (inbox.getProcessingLease().isClaimed()) {
-            this.processingStartedAt = inbox.getProcessingLease().startedAt();
-        }
-    }
-
-    private void applyProcessedTime(SlackInteractionInbox inbox) {
-        this.processedAt = null;
-        if (inbox.getProcessedTime().isPresent()) {
-            this.processedAt = inbox.getProcessedTime().occurredAt();
-        }
-    }
-
-    private void applyFailedTime(SlackInteractionInbox inbox) {
-        this.failedAt = null;
-        if (inbox.getFailedTime().isPresent()) {
-            this.failedAt = inbox.getFailedTime().occurredAt();
-        }
-    }
-
-    private void applyFailure(SlackInteractionInbox inbox) {
-        this.failureReason = null;
-        this.failureType = null;
-
-        BoxFailureSnapshot<SlackInteractionFailureType> failure = inbox.getFailure();
-        if (!failure.isPresent()) {
-            return;
-        }
-
-        this.failureReason = failure.reason();
-        this.failureType = failure.type();
     }
 
     private BoxProcessingLease toProcessingLease() {
