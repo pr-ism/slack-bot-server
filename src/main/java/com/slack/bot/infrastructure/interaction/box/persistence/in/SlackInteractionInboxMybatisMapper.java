@@ -62,7 +62,7 @@ public interface SlackInteractionInboxMybatisMapper {
             "FOR UPDATE SKIP LOCKED",
             "</script>"
     })
-    SlackInteractionInboxRow findNullableClaimableRowForUpdate(
+    Optional<SlackInteractionInboxRow> findClaimableRowForUpdate(
             @Param("interactionType") String interactionType,
             @Param("claimableStatuses") List<String> claimableStatuses,
             @Param("excludedInboxIds") Collection<Long> excludedInboxIds
@@ -146,20 +146,6 @@ public interface SlackInteractionInboxMybatisMapper {
             WHERE id = #{id}
             """)
     int update(SlackInteractionInboxRow row);
-
-    default Optional<SlackInteractionInboxRow> findClaimableRowForUpdate(
-            String interactionType,
-            List<String> claimableStatuses,
-            Collection<Long> excludedInboxIds
-    ) {
-        return Optional.ofNullable(
-                findNullableClaimableRowForUpdate(
-                        interactionType,
-                        claimableStatuses,
-                        excludedInboxIds
-                )
-        );
-    }
 
     default Optional<SlackInteractionInbox> findDomainById(Long id) {
         return Optional.ofNullable(findRowById(id))
