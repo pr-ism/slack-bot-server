@@ -46,6 +46,7 @@ dependencies {
 	implementation 'com.slack.api:slack-api-client:1.46.0'
 
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4'
 	implementation "io.github.openfeign.querydsl:querydsl-jpa:${queryDslVersion}"
 	annotationProcessor "io.github.openfeign.querydsl:querydsl-apt:${queryDslVersion}:jpa"
 

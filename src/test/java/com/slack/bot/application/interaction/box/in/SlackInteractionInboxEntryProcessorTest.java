@@ -1,5 +1,6 @@
 package com.slack.bot.application.interaction.box.in;
 
+import static org.awaitility.Awaitility.await;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -27,16 +28,18 @@ import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxHist
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStatus;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
-import com.slack.bot.infrastructure.interaction.box.persistence.in.JpaSlackInteractionInboxHistoryRepository;
-import com.slack.bot.infrastructure.interaction.box.persistence.in.JpaSlackInteractionInboxRepository;
+import com.slack.bot.support.SlackInteractionInboxJdbcFixture;
+import java.time.Duration;
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -59,12 +62,6 @@ class SlackInteractionInboxEntryProcessorTest {
     SlackInteractionInboxRepository slackInteractionInboxRepository;
 
     @Autowired
-    JpaSlackInteractionInboxRepository jpaSlackInteractionInboxRepository;
-
-    @Autowired
-    JpaSlackInteractionInboxHistoryRepository jpaSlackInteractionInboxHistoryRepository;
-
-    @Autowired
     ReviewReservationRepository reviewReservationRepository;
 
     @Autowired
@@ -74,7 +71,17 @@ class SlackInteractionInboxEntryProcessorTest {
     ObjectMapper objectMapper;
 
     @Autowired
+    NamedParameterJdbcTemplate namedParameterJdbcTemplate;
+
+    @Autowired
     PlatformTransactionManager transactionManager;
+
+    SlackInteractionInboxJdbcFixture slackInteractionInboxJdbcFixture;
+
+    @BeforeEach
+    void setUp() {
+        slackInteractionInboxJdbcFixture = new SlackInteractionInboxJdbcFixture(namedParameterJdbcTemplate);
+    }
 
     @Test
     @Sql(scripts = {
@@ -92,7 +99,8 @@ class SlackInteractionInboxEntryProcessorTest {
         slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId(), CLAIMED_PROCESSING_STARTED_AT);
 
         // then
-        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
+        SlackInteractionInbox actualInbox = slackInteractionInboxRepository.findById(inbox.getId())
+                                                                           .orElseThrow();
 
         assertAll(
                 () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
@@ -127,7 +135,8 @@ class SlackInteractionInboxEntryProcessorTest {
         slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId(), CLAIMED_PROCESSING_STARTED_AT);
 
         // then
-        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
+        SlackInteractionInbox actualInbox = slackInteractionInboxRepository.findById(inbox.getId())
+                                                                           .orElseThrow();
 
         assertAll(
                 () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
@@ -159,7 +168,8 @@ class SlackInteractionInboxEntryProcessorTest {
         slackInteractionInboxEntryProcessor.processClaimedViewSubmission(inbox.getId(), CLAIMED_PROCESSING_STARTED_AT);
 
         // then
-        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
+        SlackInteractionInbox actualInbox = slackInteractionInboxRepository.findById(inbox.getId())
+                                                                           .orElseThrow();
 
         assertAll(
                 () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSED),
@@ -179,7 +189,8 @@ class SlackInteractionInboxEntryProcessorTest {
         slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId(), CLAIMED_PROCESSING_STARTED_AT);
 
         // then
-        SlackInteractionInbox actual = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
+        SlackInteractionInbox actual = slackInteractionInboxRepository.findById(inbox.getId())
+                                                                      .orElseThrow();
 
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
@@ -217,7 +228,8 @@ class SlackInteractionInboxEntryProcessorTest {
                 .isInstanceOf(DataAccessException.class)
                 .hasMessageContaining("forced save failure");
 
-        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
+        SlackInteractionInbox actualInbox = slackInteractionInboxRepository.findById(inbox.getId())
+                                                                           .orElseThrow();
         ReviewReservation actualReservation = reviewReservationRepository.findById(100L).orElseThrow();
 
         assertAll(
@@ -252,21 +264,24 @@ class SlackInteractionInboxEntryProcessorTest {
         slackInteractionInboxEntryProcessor.processClaimedBlockAction(inbox.getId(), CLAIMED_PROCESSING_STARTED_AT);
 
         // then
-        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
-        List<SlackInteractionInboxHistory> histories = historiesOf(inbox.getId());
+        await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
+            SlackInteractionInbox actualInbox = slackInteractionInboxRepository.findById(inbox.getId())
+                                                                               .orElseThrow();
+            List<SlackInteractionInboxHistory> histories = historiesOf(inbox.getId());
 
-        assertAll(
-                () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
-                () -> assertThat(actualInbox.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(actualInbox.getFailure().type()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
-                () -> assertThat(histories).hasSize(1),
-                () -> assertThat(histories.getFirst().getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
-                () -> assertThat(histories.getFirst().getFailure().type())
-                        .isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
-                () -> assertThat(reviewReservationRepository.findById(100L))
-                        .map(reservation -> reservation.getStatus())
-                        .hasValue(ReservationStatus.ACTIVE)
-        );
+            assertAll(
+                    () -> assertThat(actualInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
+                    () -> assertThat(actualInbox.getProcessingAttempt()).isEqualTo(1),
+                    () -> assertThat(actualInbox.getFailure().type()).isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
+                    () -> assertThat(histories).hasSize(1),
+                    () -> assertThat(histories.getFirst().getStatus()).isEqualTo(SlackInteractionInboxStatus.FAILED),
+                    () -> assertThat(histories.getFirst().getFailure().type())
+                            .isEqualTo(SlackInteractionFailureType.BUSINESS_INVARIANT),
+                    () -> assertThat(reviewReservationRepository.findById(100L))
+                            .map(reservation -> reservation.getStatus())
+                            .hasValue(ReservationStatus.ACTIVE)
+            );
+        });
         verify(notificationApiClient).openDirectMessageChannel("xoxb-test-token", "U1");
         verify(notificationApiClient).sendBlockMessage(
                 eq("xoxb-test-token"),
@@ -316,7 +331,8 @@ class SlackInteractionInboxEntryProcessorTest {
                 .hasMessageContaining("processing lease");
 
         // then
-        SlackInteractionInbox actualInbox = jpaSlackInteractionInboxRepository.findDomainById(inbox.getId()).orElseThrow();
+        SlackInteractionInbox actualInbox = slackInteractionInboxRepository.findById(inbox.getId())
+                                                                           .orElseThrow();
         List<SlackInteractionInboxHistory> histories = historiesOf(inbox.getId());
 
         assertAll(
@@ -416,10 +432,6 @@ class SlackInteractionInboxEntryProcessorTest {
     }
 
     private List<SlackInteractionInboxHistory> historiesOf(Long inboxId) {
-        return jpaSlackInteractionInboxHistoryRepository.findAllDomains()
-                                                        .stream()
-                                                        .filter(history -> inboxId.equals(history.getInboxId()))
-                                                        .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))
-                                                        .toList();
+        return slackInteractionInboxJdbcFixture.historiesOf(inboxId);
     }
 }

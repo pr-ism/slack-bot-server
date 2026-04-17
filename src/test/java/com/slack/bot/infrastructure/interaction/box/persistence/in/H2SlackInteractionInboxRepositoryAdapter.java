@@ -6,10 +6,14 @@ public class H2SlackInteractionInboxRepositoryAdapter extends SlackInteractionIn
 
     public H2SlackInteractionInboxRepositoryAdapter(
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaSlackInteractionInboxRepository repository,
-            JpaSlackInteractionInboxHistoryRepository historyRepository
+            SlackInteractionInboxMybatisMapper slackInteractionInboxMybatisMapper,
+            SlackInteractionInboxHistoryMybatisMapper slackInteractionInboxHistoryMybatisMapper
     ) {
-        super(namedParameterJdbcTemplate, repository, historyRepository);
+        super(
+                namedParameterJdbcTemplate,
+                slackInteractionInboxMybatisMapper,
+                slackInteractionInboxHistoryMybatisMapper
+        );
     }
 
     @Override

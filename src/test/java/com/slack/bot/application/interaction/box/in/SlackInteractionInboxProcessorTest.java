@@ -25,19 +25,18 @@ import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInbox;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxHistory;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxStatus;
 import com.slack.bot.infrastructure.interaction.box.in.SlackInteractionInboxType;
-import com.slack.bot.infrastructure.interaction.box.persistence.in.JpaSlackInteractionInboxHistoryRepository;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
-import com.slack.bot.infrastructure.interaction.box.persistence.in.JpaSlackInteractionInboxRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -49,6 +48,7 @@ import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import com.slack.bot.support.SlackInteractionInboxJdbcFixture;
 
 @IntegrationTest
 @MockitoSpyBean(types = PollingHintPublisher.class)
@@ -69,12 +69,6 @@ class SlackInteractionInboxProcessorTest {
     ObjectMapper objectMapper;
 
     @Autowired
-    JpaSlackInteractionInboxRepository jpaSlackInteractionInboxRepository;
-
-    @Autowired
-    JpaSlackInteractionInboxHistoryRepository jpaSlackInteractionInboxHistoryRepository;
-
-    @Autowired
     SlackInteractionInboxRepository actualSlackInteractionInboxRepository;
 
     @Autowired
@@ -88,6 +82,13 @@ class SlackInteractionInboxProcessorTest {
 
     @Autowired
     PlatformTransactionManager transactionManager;
+
+    SlackInteractionInboxJdbcFixture slackInteractionInboxJdbcFixture;
+
+    @BeforeEach
+    void setUp() {
+        slackInteractionInboxJdbcFixture = new SlackInteractionInboxJdbcFixture(namedParameterJdbcTemplate);
+    }
 
     @Test
     @Sql(scripts = {
@@ -109,7 +110,7 @@ class SlackInteractionInboxProcessorTest {
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
             assertAll(
                     () -> assertThat(actual).isTrue(),
-                    () -> assertThat(jpaSlackInteractionInboxRepository.findAllDomains())
+                    () -> assertThat(findAllInboxes())
                             .hasSize(1)
                             .first()
                             .extracting(inbox -> inbox.getStatus())
@@ -145,7 +146,8 @@ class SlackInteractionInboxProcessorTest {
 
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
-            SlackInteractionInbox actualProcessedInbox = jpaSlackInteractionInboxRepository.findDomainById(200L).orElseThrow();
+            SlackInteractionInbox actualProcessedInbox = actualSlackInteractionInboxRepository.findById(200L)
+                                                                                              .orElseThrow();
             List<SlackInteractionInboxHistory> actualHistories = historiesOf(200L);
 
             assertAll(
@@ -202,6 +204,7 @@ class SlackInteractionInboxProcessorTest {
     void PROCESSING_타임아웃_block_actions_inbox_복구는_배치_크기만큼만_처리한다() {
         // given
         Instant base = clock.instant();
+        List<Long> savedInboxIds = new ArrayList<>();
         for (int index = 0; index < 101; index++) {
             SlackInteractionInbox timeoutInbox = SlackInteractionInbox.pending(
                     SlackInteractionInboxType.BLOCK_ACTIONS,
@@ -209,32 +212,36 @@ class SlackInteractionInboxProcessorTest {
                     "{\"type\":\"block_actions\",\"actions\":[]}"
             );
             setProcessingState(timeoutInbox, base.minusSeconds(120L + index), 1);
-            actualSlackInteractionInboxRepository.save(timeoutInbox);
+            SlackInteractionInbox savedInbox = actualSlackInteractionInboxRepository.save(timeoutInbox);
+            savedInboxIds.add(savedInbox.getId());
         }
 
         // when
         int recoveredCount = slackInteractionInboxProcessor.recoverBlockActionTimeoutProcessing();
 
         // then
-        List<SlackInteractionInbox> actualInboxes = jpaSlackInteractionInboxRepository.findAllDomains();
-        List<SlackInteractionInboxHistory> actualHistories = jpaSlackInteractionInboxHistoryRepository.findAllDomains();
+        await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
+            List<SlackInteractionInbox> actualInboxes = findInboxesByIds(savedInboxIds);
+            List<SlackInteractionInboxHistory> actualHistories = findHistoriesByInboxIds(savedInboxIds);
 
-        assertAll(
-                () -> assertThat(recoveredCount).isEqualTo(100),
-                () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == SlackInteractionInboxStatus.RETRY_PENDING)
-                        .hasSize(100),
-                () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == SlackInteractionInboxStatus.PROCESSING)
-                        .hasSize(1),
-                () -> assertThat(actualHistories).hasSize(100),
-                () -> assertThat(actualHistories).extracting(history -> history.getStatus())
-                        .containsOnly(SlackInteractionInboxStatus.RETRY_PENDING)
-        );
+            assertAll(
+                    () -> assertThat(recoveredCount).isEqualTo(100),
+                    () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == SlackInteractionInboxStatus.RETRY_PENDING)
+                            .hasSize(100),
+                    () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == SlackInteractionInboxStatus.PROCESSING)
+                            .hasSize(1),
+                    () -> assertThat(actualHistories).hasSize(100),
+                    () -> assertThat(actualHistories).extracting(history -> history.getStatus())
+                            .containsOnly(SlackInteractionInboxStatus.RETRY_PENDING)
+            );
+        });
     }
 
     @Test
     void PROCESSING_타임아웃_block_actions_inbox_복구는_재시도_가능과_소진건을_합쳐_배치_크기만큼만_처리한다() {
         // given
         Instant base = clock.instant();
+        List<Long> savedInboxIds = new ArrayList<>();
         for (int index = 0; index < 50; index++) {
             SlackInteractionInbox retryableInbox = SlackInteractionInbox.pending(
                     SlackInteractionInboxType.BLOCK_ACTIONS,
@@ -242,7 +249,8 @@ class SlackInteractionInboxProcessorTest {
                     "{\"type\":\"block_actions\",\"actions\":[]}"
             );
             setProcessingState(retryableInbox, base.minusSeconds(200L + index), 1);
-            actualSlackInteractionInboxRepository.save(retryableInbox);
+            SlackInteractionInbox savedInbox = actualSlackInteractionInboxRepository.save(retryableInbox);
+            savedInboxIds.add(savedInbox.getId());
         }
         for (int index = 0; index < 51; index++) {
             SlackInteractionInbox exhaustedInbox = SlackInteractionInbox.pending(
@@ -251,31 +259,34 @@ class SlackInteractionInboxProcessorTest {
                     "{\"type\":\"block_actions\",\"actions\":[]}"
             );
             setProcessingState(exhaustedInbox, base.minusSeconds(100L + index), 2);
-            actualSlackInteractionInboxRepository.save(exhaustedInbox);
+            SlackInteractionInbox savedInbox = actualSlackInteractionInboxRepository.save(exhaustedInbox);
+            savedInboxIds.add(savedInbox.getId());
         }
 
         // when
         int recoveredCount = slackInteractionInboxProcessor.recoverBlockActionTimeoutProcessing();
 
         // then
-        List<SlackInteractionInbox> actualInboxes = jpaSlackInteractionInboxRepository.findAllDomains();
-        List<SlackInteractionInboxHistory> actualHistories = jpaSlackInteractionInboxHistoryRepository.findAllDomains();
+        await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
+            List<SlackInteractionInbox> actualInboxes = findInboxesByIds(savedInboxIds);
+            List<SlackInteractionInboxHistory> actualHistories = findHistoriesByInboxIds(savedInboxIds);
 
-        assertAll(
-                () -> assertThat(recoveredCount).isEqualTo(100),
-                () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == SlackInteractionInboxStatus.RETRY_PENDING)
-                        .hasSize(50),
-                () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == SlackInteractionInboxStatus.FAILED)
-                        .hasSize(50),
-                () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == SlackInteractionInboxStatus.PROCESSING)
-                        .hasSize(1),
-                () -> assertThat(actualHistories).filteredOn(
-                        history -> history.getFailure().type() == SlackInteractionFailureType.PROCESSING_TIMEOUT
-                ).hasSize(50),
-                () -> assertThat(actualHistories).filteredOn(
-                        history -> history.getFailure().type() == SlackInteractionFailureType.RETRY_EXHAUSTED
-                ).hasSize(50)
-        );
+            assertAll(
+                    () -> assertThat(recoveredCount).isEqualTo(100),
+                    () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == SlackInteractionInboxStatus.RETRY_PENDING)
+                            .hasSize(50),
+                    () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == SlackInteractionInboxStatus.FAILED)
+                            .hasSize(50),
+                    () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == SlackInteractionInboxStatus.PROCESSING)
+                            .hasSize(1),
+                    () -> assertThat(actualHistories).filteredOn(
+                            history -> history.getFailure().type() == SlackInteractionFailureType.PROCESSING_TIMEOUT
+                    ).hasSize(50),
+                    () -> assertThat(actualHistories).filteredOn(
+                            history -> history.getFailure().type() == SlackInteractionFailureType.RETRY_EXHAUSTED
+                    ).hasSize(50)
+            );
+        });
     }
 
     @Test
@@ -315,12 +326,15 @@ class SlackInteractionInboxProcessorTest {
             int skippedCount = slackInteractionInboxProcessor.recoverBlockActionTimeoutProcessing();
 
             // then
-            SlackInteractionInbox lockedInbox = actualSlackInteractionInboxRepository.findById(saved.getId()).orElseThrow();
-            assertAll(
-                    () -> assertThat(skippedCount).isZero(),
-                    () -> assertThat(lockedInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSING),
-                    () -> assertThat(jpaSlackInteractionInboxHistoryRepository.findAllDomains()).isEmpty()
-            );
+            await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
+                SlackInteractionInbox lockedInbox = actualSlackInteractionInboxRepository.findById(saved.getId()).orElseThrow();
+
+                assertAll(
+                        () -> assertThat(skippedCount).isZero(),
+                        () -> assertThat(lockedInbox.getStatus()).isEqualTo(SlackInteractionInboxStatus.PROCESSING),
+                        () -> assertThat(historiesOf(saved.getId())).isEmpty()
+                );
+            });
 
             releaseLock.countDown();
             lockFuture.get(5, TimeUnit.SECONDS);
@@ -385,7 +399,7 @@ class SlackInteractionInboxProcessorTest {
         // when
         boolean actual = slackInteractionInboxProcessor.enqueueBlockAction(invalidPayload);
         slackInteractionInboxProcessor.processPendingBlockActions(10);
-        SlackInteractionInbox inbox = jpaSlackInteractionInboxRepository.findAllDomains().getFirst();
+        SlackInteractionInbox inbox = slackInteractionInboxJdbcFixture.getInboxByPayloadJson(invalidPayload);
         SlackInteractionInbox actualAfterFirst = actualSlackInteractionInboxRepository.findById(inbox.getId()).orElseThrow();
         List<SlackInteractionInboxHistory> histories = historiesOf(inbox.getId());
 
@@ -402,11 +416,19 @@ class SlackInteractionInboxProcessorTest {
     }
 
     private List<SlackInteractionInboxHistory> historiesOf(Long inboxId) {
-        return jpaSlackInteractionInboxHistoryRepository.findAllDomains()
-                                                        .stream()
-                                                        .filter(history -> inboxId.equals(history.getInboxId()))
-                                                        .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))
-                                                        .toList();
+        return slackInteractionInboxJdbcFixture.historiesOf(inboxId);
+    }
+
+    private List<SlackInteractionInbox> findAllInboxes() {
+        return slackInteractionInboxJdbcFixture.findAllInboxes();
+    }
+
+    private List<SlackInteractionInbox> findInboxesByIds(List<Long> inboxIds) {
+        return slackInteractionInboxJdbcFixture.findInboxesByIds(inboxIds);
+    }
+
+    private List<SlackInteractionInboxHistory> findHistoriesByInboxIds(List<Long> inboxIds) {
+        return slackInteractionInboxJdbcFixture.findHistoriesByInboxIds(inboxIds);
     }
 
     private void awaitLatch(CountDownLatch latch) {

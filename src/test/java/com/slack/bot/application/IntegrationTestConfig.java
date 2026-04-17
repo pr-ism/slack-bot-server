@@ -13,8 +13,8 @@ import com.slack.bot.infrastructure.common.MysqlDuplicateKeyDetector;
 import com.slack.bot.infrastructure.interaction.box.in.repository.SlackInteractionInboxRepository;
 import com.slack.bot.infrastructure.interaction.box.out.repository.SlackNotificationOutboxRepository;
 import com.slack.bot.infrastructure.interaction.box.persistence.in.H2SlackInteractionInboxRepositoryAdapter;
-import com.slack.bot.infrastructure.interaction.box.persistence.in.JpaSlackInteractionInboxHistoryRepository;
-import com.slack.bot.infrastructure.interaction.box.persistence.in.JpaSlackInteractionInboxRepository;
+import com.slack.bot.infrastructure.interaction.box.persistence.in.SlackInteractionInboxHistoryMybatisMapper;
+import com.slack.bot.infrastructure.interaction.box.persistence.in.SlackInteractionInboxMybatisMapper;
 import com.slack.bot.infrastructure.interaction.box.persistence.out.H2SlackNotificationOutboxRepositoryAdapter;
 import com.slack.bot.infrastructure.interaction.box.persistence.out.JpaSlackNotificationOutboxHistoryRepository;
 import com.slack.bot.infrastructure.interaction.box.persistence.out.JpaSlackNotificationOutboxRepository;
@@ -97,13 +97,13 @@ public class IntegrationTestConfig {
     @Primary
     public SlackInteractionInboxRepository slackInteractionInboxRepository(
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaSlackInteractionInboxRepository repository,
-            JpaSlackInteractionInboxHistoryRepository historyRepository
+            SlackInteractionInboxMybatisMapper slackInteractionInboxMybatisMapper,
+            SlackInteractionInboxHistoryMybatisMapper slackInteractionInboxHistoryMybatisMapper
     ) {
         return new H2SlackInteractionInboxRepositoryAdapter(
                 namedParameterJdbcTemplate,
-                repository,
-                historyRepository
+                slackInteractionInboxMybatisMapper,
+                slackInteractionInboxHistoryMybatisMapper
         );
     }
 
