@@ -56,22 +56,19 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
         validateInteractionType(interactionType);
         validateProcessingStartedAt(processingStartedAt);
 
-        List<SlackInteractionInboxRow> claimableRows = slackInteractionInboxMybatisMapper.findClaimableRowsForUpdate(
+        return slackInteractionInboxMybatisMapper.findClaimableRowForUpdate(
                 interactionType.name(),
                 List.of(
                         SlackInteractionInboxStatus.PENDING.name(),
                         SlackInteractionInboxStatus.RETRY_PENDING.name()
                 ),
                 excludedInboxIds
-        );
-        if (claimableRows.isEmpty()) {
-            return Optional.empty();
-        }
-
-        SlackInteractionInbox inbox = claimableRows.getFirst().toDomain();
-        inbox.claim(processingStartedAt);
-        updateInbox(inbox);
-        return Optional.of(inbox.getId());
+        ).map(row -> {
+            SlackInteractionInbox inbox = row.toDomain();
+            inbox.claim(processingStartedAt);
+            updateInbox(inbox);
+            return inbox.getId();
+        });
     }
 
     @Override
@@ -445,7 +442,6 @@ public class SlackInteractionInboxRepositoryAdapter implements SlackInteractionI
 
     private SlackInteractionInbox insertInbox(SlackInteractionInbox inbox) {
         SlackInteractionInboxRow row = SlackInteractionInboxRow.from(inbox);
-        row.setId(null);
         slackInteractionInboxMybatisMapper.insert(row);
         return row.toDomain();
     }
