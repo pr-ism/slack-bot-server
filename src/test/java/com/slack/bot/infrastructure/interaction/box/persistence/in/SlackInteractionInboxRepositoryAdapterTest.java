@@ -71,7 +71,7 @@ class SlackInteractionInboxRepositoryAdapterTest {
         boolean secondEnqueued = slackInteractionInboxRepository.enqueue(interactionType, idempotencyKey, payloadJson);
 
         // then
-        SlackInteractionInbox savedInbox = findInboxByIdempotencyKey(idempotencyKey);
+        SlackInteractionInbox savedInbox = getInboxByIdempotencyKey(idempotencyKey);
         assertAll(
                 () -> assertThat(firstEnqueued).isTrue(),
                 () -> assertThat(secondEnqueued).isFalse(),
@@ -341,8 +341,8 @@ class SlackInteractionInboxRepositoryAdapterTest {
         return slackInteractionInboxJdbcFixture.historiesOf(inboxId);
     }
 
-    private SlackInteractionInbox findInboxByIdempotencyKey(String idempotencyKey) {
-        return slackInteractionInboxJdbcFixture.findInboxByIdempotencyKey(idempotencyKey);
+    private SlackInteractionInbox getInboxByIdempotencyKey(String idempotencyKey) {
+        return slackInteractionInboxJdbcFixture.getInboxByIdempotencyKey(idempotencyKey);
     }
 
     private int countInboxByIdempotencyKey(String idempotencyKey) {

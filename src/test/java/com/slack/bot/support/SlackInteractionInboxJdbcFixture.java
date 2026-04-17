@@ -104,7 +104,7 @@ public final class SlackInteractionInboxJdbcFixture {
         );
     }
 
-    public SlackInteractionInbox findInboxByIdempotencyKey(String idempotencyKey) {
+    public SlackInteractionInbox getInboxByIdempotencyKey(String idempotencyKey) {
         return namedParameterJdbcTemplate.queryForObject(
                 """
                 SELECT id,
@@ -126,7 +126,7 @@ public final class SlackInteractionInboxJdbcFixture {
         );
     }
 
-    public SlackInteractionInbox findInboxByPayloadJson(String payloadJson) {
+    public SlackInteractionInbox getInboxByPayloadJson(String payloadJson) {
         return namedParameterJdbcTemplate.queryForObject(
                 """
                 SELECT id,
