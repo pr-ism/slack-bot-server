@@ -148,6 +148,40 @@ public final class SlackInteractionInboxJdbcFixture {
         );
     }
 
+    public int countInboxByIdempotencyKey(String idempotencyKey) {
+        return namedParameterJdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM slack_interaction_inbox
+                WHERE idempotency_key = :idempotencyKey
+                """,
+                new MapSqlParameterSource().addValue("idempotencyKey", idempotencyKey),
+                Integer.class
+        );
+    }
+
+    public int countHistoryByInboxId(Long inboxId) {
+        return namedParameterJdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM slack_interaction_inbox_history
+                WHERE inbox_id = :inboxId
+                """,
+                new MapSqlParameterSource().addValue("inboxId", inboxId),
+                Integer.class
+        );
+    }
+
+    public void deleteInboxById(Long inboxId) {
+        namedParameterJdbcTemplate.update(
+                """
+                DELETE FROM slack_interaction_inbox
+                WHERE id = :inboxId
+                """,
+                new MapSqlParameterSource().addValue("inboxId", inboxId)
+        );
+    }
+
     private SlackInteractionInbox mapInbox(ResultSet resultSet) throws SQLException {
         return SlackInteractionInbox.rehydrate(
                 resultSet.getLong("id"),
