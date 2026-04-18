@@ -6,6 +6,8 @@ import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxH
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
 import java.time.Instant;
 import java.util.List;
+import org.apache.ibatis.annotations.Arg;
+import org.apache.ibatis.annotations.ConstructorArgs;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
@@ -41,6 +43,16 @@ public interface SlackNotificationOutboxHistoryMybatisMapper {
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(SlackNotificationOutboxHistoryRow row);
 
+    @ConstructorArgs({
+            @Arg(column = "id", javaType = Long.class, id = true),
+            @Arg(column = "outboxId", javaType = Long.class),
+            @Arg(column = "processingAttempt", javaType = int.class),
+            @Arg(column = "status", javaType = SlackNotificationOutboxStatus.class),
+            @Arg(column = "completedAt", javaType = Instant.class),
+            @Arg(column = "failureState", javaType = BoxFailureState.class),
+            @Arg(column = "failureReason", javaType = String.class),
+            @Arg(column = "failureType", javaType = SlackInteractionFailureType.class)
+    })
     @Select("""
             SELECT id,
                    outbox_id AS outboxId,

@@ -29,8 +29,14 @@ class SlackNotificationOutboxHistoryRowTest {
         );
 
         // when
-        SlackNotificationOutboxHistoryRow row = SlackNotificationOutboxHistoryRow.from(sentHistory);
-        row.setId(1L);
+        SlackNotificationOutboxHistoryRow row = SlackNotificationOutboxHistoryRow.builder()
+                                                                                 .id(1L)
+                                                                                 .outboxId(sentHistory.getOutboxId())
+                                                                                 .processingAttempt(sentHistory.getProcessingAttempt())
+                                                                                 .status(sentHistory.getStatus())
+                                                                                 .completedAt(sentHistory.getCompletedAt())
+                                                                                 .failureState(BoxFailureState.ABSENT)
+                                                                                 .build();
 
         // then
         assertAll(
@@ -53,8 +59,16 @@ class SlackNotificationOutboxHistoryRowTest {
         );
 
         // when
-        SlackNotificationOutboxHistoryRow row = SlackNotificationOutboxHistoryRow.from(failedHistory);
-        row.setId(1L);
+        SlackNotificationOutboxHistoryRow row = SlackNotificationOutboxHistoryRow.builder()
+                                                                                 .id(1L)
+                                                                                 .outboxId(failedHistory.getOutboxId())
+                                                                                 .processingAttempt(failedHistory.getProcessingAttempt())
+                                                                                 .status(failedHistory.getStatus())
+                                                                                 .completedAt(failedHistory.getCompletedAt())
+                                                                                 .failureState(BoxFailureState.PRESENT)
+                                                                                 .failureReason("failure")
+                                                                                 .failureType(SlackInteractionFailureType.RETRY_EXHAUSTED)
+                                                                                 .build();
 
         // then
         assertAll(

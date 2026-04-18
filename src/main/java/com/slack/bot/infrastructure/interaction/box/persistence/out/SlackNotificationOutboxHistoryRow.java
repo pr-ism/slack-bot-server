@@ -6,11 +6,10 @@ import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxHistory;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxStatus;
 import java.time.Instant;
+import lombok.Builder;
 import lombok.Getter;
-import lombok.Setter;
 
 @Getter
-@Setter
 public class SlackNotificationOutboxHistoryRow {
 
     private Long id;
@@ -22,17 +21,49 @@ public class SlackNotificationOutboxHistoryRow {
     private String failureReason;
     private SlackInteractionFailureType failureType;
 
+    @Builder
+    public SlackNotificationOutboxHistoryRow(
+            Long id,
+            Long outboxId,
+            int processingAttempt,
+            SlackNotificationOutboxStatus status,
+            Instant completedAt,
+            BoxFailureState failureState,
+            String failureReason,
+            SlackInteractionFailureType failureType
+    ) {
+        this.id = id;
+        this.outboxId = outboxId;
+        this.processingAttempt = processingAttempt;
+        this.status = status;
+        this.completedAt = completedAt;
+        this.failureState = failureState;
+        this.failureReason = failureReason;
+        this.failureType = failureType;
+    }
+
     public static SlackNotificationOutboxHistoryRow from(SlackNotificationOutboxHistory history) {
-        SlackNotificationOutboxHistoryRow row = new SlackNotificationOutboxHistoryRow();
-        if (history.getHistoryId().isAssigned()) {
-            row.setId(history.getId());
+        BoxFailureSnapshot<SlackInteractionFailureType> failure = history.getFailure();
+        String failureReason = null;
+        SlackInteractionFailureType failureType = null;
+        if (failure.isPresent()) {
+            failureReason = failure.reason();
+            failureType = failure.type();
         }
-        row.setOutboxId(history.getOutboxId());
-        row.setProcessingAttempt(history.getProcessingAttempt());
-        row.setStatus(history.getStatus());
-        row.setCompletedAt(history.getCompletedAt());
-        row.applyFailure(history);
-        return row;
+
+        SlackNotificationOutboxHistoryRowBuilder rowBuilder = SlackNotificationOutboxHistoryRow.builder()
+                                                                                                .outboxId(history.getOutboxId())
+                                                                                                .processingAttempt(history.getProcessingAttempt())
+                                                                                                .status(history.getStatus())
+                                                                                                .completedAt(history.getCompletedAt())
+                                                                                                .failureState(resolveFailureState(failure))
+                                                                                                .failureReason(failureReason)
+                                                                                                .failureType(failureType);
+        if (history.getHistoryId().isAssigned()) {
+            rowBuilder.id(history.getId());
+        }
+
+        return rowBuilder.build();
     }
 
     public SlackNotificationOutboxHistory toDomain() {
@@ -44,21 +75,6 @@ public class SlackNotificationOutboxHistoryRow {
                 completedAt,
                 toFailure()
         );
-    }
-
-    private void applyFailure(SlackNotificationOutboxHistory history) {
-        this.failureState = BoxFailureState.ABSENT;
-        this.failureReason = null;
-        this.failureType = null;
-
-        BoxFailureSnapshot<SlackInteractionFailureType> failure = history.getFailure();
-        if (!failure.isPresent()) {
-            return;
-        }
-
-        this.failureState = BoxFailureState.PRESENT;
-        this.failureReason = failure.reason();
-        this.failureType = failure.type();
     }
 
     private BoxFailureSnapshot<SlackInteractionFailureType> toFailure() {
@@ -77,5 +93,15 @@ public class SlackNotificationOutboxHistoryRow {
         if (failureState == null) {
             throw new IllegalStateException("history failureState는 비어 있을 수 없습니다.");
         }
+    }
+
+    private static BoxFailureState resolveFailureState(
+            BoxFailureSnapshot<SlackInteractionFailureType> failure
+    ) {
+        if (failure.isPresent()) {
+            return BoxFailureState.PRESENT;
+        }
+
+        return BoxFailureState.ABSENT;
     }
 }
