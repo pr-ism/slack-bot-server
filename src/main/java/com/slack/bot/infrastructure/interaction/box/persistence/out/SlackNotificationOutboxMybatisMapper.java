@@ -18,12 +18,15 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.ResultMap;
+import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 @Mapper
 public interface SlackNotificationOutboxMybatisMapper {
 
+    @Results(id = "slackNotificationOutboxRowResultMap", value = {})
     @ConstructorArgs({
             @Arg(column = "id", javaType = Long.class, id = true),
             @Arg(column = "messageType", javaType = SlackNotificationOutboxMessageType.class),
@@ -80,32 +83,7 @@ public interface SlackNotificationOutboxMybatisMapper {
             """)
     SlackNotificationOutboxRow findRowById(@Param("id") Long id);
 
-    @ConstructorArgs({
-            @Arg(column = "id", javaType = Long.class, id = true),
-            @Arg(column = "messageType", javaType = SlackNotificationOutboxMessageType.class),
-            @Arg(column = "idempotencyKey", javaType = String.class),
-            @Arg(column = "teamId", javaType = String.class),
-            @Arg(column = "channelId", javaType = String.class),
-            @Arg(column = "userIdState", javaType = SlackNotificationOutboxFieldState.class),
-            @Arg(column = "userId", javaType = String.class),
-            @Arg(column = "textState", javaType = SlackNotificationOutboxFieldState.class),
-            @Arg(column = "text", javaType = String.class),
-            @Arg(column = "blocksJsonState", javaType = SlackNotificationOutboxFieldState.class),
-            @Arg(column = "blocksJson", javaType = String.class),
-            @Arg(column = "fallbackTextState", javaType = SlackNotificationOutboxFieldState.class),
-            @Arg(column = "fallbackText", javaType = String.class),
-            @Arg(column = "status", javaType = SlackNotificationOutboxStatus.class),
-            @Arg(column = "processingAttempt", javaType = int.class),
-            @Arg(column = "processingLeaseState", javaType = BoxProcessingLeaseState.class),
-            @Arg(column = "processingStartedAt", javaType = Instant.class),
-            @Arg(column = "sentTimeState", javaType = BoxEventTimeState.class),
-            @Arg(column = "sentAt", javaType = Instant.class),
-            @Arg(column = "failedTimeState", javaType = BoxEventTimeState.class),
-            @Arg(column = "failedAt", javaType = Instant.class),
-            @Arg(column = "failureState", javaType = BoxFailureState.class),
-            @Arg(column = "failureReason", javaType = String.class),
-            @Arg(column = "failureType", javaType = SlackInteractionFailureType.class)
-    })
+    @ResultMap("slackNotificationOutboxRowResultMap")
     @Select("""
             SELECT id,
                    message_type AS messageType,
@@ -137,32 +115,7 @@ public interface SlackNotificationOutboxMybatisMapper {
             """)
     Optional<SlackNotificationOutboxRow> findRowForUpdateById(@Param("id") Long id);
 
-    @ConstructorArgs({
-            @Arg(column = "id", javaType = Long.class, id = true),
-            @Arg(column = "messageType", javaType = SlackNotificationOutboxMessageType.class),
-            @Arg(column = "idempotencyKey", javaType = String.class),
-            @Arg(column = "teamId", javaType = String.class),
-            @Arg(column = "channelId", javaType = String.class),
-            @Arg(column = "userIdState", javaType = SlackNotificationOutboxFieldState.class),
-            @Arg(column = "userId", javaType = String.class),
-            @Arg(column = "textState", javaType = SlackNotificationOutboxFieldState.class),
-            @Arg(column = "text", javaType = String.class),
-            @Arg(column = "blocksJsonState", javaType = SlackNotificationOutboxFieldState.class),
-            @Arg(column = "blocksJson", javaType = String.class),
-            @Arg(column = "fallbackTextState", javaType = SlackNotificationOutboxFieldState.class),
-            @Arg(column = "fallbackText", javaType = String.class),
-            @Arg(column = "status", javaType = SlackNotificationOutboxStatus.class),
-            @Arg(column = "processingAttempt", javaType = int.class),
-            @Arg(column = "processingLeaseState", javaType = BoxProcessingLeaseState.class),
-            @Arg(column = "processingStartedAt", javaType = Instant.class),
-            @Arg(column = "sentTimeState", javaType = BoxEventTimeState.class),
-            @Arg(column = "sentAt", javaType = Instant.class),
-            @Arg(column = "failedTimeState", javaType = BoxEventTimeState.class),
-            @Arg(column = "failedAt", javaType = Instant.class),
-            @Arg(column = "failureState", javaType = BoxFailureState.class),
-            @Arg(column = "failureReason", javaType = String.class),
-            @Arg(column = "failureType", javaType = SlackInteractionFailureType.class)
-    })
+    @ResultMap("slackNotificationOutboxRowResultMap")
     @Select({
             "<script>",
             "SELECT id,",
@@ -210,32 +163,7 @@ public interface SlackNotificationOutboxMybatisMapper {
             @Param("excludedOutboxIds") Collection<Long> excludedOutboxIds
     );
 
-    @ConstructorArgs({
-            @Arg(column = "id", javaType = Long.class, id = true),
-            @Arg(column = "messageType", javaType = SlackNotificationOutboxMessageType.class),
-            @Arg(column = "idempotencyKey", javaType = String.class),
-            @Arg(column = "teamId", javaType = String.class),
-            @Arg(column = "channelId", javaType = String.class),
-            @Arg(column = "userIdState", javaType = SlackNotificationOutboxFieldState.class),
-            @Arg(column = "userId", javaType = String.class),
-            @Arg(column = "textState", javaType = SlackNotificationOutboxFieldState.class),
-            @Arg(column = "text", javaType = String.class),
-            @Arg(column = "blocksJsonState", javaType = SlackNotificationOutboxFieldState.class),
-            @Arg(column = "blocksJson", javaType = String.class),
-            @Arg(column = "fallbackTextState", javaType = SlackNotificationOutboxFieldState.class),
-            @Arg(column = "fallbackText", javaType = String.class),
-            @Arg(column = "status", javaType = SlackNotificationOutboxStatus.class),
-            @Arg(column = "processingAttempt", javaType = int.class),
-            @Arg(column = "processingLeaseState", javaType = BoxProcessingLeaseState.class),
-            @Arg(column = "processingStartedAt", javaType = Instant.class),
-            @Arg(column = "sentTimeState", javaType = BoxEventTimeState.class),
-            @Arg(column = "sentAt", javaType = Instant.class),
-            @Arg(column = "failedTimeState", javaType = BoxEventTimeState.class),
-            @Arg(column = "failedAt", javaType = Instant.class),
-            @Arg(column = "failureState", javaType = BoxFailureState.class),
-            @Arg(column = "failureReason", javaType = String.class),
-            @Arg(column = "failureType", javaType = SlackInteractionFailureType.class)
-    })
+    @ResultMap("slackNotificationOutboxRowResultMap")
     @Select({
             "<script>",
             "SELECT id,",
@@ -276,32 +204,7 @@ public interface SlackNotificationOutboxMybatisMapper {
             @Param("recoveryBatchSize") int recoveryBatchSize
     );
 
-    @ConstructorArgs({
-            @Arg(column = "id", javaType = Long.class, id = true),
-            @Arg(column = "messageType", javaType = SlackNotificationOutboxMessageType.class),
-            @Arg(column = "idempotencyKey", javaType = String.class),
-            @Arg(column = "teamId", javaType = String.class),
-            @Arg(column = "channelId", javaType = String.class),
-            @Arg(column = "userIdState", javaType = SlackNotificationOutboxFieldState.class),
-            @Arg(column = "userId", javaType = String.class),
-            @Arg(column = "textState", javaType = SlackNotificationOutboxFieldState.class),
-            @Arg(column = "text", javaType = String.class),
-            @Arg(column = "blocksJsonState", javaType = SlackNotificationOutboxFieldState.class),
-            @Arg(column = "blocksJson", javaType = String.class),
-            @Arg(column = "fallbackTextState", javaType = SlackNotificationOutboxFieldState.class),
-            @Arg(column = "fallbackText", javaType = String.class),
-            @Arg(column = "status", javaType = SlackNotificationOutboxStatus.class),
-            @Arg(column = "processingAttempt", javaType = int.class),
-            @Arg(column = "processingLeaseState", javaType = BoxProcessingLeaseState.class),
-            @Arg(column = "processingStartedAt", javaType = Instant.class),
-            @Arg(column = "sentTimeState", javaType = BoxEventTimeState.class),
-            @Arg(column = "sentAt", javaType = Instant.class),
-            @Arg(column = "failedTimeState", javaType = BoxEventTimeState.class),
-            @Arg(column = "failedAt", javaType = Instant.class),
-            @Arg(column = "failureState", javaType = BoxFailureState.class),
-            @Arg(column = "failureReason", javaType = String.class),
-            @Arg(column = "failureType", javaType = SlackInteractionFailureType.class)
-    })
+    @ResultMap("slackNotificationOutboxRowResultMap")
     @Select("""
             SELECT id,
                    message_type AS messageType,
