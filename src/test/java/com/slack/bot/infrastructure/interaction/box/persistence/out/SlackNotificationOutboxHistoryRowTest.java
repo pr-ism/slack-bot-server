@@ -20,7 +20,8 @@ class SlackNotificationOutboxHistoryRowTest {
     @Test
     void from은_ABSENT_failure를_row와_domain에_그대로_반영한다() {
         // given
-        SlackNotificationOutboxHistory sentHistory = SlackNotificationOutboxHistory.completed(
+        SlackNotificationOutboxHistory sentHistory = SlackNotificationOutboxHistory.rehydrate(
+                1L,
                 10L,
                 1,
                 SlackNotificationOutboxStatus.SENT,
@@ -29,28 +30,28 @@ class SlackNotificationOutboxHistoryRowTest {
         );
 
         // when
-        SlackNotificationOutboxHistoryRow row = SlackNotificationOutboxHistoryRow.builder()
-                                                                                 .id(1L)
-                                                                                 .outboxId(sentHistory.getOutboxId())
-                                                                                 .processingAttempt(sentHistory.getProcessingAttempt())
-                                                                                 .status(sentHistory.getStatus())
-                                                                                 .completedAt(sentHistory.getCompletedAt())
-                                                                                 .failureState(BoxFailureState.ABSENT)
-                                                                                 .build();
+        SlackNotificationOutboxHistoryRow row = SlackNotificationOutboxHistoryRow.from(sentHistory);
+        SlackNotificationOutboxHistory restoredHistory = row.toDomain();
 
         // then
         assertAll(
+                () -> assertThat(row.getId()).isEqualTo(sentHistory.getId()),
+                () -> assertThat(row.getOutboxId()).isEqualTo(sentHistory.getOutboxId()),
+                () -> assertThat(row.getProcessingAttempt()).isEqualTo(sentHistory.getProcessingAttempt()),
+                () -> assertThat(row.getStatus()).isEqualTo(sentHistory.getStatus()),
+                () -> assertThat(row.getCompletedAt()).isEqualTo(sentHistory.getCompletedAt()),
                 () -> assertThat(row.getFailureState()).isEqualTo(BoxFailureState.ABSENT),
                 () -> assertThat(row.getFailureReason()).isNull(),
                 () -> assertThat(row.getFailureType()).isNull(),
-                () -> assertThat(row.toDomain().getFailure().isPresent()).isFalse()
+                () -> assertThat(restoredHistory.getFailure().isPresent()).isFalse()
         );
     }
 
     @Test
     void from은_PRESENT_failure를_row와_domain에_그대로_반영한다() {
         // given
-        SlackNotificationOutboxHistory failedHistory = SlackNotificationOutboxHistory.completed(
+        SlackNotificationOutboxHistory failedHistory = SlackNotificationOutboxHistory.rehydrate(
+                1L,
                 10L,
                 1,
                 SlackNotificationOutboxStatus.FAILED,
@@ -59,24 +60,22 @@ class SlackNotificationOutboxHistoryRowTest {
         );
 
         // when
-        SlackNotificationOutboxHistoryRow row = SlackNotificationOutboxHistoryRow.builder()
-                                                                                 .id(1L)
-                                                                                 .outboxId(failedHistory.getOutboxId())
-                                                                                 .processingAttempt(failedHistory.getProcessingAttempt())
-                                                                                 .status(failedHistory.getStatus())
-                                                                                 .completedAt(failedHistory.getCompletedAt())
-                                                                                 .failureState(BoxFailureState.PRESENT)
-                                                                                 .failureReason("failure")
-                                                                                 .failureType(SlackInteractionFailureType.RETRY_EXHAUSTED)
-                                                                                 .build();
+        SlackNotificationOutboxHistoryRow row = SlackNotificationOutboxHistoryRow.from(failedHistory);
+        SlackNotificationOutboxHistory restoredHistory = row.toDomain();
 
         // then
         assertAll(
+                () -> assertThat(row.getId()).isEqualTo(failedHistory.getId()),
+                () -> assertThat(row.getOutboxId()).isEqualTo(failedHistory.getOutboxId()),
+                () -> assertThat(row.getProcessingAttempt()).isEqualTo(failedHistory.getProcessingAttempt()),
+                () -> assertThat(row.getStatus()).isEqualTo(failedHistory.getStatus()),
+                () -> assertThat(row.getCompletedAt()).isEqualTo(failedHistory.getCompletedAt()),
                 () -> assertThat(row.getFailureState()).isEqualTo(BoxFailureState.PRESENT),
                 () -> assertThat(row.getFailureReason()).isEqualTo("failure"),
                 () -> assertThat(row.getFailureType()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED),
-                () -> assertThat(row.toDomain().getFailure().reason()).isEqualTo("failure"),
-                () -> assertThat(row.toDomain().getFailure().type()).isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED)
+                () -> assertThat(restoredHistory.getFailure().reason()).isEqualTo("failure"),
+                () -> assertThat(restoredHistory.getFailure().type())
+                        .isEqualTo(SlackInteractionFailureType.RETRY_EXHAUSTED)
         );
     }
 }
