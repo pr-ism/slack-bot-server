@@ -118,18 +118,9 @@ public final class SlackNotificationOutboxJdbcFixture {
         Timestamp processingStartedAt = resultSet.getTimestamp("processing_started_at");
         Timestamp sentAt = resultSet.getTimestamp("sent_at");
         Timestamp failedAt = resultSet.getTimestamp("failed_at");
-        Instant actualProcessingStartedAt = null;
-        if (processingStartedAt != null) {
-            actualProcessingStartedAt = processingStartedAt.toInstant();
-        }
-        Instant actualSentAt = null;
-        if (sentAt != null) {
-            actualSentAt = sentAt.toInstant();
-        }
-        Instant actualFailedAt = null;
-        if (failedAt != null) {
-            actualFailedAt = failedAt.toInstant();
-        }
+        Instant actualProcessingStartedAt = toInstantOrNull(processingStartedAt);
+        Instant actualSentAt = toInstantOrNull(sentAt);
+        Instant actualFailedAt = toInstantOrNull(failedAt);
         SlackNotificationOutboxRow row = SlackNotificationOutboxRow.builder()
                                                                    .id(resultSet.getLong("id"))
                                                                    .messageType(
@@ -208,6 +199,8 @@ public final class SlackNotificationOutboxJdbcFixture {
             actualFailureType = SlackInteractionFailureType.valueOf(failureType);
         }
 
+        Timestamp completedAt = resultSet.getTimestamp("completed_at");
+        Instant actualCompletedAt = toInstantOrNull(completedAt);
         SlackNotificationOutboxHistoryRow row = SlackNotificationOutboxHistoryRow.builder()
                                                                                  .id(resultSet.getLong("id"))
                                                                                  .outboxId(resultSet.getLong("outbox_id"))
@@ -217,7 +210,7 @@ public final class SlackNotificationOutboxJdbcFixture {
                                                                                                  resultSet.getString("status")
                                                                                          )
                                                                                  )
-                                                                                 .completedAt(resultSet.getTimestamp("completed_at").toInstant())
+                                                                                 .completedAt(actualCompletedAt)
                                                                                  .failureState(
                                                                                          BoxFailureState.valueOf(
                                                                                                  resultSet.getString("failure_state")
@@ -228,5 +221,14 @@ public final class SlackNotificationOutboxJdbcFixture {
                                                                                  .build();
 
         return row.toDomain();
+    }
+
+    private Instant toInstantOrNull(Timestamp timestamp) {
+        Instant instant = null;
+        if (timestamp != null) {
+            instant = timestamp.toInstant();
+        }
+
+        return instant;
     }
 }
