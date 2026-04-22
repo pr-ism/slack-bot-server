@@ -6,10 +6,14 @@ public class H2SlackNotificationOutboxRepositoryAdapter extends SlackNotificatio
 
     public H2SlackNotificationOutboxRepositoryAdapter(
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaSlackNotificationOutboxRepository repository,
-            JpaSlackNotificationOutboxHistoryRepository historyRepository
+            SlackNotificationOutboxMybatisMapper slackNotificationOutboxMybatisMapper,
+            SlackNotificationOutboxHistoryMybatisMapper slackNotificationOutboxHistoryMybatisMapper
     ) {
-        super(namedParameterJdbcTemplate, repository, historyRepository);
+        super(
+                namedParameterJdbcTemplate,
+                slackNotificationOutboxMybatisMapper,
+                slackNotificationOutboxHistoryMybatisMapper
+        );
     }
 
     @Override

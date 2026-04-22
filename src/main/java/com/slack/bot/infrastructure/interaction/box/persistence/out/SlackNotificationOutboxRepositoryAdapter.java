@@ -1,9 +1,6 @@
 package com.slack.bot.infrastructure.interaction.box.persistence.out;
 
-import com.slack.bot.infrastructure.common.BoxEventTimeState;
-import com.slack.bot.infrastructure.common.BoxFailureState;
 import com.slack.bot.infrastructure.common.BoxProcessingLease;
-import com.slack.bot.infrastructure.common.BoxProcessingLeaseState;
 import com.slack.bot.infrastructure.interaction.box.SlackInteractionFailureType;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutbox;
 import com.slack.bot.infrastructure.interaction.box.out.SlackNotificationOutboxHistory;
@@ -14,7 +11,6 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -26,30 +22,31 @@ import org.springframework.transaction.annotation.Transactional;
 public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificationOutboxRepository {
 
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
-    private final JpaSlackNotificationOutboxRepository repository;
-    private final JpaSlackNotificationOutboxHistoryRepository historyRepository;
+    private final SlackNotificationOutboxMybatisMapper slackNotificationOutboxMybatisMapper;
+    private final SlackNotificationOutboxHistoryMybatisMapper slackNotificationOutboxHistoryMybatisMapper;
 
     @Override
     public boolean enqueue(SlackNotificationOutbox outbox) {
+        SlackNotificationOutboxRow row = SlackNotificationOutboxRow.from(outbox);
         MapSqlParameterSource parameters = new MapSqlParameterSource()
-                .addValue("messageType", outbox.getMessageType().name())
-                .addValue("idempotencyKey", outbox.getIdempotencyKey())
-                .addValue("teamId", outbox.getTeamId())
-                .addValue("channelId", outbox.getChannelId())
-                .addValue("userIdState", outbox.getUserId().getState().name())
-                .addValue("userId", outbox.getUserId().valueOrBlank())
-                .addValue("textState", outbox.getText().getState().name())
-                .addValue("text", outbox.getText().valueOrBlank())
-                .addValue("blocksJsonState", outbox.getBlocksJson().getState().name())
-                .addValue("blocksJson", outbox.getBlocksJson().valueOrBlank())
-                .addValue("fallbackTextState", outbox.getFallbackText().getState().name())
-                .addValue("fallbackText", outbox.getFallbackText().valueOrBlank())
-                .addValue("pendingStatus", outbox.getStatus().name())
-                .addValue("processingAttempt", outbox.getProcessingAttempt())
-                .addValue("processingLeaseState", BoxProcessingLeaseState.IDLE.name())
-                .addValue("sentTimeState", BoxEventTimeState.ABSENT.name())
-                .addValue("failedTimeState", BoxEventTimeState.ABSENT.name())
-                .addValue("failureState", BoxFailureState.ABSENT.name());
+                .addValue("messageType", row.getMessageType().name())
+                .addValue("idempotencyKey", row.getIdempotencyKey())
+                .addValue("teamId", row.getTeamId())
+                .addValue("channelId", row.getChannelId())
+                .addValue("userIdState", row.getUserIdState().name())
+                .addValue("userId", row.getUserId())
+                .addValue("textState", row.getTextState().name())
+                .addValue("text", row.getText())
+                .addValue("blocksJsonState", row.getBlocksJsonState().name())
+                .addValue("blocksJson", row.getBlocksJson())
+                .addValue("fallbackTextState", row.getFallbackTextState().name())
+                .addValue("fallbackText", row.getFallbackText())
+                .addValue("pendingStatus", row.getStatus().name())
+                .addValue("processingAttempt", row.getProcessingAttempt())
+                .addValue("processingLeaseState", row.getProcessingLeaseState().name())
+                .addValue("sentTimeState", row.getSentTimeState().name())
+                .addValue("failedTimeState", row.getFailedTimeState().name())
+                .addValue("failureState", row.getFailureState().name());
 
         int updatedCount = namedParameterJdbcTemplate.update(buildEnqueueSql(), parameters);
 
@@ -59,9 +56,11 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
     @Override
     @Transactional
     public SlackNotificationOutbox save(SlackNotificationOutbox outbox) {
-        SlackNotificationOutboxJpaEntity entity = findOutboxEntity(outbox);
-        entity.apply(outbox);
-        return repository.save(entity).toDomain();
+        if (!outbox.hasId()) {
+            return insertOutbox(outbox);
+        }
+
+        return updateOutbox(outbox);
     }
 
     @Override
@@ -77,19 +76,25 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                 renewedProcessingStartedAt
         );
 
-        return repository.findLockedById(outboxId)
-                .map(entity -> renewProcessingLease(
-                        entity,
-                        currentProcessingStartedAt,
-                        renewedProcessingStartedAt
-                ))
-                .orElse(false);
+        return slackNotificationOutboxMybatisMapper.findRowForUpdateById(outboxId)
+                                                   .filter(row -> {
+                                                       SlackNotificationOutbox outbox = row.toDomain();
+                                                       return outbox.getStatus() == SlackNotificationOutboxStatus.PROCESSING
+                                                               && hasClaimedLease(outbox, currentProcessingStartedAt);
+                                                   })
+                                                   .map(row -> {
+                                                       SlackNotificationOutbox outbox = row.toDomain();
+                                                       outbox.renewProcessingLease(renewedProcessingStartedAt);
+                                                       updateOutbox(outbox);
+                                                       return true;
+                                                   })
+                                                   .orElse(false);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<SlackNotificationOutbox> findById(Long outboxId) {
-        return repository.findDomainById(outboxId);
+        return slackNotificationOutboxMybatisMapper.findDomainById(outboxId);
     }
 
     @Override
@@ -97,74 +102,18 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
     public Optional<Long> claimNextId(Instant processingStartedAt, Collection<Long> excludedOutboxIds) {
         validateProcessingStartedAt(processingStartedAt);
 
-        MapSqlParameterSource selectParameters = new MapSqlParameterSource()
-                .addValue(
-                        "claimableStatuses",
-                        List.of(
-                                SlackNotificationOutboxStatus.PENDING.name(),
-                                SlackNotificationOutboxStatus.RETRY_PENDING.name()
-                        )
-                );
-        addExcludedOutboxIds(selectParameters, excludedOutboxIds);
-
-        List<Long> claimedIds = namedParameterJdbcTemplate.query(
-                buildClaimNextIdSelectSql(excludedOutboxIds),
-                selectParameters,
-                (resultSet, rowNum) -> resultSet.getLong(1)
-        );
-        if (claimedIds.isEmpty()) {
-            return Optional.empty();
-        }
-
-        Long outboxId = claimedIds.getFirst();
-        return repository.findLockedById(outboxId)
-                .flatMap(entity -> {
-                    SlackNotificationOutbox outbox = entity.toDomain();
-                    outbox.claim(processingStartedAt);
-                    entity.apply(outbox);
-                    SlackNotificationOutboxJpaEntity saved = repository.save(entity);
-                    return Optional.of(saved.getId());
-                });
-    }
-
-    private String buildClaimNextIdSelectSql(Collection<Long> excludedOutboxIds) {
-        StringBuilder sql = new StringBuilder(
-                """
-                SELECT id
-                FROM slack_notification_outbox
-                WHERE status IN (:claimableStatuses)
-                """
-        );
-
-        appendExcludedOutboxIdsClause(sql, excludedOutboxIds);
-        sql.append(
-                """
-                ORDER BY id ASC
-                LIMIT 1
-                FOR UPDATE SKIP LOCKED
-                """
-        );
-
-        return sql.toString();
-    }
-
-    private void appendExcludedOutboxIdsClause(StringBuilder sql, Collection<Long> excludedOutboxIds) {
-        if (excludedOutboxIds == null || excludedOutboxIds.isEmpty()) {
-            return;
-        }
-
-        sql.append("\n  AND id NOT IN (:excludedOutboxIds)");
-    }
-
-    private void addExcludedOutboxIds(
-            MapSqlParameterSource parameters,
-            Collection<Long> excludedOutboxIds
-    ) {
-        if (excludedOutboxIds == null || excludedOutboxIds.isEmpty()) {
-            return;
-        }
-
-        parameters.addValue("excludedOutboxIds", excludedOutboxIds);
+        return slackNotificationOutboxMybatisMapper.findClaimableRowForUpdate(
+                List.of(
+                        SlackNotificationOutboxStatus.PENDING.name(),
+                        SlackNotificationOutboxStatus.RETRY_PENDING.name()
+                ),
+                excludedOutboxIds
+        ).map(row -> {
+            SlackNotificationOutbox outbox = row.toDomain();
+            outbox.claim(processingStartedAt);
+            updateOutbox(outbox);
+            return outbox.getId();
+        });
     }
 
     @Override
@@ -184,32 +133,32 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                 recoveryBatchSize
         );
 
-        List<Long> timedOutOutboxIds = selectTimeoutRecoveryTargetIds(
+        List<SlackNotificationOutboxRow> timedOutOutboxRows = slackNotificationOutboxMybatisMapper.findTimeoutRecoveryRowsForUpdate(
+                SlackNotificationOutboxStatus.PROCESSING.name(),
                 processingStartedBefore,
                 recoveryBatchSize
         );
 
-        AtomicInteger recoveredCount = new AtomicInteger();
-        for (Long outboxId : timedOutOutboxIds) {
-            repository.findLockedById(outboxId)
-                    .map(entity -> TimeoutRecoveryCandidate.of(entity, entity.toDomain()))
-                    .filter(candidate -> isTimeoutRecoverable(candidate.outbox(), processingStartedBefore))
-                    .ifPresent(candidate -> {
-                        SlackNotificationOutboxHistory history = recoverTimeoutProcessing(
-                                candidate.outbox(),
-                                failedAt,
-                                failureReason,
-                                maxAttempts
-                        );
+        int recoveredCount = 0;
+        for (SlackNotificationOutboxRow timedOutOutboxRow : timedOutOutboxRows) {
+            SlackNotificationOutbox outbox = timedOutOutboxRow.toDomain();
+            if (!isTimeoutRecoverable(outbox, processingStartedBefore)) {
+                continue;
+            }
 
-                        candidate.entity().apply(candidate.outbox());
-                        repository.save(candidate.entity());
-                        saveHistory(history);
-                        recoveredCount.incrementAndGet();
-                    });
+            SlackNotificationOutboxHistory history = recoverTimeoutProcessing(
+                    outbox,
+                    failedAt,
+                    failureReason,
+                    maxAttempts
+            );
+
+            updateOutbox(outbox);
+            saveHistory(history);
+            recoveredCount++;
         }
 
-        return recoveredCount.get();
+        return recoveredCount;
     }
 
     @Override
@@ -225,35 +174,6 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
 
         deleteHistories(deletableOutboxIds);
         return deleteOutboxes(deletableOutboxIds);
-    }
-
-    private List<Long> selectTimeoutRecoveryTargetIds(
-            Instant processingStartedBefore,
-            int recoveryBatchSize
-    ) {
-        return namedParameterJdbcTemplate.query(
-                buildTimeoutRecoverySelectSql(recoveryBatchSize),
-                new MapSqlParameterSource()
-                        .addValue("processingStatus", SlackNotificationOutboxStatus.PROCESSING.name())
-                        .addValue("processingStartedBefore", Timestamp.from(processingStartedBefore)),
-                (resultSet, rowNum) -> resultSet.getLong("id")
-        );
-    }
-
-    private String buildTimeoutRecoverySelectSql(int recoveryBatchSize) {
-        StringBuilder sql = new StringBuilder(
-                """
-                SELECT id
-                FROM slack_notification_outbox
-                WHERE status = :processingStatus
-                  AND processing_started_at < :processingStartedBefore
-                ORDER BY processing_started_at ASC, id ASC
-                LIMIT
-                """
-        );
-        sql.append(recoveryBatchSize);
-        sql.append("\nFOR UPDATE SKIP LOCKED");
-        return sql.toString();
     }
 
     private List<Long> selectCompletedDeletionTargetIds(
@@ -366,7 +286,7 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
             SlackNotificationOutbox outbox,
             Instant claimedProcessingStartedAt
     ) {
-        return saveIfProcessingLeaseMatched(outbox, SlackNotificationOutboxHistoryHolder.absent(), claimedProcessingStartedAt);
+        return saveIfProcessingLeaseMatched(outbox, null, claimedProcessingStartedAt);
     }
 
     @Override
@@ -376,33 +296,21 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
             SlackNotificationOutboxHistory history,
             Instant claimedProcessingStartedAt
     ) {
-        SlackNotificationOutboxHistoryHolder historyHolder = SlackNotificationOutboxHistoryHolder.of(history);
-        return saveIfProcessingLeaseMatched(outbox, historyHolder, claimedProcessingStartedAt);
-    }
-
-    private boolean saveIfProcessingLeaseMatched(
-            SlackNotificationOutbox outbox,
-            SlackNotificationOutboxHistoryHolder historyHolder,
-            Instant claimedProcessingStartedAt
-    ) {
         validateSaveIfProcessingLeaseMatchedArguments(outbox, claimedProcessingStartedAt);
-        return repository.findLockedById(outbox.getId())
-                .filter(entity -> {
-                    SlackNotificationOutbox persistedOutbox = entity.toDomain();
-                    return persistedOutbox.getStatus() == SlackNotificationOutboxStatus.PROCESSING
-                            && hasClaimedLease(persistedOutbox, claimedProcessingStartedAt);
-                })
-                .map(entity -> {
-                    entity.apply(outbox);
-                    repository.save(entity);
-
-                    if (historyHolder.isPresent()) {
-                        saveHistory(historyHolder.value());
-                    }
-
-                    return true;
-                })
-                .orElse(false);
+        return slackNotificationOutboxMybatisMapper.findRowForUpdateById(outbox.getId())
+                                                   .filter(row -> {
+                                                       SlackNotificationOutbox persistedOutbox = row.toDomain();
+                                                       return persistedOutbox.getStatus() == SlackNotificationOutboxStatus.PROCESSING
+                                                               && hasClaimedLease(persistedOutbox, claimedProcessingStartedAt);
+                                                   })
+                                                   .map(row -> {
+                                                       updateOutbox(outbox);
+                                                       if (history != null) {
+                                                           saveHistory(history);
+                                                       }
+                                                       return true;
+                                                   })
+                                                   .orElse(false);
     }
 
     protected String buildEnqueueSql() {
@@ -456,47 +364,24 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
                 """;
     }
 
-    private boolean hasClaimedLease(SlackNotificationOutbox outbox, Instant claimedProcessingStartedAt) {
-        BoxProcessingLease processingLease = outbox.getProcessingLease();
-        if (!processingLease.isClaimed()) {
-            return false;
-        }
-
-        return processingLease.startedAt().equals(claimedProcessingStartedAt);
+    private SlackNotificationOutbox insertOutbox(SlackNotificationOutbox outbox) {
+        SlackNotificationOutboxRow row = SlackNotificationOutboxRow.from(outbox);
+        slackNotificationOutboxMybatisMapper.insert(row);
+        return row.toDomain();
     }
 
-    private boolean renewProcessingLease(
-            SlackNotificationOutboxJpaEntity entity,
-            Instant currentProcessingStartedAt,
-            Instant renewedProcessingStartedAt
-    ) {
-        SlackNotificationOutbox outbox = entity.toDomain();
-        if (outbox.getStatus() != SlackNotificationOutboxStatus.PROCESSING) {
-            return false;
-        }
-        if (!hasClaimedLease(outbox, currentProcessingStartedAt)) {
-            return false;
+    private SlackNotificationOutbox updateOutbox(SlackNotificationOutbox outbox) {
+        SlackNotificationOutboxRow row = SlackNotificationOutboxRow.from(outbox);
+        int updatedCount = slackNotificationOutboxMybatisMapper.update(row);
+        if (updatedCount == 0) {
+            throw new IllegalStateException("저장 대상 outbox를 찾을 수 없습니다. id=" + outbox.getId());
         }
 
-        outbox.renewProcessingLease(renewedProcessingStartedAt);
-        entity.apply(outbox);
-        repository.save(entity);
-        return true;
-    }
-
-    private SlackNotificationOutboxJpaEntity findOutboxEntity(SlackNotificationOutbox outbox) {
-        if (!outbox.hasId()) {
-            return new SlackNotificationOutboxJpaEntity();
-        }
-
-        return repository.findById(outbox.getId())
-                .orElseThrow(() -> new IllegalStateException("저장 대상 outbox를 찾을 수 없습니다. id=" + outbox.getId()));
+        return outbox;
     }
 
     private void saveHistory(SlackNotificationOutboxHistory history) {
-        SlackNotificationOutboxHistoryJpaEntity entity = new SlackNotificationOutboxHistoryJpaEntity();
-        entity.apply(history);
-        historyRepository.save(entity);
+        slackNotificationOutboxHistoryMybatisMapper.insert(SlackNotificationOutboxHistoryRow.from(history));
     }
 
     private void validateRecoverTimeoutProcessingArguments(
@@ -575,68 +460,12 @@ public class SlackNotificationOutboxRepositoryAdapter implements SlackNotificati
         }
     }
 
-    private record TimeoutRecoveryCandidate(
-            SlackNotificationOutboxJpaEntity entity,
-            SlackNotificationOutbox outbox
-    ) {
-        private static TimeoutRecoveryCandidate of(
-                SlackNotificationOutboxJpaEntity entity,
-                SlackNotificationOutbox outbox
-        ) {
-            return new TimeoutRecoveryCandidate(entity, outbox);
-        }
-    }
-
-    private sealed interface SlackNotificationOutboxHistoryHolder
-            permits AbsentSlackNotificationOutboxHistoryHolder, PresentSlackNotificationOutboxHistoryHolder {
-
-        static SlackNotificationOutboxHistoryHolder absent() {
-            return AbsentSlackNotificationOutboxHistoryHolder.INSTANCE;
-        }
-
-        static SlackNotificationOutboxHistoryHolder of(SlackNotificationOutboxHistory history) {
-            if (history == null) {
-                return absent();
-            }
-
-            return new PresentSlackNotificationOutboxHistoryHolder(history);
-        }
-
-        boolean isPresent();
-
-        default SlackNotificationOutboxHistory value() {
-            throw new IllegalStateException("history가 없는 상태입니다.");
-        }
-    }
-
-    private static final class AbsentSlackNotificationOutboxHistoryHolder
-            implements SlackNotificationOutboxHistoryHolder {
-
-        private static final AbsentSlackNotificationOutboxHistoryHolder INSTANCE =
-                new AbsentSlackNotificationOutboxHistoryHolder();
-
-        private AbsentSlackNotificationOutboxHistoryHolder() {
-        }
-
-        @Override
-        public boolean isPresent() {
+    private boolean hasClaimedLease(SlackNotificationOutbox outbox, Instant claimedProcessingStartedAt) {
+        BoxProcessingLease processingLease = outbox.getProcessingLease();
+        if (!processingLease.isClaimed()) {
             return false;
         }
-    }
 
-    private record PresentSlackNotificationOutboxHistoryHolder(
-            SlackNotificationOutboxHistory value
-    ) implements SlackNotificationOutboxHistoryHolder {
-
-        private PresentSlackNotificationOutboxHistoryHolder {
-            if (value == null) {
-                throw new IllegalArgumentException("history는 비어 있을 수 없습니다.");
-            }
-        }
-
-        @Override
-        public boolean isPresent() {
-            return true;
-        }
+        return processingLease.startedAt().equals(claimedProcessingStartedAt);
     }
 }

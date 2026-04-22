@@ -32,10 +32,10 @@ class SlackNotificationOutboxRepositoryAdapterTest {
     SlackNotificationOutboxRepository slackNotificationOutboxRepository;
 
     @Autowired
-    JpaSlackNotificationOutboxRepository jpaSlackNotificationOutboxRepository;
+    SlackNotificationOutboxMybatisMapper slackNotificationOutboxMybatisMapper;
 
     @Autowired
-    JpaSlackNotificationOutboxHistoryRepository jpaSlackNotificationOutboxHistoryRepository;
+    SlackNotificationOutboxHistoryMybatisMapper slackNotificationOutboxHistoryMybatisMapper;
 
     @Test
     void save는_할당된_id의_row를_찾지_못하면_예외를_던지고_새_row를_만들지_않는다() {
@@ -63,7 +63,7 @@ class SlackNotificationOutboxRepositoryAdapterTest {
                 .isInstanceOf(InvalidDataAccessApiUsageException.class)
                 .hasMessageContaining("저장 대상 outbox를 찾을 수 없습니다. id=999999")
                 .hasRootCauseInstanceOf(IllegalStateException.class);
-        assertThat(jpaSlackNotificationOutboxRepository.findAllDomains()).isEmpty();
+        assertThat(slackNotificationOutboxMybatisMapper.findAllDomains()).isEmpty();
     }
 
     @Test
@@ -82,11 +82,11 @@ class SlackNotificationOutboxRepositoryAdapterTest {
         );
 
         // then
-        List<SlackNotificationOutboxHistory> histories = jpaSlackNotificationOutboxHistoryRepository.findAllDomains();
+        List<SlackNotificationOutboxHistory> histories = slackNotificationOutboxHistoryMybatisMapper.findAllDomains();
         assertAll(
                 () -> assertThat(deletedCount).isEqualTo(1),
-                () -> assertThat(jpaSlackNotificationOutboxRepository.findDomainById(oldSentOutbox.getId())).isEmpty(),
-                () -> assertThat(jpaSlackNotificationOutboxRepository.findDomainById(recentFailedOutbox.getId())).isPresent(),
+                () -> assertThat(slackNotificationOutboxMybatisMapper.findDomainById(oldSentOutbox.getId())).isEmpty(),
+                () -> assertThat(slackNotificationOutboxMybatisMapper.findDomainById(recentFailedOutbox.getId())).isPresent(),
                 () -> assertThat(histories)
                         .filteredOn(history -> history.getOutboxId().equals(oldSentOutbox.getId()))
                         .isEmpty(),
@@ -111,8 +111,8 @@ class SlackNotificationOutboxRepositoryAdapterTest {
         // then
         assertAll(
                 () -> assertThat(deletedCount).isEqualTo(1),
-                () -> assertThat(jpaSlackNotificationOutboxRepository.findDomainById(firstOutbox.getId())).isEmpty(),
-                () -> assertThat(jpaSlackNotificationOutboxRepository.findDomainById(secondOutbox.getId())).isPresent()
+                () -> assertThat(slackNotificationOutboxMybatisMapper.findDomainById(firstOutbox.getId())).isEmpty(),
+                () -> assertThat(slackNotificationOutboxMybatisMapper.findDomainById(secondOutbox.getId())).isPresent()
         );
     }
 
@@ -153,9 +153,7 @@ class SlackNotificationOutboxRepositoryAdapterTest {
             SlackNotificationOutboxHistory history
     ) {
         SlackNotificationOutbox persistedOutbox = slackNotificationOutboxRepository.save(outbox);
-        SlackNotificationOutboxHistoryJpaEntity entity = new SlackNotificationOutboxHistoryJpaEntity();
-        entity.apply(history);
-        jpaSlackNotificationOutboxHistoryRepository.save(entity);
+        slackNotificationOutboxHistoryMybatisMapper.insert(SlackNotificationOutboxHistoryRow.from(history));
         return persistedOutbox;
     }
 }

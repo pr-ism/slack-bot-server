@@ -16,8 +16,8 @@ import com.slack.bot.infrastructure.interaction.box.persistence.in.H2SlackIntera
 import com.slack.bot.infrastructure.interaction.box.persistence.in.SlackInteractionInboxHistoryMybatisMapper;
 import com.slack.bot.infrastructure.interaction.box.persistence.in.SlackInteractionInboxMybatisMapper;
 import com.slack.bot.infrastructure.interaction.box.persistence.out.H2SlackNotificationOutboxRepositoryAdapter;
-import com.slack.bot.infrastructure.interaction.box.persistence.out.JpaSlackNotificationOutboxHistoryRepository;
-import com.slack.bot.infrastructure.interaction.box.persistence.out.JpaSlackNotificationOutboxRepository;
+import com.slack.bot.infrastructure.interaction.box.persistence.out.SlackNotificationOutboxHistoryMybatisMapper;
+import com.slack.bot.infrastructure.interaction.box.persistence.out.SlackNotificationOutboxMybatisMapper;
 import com.slack.bot.infrastructure.review.batch.SpyReviewNotificationService;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
 import java.sql.SQLException;
@@ -111,13 +111,13 @@ public class IntegrationTestConfig {
     @Primary
     public SlackNotificationOutboxRepository slackNotificationOutboxRepository(
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaSlackNotificationOutboxRepository repository,
-            JpaSlackNotificationOutboxHistoryRepository historyRepository
+            SlackNotificationOutboxMybatisMapper slackNotificationOutboxMybatisMapper,
+            SlackNotificationOutboxHistoryMybatisMapper slackNotificationOutboxHistoryMybatisMapper
     ) {
         return new H2SlackNotificationOutboxRepositoryAdapter(
                 namedParameterJdbcTemplate,
-                repository,
-                historyRepository
+                slackNotificationOutboxMybatisMapper,
+                slackNotificationOutboxHistoryMybatisMapper
         );
     }
 
