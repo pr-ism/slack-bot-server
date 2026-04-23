@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -150,6 +151,94 @@ class ReviewRequestInboxRepositoryAdapterTest {
                 () -> assertThat(actual.getFailure().isPresent()).isFalse(),
                 () -> assertThat(actual.getRequestJson()).isEqualTo("{\"pullRequestTitle\":\"new\"}"),
                 () -> assertThat(actual.getAvailableAt()).isEqualTo(newAvailableAt)
+        );
+    }
+
+    @Test
+    void claimNextId는_제외된_inbox와_아직_처리할_수_없는_inbox를_건너뛴다() {
+        // given
+        Instant base = Instant.parse("2026-02-24T00:10:00Z");
+        ReviewRequestInbox excludedInbox = reviewRequestInboxRepository.save(ReviewRequestInbox.pending(
+                "api-key:claim-excluded",
+                "api-key",
+                5101L,
+                "{\"pullRequestTitle\":\"excluded\"}",
+                base.minusSeconds(30L)
+        ));
+        ReviewRequestInbox claimableInbox = reviewRequestInboxRepository.save(ReviewRequestInbox.pending(
+                "api-key:claim-target",
+                "api-key",
+                5102L,
+                "{\"pullRequestTitle\":\"target\"}",
+                base.minusSeconds(20L)
+        ));
+        ReviewRequestInbox notYetAvailableInbox = reviewRequestInboxRepository.save(ReviewRequestInbox.pending(
+                "api-key:claim-future",
+                "api-key",
+                5103L,
+                "{\"pullRequestTitle\":\"future\"}",
+                base.plusSeconds(60L)
+        ));
+
+        // when
+        Optional<Long> claimedInboxId = reviewRequestInboxRepository.claimNextId(
+                base,
+                base,
+                List.of(excludedInbox.getId())
+        );
+
+        // then
+        ReviewRequestInbox actualExcludedInbox = jpaReviewRequestInboxRepository.findDomainById(
+                excludedInbox.getId()
+        ).orElseThrow();
+        ReviewRequestInbox actualClaimableInbox = jpaReviewRequestInboxRepository.findDomainById(
+                claimableInbox.getId()
+        ).orElseThrow();
+        ReviewRequestInbox actualNotYetAvailableInbox = jpaReviewRequestInboxRepository.findDomainById(
+                notYetAvailableInbox.getId()
+        ).orElseThrow();
+        assertAll(
+                () -> assertThat(claimedInboxId).contains(claimableInbox.getId()),
+                () -> assertThat(actualExcludedInbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING),
+                () -> assertThat(actualNotYetAvailableInbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING),
+                () -> assertThat(actualClaimableInbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
+                () -> assertThat(actualClaimableInbox.getProcessingAttempt()).isEqualTo(1),
+                () -> assertThat(actualClaimableInbox.currentProcessingLeaseStartedAt()).isEqualTo(base)
+        );
+    }
+
+    @Test
+    void claimNextId는_RETRY_PENDING_inbox의_실패_상세값을_초기화한다() {
+        // given
+        Instant processingStartedAt = Instant.parse("2026-02-24T00:20:00Z");
+        ReviewRequestInbox inbox = ReviewRequestInbox.pending(
+                "api-key:claim-retry",
+                "api-key",
+                5201L,
+                "{\"pullRequestTitle\":\"retry\"}",
+                Instant.parse("2026-02-24T00:00:00Z")
+        );
+        setProcessingState(inbox, Instant.parse("2026-02-24T00:01:00Z"), 1);
+        inbox.markRetryPending(Instant.parse("2026-02-24T00:02:00Z"), "temporary failure");
+        ReviewRequestInbox saved = reviewRequestInboxRepository.save(inbox);
+
+        // when
+        Optional<Long> claimedInboxId = reviewRequestInboxRepository.claimNextId(
+                processingStartedAt,
+                processingStartedAt,
+                List.of()
+        );
+
+        // then
+        ReviewRequestInbox actualInbox = jpaReviewRequestInboxRepository.findDomainById(saved.getId()).orElseThrow();
+        assertAll(
+                () -> assertThat(claimedInboxId).contains(saved.getId()),
+                () -> assertThat(actualInbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
+                () -> assertThat(actualInbox.getProcessingAttempt()).isEqualTo(2),
+                () -> assertThat(actualInbox.currentProcessingLeaseStartedAt()).isEqualTo(processingStartedAt),
+                () -> assertThat(actualInbox.getProcessedTime().isPresent()).isFalse(),
+                () -> assertThat(actualInbox.getFailedTime().isPresent()).isFalse(),
+                () -> assertThat(actualInbox.getFailure().isPresent()).isFalse()
         );
     }
 
