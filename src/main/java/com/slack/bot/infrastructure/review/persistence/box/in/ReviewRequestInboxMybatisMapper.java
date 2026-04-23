@@ -90,7 +90,7 @@ public interface ReviewRequestInboxMybatisMapper {
             FOR UPDATE SKIP LOCKED
             </script>
             """)
-    Optional<ReviewRequestInboxRow> findClaimableRowForUpdate(
+    Optional<ReviewRequestInboxRow> selectClaimableRowForUpdate(
             @Param("claimableStatuses") List<String> claimableStatuses,
             @Param("availableBeforeOrAt") Instant availableBeforeOrAt,
             @Param("excludedInboxIds") Collection<Long> excludedInboxIds
@@ -210,6 +210,22 @@ public interface ReviewRequestInboxMybatisMapper {
     default Optional<ReviewRequestInbox> findDomainById(Long id) {
         return Optional.ofNullable(findRowById(id))
                        .map(row -> row.toDomain());
+    }
+
+    default Optional<ReviewRequestInboxRow> findClaimableRowForUpdate(
+            List<String> claimableStatuses,
+            Instant availableBeforeOrAt,
+            Collection<Long> excludedInboxIds
+    ) {
+        if (claimableStatuses == null || claimableStatuses.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return selectClaimableRowForUpdate(
+                claimableStatuses,
+                availableBeforeOrAt,
+                excludedInboxIds
+        );
     }
 
     default List<ReviewRequestInbox> findAllDomains() {

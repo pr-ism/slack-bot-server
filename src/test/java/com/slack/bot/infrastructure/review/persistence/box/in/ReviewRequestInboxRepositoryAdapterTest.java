@@ -81,6 +81,34 @@ class ReviewRequestInboxRepositoryAdapterTest {
     }
 
     @Test
+    void 빈_claimable_status_목록이면_claimable_row를_조회하지_않는다() {
+        // given
+        ReviewRequestInbox inbox = ReviewRequestInbox.pending(
+                "api-key:empty-claimable-status",
+                "api-key",
+                4100L,
+                "{\"pullRequestTitle\":\"empty\"}",
+                Instant.parse("2026-02-24T00:00:00Z")
+        );
+        ReviewRequestInbox saved = reviewRequestInboxRepository.save(inbox);
+
+        // when
+        Optional<ReviewRequestInboxRow> actual = reviewRequestInboxMybatisMapper.findClaimableRowForUpdate(
+                List.of(),
+                Instant.parse("2026-02-24T00:01:00Z"),
+                List.of()
+        );
+
+        // then
+        ReviewRequestInbox unchangedInbox = reviewRequestInboxMybatisMapper.findDomainById(saved.getId()).orElseThrow();
+        assertAll(
+                () -> assertThat(actual).isEmpty(),
+                () -> assertThat(unchangedInbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING),
+                () -> assertThat(unchangedInbox.hasClaimedProcessingLease()).isFalse()
+        );
+    }
+
+    @Test
     void PROCESSING_상태면_upsertPending이_행을_덮어쓰지_않는다() {
         // given
         Instant oldAvailableAt = Instant.parse("2026-02-24T00:00:00Z");
