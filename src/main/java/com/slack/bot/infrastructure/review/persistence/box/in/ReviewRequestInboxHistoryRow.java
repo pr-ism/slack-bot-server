@@ -6,22 +6,17 @@ import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxHistory;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import java.time.Instant;
 import lombok.Getter;
-import lombok.Setter;
 
 @Getter
-@Setter
 public class ReviewRequestInboxHistoryRow {
 
     private Long id;
-    private Long inboxId;
-    private int processingAttempt;
-    private ReviewRequestInboxStatus status;
-    private Instant completedAt;
-    private String failureReason;
-    private ReviewRequestInboxFailureType failureType;
-
-    public ReviewRequestInboxHistoryRow() {
-    }
+    private final Long inboxId;
+    private final int processingAttempt;
+    private final ReviewRequestInboxStatus status;
+    private final Instant completedAt;
+    private final String failureReason;
+    private final ReviewRequestInboxFailureType failureType;
 
     public ReviewRequestInboxHistoryRow(
             Long id,
@@ -42,14 +37,16 @@ public class ReviewRequestInboxHistoryRow {
     }
 
     public static ReviewRequestInboxHistoryRow from(ReviewRequestInboxHistory history) {
-        ReviewRequestInboxHistoryRow row = new ReviewRequestInboxHistoryRow();
-        row.setId(history.getId());
-        row.setInboxId(history.getInboxId());
-        row.setProcessingAttempt(history.getProcessingAttempt());
-        row.setStatus(history.getStatus());
-        row.setCompletedAt(history.getCompletedAt());
-        row.applyFailure(history);
-        return row;
+        FailureColumnValues failureColumnValues = FailureColumnValues.from(history.getFailure());
+        return new ReviewRequestInboxHistoryRow(
+                history.getId(),
+                history.getInboxId(),
+                history.getProcessingAttempt(),
+                history.getStatus(),
+                history.getCompletedAt(),
+                failureColumnValues.reason(),
+                failureColumnValues.type()
+        );
     }
 
     public ReviewRequestInboxHistory toDomain() {
@@ -63,19 +60,6 @@ public class ReviewRequestInboxHistoryRow {
         );
     }
 
-    private void applyFailure(ReviewRequestInboxHistory history) {
-        this.failureReason = null;
-        this.failureType = null;
-
-        BoxFailureSnapshot<ReviewRequestInboxFailureType> failure = history.getFailure();
-        if (!failure.isPresent()) {
-            return;
-        }
-
-        this.failureReason = failure.reason();
-        this.failureType = failure.type();
-    }
-
     private BoxFailureSnapshot<ReviewRequestInboxFailureType> toFailure() {
         if (failureReason == null && failureType == null) {
             return BoxFailureSnapshot.absent();
@@ -85,5 +69,19 @@ public class ReviewRequestInboxHistoryRow {
         }
 
         return BoxFailureSnapshot.present(failureReason, failureType);
+    }
+
+    private record FailureColumnValues(
+            String reason,
+            ReviewRequestInboxFailureType type
+    ) {
+
+        private static FailureColumnValues from(BoxFailureSnapshot<ReviewRequestInboxFailureType> failure) {
+            if (!failure.isPresent()) {
+                return new FailureColumnValues(null, null);
+            }
+
+            return new FailureColumnValues(failure.reason(), failure.type());
+        }
     }
 }
