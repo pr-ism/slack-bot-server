@@ -8,7 +8,7 @@ import com.slack.bot.application.IntegrationTest;
 import com.slack.bot.application.review.ReviewEventBatch;
 import com.slack.bot.application.review.dto.request.ReviewAssignmentRequest;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
-import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxRepository;
+import com.slack.bot.infrastructure.review.persistence.box.in.ReviewRequestInboxMybatisMapper;
 import java.util.List;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -28,7 +28,7 @@ class InMemoryReviewEventBatchTest {
     SpyReviewNotificationService spyNotificationService;
 
     @Autowired
-    JpaReviewRequestInboxRepository jpaReviewRequestInboxRepository;
+    ReviewRequestInboxMybatisMapper reviewRequestInboxMybatisMapper;
 
     @Test
     @Sql(scripts = {
@@ -140,7 +140,7 @@ class InMemoryReviewEventBatchTest {
 
         // then
         await().atMost(3, SECONDS).untilAsserted(() -> {
-            ReviewRequestInbox inbox = jpaReviewRequestInboxRepository.findAllDomains().getFirst();
+            ReviewRequestInbox inbox = reviewRequestInboxMybatisMapper.findAllDomains().getFirst();
 
             assertThat(inbox.getRequestJson())
                     .contains("\"reviewRoundKey\":\"1\"")

@@ -19,19 +19,19 @@ import com.slack.bot.infrastructure.interaction.box.persistence.out.H2SlackNotif
 import com.slack.bot.infrastructure.interaction.box.persistence.out.SlackNotificationOutboxHistoryMybatisMapper;
 import com.slack.bot.infrastructure.interaction.box.persistence.out.SlackNotificationOutboxMybatisMapper;
 import com.slack.bot.infrastructure.review.batch.SpyReviewNotificationService;
+import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
+import com.slack.bot.infrastructure.review.persistence.box.in.H2ReviewRequestInboxRepositoryAdapter;
+import com.slack.bot.infrastructure.review.persistence.box.in.ReviewRequestInboxHistoryMybatisMapper;
+import com.slack.bot.infrastructure.review.persistence.box.in.ReviewRequestInboxMybatisMapper;
+import com.slack.bot.infrastructure.review.persistence.box.out.H2ReviewNotificationOutboxRepositoryAdapter;
+import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxHistoryRepository;
+import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxRepository;
 import java.sql.SQLException;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
-import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
-import com.slack.bot.infrastructure.review.persistence.box.in.H2ReviewRequestInboxRepositoryAdapter;
-import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxHistoryRepository;
-import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxRepository;
-import com.slack.bot.infrastructure.review.persistence.box.out.H2ReviewNotificationOutboxRepositoryAdapter;
-import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxHistoryRepository;
-import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxRepository;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.web.client.RestClient;
 
@@ -125,13 +125,13 @@ public class IntegrationTestConfig {
     @Primary
     public ReviewRequestInboxRepository reviewRequestInboxRepository(
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaReviewRequestInboxRepository repository,
-            JpaReviewRequestInboxHistoryRepository historyRepository
+            ReviewRequestInboxMybatisMapper reviewRequestInboxMybatisMapper,
+            ReviewRequestInboxHistoryMybatisMapper reviewRequestInboxHistoryMybatisMapper
     ) {
         return new H2ReviewRequestInboxRepositoryAdapter(
                 namedParameterJdbcTemplate,
-                repository,
-                historyRepository
+                reviewRequestInboxMybatisMapper,
+                reviewRequestInboxHistoryMybatisMapper
         );
     }
 

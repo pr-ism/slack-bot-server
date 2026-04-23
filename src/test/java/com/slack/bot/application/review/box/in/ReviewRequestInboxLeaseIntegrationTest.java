@@ -17,7 +17,7 @@ import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
-import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxRepository;
+import com.slack.bot.infrastructure.review.persistence.box.in.ReviewRequestInboxMybatisMapper;
 import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -44,7 +44,7 @@ class ReviewRequestInboxLeaseIntegrationTest {
     ReviewNotificationOutboxEnqueuer reviewNotificationOutboxEnqueuer;
 
     @Autowired
-    JpaReviewRequestInboxRepository jpaReviewRequestInboxRepository;
+    ReviewRequestInboxMybatisMapper reviewRequestInboxMybatisMapper;
 
     @Autowired
     JpaReviewNotificationOutboxRepository jpaReviewNotificationOutboxRepository;
@@ -95,7 +95,7 @@ class ReviewRequestInboxLeaseIntegrationTest {
         reviewRequestInboxProcessor.processPending(1);
 
         // then
-        ReviewRequestInbox actualInbox = jpaReviewRequestInboxRepository.findDomainById(inbox.getId()).orElseThrow();
+        ReviewRequestInbox actualInbox = reviewRequestInboxMybatisMapper.findDomainById(inbox.getId()).orElseThrow();
         List<ReviewNotificationOutbox> actualOutboxes = jpaReviewNotificationOutboxRepository.findAllDomains();
 
         assertAll(
@@ -129,7 +129,7 @@ class ReviewRequestInboxLeaseIntegrationTest {
         int recoveredCount = reviewRequestInboxProcessor.recoverTimeoutProcessing(60_000L);
 
         // then
-        ReviewRequestInbox actualInbox = jpaReviewRequestInboxRepository.findDomainById(inbox.getId()).orElseThrow();
+        ReviewRequestInbox actualInbox = reviewRequestInboxMybatisMapper.findDomainById(inbox.getId()).orElseThrow();
         List<ReviewNotificationOutbox> actualOutboxes = jpaReviewNotificationOutboxRepository.findAllDomains();
 
         assertAll(

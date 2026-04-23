@@ -6,13 +6,13 @@ public class H2ReviewRequestInboxRepositoryAdapter extends ReviewRequestInboxRep
 
     public H2ReviewRequestInboxRepositoryAdapter(
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaReviewRequestInboxRepository reviewRequestInboxJpaRepository,
-            JpaReviewRequestInboxHistoryRepository reviewRequestInboxHistoryJpaRepository
+            ReviewRequestInboxMybatisMapper reviewRequestInboxMybatisMapper,
+            ReviewRequestInboxHistoryMybatisMapper reviewRequestInboxHistoryMybatisMapper
     ) {
         super(
                 namedParameterJdbcTemplate,
-                reviewRequestInboxJpaRepository,
-                reviewRequestInboxHistoryJpaRepository
+                reviewRequestInboxMybatisMapper,
+                reviewRequestInboxHistoryMybatisMapper
         );
     }
 

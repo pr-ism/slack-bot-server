@@ -1,10 +1,7 @@
 package com.slack.bot.infrastructure.review.persistence.box.in;
 
-import com.slack.bot.infrastructure.common.BoxEventTime;
-import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
-import com.slack.bot.infrastructure.common.BoxProcessingLease;
-import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
+import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxHistory;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
@@ -27,8 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRepository {
 
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
-    private final JpaReviewRequestInboxRepository reviewRequestInboxJpaRepository;
-    private final JpaReviewRequestInboxHistoryRepository reviewRequestInboxHistoryJpaRepository;
+    private final ReviewRequestInboxMybatisMapper reviewRequestInboxMybatisMapper;
+    private final ReviewRequestInboxHistoryMybatisMapper reviewRequestInboxHistoryMybatisMapper;
 
     @Override
     @Transactional
@@ -83,49 +80,40 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
         validateProcessingStartedAt(processingStartedAt);
         validateAvailableAt(availableBeforeOrAt);
 
-        MapSqlParameterSource selectParameters = new MapSqlParameterSource()
-                .addValue(
-                        "claimableStatuses",
-                        List.of(
-                                ReviewRequestInboxStatus.PENDING.name(),
-                                ReviewRequestInboxStatus.RETRY_PENDING.name()
-                        )
-                )
-                .addValue("availableBeforeOrAt", Timestamp.from(availableBeforeOrAt));
-        addExcludedInboxIds(selectParameters, excludedInboxIds);
+        return reviewRequestInboxMybatisMapper.findClaimableRowForUpdate(
+                List.of(
+                        ReviewRequestInboxStatus.PENDING.name(),
+                        ReviewRequestInboxStatus.RETRY_PENDING.name()
+                ),
+                availableBeforeOrAt,
+                excludedInboxIds
+        ).flatMap(row -> claimInbox(row.getId(), processingStartedAt));
+    }
 
-        List<Long> claimedIds = namedParameterJdbcTemplate.query(
-                buildClaimNextIdSelectSql(excludedInboxIds),
-                selectParameters,
-                (resultSet, rowNum) -> resultSet.getLong(1)
-        );
-        if (claimedIds.isEmpty()) {
-            return Optional.empty();
-        }
-
-        Long inboxId = claimedIds.getFirst();
+    private Optional<Long> claimInbox(Long inboxId, Instant processingStartedAt) {
         MapSqlParameterSource updateParameters = new MapSqlParameterSource()
                 .addValue("processingStatus", ReviewRequestInboxStatus.PROCESSING.name())
                 .addValue("processingStartedAt", Timestamp.from(processingStartedAt))
-                .addValue("inboxId", inboxId);
+                .addValue("inboxId", inboxId)
+                .addValue("noProcessedAt", null)
+                .addValue("noFailureAt", null)
+                .addValue("noFailureReason", null)
+                .addValue("noneFailureType", null);
 
         int updatedCount = namedParameterJdbcTemplate.update(
                 """
-                    UPDATE review_request_inbox
-                    SET status = :processingStatus,
-                        processing_attempt = processing_attempt + 1,
-                        processing_started_at = :processingStartedAt,
-                        processed_at = :noProcessedAt,
-                        failed_at = :noFailureAt,
-                        failure_reason = :noFailureReason,
-                        failure_type = :noneFailureType
-                    WHERE id = :inboxId
+                UPDATE review_request_inbox
+                SET updated_at = CURRENT_TIMESTAMP(6),
+                    status = :processingStatus,
+                    processing_attempt = processing_attempt + 1,
+                    processing_started_at = :processingStartedAt,
+                    processed_at = :noProcessedAt,
+                    failed_at = :noFailureAt,
+                    failure_reason = :noFailureReason,
+                    failure_type = :noneFailureType
+                WHERE id = :inboxId
                 """,
                 updateParameters
-                        .addValue("noProcessedAt", null)
-                        .addValue("noFailureAt", null)
-                        .addValue("noFailureReason", null)
-                        .addValue("noneFailureType", null)
         );
         if (updatedCount == 0) {
             return Optional.empty();
@@ -168,51 +156,10 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
         return updatedCount > 0;
     }
 
-    private String buildClaimNextIdSelectSql(Collection<Long> excludedInboxIds) {
-        StringBuilder sql = new StringBuilder(
-                """
-                SELECT id
-                FROM review_request_inbox
-                WHERE status IN (:claimableStatuses)
-                  AND available_at <= :availableBeforeOrAt
-                """
-        );
-
-        appendExcludedInboxIdsClause(sql, excludedInboxIds);
-        sql.append(
-                """
-                ORDER BY available_at ASC, id ASC
-                LIMIT 1
-                FOR UPDATE SKIP LOCKED
-                """
-        );
-
-        return sql.toString();
-    }
-
-    private void appendExcludedInboxIdsClause(StringBuilder sql, Collection<Long> excludedInboxIds) {
-        if (excludedInboxIds == null || excludedInboxIds.isEmpty()) {
-            return;
-        }
-
-        sql.append("\n  AND id NOT IN (:excludedInboxIds)");
-    }
-
-    private void addExcludedInboxIds(
-            MapSqlParameterSource parameters,
-            Collection<Long> excludedInboxIds
-    ) {
-        if (excludedInboxIds == null || excludedInboxIds.isEmpty()) {
-            return;
-        }
-
-        parameters.addValue("excludedInboxIds", excludedInboxIds);
-    }
-
     @Override
     @Transactional(readOnly = true)
     public Optional<ReviewRequestInbox> findById(Long inboxId) {
-        return reviewRequestInboxJpaRepository.findDomainById(inboxId);
+        return reviewRequestInboxMybatisMapper.findDomainById(inboxId);
     }
 
     @Override
@@ -472,7 +419,7 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
             ReviewRequestInbox inbox,
             Instant claimedProcessingStartedAt
     ) {
-        return saveIfProcessingLeaseMatched(inbox, Optional.empty(), claimedProcessingStartedAt);
+        return saveIfProcessingLeaseMatched(inbox, List.of(), claimedProcessingStartedAt);
     }
 
     @Override
@@ -482,23 +429,44 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
             ReviewRequestInboxHistory history,
             Instant claimedProcessingStartedAt
     ) {
-        return saveIfProcessingLeaseMatched(inbox, Optional.of(history), claimedProcessingStartedAt);
+        return saveIfProcessingLeaseMatched(inbox, List.of(history), claimedProcessingStartedAt);
     }
 
     private boolean saveIfProcessingLeaseMatched(
             ReviewRequestInbox inbox,
-            Optional<ReviewRequestInboxHistory> history,
+            List<ReviewRequestInboxHistory> histories,
             Instant claimedProcessingStartedAt
     ) {
         validateSaveIfProcessingLeaseMatchedArguments(inbox, claimedProcessingStartedAt);
 
+        ReviewRequestInboxRow row = ReviewRequestInboxRow.from(inbox);
+        Timestamp processingStartedAt = null;
+        if (row.getProcessingStartedAt() != null) {
+            processingStartedAt = Timestamp.from(row.getProcessingStartedAt());
+        }
+
+        Timestamp processedAt = null;
+        if (row.getProcessedAt() != null) {
+            processedAt = Timestamp.from(row.getProcessedAt());
+        }
+
+        Timestamp failedAt = null;
+        if (row.getFailedAt() != null) {
+            failedAt = Timestamp.from(row.getFailedAt());
+        }
+
+        String failureType = null;
+        if (row.getFailureType() != null) {
+            failureType = row.getFailureType().name();
+        }
+
         MapSqlParameterSource parameters = new MapSqlParameterSource()
-                .addValue("status", inbox.getStatus().name())
-                .addValue("processingStartedAt", toTimestamp(inbox.getProcessingLease()))
-                .addValue("processedAt", toTimestamp(inbox.getProcessedTime()))
-                .addValue("failedAt", toTimestamp(inbox.getFailedTime()))
-                .addValue("failureReason", resolveFailureReason(inbox))
-                .addValue("failureType", resolveFailureTypeName(inbox))
+                .addValue("status", row.getStatus().name())
+                .addValue("processingStartedAt", processingStartedAt)
+                .addValue("processedAt", processedAt)
+                .addValue("failedAt", failedAt)
+                .addValue("failureReason", row.getFailureReason())
+                .addValue("failureType", failureType)
                 .addValue("inboxId", inbox.getId())
                 .addValue("processingStatus", ReviewRequestInboxStatus.PROCESSING.name())
                 .addValue("claimedProcessingStartedAt", Timestamp.from(claimedProcessingStartedAt));
@@ -524,8 +492,9 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
             return false;
         }
 
-        history.map(historyEntry -> historyEntry.bindInboxId(inbox.getId()))
-               .ifPresent(historyEntry -> saveHistory(historyEntry));
+        for (ReviewRequestInboxHistory history : histories) {
+            saveHistory(history.bindInboxId(inbox.getId()));
+        }
 
         return true;
     }
@@ -533,11 +502,11 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
     @Override
     @Transactional
     public ReviewRequestInbox save(ReviewRequestInbox inbox) {
-        ReviewRequestInboxJpaEntity entity = findInboxEntity(inbox.getId()).orElseGet(
-                () -> new ReviewRequestInboxJpaEntity()
-        );
-        entity.apply(inbox);
-        return reviewRequestInboxJpaRepository.save(entity).toDomain();
+        if (inbox.getId() == null) {
+            return insertInbox(inbox);
+        }
+
+        return updateInbox(inbox);
     }
 
     protected String buildUpsertPendingSql() {
@@ -741,51 +710,23 @@ public class ReviewRequestInboxRepositoryAdapter implements ReviewRequestInboxRe
         validateProcessingStartedAt(claimedProcessingStartedAt);
     }
 
-    private Timestamp toTimestamp(BoxProcessingLease processingLease) {
-        if (!processingLease.isClaimed()) {
-            return null;
-        }
-
-        return Timestamp.from(processingLease.startedAt());
+    private ReviewRequestInbox insertInbox(ReviewRequestInbox inbox) {
+        ReviewRequestInboxRow row = ReviewRequestInboxRow.from(inbox);
+        reviewRequestInboxMybatisMapper.insert(row);
+        return row.toDomain();
     }
 
-    private Timestamp toTimestamp(BoxEventTime eventTime) {
-        if (!eventTime.isPresent()) {
-            return null;
+    private ReviewRequestInbox updateInbox(ReviewRequestInbox inbox) {
+        ReviewRequestInboxRow row = ReviewRequestInboxRow.from(inbox);
+        int updatedCount = reviewRequestInboxMybatisMapper.update(row);
+        if (updatedCount == 0) {
+            throw new IllegalStateException("저장 대상 inbox를 찾을 수 없습니다. id=" + inbox.getId());
         }
 
-        return Timestamp.from(eventTime.occurredAt());
-    }
-
-    private String resolveFailureReason(ReviewRequestInbox inbox) {
-        BoxFailureSnapshot<ReviewRequestInboxFailureType> failure = inbox.getFailure();
-        if (!failure.isPresent()) {
-            return null;
-        }
-
-        return failure.reason();
-    }
-
-    private String resolveFailureTypeName(ReviewRequestInbox inbox) {
-        BoxFailureSnapshot<ReviewRequestInboxFailureType> failure = inbox.getFailure();
-        if (!failure.isPresent()) {
-            return null;
-        }
-
-        return failure.type().name();
-    }
-
-    private Optional<ReviewRequestInboxJpaEntity> findInboxEntity(Long inboxId) {
-        if (inboxId == null) {
-            return Optional.empty();
-        }
-
-        return reviewRequestInboxJpaRepository.findById(inboxId);
+        return inbox;
     }
 
     private void saveHistory(ReviewRequestInboxHistory history) {
-        ReviewRequestInboxHistoryJpaEntity entity = new ReviewRequestInboxHistoryJpaEntity();
-        entity.apply(history);
-        reviewRequestInboxHistoryJpaRepository.save(entity);
+        reviewRequestInboxHistoryMybatisMapper.insert(ReviewRequestInboxHistoryRow.from(history));
     }
 }
