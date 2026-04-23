@@ -1,6 +1,7 @@
 package com.slack.bot.infrastructure.review.persistence.box.in;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
@@ -70,5 +71,25 @@ class ReviewRequestInboxHistoryRowTest {
                 () -> assertThat(restoredHistory.getFailure().type())
                         .isEqualTo(ReviewRequestInboxFailureType.RETRY_EXHAUSTED)
         );
+    }
+
+    @Test
+    void toDomain은_blank_failure_reason을_상태_오류로_변환한다() {
+        // given
+        ReviewRequestInboxHistoryRow row = new ReviewRequestInboxHistoryRow(
+                1L,
+                10L,
+                1,
+                ReviewRequestInboxStatus.FAILED,
+                Instant.parse("2026-02-24T00:02:00Z"),
+                " ",
+                ReviewRequestInboxFailureType.RETRY_EXHAUSTED
+        );
+
+        // when & then
+        assertThatThrownBy(() -> row.toDomain())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("history 상태가 올바르지 않습니다.")
+                .hasCauseInstanceOf(IllegalArgumentException.class);
     }
 }

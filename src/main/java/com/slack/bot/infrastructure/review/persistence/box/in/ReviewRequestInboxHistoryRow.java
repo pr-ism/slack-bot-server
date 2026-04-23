@@ -50,14 +50,18 @@ public class ReviewRequestInboxHistoryRow {
     }
 
     public ReviewRequestInboxHistory toDomain() {
-        return ReviewRequestInboxHistory.rehydrate(
-                id,
-                inboxId,
-                processingAttempt,
-                status,
-                completedAt,
-                toFailure()
-        );
+        try {
+            return ReviewRequestInboxHistory.rehydrate(
+                    id,
+                    inboxId,
+                    processingAttempt,
+                    status,
+                    completedAt,
+                    toFailure()
+            );
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("history 상태가 올바르지 않습니다.", e);
+        }
     }
 
     private BoxFailureSnapshot<ReviewRequestInboxFailureType> toFailure() {
