@@ -12,7 +12,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.bot.application.IntegrationTest;
@@ -25,15 +24,15 @@ import com.slack.bot.infrastructure.common.BoxEventTime;
 import com.slack.bot.infrastructure.common.BoxFailureSnapshot;
 import com.slack.bot.infrastructure.common.BoxProcessingLease;
 import com.slack.bot.infrastructure.review.batch.SpyReviewNotificationService;
-import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInbox;
+import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxFailureType;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxHistory;
 import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
-import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
-import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxHistoryRepository;
+import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
+import com.slack.bot.infrastructure.review.persistence.box.in.ReviewRequestInboxHistoryMybatisMapper;
+import com.slack.bot.infrastructure.review.persistence.box.in.ReviewRequestInboxMybatisMapper;
 import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxRepository;
-import com.slack.bot.infrastructure.review.persistence.box.in.JpaReviewRequestInboxRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
@@ -62,13 +61,13 @@ class ReviewRequestInboxProcessorTest {
     ReviewRequestInboxRepository reviewRequestInboxRepository;
 
     @Autowired
-    JpaReviewRequestInboxRepository jpaReviewRequestInboxRepository;
+    ReviewRequestInboxMybatisMapper reviewRequestInboxMybatisMapper;
 
     @Autowired
     JpaReviewNotificationOutboxRepository jpaReviewNotificationOutboxRepository;
 
     @Autowired
-    JpaReviewRequestInboxHistoryRepository jpaReviewRequestInboxHistoryRepository;
+    ReviewRequestInboxHistoryMybatisMapper reviewRequestInboxHistoryMybatisMapper;
 
     @Autowired
     SpyReviewNotificationService spyReviewNotificationService;
@@ -87,6 +86,8 @@ class ReviewRequestInboxProcessorTest {
 
     @BeforeEach
     void setUp() {
+        reviewRequestInboxHistoryMybatisMapper.deleteAll();
+        reviewRequestInboxMybatisMapper.deleteAll();
         reset(
                 reviewRequestInboxRepository,
                 reviewNotificationOutboxEnqueuer,
@@ -114,7 +115,7 @@ class ReviewRequestInboxProcessorTest {
 
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
-            List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAllDomains();
+            List<ReviewRequestInbox> inboxes = reviewRequestInboxMybatisMapper.findAllDomains();
             List<ReviewNotificationOutbox> outboxes = jpaReviewNotificationOutboxRepository.findAllDomains();
             ReviewRequestInbox inbox = findOnlyInbox();
 
@@ -150,7 +151,7 @@ class ReviewRequestInboxProcessorTest {
 
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
-            List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAllDomains();
+            List<ReviewRequestInbox> inboxes = reviewRequestInboxMybatisMapper.findAllDomains();
             List<ReviewNotificationOutbox> outboxes = jpaReviewNotificationOutboxRepository.findAllDomains();
             ReviewRequestInbox inbox = findOnlyInbox();
 
@@ -218,7 +219,7 @@ class ReviewRequestInboxProcessorTest {
 
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
-            ReviewRequestInbox processed = jpaReviewRequestInboxRepository.findDomainById(saved.getId()).orElseThrow();
+            ReviewRequestInbox processed = reviewRequestInboxMybatisMapper.findDomainById(saved.getId()).orElseThrow();
             List<ReviewRequestInboxHistory> histories = historiesOf(saved.getId());
 
             assertAll(
@@ -257,7 +258,7 @@ class ReviewRequestInboxProcessorTest {
         reviewRequestInboxProcessor.recoverTimeoutProcessing(1_000);
 
         // then
-        ReviewRequestInbox failed = jpaReviewRequestInboxRepository.findDomainById(saved.getId()).orElseThrow();
+        ReviewRequestInbox failed = reviewRequestInboxMybatisMapper.findDomainById(saved.getId()).orElseThrow();
         assertAll(
                 () -> assertThat(spyReviewNotificationService.getSendCount()).isZero(),
                 () -> assertThat(failed.getStatus()).isEqualTo(ReviewRequestInboxStatus.FAILED),
@@ -302,7 +303,7 @@ class ReviewRequestInboxProcessorTest {
     }
 
     private List<ReviewRequestInboxHistory> historiesOf(Long inboxId) {
-        return jpaReviewRequestInboxHistoryRepository.findAllDomains()
+        return reviewRequestInboxHistoryMybatisMapper.findAllDomains()
                                                      .stream()
                                                      .filter(history -> inboxId.equals(history.getInboxId()))
                                                      .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))
@@ -361,7 +362,7 @@ class ReviewRequestInboxProcessorTest {
         reviewRequestInboxProcessor.enqueue("test-api-key", second, 0);
 
         // then
-        List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAllDomains();
+        List<ReviewRequestInbox> inboxes = reviewRequestInboxMybatisMapper.findAllDomains();
         ReviewRequestInbox inbox = findOnlyInbox();
         assertAll(
                 () -> assertThat(inboxes).hasSize(1),
@@ -378,7 +379,7 @@ class ReviewRequestInboxProcessorTest {
         // when
         reviewRequestInboxProcessor.enqueue("test-api-key-1", request, 0);
         String firstIdempotencyKey = findOnlyInbox().getIdempotencyKey();
-        jpaReviewRequestInboxRepository.deleteAll();
+        reviewRequestInboxMybatisMapper.deleteAll();
         reviewRequestInboxProcessor.enqueue("test-api-key-2", request, 0);
         String secondIdempotencyKey = findOnlyInbox().getIdempotencyKey();
 
@@ -395,7 +396,7 @@ class ReviewRequestInboxProcessorTest {
         // when
         reviewRequestInboxProcessor.enqueue("test-api-key", first, 0);
         String firstIdempotencyKey = findOnlyInbox().getIdempotencyKey();
-        jpaReviewRequestInboxRepository.deleteAll();
+        reviewRequestInboxMybatisMapper.deleteAll();
         reviewRequestInboxProcessor.enqueue("test-api-key", second, 0);
         String secondIdempotencyKey = findOnlyInbox().getIdempotencyKey();
 
@@ -492,7 +493,7 @@ class ReviewRequestInboxProcessorTest {
         reviewRequestInboxProcessor.processPending(10);
 
         // then
-        ReviewRequestInbox failed = jpaReviewRequestInboxRepository.findDomainById(saved.getId()).orElseThrow();
+        ReviewRequestInbox failed = reviewRequestInboxMybatisMapper.findDomainById(saved.getId()).orElseThrow();
         assertAll(
                 () -> assertThat(failed.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(failed.getProcessingAttempt()).isEqualTo(2),
@@ -514,7 +515,7 @@ class ReviewRequestInboxProcessorTest {
         reviewRequestInboxProcessor.processPending(10);
 
         // then
-        ReviewRequestInbox reloaded = jpaReviewRequestInboxRepository.findDomainById(saved.getId()).orElseThrow();
+        ReviewRequestInbox reloaded = reviewRequestInboxMybatisMapper.findDomainById(saved.getId()).orElseThrow();
         assertAll(
                 () -> assertThat(spyReviewNotificationService.getSendCount()).isZero(),
                 () -> assertThat(reloaded.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
@@ -545,8 +546,8 @@ class ReviewRequestInboxProcessorTest {
         reviewRequestInboxProcessor.processPending(10);
 
         // then
-        ReviewRequestInbox reloadedFirst = jpaReviewRequestInboxRepository.findDomainById(firstInbox.getId()).orElseThrow();
-        ReviewRequestInbox reloadedSecond = jpaReviewRequestInboxRepository.findDomainById(secondInbox.getId()).orElseThrow();
+        ReviewRequestInbox reloadedFirst = reviewRequestInboxMybatisMapper.findDomainById(firstInbox.getId()).orElseThrow();
+        ReviewRequestInbox reloadedSecond = reviewRequestInboxMybatisMapper.findDomainById(secondInbox.getId()).orElseThrow();
         assertAll(
                 () -> assertThat(reloadedFirst.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(reloadedSecond.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
@@ -582,13 +583,13 @@ class ReviewRequestInboxProcessorTest {
     }
 
     private ReviewRequestInbox findOnlyInbox() {
-        List<ReviewRequestInbox> inboxes = jpaReviewRequestInboxRepository.findAllDomains();
+        List<ReviewRequestInbox> inboxes = reviewRequestInboxMybatisMapper.findAllDomains();
         assertThat(inboxes).hasSize(1);
         return inboxes.getFirst();
     }
 
     private ReviewRequestInbox findInboxByGithubPullRequestId(Long githubPullRequestId) {
-        return jpaReviewRequestInboxRepository.findAllDomains()
+        return reviewRequestInboxMybatisMapper.findAllDomains()
                                              .stream()
                                              .filter(inbox -> githubPullRequestId.equals(inbox.getGithubPullRequestId()))
                                              .findFirst()

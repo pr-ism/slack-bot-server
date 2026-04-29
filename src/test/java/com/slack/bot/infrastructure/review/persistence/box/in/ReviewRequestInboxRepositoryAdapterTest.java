@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,10 +42,10 @@ class ReviewRequestInboxRepositoryAdapterTest {
     ReviewRequestInboxRepository reviewRequestInboxRepository;
 
     @Autowired
-    JpaReviewRequestInboxRepository jpaReviewRequestInboxRepository;
+    ReviewRequestInboxMybatisMapper reviewRequestInboxMybatisMapper;
 
     @Autowired
-    JpaReviewRequestInboxHistoryRepository jpaReviewRequestInboxHistoryRepository;
+    ReviewRequestInboxHistoryMybatisMapper reviewRequestInboxHistoryMybatisMapper;
 
     @Autowired
     NamedParameterJdbcTemplate namedParameterJdbcTemplate;
@@ -80,6 +81,34 @@ class ReviewRequestInboxRepositoryAdapterTest {
     }
 
     @Test
+    void 빈_claimable_status_목록이면_claimable_row를_조회하지_않는다() {
+        // given
+        ReviewRequestInbox inbox = ReviewRequestInbox.pending(
+                "api-key:empty-claimable-status",
+                "api-key",
+                4100L,
+                "{\"pullRequestTitle\":\"empty\"}",
+                Instant.parse("2026-02-24T00:00:00Z")
+        );
+        ReviewRequestInbox saved = reviewRequestInboxRepository.save(inbox);
+
+        // when
+        Optional<ReviewRequestInboxRow> actual = reviewRequestInboxMybatisMapper.findClaimableRowForUpdate(
+                List.of(),
+                Instant.parse("2026-02-24T00:01:00Z"),
+                List.of()
+        );
+
+        // then
+        ReviewRequestInbox unchangedInbox = reviewRequestInboxMybatisMapper.findDomainById(saved.getId()).orElseThrow();
+        assertAll(
+                () -> assertThat(actual).isEmpty(),
+                () -> assertThat(unchangedInbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING),
+                () -> assertThat(unchangedInbox.hasClaimedProcessingLease()).isFalse()
+        );
+    }
+
+    @Test
     void PROCESSING_상태면_upsertPending이_행을_덮어쓰지_않는다() {
         // given
         Instant oldAvailableAt = Instant.parse("2026-02-24T00:00:00Z");
@@ -104,7 +133,7 @@ class ReviewRequestInboxRepositoryAdapterTest {
         );
 
         // then
-        ReviewRequestInbox actual = jpaReviewRequestInboxRepository.findDomainById(saved.getId()).orElseThrow();
+        ReviewRequestInbox actual = reviewRequestInboxMybatisMapper.findDomainById(saved.getId()).orElseThrow();
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(actual.getProcessingAttempt()).isEqualTo(1),
@@ -140,7 +169,7 @@ class ReviewRequestInboxRepositoryAdapterTest {
         );
 
         // then
-        ReviewRequestInbox actual = jpaReviewRequestInboxRepository.findDomainById(saved.getId()).orElseThrow();
+        ReviewRequestInbox actual = reviewRequestInboxMybatisMapper.findDomainById(saved.getId()).orElseThrow();
         assertAll(
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING),
                 () -> assertThat(actual.getProcessingAttempt()).isZero(),
@@ -150,6 +179,94 @@ class ReviewRequestInboxRepositoryAdapterTest {
                 () -> assertThat(actual.getFailure().isPresent()).isFalse(),
                 () -> assertThat(actual.getRequestJson()).isEqualTo("{\"pullRequestTitle\":\"new\"}"),
                 () -> assertThat(actual.getAvailableAt()).isEqualTo(newAvailableAt)
+        );
+    }
+
+    @Test
+    void claimNextId는_제외된_inbox와_아직_처리할_수_없는_inbox를_건너뛴다() {
+        // given
+        Instant base = Instant.parse("2026-02-24T00:10:00Z");
+        ReviewRequestInbox excludedInbox = reviewRequestInboxRepository.save(ReviewRequestInbox.pending(
+                "api-key:claim-excluded",
+                "api-key",
+                5101L,
+                "{\"pullRequestTitle\":\"excluded\"}",
+                base.minusSeconds(30L)
+        ));
+        ReviewRequestInbox claimableInbox = reviewRequestInboxRepository.save(ReviewRequestInbox.pending(
+                "api-key:claim-target",
+                "api-key",
+                5102L,
+                "{\"pullRequestTitle\":\"target\"}",
+                base.minusSeconds(20L)
+        ));
+        ReviewRequestInbox notYetAvailableInbox = reviewRequestInboxRepository.save(ReviewRequestInbox.pending(
+                "api-key:claim-future",
+                "api-key",
+                5103L,
+                "{\"pullRequestTitle\":\"future\"}",
+                base.plusSeconds(60L)
+        ));
+
+        // when
+        Optional<Long> claimedInboxId = reviewRequestInboxRepository.claimNextId(
+                base,
+                base,
+                List.of(excludedInbox.getId())
+        );
+
+        // then
+        ReviewRequestInbox actualExcludedInbox = reviewRequestInboxMybatisMapper.findDomainById(
+                excludedInbox.getId()
+        ).orElseThrow();
+        ReviewRequestInbox actualClaimableInbox = reviewRequestInboxMybatisMapper.findDomainById(
+                claimableInbox.getId()
+        ).orElseThrow();
+        ReviewRequestInbox actualNotYetAvailableInbox = reviewRequestInboxMybatisMapper.findDomainById(
+                notYetAvailableInbox.getId()
+        ).orElseThrow();
+        assertAll(
+                () -> assertThat(claimedInboxId).contains(claimableInbox.getId()),
+                () -> assertThat(actualExcludedInbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING),
+                () -> assertThat(actualNotYetAvailableInbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PENDING),
+                () -> assertThat(actualClaimableInbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
+                () -> assertThat(actualClaimableInbox.getProcessingAttempt()).isEqualTo(1),
+                () -> assertThat(actualClaimableInbox.currentProcessingLeaseStartedAt()).isEqualTo(base)
+        );
+    }
+
+    @Test
+    void claimNextId는_RETRY_PENDING_inbox의_실패_상세값을_초기화한다() {
+        // given
+        Instant processingStartedAt = Instant.parse("2026-02-24T00:20:00Z");
+        ReviewRequestInbox inbox = ReviewRequestInbox.pending(
+                "api-key:claim-retry",
+                "api-key",
+                5201L,
+                "{\"pullRequestTitle\":\"retry\"}",
+                Instant.parse("2026-02-24T00:00:00Z")
+        );
+        setProcessingState(inbox, Instant.parse("2026-02-24T00:01:00Z"), 1);
+        inbox.markRetryPending(Instant.parse("2026-02-24T00:02:00Z"), "temporary failure");
+        ReviewRequestInbox saved = reviewRequestInboxRepository.save(inbox);
+
+        // when
+        Optional<Long> claimedInboxId = reviewRequestInboxRepository.claimNextId(
+                processingStartedAt,
+                processingStartedAt,
+                List.of()
+        );
+
+        // then
+        ReviewRequestInbox actualInbox = reviewRequestInboxMybatisMapper.findDomainById(saved.getId()).orElseThrow();
+        assertAll(
+                () -> assertThat(claimedInboxId).contains(saved.getId()),
+                () -> assertThat(actualInbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
+                () -> assertThat(actualInbox.getProcessingAttempt()).isEqualTo(2),
+                () -> assertThat(actualInbox.currentProcessingLeaseStartedAt()).isEqualTo(processingStartedAt),
+                () -> assertThat(actualInbox.getProcessedTime().isPresent()).isFalse(),
+                () -> assertThat(actualInbox.getFailedTime().isPresent()).isFalse(),
+                () -> assertThat(actualInbox.getFailure().isPresent()).isFalse()
         );
     }
 
@@ -178,14 +295,14 @@ class ReviewRequestInboxRepositoryAdapterTest {
         );
 
         // then
-        ReviewRequestInboxJpaEntity actualEntity = jpaReviewRequestInboxRepository.findById(saved.getId()).orElseThrow();
-        ReviewRequestInbox actual = actualEntity.toDomain();
+        ReviewRequestInbox actual = reviewRequestInboxMybatisMapper.findDomainById(saved.getId()).orElseThrow();
         ReviewRequestInboxHistory history = findLatestHistory(saved.getId());
+        LocalDateTime actualUpdatedAt = findUpdatedAt(saved.getId());
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(1),
                 () -> assertThat(actual.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
                 () -> assertThat(actual.getFailure().type()).isEqualTo(ReviewRequestInboxFailureType.PROCESSING_TIMEOUT),
-                () -> assertThat(actualEntity.getUpdatedAt()).isEqualTo(expectedUpdatedAt),
+                () -> assertThat(actualUpdatedAt).isEqualTo(expectedUpdatedAt),
                 () -> assertThat(history.getStatus()).isEqualTo(ReviewRequestInboxStatus.RETRY_PENDING),
                 () -> assertThat(history.getFailure().type()).isEqualTo(ReviewRequestInboxFailureType.PROCESSING_TIMEOUT),
                 () -> assertThat(history.getFailure().reason()).isEqualTo("timeout"),
@@ -222,9 +339,9 @@ class ReviewRequestInboxRepositoryAdapterTest {
 
         // then
         List<ReviewRequestInbox> actualInboxes = inboxIds.stream()
-                                                         .map(inboxId -> jpaReviewRequestInboxRepository.findDomainById(inboxId).orElseThrow())
+                                                         .map(inboxId -> reviewRequestInboxMybatisMapper.findDomainById(inboxId).orElseThrow())
                                                          .toList();
-        List<ReviewRequestInboxHistory> actualHistories = jpaReviewRequestInboxHistoryRepository.findAllDomains();
+        List<ReviewRequestInboxHistory> actualHistories = reviewRequestInboxHistoryMybatisMapper.findAllDomains();
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(100),
                 () -> assertThat(actualInboxes).filteredOn(inbox -> inbox.getStatus() == ReviewRequestInboxStatus.RETRY_PENDING)
@@ -277,11 +394,11 @@ class ReviewRequestInboxRepositoryAdapterTest {
         );
 
         // then
-        List<ReviewRequestInboxHistory> histories = jpaReviewRequestInboxHistoryRepository.findAllDomains();
+        List<ReviewRequestInboxHistory> histories = reviewRequestInboxHistoryMybatisMapper.findAllDomains();
         assertAll(
                 () -> assertThat(deletedCount).isEqualTo(1),
-                () -> assertThat(jpaReviewRequestInboxRepository.findDomainById(savedProcessedInbox.getId())).isEmpty(),
-                () -> assertThat(jpaReviewRequestInboxRepository.findDomainById(savedFailedInbox.getId())).isPresent(),
+                () -> assertThat(reviewRequestInboxMybatisMapper.findDomainById(savedProcessedInbox.getId())).isEmpty(),
+                () -> assertThat(reviewRequestInboxMybatisMapper.findDomainById(savedFailedInbox.getId())).isPresent(),
                 () -> assertThat(histories)
                         .filteredOn(history -> history.getInboxId().equals(savedProcessedInbox.getId()))
                         .isEmpty(),
@@ -314,8 +431,8 @@ class ReviewRequestInboxRepositoryAdapterTest {
         // then
         assertAll(
                 () -> assertThat(deletedCount).isEqualTo(1),
-                () -> assertThat(jpaReviewRequestInboxRepository.findDomainById(firstInbox.getId())).isEmpty(),
-                () -> assertThat(jpaReviewRequestInboxRepository.findDomainById(secondInbox.getId())).isPresent()
+                () -> assertThat(reviewRequestInboxMybatisMapper.findDomainById(firstInbox.getId())).isEmpty(),
+                () -> assertThat(reviewRequestInboxMybatisMapper.findDomainById(secondInbox.getId())).isPresent()
         );
     }
 
@@ -362,9 +479,9 @@ class ReviewRequestInboxRepositoryAdapterTest {
 
         // then
         List<ReviewRequestInbox> actualInboxes = inboxIds.stream()
-                                                         .map(inboxId -> jpaReviewRequestInboxRepository.findDomainById(inboxId).orElseThrow())
+                                                         .map(inboxId -> reviewRequestInboxMybatisMapper.findDomainById(inboxId).orElseThrow())
                                                          .toList();
-        List<ReviewRequestInboxHistory> actualHistories = jpaReviewRequestInboxHistoryRepository.findAllDomains();
+        List<ReviewRequestInboxHistory> actualHistories = reviewRequestInboxHistoryMybatisMapper.findAllDomains();
 
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(100),
@@ -428,11 +545,13 @@ class ReviewRequestInboxRepositoryAdapterTest {
             );
 
             // then
-            ReviewRequestInbox lockedInbox = jpaReviewRequestInboxRepository.findDomainById(saved.getId()).orElseThrow();
+            ReviewRequestInbox lockedInbox = reviewRequestInboxMybatisMapper.findDomainById(saved.getId()).orElseThrow();
             assertAll(
                     () -> assertThat(skippedCount).isZero(),
                     () -> assertThat(lockedInbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
-                    () -> assertThat(jpaReviewRequestInboxHistoryRepository.findAllDomains()).isEmpty()
+                    () -> assertThat(
+                            reviewRequestInboxHistoryMybatisMapper.findDomainsByInboxIdOrderByIdDesc(saved.getId())
+                    ).isEmpty()
             );
 
             releaseLock.countDown();
@@ -473,14 +592,14 @@ class ReviewRequestInboxRepositoryAdapterTest {
             ReviewRequestInboxHistory history
     ) {
         ReviewRequestInbox savedInbox = reviewRequestInboxRepository.save(inbox);
-        ReviewRequestInboxHistoryJpaEntity entity = new ReviewRequestInboxHistoryJpaEntity();
-        entity.apply(history.bindInboxId(savedInbox.getId()));
-        jpaReviewRequestInboxHistoryRepository.save(entity);
+        reviewRequestInboxHistoryMybatisMapper.insert(
+                ReviewRequestInboxHistoryRow.from(history.bindInboxId(savedInbox.getId()))
+        );
         return savedInbox;
     }
 
     private ReviewRequestInbox findByIdempotencyKey(String idempotencyKey) {
-        for (ReviewRequestInbox inbox : jpaReviewRequestInboxRepository.findAllDomains()) {
+        for (ReviewRequestInbox inbox : reviewRequestInboxMybatisMapper.findAllDomains()) {
             if (idempotencyKey.equals(inbox.getIdempotencyKey())) {
                 return inbox;
             }
@@ -490,24 +609,25 @@ class ReviewRequestInboxRepositoryAdapterTest {
     }
 
     private ReviewRequestInboxHistory findLatestHistory(Long inboxId) {
-        ReviewRequestInboxHistory latestHistory = null;
-        LocalDateTime latestCreatedAt = null;
-
-        for (ReviewRequestInboxHistoryJpaEntity historyEntity : jpaReviewRequestInboxHistoryRepository.findAll()) {
-            if (!inboxId.equals(historyEntity.getInboxId())) {
-                continue;
-            }
-            if (latestCreatedAt == null || historyEntity.getCreatedAt().isAfter(latestCreatedAt)) {
-                latestHistory = historyEntity.toDomain();
-                latestCreatedAt = historyEntity.getCreatedAt();
-            }
-        }
-
-        if (latestHistory == null) {
+        List<ReviewRequestInboxHistory> histories =
+                reviewRequestInboxHistoryMybatisMapper.findDomainsByInboxIdOrderByIdDesc(inboxId);
+        if (histories.isEmpty()) {
             throw new IllegalArgumentException("해당 inboxId의 history가 없습니다.");
         }
 
-        return latestHistory;
+        return histories.getFirst();
+    }
+
+    private LocalDateTime findUpdatedAt(Long inboxId) {
+        return namedParameterJdbcTemplate.queryForObject(
+                """
+                SELECT updated_at
+                FROM review_request_inbox
+                WHERE id = :inboxId
+                """,
+                new MapSqlParameterSource().addValue("inboxId", inboxId),
+                LocalDateTime.class
+        );
     }
 
     private void awaitLatch(CountDownLatch latch) {
