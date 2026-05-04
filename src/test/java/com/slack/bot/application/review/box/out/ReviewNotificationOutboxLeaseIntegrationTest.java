@@ -23,9 +23,10 @@ import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxHisto
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxStringField;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutboxStatus;
 import com.slack.bot.infrastructure.review.box.out.repository.ReviewNotificationOutboxRepository;
-import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxHistoryRepository;
+import com.slack.bot.infrastructure.review.persistence.box.out.ReviewNotificationOutboxHistoryMybatisMapper;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -66,7 +67,7 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
     Clock clock;
 
     @Autowired
-    JpaReviewNotificationOutboxHistoryRepository jpaReviewNotificationOutboxHistoryRepository;
+    ReviewNotificationOutboxHistoryMybatisMapper reviewNotificationOutboxHistoryMybatisMapper;
 
     @Autowired
     PollingHintPublisher pollingHintPublisher;
@@ -174,7 +175,7 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
     void review_outbox_timeout_recovery는_배치_크기만큼만_처리한다() {
         // given
         Instant base = Instant.parse("2026-03-24T00:10:00Z");
-        List<Long> outboxIds = new java.util.ArrayList<>();
+        List<Long> outboxIds = new ArrayList<>();
         for (int index = 0; index < 101; index++) {
             ReviewNotificationOutbox outbox = pendingOutbox("review-timeout-batch-" + index);
             setProcessingState(outbox, base.minusSeconds(120L + index), 1);
@@ -191,8 +192,7 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
                                                                          outboxId
                                                                  ).orElseThrow())
                                                                  .toList();
-        List<ReviewNotificationOutboxHistory> actualHistories =
-                jpaReviewNotificationOutboxHistoryRepository.findAllDomains();
+        List<ReviewNotificationOutboxHistory> actualHistories = historiesOfAny(outboxIds);
 
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(100),
@@ -217,7 +217,7 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
     void review_outbox_timeout_recovery는_재시도_가능과_소진건을_합쳐_배치_크기만큼만_처리한다() {
         // given
         Instant base = Instant.parse("2026-03-24T00:20:00Z");
-        List<Long> outboxIds = new java.util.ArrayList<>();
+        List<Long> outboxIds = new ArrayList<>();
         for (int index = 0; index < 50; index++) {
             ReviewNotificationOutbox retryableOutbox = pendingOutbox("review-timeout-mixed-retry-" + index);
             setProcessingState(retryableOutbox, base.minusSeconds(200L + index), 1);
@@ -240,8 +240,7 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
                                                                          outboxId
                                                                  ).orElseThrow())
                                                                  .toList();
-        List<ReviewNotificationOutboxHistory> actualHistories =
-                jpaReviewNotificationOutboxHistoryRepository.findAllDomains();
+        List<ReviewNotificationOutboxHistory> actualHistories = historiesOfAny(outboxIds);
 
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(100),
@@ -305,7 +304,7 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
             assertAll(
                     () -> assertThat(skippedCount).isZero(),
                     () -> assertThat(lockedOutbox.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.PROCESSING),
-                    () -> assertThat(jpaReviewNotificationOutboxHistoryRepository.findAllDomains()).isEmpty()
+                    () -> assertThat(historiesOf(saved.getId())).isEmpty()
             );
 
             releaseLock.countDown();
@@ -327,9 +326,17 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
     }
 
     private List<ReviewNotificationOutboxHistory> historiesOf(Long outboxId) {
-        return jpaReviewNotificationOutboxHistoryRepository.findAllDomains()
+        return reviewNotificationOutboxHistoryMybatisMapper.findAllDomains()
                                                            .stream()
                                                            .filter(history -> outboxId.equals(history.getOutboxId()))
+                                                           .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))
+                                                           .toList();
+    }
+
+    private List<ReviewNotificationOutboxHistory> historiesOfAny(List<Long> outboxIds) {
+        return reviewNotificationOutboxHistoryMybatisMapper.findAllDomains()
+                                                           .stream()
+                                                           .filter(history -> outboxIds.contains(history.getOutboxId()))
                                                            .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))
                                                            .toList();
     }

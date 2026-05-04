@@ -32,7 +32,7 @@ import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxR
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.persistence.box.in.ReviewRequestInboxHistoryMybatisMapper;
 import com.slack.bot.infrastructure.review.persistence.box.in.ReviewRequestInboxMybatisMapper;
-import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxRepository;
+import com.slack.bot.infrastructure.review.persistence.box.out.ReviewNotificationOutboxMybatisMapper;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
@@ -43,6 +43,8 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -64,10 +66,13 @@ class ReviewRequestInboxProcessorTest {
     ReviewRequestInboxMybatisMapper reviewRequestInboxMybatisMapper;
 
     @Autowired
-    JpaReviewNotificationOutboxRepository jpaReviewNotificationOutboxRepository;
+    ReviewNotificationOutboxMybatisMapper reviewNotificationOutboxMybatisMapper;
 
     @Autowired
     ReviewRequestInboxHistoryMybatisMapper reviewRequestInboxHistoryMybatisMapper;
+
+    @Autowired
+    NamedParameterJdbcTemplate namedParameterJdbcTemplate;
 
     @Autowired
     SpyReviewNotificationService spyReviewNotificationService;
@@ -86,6 +91,7 @@ class ReviewRequestInboxProcessorTest {
 
     @BeforeEach
     void setUp() {
+        deleteReviewNotificationOutboxes();
         reviewRequestInboxHistoryMybatisMapper.deleteAll();
         reviewRequestInboxMybatisMapper.deleteAll();
         reset(
@@ -96,6 +102,22 @@ class ReviewRequestInboxProcessorTest {
                 pollingHintPublisher
         );
         spyReviewNotificationService.resetCount();
+    }
+
+    private void deleteReviewNotificationOutboxes() {
+        MapSqlParameterSource parameters = new MapSqlParameterSource();
+        namedParameterJdbcTemplate.update(
+                """
+                DELETE FROM review_notification_outbox_history
+                """,
+                parameters
+        );
+        namedParameterJdbcTemplate.update(
+                """
+                DELETE FROM review_notification_outbox
+                """,
+                parameters
+        );
     }
 
     @Test
@@ -116,7 +138,7 @@ class ReviewRequestInboxProcessorTest {
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
             List<ReviewRequestInbox> inboxes = reviewRequestInboxMybatisMapper.findAllDomains();
-            List<ReviewNotificationOutbox> outboxes = jpaReviewNotificationOutboxRepository.findAllDomains();
+            List<ReviewNotificationOutbox> outboxes = reviewNotificationOutboxMybatisMapper.findAllDomains();
             ReviewRequestInbox inbox = findOnlyInbox();
 
             assertAll(
@@ -152,7 +174,7 @@ class ReviewRequestInboxProcessorTest {
         // then
         await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
             List<ReviewRequestInbox> inboxes = reviewRequestInboxMybatisMapper.findAllDomains();
-            List<ReviewNotificationOutbox> outboxes = jpaReviewNotificationOutboxRepository.findAllDomains();
+            List<ReviewNotificationOutbox> outboxes = reviewNotificationOutboxMybatisMapper.findAllDomains();
             ReviewRequestInbox inbox = findOnlyInbox();
 
             assertAll(
@@ -454,7 +476,7 @@ class ReviewRequestInboxProcessorTest {
                 () -> assertThat(inbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(inbox.getProcessingAttempt()).isEqualTo(1),
                 () -> assertThat(inbox.getFailure().isPresent()).isFalse(),
-                () -> assertThat(jpaReviewNotificationOutboxRepository.findAllDomains()).isEmpty()
+                () -> assertThat(reviewNotificationOutboxMybatisMapper.findAllDomains()).isEmpty()
         );
     }
 
@@ -498,7 +520,7 @@ class ReviewRequestInboxProcessorTest {
                 () -> assertThat(failed.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(failed.getProcessingAttempt()).isEqualTo(2),
                 () -> assertThat(failed.getFailure().isPresent()).isFalse(),
-                () -> assertThat(jpaReviewNotificationOutboxRepository.findAllDomains()).isEmpty()
+                () -> assertThat(reviewNotificationOutboxMybatisMapper.findAllDomains()).isEmpty()
         );
     }
 
@@ -520,7 +542,7 @@ class ReviewRequestInboxProcessorTest {
                 () -> assertThat(spyReviewNotificationService.getSendCount()).isZero(),
                 () -> assertThat(reloaded.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),
                 () -> assertThat(reloaded.getProcessingAttempt()).isEqualTo(1),
-                () -> assertThat(jpaReviewNotificationOutboxRepository.findAllDomains()).isEmpty()
+                () -> assertThat(reviewNotificationOutboxMybatisMapper.findAllDomains()).isEmpty()
         );
     }
 

@@ -25,8 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotificationOutboxRepository {
 
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
-    private final JpaReviewNotificationOutboxRepository repository;
-    private final JpaReviewNotificationOutboxHistoryRepository historyRepository;
+    private final ReviewNotificationOutboxMybatisMapper reviewNotificationOutboxMybatisMapper;
+    private final ReviewNotificationOutboxHistoryMybatisMapper reviewNotificationOutboxHistoryMybatisMapper;
 
     @Override
     public boolean enqueue(ReviewNotificationOutbox outbox) {
@@ -59,9 +59,11 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
     @Override
     @Transactional
     public ReviewNotificationOutbox save(ReviewNotificationOutbox outbox) {
-        ReviewNotificationOutboxJpaEntity entity = findOutboxEntity(outbox);
-        entity.apply(outbox);
-        return repository.save(entity).toDomain();
+        if (!outbox.hasId()) {
+            return insertOutbox(outbox);
+        }
+
+        return updateOutbox(outbox);
     }
 
     @Override
@@ -174,7 +176,7 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
     @Override
     @Transactional(readOnly = true)
     public Optional<ReviewNotificationOutbox> findById(Long outboxId) {
-        return repository.findDomainById(outboxId);
+        return reviewNotificationOutboxMybatisMapper.findDomainById(outboxId);
     }
 
     @Override
@@ -652,19 +654,28 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
         }
     }
 
-    private ReviewNotificationOutboxJpaEntity findOutboxEntity(ReviewNotificationOutbox outbox) {
-        if (!outbox.hasId()) {
-            return new ReviewNotificationOutboxJpaEntity();
+    private ReviewNotificationOutbox insertOutbox(ReviewNotificationOutbox outbox) {
+        ReviewNotificationOutboxRow row = ReviewNotificationOutboxRow.from(outbox);
+        int insertedCount = reviewNotificationOutboxMybatisMapper.insert(row);
+        if (insertedCount == 0 || row.getId() == null) {
+            throw new IllegalStateException("outbox 저장에 실패했습니다.");
         }
 
-        return repository.findById(outbox.getId())
-                .orElseThrow(() -> new IllegalStateException("저장 대상 outbox를 찾을 수 없습니다. id=" + outbox.getId()));
+        return row.toDomain();
+    }
+
+    private ReviewNotificationOutbox updateOutbox(ReviewNotificationOutbox outbox) {
+        ReviewNotificationOutboxRow row = ReviewNotificationOutboxRow.from(outbox);
+        int updatedCount = reviewNotificationOutboxMybatisMapper.update(row);
+        if (updatedCount == 0) {
+            throw new IllegalStateException("저장 대상 outbox를 찾을 수 없습니다. id=" + outbox.getId());
+        }
+
+        return outbox;
     }
 
     private void saveHistory(ReviewNotificationOutboxHistory history) {
-        ReviewNotificationOutboxHistoryJpaEntity entity = new ReviewNotificationOutboxHistoryJpaEntity();
-        entity.apply(history);
-        historyRepository.save(entity);
+        reviewNotificationOutboxHistoryMybatisMapper.insert(ReviewNotificationOutboxHistoryRow.from(history));
     }
 
     private void addProjectId(MapSqlParameterSource parameters, ReviewNotificationOutbox outbox) {

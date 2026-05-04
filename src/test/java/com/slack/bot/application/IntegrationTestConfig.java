@@ -25,8 +25,8 @@ import com.slack.bot.infrastructure.review.persistence.box.in.H2ReviewRequestInb
 import com.slack.bot.infrastructure.review.persistence.box.in.ReviewRequestInboxHistoryMybatisMapper;
 import com.slack.bot.infrastructure.review.persistence.box.in.ReviewRequestInboxMybatisMapper;
 import com.slack.bot.infrastructure.review.persistence.box.out.H2ReviewNotificationOutboxRepositoryAdapter;
-import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxHistoryRepository;
-import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxRepository;
+import com.slack.bot.infrastructure.review.persistence.box.out.ReviewNotificationOutboxHistoryMybatisMapper;
+import com.slack.bot.infrastructure.review.persistence.box.out.ReviewNotificationOutboxMybatisMapper;
 import java.sql.SQLException;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -139,13 +139,13 @@ public class IntegrationTestConfig {
     @Primary
     public ReviewNotificationOutboxRepository reviewNotificationOutboxRepository(
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaReviewNotificationOutboxRepository repository,
-            JpaReviewNotificationOutboxHistoryRepository historyRepository
+            ReviewNotificationOutboxMybatisMapper reviewNotificationOutboxMybatisMapper,
+            ReviewNotificationOutboxHistoryMybatisMapper reviewNotificationOutboxHistoryMybatisMapper
     ) {
         return new H2ReviewNotificationOutboxRepositoryAdapter(
                 namedParameterJdbcTemplate,
-                repository,
-                historyRepository
+                reviewNotificationOutboxMybatisMapper,
+                reviewNotificationOutboxHistoryMybatisMapper
         );
     }
 
