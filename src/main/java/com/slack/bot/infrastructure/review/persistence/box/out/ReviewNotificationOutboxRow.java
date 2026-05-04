@@ -90,7 +90,6 @@ public class ReviewNotificationOutboxRow {
         ReviewNotificationOutboxRowBuilder rowBuilder = ReviewNotificationOutboxRow.builder()
                                                                                    .messageType(outbox.getMessageType())
                                                                                    .idempotencyKey(outbox.getIdempotencyKey())
-                                                                                   .projectId(resolveProjectId(outbox))
                                                                                    .teamId(outbox.getTeamId())
                                                                                    .channelId(outbox.getChannelId())
                                                                                    .payloadJsonState(outbox.getPayloadJson().getState())
@@ -102,12 +101,12 @@ public class ReviewNotificationOutboxRow {
                                                                                    .fallbackTextState(outbox.getFallbackText().getState())
                                                                                    .fallbackText(outbox.getFallbackText().valueOrBlank())
                                                                                    .status(outbox.getStatus())
-                                                                                   .processingAttempt(outbox.getProcessingAttempt())
-                                                                                   .processingStartedAt(resolveProcessingStartedAt(outbox))
-                                                                                   .sentAt(resolveSentAt(outbox))
-                                                                                   .failedAt(resolveFailedAt(outbox))
-                                                                                   .failureReason(resolveFailureReason(outbox))
-                                                                                   .failureType(resolveFailureType(outbox));
+                                                                                   .processingAttempt(outbox.getProcessingAttempt());
+        applyProjectId(rowBuilder, outbox);
+        applyProcessingStartedAt(rowBuilder, outbox);
+        applySentAt(rowBuilder, outbox);
+        applyFailedAt(rowBuilder, outbox);
+        applyFailure(rowBuilder, outbox);
         if (outbox.hasId()) {
             rowBuilder.id(outbox.getId());
         }
@@ -136,52 +135,60 @@ public class ReviewNotificationOutboxRow {
         );
     }
 
-    private static Long resolveProjectId(ReviewNotificationOutbox outbox) {
+    private static void applyProjectId(
+            ReviewNotificationOutboxRowBuilder rowBuilder,
+            ReviewNotificationOutbox outbox
+    ) {
         if (!outbox.getProjectId().isPresent()) {
-            return null;
+            return;
         }
 
-        return outbox.getProjectId().value();
+        rowBuilder.projectId(outbox.getProjectId().value());
     }
 
-    private static Instant resolveProcessingStartedAt(ReviewNotificationOutbox outbox) {
+    private static void applyProcessingStartedAt(
+            ReviewNotificationOutboxRowBuilder rowBuilder,
+            ReviewNotificationOutbox outbox
+    ) {
         if (!outbox.getProcessingLease().isClaimed()) {
-            return null;
+            return;
         }
 
-        return outbox.getProcessingLease().startedAt();
+        rowBuilder.processingStartedAt(outbox.getProcessingLease().startedAt());
     }
 
-    private static Instant resolveSentAt(ReviewNotificationOutbox outbox) {
+    private static void applySentAt(
+            ReviewNotificationOutboxRowBuilder rowBuilder,
+            ReviewNotificationOutbox outbox
+    ) {
         if (!outbox.getSentTime().isPresent()) {
-            return null;
+            return;
         }
 
-        return outbox.getSentTime().occurredAt();
+        rowBuilder.sentAt(outbox.getSentTime().occurredAt());
     }
 
-    private static Instant resolveFailedAt(ReviewNotificationOutbox outbox) {
+    private static void applyFailedAt(
+            ReviewNotificationOutboxRowBuilder rowBuilder,
+            ReviewNotificationOutbox outbox
+    ) {
         if (!outbox.getFailedTime().isPresent()) {
-            return null;
+            return;
         }
 
-        return outbox.getFailedTime().occurredAt();
+        rowBuilder.failedAt(outbox.getFailedTime().occurredAt());
     }
 
-    private static String resolveFailureReason(ReviewNotificationOutbox outbox) {
+    private static void applyFailure(
+            ReviewNotificationOutboxRowBuilder rowBuilder,
+            ReviewNotificationOutbox outbox
+    ) {
         if (!outbox.getFailure().isPresent()) {
-            return null;
+            return;
         }
 
-        return outbox.getFailure().reason();
-    }
-
-    private static SlackInteractionFailureType resolveFailureType(ReviewNotificationOutbox outbox) {
-        if (!outbox.getFailure().isPresent()) {
-            return null;
-        }
-
-        return outbox.getFailure().type();
+        rowBuilder.failureReason(outbox.getFailure().reason());
+        rowBuilder.failureType(outbox.getFailure().type());
     }
 
     private ReviewNotificationOutboxProjectId toProjectId() {

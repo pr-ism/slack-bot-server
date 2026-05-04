@@ -19,7 +19,7 @@ import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.persistence.box.in.ReviewRequestInboxMybatisMapper;
-import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxRepository;
+import com.slack.bot.infrastructure.review.persistence.box.out.ReviewNotificationOutboxMybatisMapper;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -46,7 +46,7 @@ class ReviewRequestInboxEntryProcessorTest {
     ReviewRequestInboxMybatisMapper reviewRequestInboxMybatisMapper;
 
     @Autowired
-    JpaReviewNotificationOutboxRepository jpaReviewNotificationOutboxRepository;
+    ReviewNotificationOutboxMybatisMapper reviewNotificationOutboxMybatisMapper;
 
     @Autowired
     ObjectMapper objectMapper;
@@ -85,7 +85,7 @@ class ReviewRequestInboxEntryProcessorTest {
                 .hasMessageContaining("processing lease");
 
         ReviewRequestInbox actualInbox = reviewRequestInboxMybatisMapper.findDomainById(inbox.getId()).orElseThrow();
-        List<ReviewNotificationOutbox> actualOutboxes = jpaReviewNotificationOutboxRepository.findAllDomains();
+        List<ReviewNotificationOutbox> actualOutboxes = reviewNotificationOutboxMybatisMapper.findAllDomains();
 
         assertAll(
                 () -> assertThat(actualInbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSING),

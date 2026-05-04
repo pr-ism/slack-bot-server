@@ -1,6 +1,7 @@
 package com.slack.bot.infrastructure.review.persistence.box.out;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 import com.slack.bot.application.IntegrationTest;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -40,16 +42,46 @@ class ReviewNotificationOutboxRepositoryAdapterTest {
     ReviewNotificationOutboxRepository reviewNotificationOutboxRepository;
 
     @Autowired
-    JpaReviewNotificationOutboxRepository jpaReviewNotificationOutboxRepository;
+    ReviewNotificationOutboxMybatisMapper reviewNotificationOutboxMybatisMapper;
 
     @Autowired
-    JpaReviewNotificationOutboxHistoryRepository jpaReviewNotificationOutboxHistoryRepository;
+    ReviewNotificationOutboxHistoryMybatisMapper reviewNotificationOutboxHistoryMybatisMapper;
 
     @Autowired
     NamedParameterJdbcTemplate namedParameterJdbcTemplate;
 
     @Autowired
     PlatformTransactionManager transactionManager;
+
+    @Test
+    void save는_할당된_id의_row를_찾지_못하면_예외를_던지고_새_row를_만들지_않는다() {
+        // given
+        ReviewNotificationOutbox missingOutbox = ReviewNotificationOutbox.rehydrate(
+                999_999L,
+                ReviewNotificationOutboxMessageType.SEMANTIC,
+                "review-outbox-missing-id",
+                ReviewNotificationOutboxProjectId.present(1001L),
+                "T1",
+                "C1",
+                ReviewNotificationOutboxStringField.present("{\"payload\":\"hello\"}"),
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStringField.absent(),
+                ReviewNotificationOutboxStatus.PENDING,
+                0,
+                BoxProcessingLease.idle(),
+                BoxEventTime.absent(),
+                BoxEventTime.absent(),
+                BoxFailureSnapshot.absent()
+        );
+
+        // when & then
+        assertThatThrownBy(() -> reviewNotificationOutboxRepository.save(missingOutbox))
+                .isInstanceOf(InvalidDataAccessApiUsageException.class)
+                .hasMessageContaining("저장 대상 outbox를 찾을 수 없습니다. id=999999")
+                .hasRootCauseInstanceOf(IllegalStateException.class);
+        assertThat(reviewNotificationOutboxMybatisMapper.findAllDomains()).isEmpty();
+    }
 
     @Test
     void 완료된_review_outbox와_history를_같이_삭제한다() {
@@ -70,11 +102,11 @@ class ReviewNotificationOutboxRepositoryAdapterTest {
         );
 
         // then
-        List<ReviewNotificationOutboxHistory> histories = jpaReviewNotificationOutboxHistoryRepository.findAllDomains();
+        List<ReviewNotificationOutboxHistory> histories = reviewNotificationOutboxHistoryMybatisMapper.findAllDomains();
         assertAll(
                 () -> assertThat(deletedCount).isEqualTo(1),
-                () -> assertThat(jpaReviewNotificationOutboxRepository.findDomainById(oldSentOutbox.getId())).isEmpty(),
-                () -> assertThat(jpaReviewNotificationOutboxRepository.findDomainById(recentFailedOutbox.getId())).isPresent(),
+                () -> assertThat(reviewNotificationOutboxMybatisMapper.findDomainById(oldSentOutbox.getId())).isEmpty(),
+                () -> assertThat(reviewNotificationOutboxMybatisMapper.findDomainById(recentFailedOutbox.getId())).isPresent(),
                 () -> assertThat(histories)
                         .filteredOn(history -> history.getOutboxId().equals(oldSentOutbox.getId()))
                         .isEmpty(),
@@ -105,8 +137,8 @@ class ReviewNotificationOutboxRepositoryAdapterTest {
         // then
         assertAll(
                 () -> assertThat(deletedCount).isEqualTo(1),
-                () -> assertThat(jpaReviewNotificationOutboxRepository.findDomainById(firstOutbox.getId())).isEmpty(),
-                () -> assertThat(jpaReviewNotificationOutboxRepository.findDomainById(secondOutbox.getId())).isPresent()
+                () -> assertThat(reviewNotificationOutboxMybatisMapper.findDomainById(firstOutbox.getId())).isEmpty(),
+                () -> assertThat(reviewNotificationOutboxMybatisMapper.findDomainById(secondOutbox.getId())).isPresent()
         );
     }
 
@@ -148,10 +180,10 @@ class ReviewNotificationOutboxRepositoryAdapterTest {
             int deletedCount = cleanupFuture.get(1, TimeUnit.SECONDS);
 
             // then
-            List<ReviewNotificationOutboxHistory> histories = jpaReviewNotificationOutboxHistoryRepository.findAllDomains();
+            List<ReviewNotificationOutboxHistory> histories = reviewNotificationOutboxHistoryMybatisMapper.findAllDomains();
             assertAll(
                     () -> assertThat(deletedCount).isZero(),
-                    () -> assertThat(jpaReviewNotificationOutboxRepository.findDomainById(lockedOutbox.getId())).isPresent(),
+                    () -> assertThat(reviewNotificationOutboxMybatisMapper.findDomainById(lockedOutbox.getId())).isPresent(),
                     () -> assertThat(histories)
                             .filteredOn(history -> history.getOutboxId().equals(lockedOutbox.getId()))
                             .hasSize(1)
@@ -244,9 +276,7 @@ class ReviewNotificationOutboxRepositoryAdapterTest {
             ReviewNotificationOutboxHistory history
     ) {
         ReviewNotificationOutbox savedOutbox = reviewNotificationOutboxRepository.save(outbox);
-        ReviewNotificationOutboxHistoryJpaEntity entity = new ReviewNotificationOutboxHistoryJpaEntity();
-        entity.apply(history);
-        jpaReviewNotificationOutboxHistoryRepository.save(entity);
+        reviewNotificationOutboxHistoryMybatisMapper.insert(ReviewNotificationOutboxHistoryRow.from(history));
         return savedOutbox;
     }
 

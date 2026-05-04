@@ -6,10 +6,14 @@ public class H2ReviewNotificationOutboxRepositoryAdapter extends ReviewNotificat
 
     public H2ReviewNotificationOutboxRepositoryAdapter(
             NamedParameterJdbcTemplate namedParameterJdbcTemplate,
-            JpaReviewNotificationOutboxRepository repository,
-            JpaReviewNotificationOutboxHistoryRepository historyRepository
+            ReviewNotificationOutboxMybatisMapper reviewNotificationOutboxMybatisMapper,
+            ReviewNotificationOutboxHistoryMybatisMapper reviewNotificationOutboxHistoryMybatisMapper
     ) {
-        super(namedParameterJdbcTemplate, repository, historyRepository);
+        super(
+                namedParameterJdbcTemplate,
+                reviewNotificationOutboxMybatisMapper,
+                reviewNotificationOutboxHistoryMybatisMapper
+        );
     }
 
     @Override

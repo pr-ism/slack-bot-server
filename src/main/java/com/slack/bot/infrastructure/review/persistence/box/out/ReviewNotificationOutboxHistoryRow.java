@@ -43,9 +43,8 @@ public class ReviewNotificationOutboxHistoryRow {
                                                                                                   .outboxId(history.getOutboxId())
                                                                                                   .processingAttempt(history.getProcessingAttempt())
                                                                                                   .status(history.getStatus())
-                                                                                                  .completedAt(history.getCompletedAt())
-                                                                                                  .failureReason(resolveFailureReason(history))
-                                                                                                  .failureType(resolveFailureType(history));
+                                                                                                  .completedAt(history.getCompletedAt());
+        applyFailure(rowBuilder, history);
         if (history.getHistoryId().isAssigned()) {
             rowBuilder.id(history.getId());
         }
@@ -68,20 +67,16 @@ public class ReviewNotificationOutboxHistoryRow {
         }
     }
 
-    private static String resolveFailureReason(ReviewNotificationOutboxHistory history) {
+    private static void applyFailure(
+            ReviewNotificationOutboxHistoryRowBuilder rowBuilder,
+            ReviewNotificationOutboxHistory history
+    ) {
         if (!history.getFailure().isPresent()) {
-            return null;
+            return;
         }
 
-        return history.getFailure().reason();
-    }
-
-    private static SlackInteractionFailureType resolveFailureType(ReviewNotificationOutboxHistory history) {
-        if (!history.getFailure().isPresent()) {
-            return null;
-        }
-
-        return history.getFailure().type();
+        rowBuilder.failureReason(history.getFailure().reason());
+        rowBuilder.failureType(history.getFailure().type());
     }
 
     private BoxFailureSnapshot<SlackInteractionFailureType> toFailure() {

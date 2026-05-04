@@ -18,7 +18,7 @@ import com.slack.bot.infrastructure.review.box.in.ReviewRequestInboxStatus;
 import com.slack.bot.infrastructure.review.box.in.repository.ReviewRequestInboxRepository;
 import com.slack.bot.infrastructure.review.box.out.ReviewNotificationOutbox;
 import com.slack.bot.infrastructure.review.persistence.box.in.ReviewRequestInboxMybatisMapper;
-import com.slack.bot.infrastructure.review.persistence.box.out.JpaReviewNotificationOutboxRepository;
+import com.slack.bot.infrastructure.review.persistence.box.out.ReviewNotificationOutboxMybatisMapper;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -47,7 +47,7 @@ class ReviewRequestInboxLeaseIntegrationTest {
     ReviewRequestInboxMybatisMapper reviewRequestInboxMybatisMapper;
 
     @Autowired
-    JpaReviewNotificationOutboxRepository jpaReviewNotificationOutboxRepository;
+    ReviewNotificationOutboxMybatisMapper reviewNotificationOutboxMybatisMapper;
 
     @Autowired
     Clock clock;
@@ -96,7 +96,7 @@ class ReviewRequestInboxLeaseIntegrationTest {
 
         // then
         ReviewRequestInbox actualInbox = reviewRequestInboxMybatisMapper.findDomainById(inbox.getId()).orElseThrow();
-        List<ReviewNotificationOutbox> actualOutboxes = jpaReviewNotificationOutboxRepository.findAllDomains();
+        List<ReviewNotificationOutbox> actualOutboxes = reviewNotificationOutboxMybatisMapper.findAllDomains();
 
         assertAll(
                 () -> assertThat(actualInbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
@@ -130,7 +130,7 @@ class ReviewRequestInboxLeaseIntegrationTest {
 
         // then
         ReviewRequestInbox actualInbox = reviewRequestInboxMybatisMapper.findDomainById(inbox.getId()).orElseThrow();
-        List<ReviewNotificationOutbox> actualOutboxes = jpaReviewNotificationOutboxRepository.findAllDomains();
+        List<ReviewNotificationOutbox> actualOutboxes = reviewNotificationOutboxMybatisMapper.findAllDomains();
 
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(1),
