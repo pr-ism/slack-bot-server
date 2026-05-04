@@ -21,6 +21,7 @@ import com.slack.bot.infrastructure.review.persistence.box.in.ReviewRequestInbox
 import com.slack.bot.infrastructure.review.persistence.box.out.ReviewNotificationOutboxMybatisMapper;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -77,7 +78,12 @@ class ReviewRequestInboxLeaseIntegrationTest {
                 base.plusSeconds(71)
         ).when(clock).instant();
 
-        ReviewRequestInbox inbox = savePendingInbox("review-inbox-lease-success", requestJson(request(1101L)));
+        Long githubPullRequestId = 1101L;
+        ReviewRequestInbox inbox = savePendingInbox(
+                "review-inbox-lease-success",
+                githubPullRequestId,
+                requestJson(request(githubPullRequestId))
+        );
 
         doAnswer(invocation -> {
             int recoveredCount = reviewRequestInboxProcessor.recoverTimeoutProcessing(60_000L);
@@ -96,7 +102,7 @@ class ReviewRequestInboxLeaseIntegrationTest {
 
         // then
         ReviewRequestInbox actualInbox = reviewRequestInboxMybatisMapper.findDomainById(inbox.getId()).orElseThrow();
-        List<ReviewNotificationOutbox> actualOutboxes = reviewNotificationOutboxMybatisMapper.findAllDomains();
+        List<ReviewNotificationOutbox> actualOutboxes = findOutboxesByPullRequestId(githubPullRequestId);
 
         assertAll(
                 () -> assertThat(actualInbox.getStatus()).isEqualTo(ReviewRequestInboxStatus.PROCESSED),
@@ -122,7 +128,12 @@ class ReviewRequestInboxLeaseIntegrationTest {
         ).when(clock).instant();
         doReturn(false).when(reviewRequestInboxRepository).renewProcessingLease(any(), any(), any());
 
-        ReviewRequestInbox inbox = savePendingInbox("review-inbox-lease-failure", requestJson(request(1102L)));
+        Long githubPullRequestId = 1102L;
+        ReviewRequestInbox inbox = savePendingInbox(
+                "review-inbox-lease-failure",
+                githubPullRequestId,
+                requestJson(request(githubPullRequestId))
+        );
 
         // when
         reviewRequestInboxProcessor.processPending(1);
@@ -130,7 +141,7 @@ class ReviewRequestInboxLeaseIntegrationTest {
 
         // then
         ReviewRequestInbox actualInbox = reviewRequestInboxMybatisMapper.findDomainById(inbox.getId()).orElseThrow();
-        List<ReviewNotificationOutbox> actualOutboxes = reviewNotificationOutboxMybatisMapper.findAllDomains();
+        List<ReviewNotificationOutbox> actualOutboxes = findOutboxesByPullRequestId(githubPullRequestId);
 
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(1),
@@ -147,15 +158,39 @@ class ReviewRequestInboxLeaseIntegrationTest {
         );
     }
 
-    private ReviewRequestInbox savePendingInbox(String idempotencyKey, String requestJson) {
+    private ReviewRequestInbox savePendingInbox(
+            String idempotencyKey,
+            Long githubPullRequestId,
+            String requestJson
+    ) {
         ReviewRequestInbox inbox = ReviewRequestInbox.pending(
                 idempotencyKey,
                 "test-api-key",
-                1101L,
+                githubPullRequestId,
                 requestJson,
                 Instant.parse("2026-03-23T23:59:00Z")
         );
         return reviewRequestInboxRepository.save(inbox);
+    }
+
+    private List<ReviewNotificationOutbox> findOutboxesByPullRequestId(Long githubPullRequestId) throws Exception {
+        List<ReviewNotificationOutbox> matchedOutboxes = new ArrayList<>();
+        List<ReviewNotificationOutbox> outboxes = reviewNotificationOutboxMybatisMapper.findAllDomains();
+
+        for (ReviewNotificationOutbox outbox : outboxes) {
+            if (!outbox.hasSemanticPayload()) {
+                continue;
+            }
+
+            long actualPullRequestId = objectMapper.readTree(outbox.requiredPayloadJson())
+                                                   .path("githubPullRequestId")
+                                                   .asLong();
+            if (actualPullRequestId == githubPullRequestId) {
+                matchedOutboxes.add(outbox);
+            }
+        }
+
+        return matchedOutboxes;
     }
 
     private ReviewNotificationPayload request(Long githubPullRequestId) {
