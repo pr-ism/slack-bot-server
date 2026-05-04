@@ -656,7 +656,11 @@ public class ReviewNotificationOutboxRepositoryAdapter implements ReviewNotifica
 
     private ReviewNotificationOutbox insertOutbox(ReviewNotificationOutbox outbox) {
         ReviewNotificationOutboxRow row = ReviewNotificationOutboxRow.from(outbox);
-        reviewNotificationOutboxMybatisMapper.insert(row);
+        int insertedCount = reviewNotificationOutboxMybatisMapper.insert(row);
+        if (insertedCount == 0 || row.getId() == null) {
+            throw new IllegalStateException("outbox 저장에 실패했습니다.");
+        }
+
         return row.toDomain();
     }
 
