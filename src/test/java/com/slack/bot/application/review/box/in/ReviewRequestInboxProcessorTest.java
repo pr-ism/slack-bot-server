@@ -43,6 +43,8 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -70,6 +72,9 @@ class ReviewRequestInboxProcessorTest {
     ReviewRequestInboxHistoryMybatisMapper reviewRequestInboxHistoryMybatisMapper;
 
     @Autowired
+    NamedParameterJdbcTemplate namedParameterJdbcTemplate;
+
+    @Autowired
     SpyReviewNotificationService spyReviewNotificationService;
 
     @Autowired
@@ -86,6 +91,7 @@ class ReviewRequestInboxProcessorTest {
 
     @BeforeEach
     void setUp() {
+        deleteReviewNotificationOutboxes();
         reviewRequestInboxHistoryMybatisMapper.deleteAll();
         reviewRequestInboxMybatisMapper.deleteAll();
         reset(
@@ -96,6 +102,22 @@ class ReviewRequestInboxProcessorTest {
                 pollingHintPublisher
         );
         spyReviewNotificationService.resetCount();
+    }
+
+    private void deleteReviewNotificationOutboxes() {
+        MapSqlParameterSource parameters = new MapSqlParameterSource();
+        namedParameterJdbcTemplate.update(
+                """
+                DELETE FROM review_notification_outbox_history
+                """,
+                parameters
+        );
+        namedParameterJdbcTemplate.update(
+                """
+                DELETE FROM review_notification_outbox
+                """,
+                parameters
+        );
     }
 
     @Test
