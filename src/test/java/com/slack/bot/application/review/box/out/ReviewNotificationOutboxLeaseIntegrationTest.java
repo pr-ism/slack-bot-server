@@ -192,8 +192,7 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
                                                                          outboxId
                                                                  ).orElseThrow())
                                                                  .toList();
-        List<ReviewNotificationOutboxHistory> actualHistories =
-                reviewNotificationOutboxHistoryMybatisMapper.findAllDomains();
+        List<ReviewNotificationOutboxHistory> actualHistories = historiesOfAny(outboxIds);
 
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(100),
@@ -241,8 +240,7 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
                                                                          outboxId
                                                                  ).orElseThrow())
                                                                  .toList();
-        List<ReviewNotificationOutboxHistory> actualHistories =
-                reviewNotificationOutboxHistoryMybatisMapper.findAllDomains();
+        List<ReviewNotificationOutboxHistory> actualHistories = historiesOfAny(outboxIds);
 
         assertAll(
                 () -> assertThat(recoveredCount).isEqualTo(100),
@@ -306,7 +304,7 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
             assertAll(
                     () -> assertThat(skippedCount).isZero(),
                     () -> assertThat(lockedOutbox.getStatus()).isEqualTo(ReviewNotificationOutboxStatus.PROCESSING),
-                    () -> assertThat(reviewNotificationOutboxHistoryMybatisMapper.findAllDomains()).isEmpty()
+                    () -> assertThat(historiesOf(saved.getId())).isEmpty()
             );
 
             releaseLock.countDown();
@@ -331,6 +329,14 @@ class ReviewNotificationOutboxLeaseIntegrationTest {
         return reviewNotificationOutboxHistoryMybatisMapper.findAllDomains()
                                                            .stream()
                                                            .filter(history -> outboxId.equals(history.getOutboxId()))
+                                                           .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))
+                                                           .toList();
+    }
+
+    private List<ReviewNotificationOutboxHistory> historiesOfAny(List<Long> outboxIds) {
+        return reviewNotificationOutboxHistoryMybatisMapper.findAllDomains()
+                                                           .stream()
+                                                           .filter(history -> outboxIds.contains(history.getOutboxId()))
                                                            .sorted(Comparator.comparingInt(history -> history.getProcessingAttempt()))
                                                            .toList();
     }
